@@ -1523,32 +1523,54 @@ def page_financeiro():
         ul = _unit_label()
         arroba_mode = _use_arroba()
         st.subheader("💵 Simulador de Venda")
-        st.caption("Projeção de receita e lucro. Em kg, o valor é da arroba do **boi vivo** "
-                   "(peso vivo, sem desconto de carcaça).")
 
-        sc1,sc2=st.columns(2)
-        with sc1:
-            price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
-            default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
-            cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
-                value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
-            # Rendimento de carcaça só faz sentido no modo @
-            if arroba_mode:
-                rendimento=st.slider("Rendimento de Carcaça (%)",min_value=40,max_value=65,value=52)
-            else:
-                rendimento=52  # ignorado no modo kg (peso vivo)
-            incluir_fixos=st.checkbox("Incluir rateio de custos fixos no cálculo",
-                help="Divide os custos fixos do ano igualmente entre os animais ativos")
-        with sc2:
-            sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
-            st.markdown(
-                f'<div class="card">'
-                f'<div style="color:#94a3b8;font-size:.85rem">Cotação atual</div>'
-                f'<div style="font-size:2rem;font-weight:800;color:#4ade80">R$ {cotacao:.2f}/{ul}</div>'
-                f'<div style="color:#94a3b8;font-size:.85rem;margin-top:.5rem">{sub}</div>'
-                f'</div>', unsafe_allow_html=True)
+        precos_cat = db.get_category_prices()
+        base = st.radio("Base de preço",
+            ["categoria","manual"],
+            format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
+                                  else "✏️ Preço único manual",
+            horizontal=True, key="sim_base")
 
-        # Rateio de custos fixos (ano corrente) por animal ativo
+        cotacao = 0.0
+        rendimento = 52
+        ajuste_pct = 0
+        if base == "manual":
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
+                default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
+                cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
+                    value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
+                if arroba_mode:
+                    rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
+            with sc2:
+                sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
+                st.markdown(
+                    f'<div class="card"><div style="color:#94a3b8;font-size:.85rem">Cotação única</div>'
+                    f'<div style="font-size:2rem;font-weight:800;color:#4ade80">R$ {cotacao:.2f}/{ul}</div>'
+                    f'<div style="color:#94a3b8;font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
+                    unsafe_allow_html=True)
+        else:  # categoria
+            st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
+                       "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
+            if not precos_cat or all(v <= 0 for v in precos_cat.values()):
+                st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
+                           "e informe os valores por kg de cada categoria.")
+            ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
+                help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
+            # Mostra os preços em uso
+            linhas = []
+            for band in db.AGE_BANDS:
+                for sex in ("M","F"):
+                    p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
+                    if p > 0:
+                        linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {p:.2f}/kg")
+            if linhas:
+                st.caption("Preços aplicados: " + "  |  ".join(linhas))
+
+        incluir_fixos=st.checkbox("Incluir rateio de custos fixos no cálculo",
+            help="Divide os custos fixos do ano igualmente entre os animais ativos")
+
         rateio_fixo = 0.0
         if incluir_fixos and animals:
             total_fix_ano = db.get_total_fixed_costs(
@@ -1558,17 +1580,34 @@ def page_financeiro():
                     f"(total R$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
 
         sim_rows=[]
+        sem_preco=[]
         for a in animals:
-            tc     = db.get_total_cost(a["id"]) + rateio_fixo
-            # Modo kg: peso vivo direto. Modo @: aplica rendimento de carcaça.
-            prod   = _live_weight(a["current_weight"], rendimento/100)
-            receita= round(prod * cotacao, 2)
-            lucro  = round(receita - tc, 2)
-            sim_rows.append({"ID":a["id"],"Peso (kg)":a["current_weight"],
-                f"Venda ({ul})":prod,"Receita (R$)":receita,
-                "Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
+            tc  = db.get_total_cost(a["id"]) + rateio_fixo
+            band = db.get_age_category(a.get("birth_date"))
+            if base == "categoria":
+                price_kg = precos_cat.get((band, a["sex"]), 0.0) * (1+ajuste_pct/100)
+                receita  = round(a["current_weight"] * price_kg, 2)
+                preco_aplicado = round(price_kg, 2)
+                if price_kg <= 0: sem_preco.append(a["id"])
+            else:
+                prod    = _live_weight(a["current_weight"], rendimento/100)
+                receita = round(prod * cotacao, 2)
+                preco_aplicado = round(cotacao, 2)
+            prod_disp = _live_weight(a["current_weight"], rendimento/100)
+            lucro = round(receita - tc, 2)
+            sim_rows.append({"ID":a["id"],"Categoria":band,
+                "Peso (kg)":a["current_weight"], f"Venda ({ul})":prod_disp,
+                "Preço (R$/kg)":preco_aplicado if base=="categoria" else None,
+                "Receita (R$)":receita,"Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
                 "Margem (%)":round(lucro/receita*100,1) if receita else 0})
         df_sim=pd.DataFrame(sim_rows)
+        if base != "categoria":
+            df_sim = df_sim.drop(columns=["Preço (R$/kg)"])
+
+        if sem_preco:
+            st.warning(f"⚠️ Sem preço de categoria (receita R$ 0): **{', '.join(sem_preco)}**. "
+                       f"Defina os valores em **Preços/Categoria**.")
+
         tot_rec=df_sim["Receita (R$)"].sum(); tot_luc=df_sim["Lucro (R$)"].sum()
         tot_cost=df_sim["Custo Total (R$)"].sum()
         margem_media=df_sim["Margem (%)"].mean()
@@ -1576,24 +1615,24 @@ def page_financeiro():
         sk=st.columns(4)
         sk[0].metric("Receita Total", f"R$ {tot_rec:,.2f}")
         sk[1].metric("Custo Total",   f"R$ {tot_cost:,.2f}")
-        # Delta com sinal explícito: '+' fica verde/↑, '-' fica vermelho/↓
         sk[2].metric("Lucro / Prejuízo Total", f"R$ {tot_luc:,.2f}",
             delta=f"{tot_luc:+,.2f}", delta_color="normal")
         sk[3].metric("Margem Média", f"{margem_media:.1f}%",
             delta=f"{margem_media:+.1f}%", delta_color="normal")
 
         if tot_luc < 0:
-            st.error(f"⚠️ Projeção de **PREJUÍZO** de R$ {abs(tot_luc):,.2f} nesta cotação. "
-                     f"Reveja a cotação, os custos ou o ponto de venda.")
+            st.error(f"⚠️ Projeção de **PREJUÍZO** de R$ {abs(tot_luc):,.2f}. "
+                     f"Reveja os preços, os custos ou o ponto de venda.")
 
         fmt_prod = "%.2f" if arroba_mode else "%.1f"
-        st.dataframe(df_sim,use_container_width=True,hide_index=True,
-            column_config={
-                "Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                f"Venda ({ul})":st.column_config.NumberColumn(format=fmt_prod),
-                "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+        cfg = {"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+               f"Venda ({ul})":st.column_config.NumberColumn(format=fmt_prod),
+               "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+               "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+               "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f")}
+        if base == "categoria":
+            cfg["Preço (R$/kg)"]=st.column_config.NumberColumn(format="R$ %.2f")
+        st.dataframe(df_sim,use_container_width=True,hide_index=True,column_config=cfg)
 
     with ft3:  # BREAKEVEN
         ul = _unit_label()
