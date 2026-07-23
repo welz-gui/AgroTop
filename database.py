@@ -1497,16 +1497,17 @@ def get_sales(start_date: Optional[str] = None,
 
 def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
     """Custo dos insumos consumidos (saída) por motivo, usando o custo unitário atual."""
+    placeholders = ",".join("?" for _ in reasons)
     sql = ("SELECT COALESCE(SUM(t.quantity * i.cost_per_unit),0) AS total "
            "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
-           "WHERE t.type='saida' AND t.reason IN (%s)" % ",".join("?"*len(reasons)))
+           f"WHERE t.type='saida' AND t.reason IN ({placeholders})")
     args = list(reasons)
     if start:
         sql += " AND t.transaction_date >= ?"; args.append(start)
     if end:
         sql += " AND t.transaction_date <= ?"; args.append(end)
     row = con.execute(sql, args).fetchone()
-    return round(float(row["total"] or 0), 2)
+    return round(float((row["total"] if row else 0) or 0), 2)
 
 
 def get_financial_summary(start_date: Optional[str] = None,
@@ -1518,19 +1519,20 @@ def get_financial_summary(start_date: Optional[str] = None,
         if end_date:   s += f" AND {col} <= ?"; a.append(end_date)
         return s, a
 
+    def _scalar(con, sql, args):
+        row = con.execute(sql, args).fetchone()
+        return float((row["t"] if row else 0) or 0)
+
     with _conn() as con:
         # Saídas
         ps, pa = _period("cost_date")
-        compra = con.execute(
-            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='compra'"+ps, pa
-        ).fetchone()["t"]
-        operacional = con.execute(
-            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='operacional'"+ps, pa
-        ).fetchone()["t"]
+        compra = _scalar(con,
+            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='compra'"+ps, pa)
+        operacional = _scalar(con,
+            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='operacional'"+ps, pa)
         fs, fa = _period("cost_date")
-        fixos = con.execute(
-            "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE 1=1"+fs, fa
-        ).fetchone()["t"]
+        fixos = _scalar(con,
+            "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE 1=1"+fs, fa)
         medicamentos = _insumo_cost_by_reason(con, ("uso_animal",), start_date, end_date)
         nutricao     = _insumo_cost_by_reason(con, ("trato_lote",), start_date, end_date)
         # Entradas
