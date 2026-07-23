@@ -267,6 +267,22 @@ def _pdf_safe(text) -> str:
     return s.encode("latin-1", "replace").decode("latin-1")
 
 
+def _backup_xlsx() -> bytes:
+    """Exporta TODAS as tabelas para um único Excel (uma aba por tabela)."""
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for t in db.ADMIN_TABLES:
+            try:
+                rows = db.admin_get_rows(t)
+                df = pd.DataFrame(rows) if rows else pd.DataFrame({"(vazio)": []})
+                df = df.where(pd.notna(df), "")
+                df.to_excel(writer, index=False, sheet_name=t[:31])
+            except Exception:
+                pd.DataFrame({"erro": [f"falha ao ler {t}"]}).to_excel(
+                    writer, index=False, sheet_name=t[:31])
+    return buf.getvalue()
+
+
 def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
     try:
         from fpdf import FPDF
@@ -1201,12 +1217,184 @@ def page_lotes():
 # ══════════════════════════════════════════════════════════════════════════════
 # FINANCEIRO
 # ══════════════════════════════════════════════════════════════════════════════
+def _fin_precos():
+    """Tabela de valor esperado de venda por categoria (R$/kg)."""
+    st.subheader("🏷️ Valor Esperado por Categoria (R$/kg)")
+    st.caption("Informe quanto você espera receber por kg em cada categoria (idade × sexo). "
+               "Serve de referência e preenche automaticamente a venda por kg.")
+    precos = db.get_category_prices()
+    with st.form("f_precos"):
+        st.markdown("**Preço esperado por kg (R$)**")
+        novos = {}
+        for band in db.AGE_BANDS:
+            c1, c2, c3 = st.columns([2,1,1])
+            with c1:
+                st.markdown(f"<div style='padding-top:.55rem'>{band}</div>", unsafe_allow_html=True)
+            with c2:
+                novos[(band,"M")] = st.number_input(f"♂ Macho", min_value=0.0, step=0.10,
+                    value=float(precos.get((band,"M"),0.0)), key=f"pk_{band}_M", format="%.2f")
+            with c3:
+                novos[(band,"F")] = st.number_input(f"♀ Fêmea", min_value=0.0, step=0.10,
+                    value=float(precos.get((band,"F"),0.0)), key=f"pk_{band}_F", format="%.2f")
+        if st.form_submit_button("💾 Salvar Preços", type="primary", use_container_width=True):
+            for (band,sex), val in novos.items():
+                if val != precos.get((band,sex), 0.0):
+                    db.set_category_price(band, sex, val)
+            st.success("✅ Preços por categoria atualizados!")
+            st.rerun()
+
+
+def _fin_venda(animals):
+    """Registro de venda (por kg / cabeça / lote), com lucro real."""
+    st.subheader("💵 Registrar Venda")
+    if not animals:
+        st.info("Não há animais ativos para vender.");
+    else:
+        modo = st.radio("Modo de precificação", list(db.PRICING_MODES.keys()),
+            format_func=lambda m: db.PRICING_MODES[m], horizontal=True, key="venda_modo")
+        tipo = st.radio("Tipo de venda", list(db.SALE_TYPES.keys()),
+            format_func=lambda t: db.SALE_TYPES[t], horizontal=True, key="venda_tipo")
+
+        # Seleção de animais
+        opts = {f"{a['id']} · {a['breed']} · {a['current_weight']:.0f}kg · {db.get_age_category(a.get('birth_date'))}": a['id']
+                for a in animals}
+        multi = modo in ("lote",) or True   # sempre permite múltiplos
+        sel = st.multiselect("Animais a vender", list(opts.keys()),
+            help="Selecione um ou mais animais")
+        sel_ids = [opts[s] for s in sel]
+        sel_animals = [a for a in animals if a["id"] in sel_ids]
+        peso_total = sum(a["current_weight"] for a in sel_animals)
+
+        with st.form("f_venda", clear_on_submit=True):
+            if modo == "kg":
+                # sugere preço da categoria do 1º animal
+                sug = 0.0
+                if sel_animals:
+                    sug = db.get_expected_price_kg(
+                        db.get_age_category(sel_animals[0].get("birth_date")), sel_animals[0]["sex"])
+                valor = st.number_input("Preço por kg (R$)", min_value=0.0, step=0.10,
+                    value=float(sug), format="%.2f",
+                    help="Sugerido pela tabela de categoria; ajuste se necessário")
+                if peso_total:
+                    st.caption(f"Peso total selecionado: **{peso_total:.0f} kg** → "
+                               f"receita estimada: **R$ {peso_total*valor:,.2f}**")
+            elif modo == "cabeca":
+                valor = st.number_input("Valor por cabeça (R$)", min_value=0.0, step=50.0, format="%.2f",
+                    help="Mesmo valor para cada animal selecionado")
+                if sel_animals:
+                    st.caption(f"{len(sel_animals)} animais → receita: **R$ {valor*len(sel_animals):,.2f}**")
+            else:  # lote
+                valor = st.number_input("Valor TOTAL do lote (R$)", min_value=0.0, step=100.0, format="%.2f",
+                    help="Valor fechado do grupo; será rateado proporcionalmente ao peso")
+                if peso_total:
+                    st.caption(f"{len(sel_animals)} animais, {peso_total:.0f} kg → "
+                               "rateio proporcional ao peso")
+            c1, c2 = st.columns(2)
+            with c1: sale_date = st.date_input("Data da venda", value=date.today())
+            with c2: buyer = st.text_input("Comprador", placeholder="Ex: Frigorífico / Fazenda X")
+            notes = st.text_input("Observações", placeholder="Opcional")
+
+            if st.form_submit_button("✅ Confirmar Venda", type="primary", use_container_width=True):
+                if not sel_ids:
+                    st.error("Selecione ao menos um animal.")
+                elif valor <= 0:
+                    st.error("Informe um valor maior que zero.")
+                else:
+                    r = db.register_sale(sel_ids, sale_date.strftime("%Y-%m-%d"), tipo, modo,
+                        valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes)
+                    cor = "#4ade80" if r["lucro"] >= 0 else "#f87171"
+                    st.success(f"✅ {r['n']} animal(is) vendido(s)!")
+                    st.markdown(
+                        f"<div class='card'>Receita: <b>R$ {r['receita']:,.2f}</b> · "
+                        f"Custo: <b>R$ {r['custo']:,.2f}</b> · "
+                        f"<b style='color:{cor}'>{'Lucro' if r['lucro']>=0 else 'Prejuízo'}: "
+                        f"R$ {r['lucro']:,.2f}</b></div>", unsafe_allow_html=True)
+                    st.rerun()
+
+    # Histórico de vendas
+    st.markdown("---")
+    st.markdown("**📜 Vendas Registradas**")
+    vendas = db.get_sales()
+    if vendas:
+        df_v = pd.DataFrame(vendas)[["sale_date","animal_id","breed","sale_type","pricing_mode",
+                                     "weight_kg","total_value","cost_at_sale","profit","buyer"]].copy()
+        df_v["sale_type"]=df_v["sale_type"].map(lambda t: db.SALE_TYPES.get(t,t))
+        df_v["pricing_mode"]=df_v["pricing_mode"].map(lambda m: {"kg":"kg","cabeca":"cabeça","lote":"lote"}.get(m,m))
+        df_v.columns=["Data","Animal","Raça","Tipo","Modo","Peso (kg)","Receita (R$)","Custo (R$)","Lucro (R$)","Comprador"]
+        st.dataframe(df_v, use_container_width=True, hide_index=True,
+            column_config={c: st.column_config.NumberColumn(format="R$ %.2f")
+                           for c in ["Receita (R$)","Custo (R$)","Lucro (R$)"]})
+        tot_luc = sum(v["profit"] for v in vendas)
+        st.metric("Lucro/Prejuízo acumulado nas vendas", f"R$ {tot_luc:,.2f}")
+    else:
+        st.info("Nenhuma venda registrada ainda.")
+
+
+def _fin_resultado():
+    """Planilha financeira consolidada (todas as entradas e saídas)."""
+    st.subheader("📒 Resultado Consolidado")
+    c1, c2 = st.columns(2)
+    with c1: start = st.date_input("De", value=date(date.today().year,1,1), key="res_start")
+    with c2: end = st.date_input("Até", value=date.today(), key="res_end")
+    fin = db.get_financial_summary(start.isoformat(), end.isoformat())
+
+    st.markdown("**💸 Saídas (custos)**")
+    s = st.columns(5)
+    s[0].metric("Compra de animais", f"R$ {fin['compra_animais']:,.0f}")
+    s[1].metric("Medicamentos",      f"R$ {fin['medicamentos']:,.0f}")
+    s[2].metric("Nutrição/Trato",    f"R$ {fin['nutricao']:,.0f}")
+    s[3].metric("Operacional",       f"R$ {fin['operacional']:,.0f}")
+    s[4].metric("Custos fixos",      f"R$ {fin['custos_fixos']:,.0f}")
+
+    st.markdown("**💰 Entradas (vendas)**")
+    vendas = fin["vendas"]
+    e = st.columns(3)
+    abate = vendas.get("abate", {"receita":0,"lucro":0,"n":0})
+    criacao = vendas.get("criacao", {"receita":0,"lucro":0,"n":0})
+    e[0].metric("Vendas p/ abate",   f"R$ {abate['receita']:,.0f}", help=f"{abate['n']} animais")
+    e[1].metric("Vendas p/ criação", f"R$ {criacao['receita']:,.0f}", help=f"{criacao['n']} animais")
+    e[2].metric("Receita total",     f"R$ {fin['receita_total']:,.0f}")
+
+    st.markdown("---")
+    res = fin["resultado"]
+    cor = "#4ade80" if res >= 0 else "#f87171"
+    rk = st.columns(3)
+    rk[0].metric("Total de Saídas",  f"R$ {fin['saidas_total']:,.2f}")
+    rk[1].metric("Total de Entradas",f"R$ {fin['receita_total']:,.2f}")
+    rk[2].metric("Resultado (Caixa)", f"R$ {res:,.2f}",
+                 delta=f"{res:+,.2f}", delta_color="normal")
+    st.caption("ℹ️ 'Resultado (Caixa)' é o fluxo do período: tudo que saiu (incluindo a compra de "
+               "animais que ainda estão no pasto) menos tudo que entrou. O lucro *realizado* por "
+               "venda aparece na aba **Registrar Venda**.")
+
+    # Gráfico saídas x entradas
+    df_fluxo = pd.DataFrame({
+        "Categoria": ["Compra","Medicamentos","Nutrição","Operacional","Fixos","Vendas"],
+        "Valor": [fin['compra_animais'],fin['medicamentos'],fin['nutricao'],
+                  fin['operacional'],fin['custos_fixos'],fin['receita_total']],
+        "Tipo": ["Saída"]*5+["Entrada"]})
+    fig=px.bar(df_fluxo,x="Categoria",y="Valor",color="Tipo",
+        color_discrete_map={"Saída":"#f87171","Entrada":"#4ade80"})
+    fig.update_layout(**PLOTLY,height=300,xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+    st.plotly_chart(fig,use_container_width=True)
+
+
 def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
-    if not animals: st.info("Sem animais ativos."); return
 
-    ft1,ft_fix,ft2,ft3,ft4=st.tabs(["📊 Custos por Animal","🏢 Custos Fixos","💵 Simulador de Venda","⚖️ Ponto de Equilíbrio","🏆 Desempenho por Origem"])
+    (t_res,t_ven,t_pre,ft1,ft_fix,ft2,ft3,ft4)=st.tabs(
+        ["📒 Resultado","💵 Registrar Venda","🏷️ Preços/Categoria",
+         "📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem"])
+
+    with t_res: _fin_resultado()
+    with t_ven: _fin_venda(animals)
+    with t_pre: _fin_precos()
+
+    if not animals:
+        for t in (ft1,ft_fix,ft2,ft3,ft4):
+            with t: st.info("Sem animais ativos para esta análise.")
+        return
 
     with ft1:  # CUSTOS
         ul   = _unit_label()
@@ -1830,10 +2018,20 @@ def page_cadastrar():
         with cf1:
             # Valor de compra só para animais adquiridos (não nascidos na propriedade)
             if not is_propriedade:
-                purchase_price=st.number_input("💰 Valor de Compra (R$)",
-                    min_value=0.0,step=10.0,format="%.2f")
+                compra_modo = st.selectbox("💰 Como foi a compra?",
+                    ["cabeca","kg"],
+                    format_func=lambda m: "Por cabeça (valor fechado)" if m=="cabeca" else "Por kg (peso × preço/kg)")
+                if compra_modo == "kg":
+                    preco_kg_compra = st.number_input("Preço por kg (R$)",
+                        min_value=0.0, step=0.10, format="%.2f")
+                    purchase_price = round(entry_weight * preco_kg_compra, 2)
+                    st.caption(f"→ Total: **R$ {purchase_price:,.2f}** ({entry_weight:.0f} kg × R$ {preco_kg_compra:.2f})")
+                else:
+                    purchase_price=st.number_input("Valor de Compra (R$)",
+                        min_value=0.0,step=10.0,format="%.2f")
             else:
                 purchase_price=0.0
+                compra_modo="propriedade"
                 st.caption("💰 Valor de compra não se aplica a animais nascidos na propriedade.")
             lote_sel=st.selectbox("🌿 Lote de Destino",
                 [None]+lotes,format_func=lambda x:"— Sem lote —" if x is None else f"{x['id']} — {x['name']}")
@@ -1878,6 +2076,7 @@ def page_cadastrar():
                     nf_number=nf_number,
                     gta_number=gta_number,
                     weight_method=peso_metodo,
+                    purchase_mode=compra_modo,
                 )
                 cat = db.get_age_category(birth_date_str)
                 st.success(f"✅ Animal **{aid}** cadastrado! Categoria: **{cat}** · "
@@ -2189,6 +2388,19 @@ def page_admin():
             st.markdown("**Banco de Dados:** SQLite local `agrotop.db` — funciona offline")
             if os.path.exists(db.DB_PATH):
                 st.metric("Tamanho",f"{os.path.getsize(db.DB_PATH)/1024:.1f} KB")
+
+        st.markdown("---")
+        st.subheader("💾 Backup dos Dados")
+        st.caption("Baixe uma cópia completa de todos os dados em Excel (uma aba por tabela). "
+                   "Guarde em local seguro (pen drive, nuvem). O Supabase também mantém "
+                   "backups automáticos diários no servidor.")
+        if st.button("📥 Gerar backup completo (Excel)", type="primary"):
+            data = _backup_xlsx()
+            st.download_button(
+                "⬇️ Baixar backup agora", data,
+                f"agrotop_backup_{date.today().isoformat()}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ROTEADOR

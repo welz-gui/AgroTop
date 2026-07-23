@@ -356,6 +356,37 @@ def init_db() -> None:
                 FOREIGN KEY (plan_id) REFERENCES feeding_plans(id),
                 FOREIGN KEY (lote_id) REFERENCES lotes(id)
             );
+
+            -- Preços esperados por categoria (idade x sexo) — apenas por kg
+            CREATE TABLE IF NOT EXISTS category_prices (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                age_band       TEXT NOT NULL,
+                sex            TEXT NOT NULL,
+                price_per_kg   REAL DEFAULT 0,
+                price_per_head REAL DEFAULT 0,
+                updated_at     TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE (age_band, sex)
+            );
+
+            -- Vendas (1 linha por animal; lote agrupado por lot_ref)
+            CREATE TABLE IF NOT EXISTS sales (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_id    TEXT NOT NULL,
+                sale_date    TEXT NOT NULL,
+                sale_type    TEXT NOT NULL DEFAULT 'abate',
+                pricing_mode TEXT NOT NULL DEFAULT 'kg',
+                weight_kg    REAL,
+                price_per_kg REAL,
+                total_value  REAL NOT NULL DEFAULT 0,
+                buyer        TEXT,
+                lot_ref      TEXT,
+                cost_at_sale REAL DEFAULT 0,
+                profit       REAL DEFAULT 0,
+                operator     TEXT,
+                notes        TEXT,
+                created_at   TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (animal_id) REFERENCES animals(id)
+            );
         """)
         _migrate(con)
         _seed_users(con)
@@ -379,6 +410,10 @@ def _migrate(con) -> None:
         con.execute("ALTER TABLE animals ADD COLUMN nf_number TEXT")
     if "gta_number" not in cols:
         con.execute("ALTER TABLE animals ADD COLUMN gta_number TEXT")
+    if "purchase_mode" not in cols:
+        con.execute("ALTER TABLE animals ADD COLUMN purchase_mode TEXT DEFAULT 'cabeca'")
+    if "purchase_lot_ref" not in cols:
+        con.execute("ALTER TABLE animals ADD COLUMN purchase_lot_ref TEXT")
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")
@@ -822,19 +857,20 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                entry_weight, target_weight, purchase_price,
                lote_id, fornecedor_id, notes="",
                birth_estimated=0, age_source="propriedade",
-               nf_number="", gta_number="", weight_method="pesado") -> None:
+               nf_number="", gta_number="", weight_method="pesado",
+               purchase_mode="cabeca") -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO animals
                (id,breed,sex,birth_date,birth_estimated,age_source,nf_number,
                 gta_number,entry_date,entry_weight,current_weight,target_weight,
-                purchase_price,lote_id,fornecedor_id,notes)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                purchase_price,purchase_mode,lote_id,fornecedor_id,notes)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (animal_id, breed, sex, birth_date or None,
              int(birth_estimated), age_source,
              nf_number or None, gta_number or None, entry_date,
              entry_weight, entry_weight, target_weight, purchase_price,
-             lote_id or None, fornecedor_id or None, notes),
+             purchase_mode, lote_id or None, fornecedor_id or None, notes),
         )
         con.execute(
             "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
@@ -1341,12 +1377,193 @@ def get_pending_feedings(ref_date: Optional[date] = None) -> list[dict]:
             result.append({**p, "done_this_period": done, "last_check": last_date})
     return result
 
+# ─── Preços por Categoria (valor esperado por kg) ────────────────────────────
+
+SALE_TYPES = {"abate": "Abate (frigorífico)", "criacao": "Criação (reprodução/recria)"}
+PRICING_MODES = {"kg": "Por kg (peso × preço)",
+                 "cabeca": "Por cabeça (valor fechado)",
+                 "lote": "Por lote fechado (valor único do grupo)"}
+
+
+def get_category_prices() -> dict:
+    """Retorna {(age_band, sex): price_per_kg} para consulta rápida."""
+    with _conn() as con:
+        rows = con.execute("SELECT age_band, sex, price_per_kg FROM category_prices").fetchall()
+    return {(r["age_band"], r["sex"]): r["price_per_kg"] for r in rows}
+
+
+def get_category_prices_list() -> list[dict]:
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT * FROM category_prices ORDER BY age_band, sex"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@_writes
+def set_category_price(age_band: str, sex: str, price_per_kg: float) -> None:
+    """Insere/atualiza o valor esperado por kg de uma categoria."""
+    today = date.today().isoformat()
+    with _conn() as con:
+        if USE_PG:
+            con.execute(
+                "INSERT INTO category_prices (age_band,sex,price_per_kg,updated_at) VALUES(?,?,?,?) "
+                "ON CONFLICT (age_band,sex) DO UPDATE SET price_per_kg=EXCLUDED.price_per_kg, updated_at=EXCLUDED.updated_at",
+                (age_band, sex, price_per_kg, today),
+            )
+        else:
+            con.execute(
+                "INSERT OR REPLACE INTO category_prices (age_band,sex,price_per_kg,updated_at) VALUES(?,?,?,?)",
+                (age_band, sex, price_per_kg, today),
+            )
+
+
+def get_expected_price_kg(age_band: str, sex: str) -> float:
+    return get_category_prices().get((age_band, sex), 0.0)
+
+
+def expected_sale_value(animal: dict) -> float:
+    """Valor esperado de venda do animal = peso atual × preço/kg da categoria."""
+    band = get_age_category(animal.get("birth_date"))
+    price = get_expected_price_kg(band, animal["sex"])
+    return round(animal["current_weight"] * price, 2)
+
+# ─── Vendas ──────────────────────────────────────────────────────────────────
+
+@_writes
+def register_sale(animal_ids: list, sale_date: str, sale_type: str,
+                  pricing_mode: str, value: float, buyer: str = "",
+                  operator: str = "", notes: str = "") -> dict:
+    """Registra a venda de um ou mais animais.
+    - pricing_mode='kg':     `value` é o preço por kg (cada animal: peso × preço).
+    - pricing_mode='cabeca': `value` é o valor por cabeça (igual para cada animal).
+    - pricing_mode='lote':   `value` é o valor TOTAL do lote, rateado pelo peso.
+    Retorna {'receita':..., 'custo':..., 'lucro':..., 'n':...}."""
+    animais = [get_animal(a) for a in animal_ids]
+    animais = [a for a in animais if a]
+    if not animais:
+        return {"receita": 0, "custo": 0, "lucro": 0, "n": 0}
+
+    peso_total = sum(a["current_weight"] for a in animais) or 1
+    lot_ref = f"V{sale_date.replace('-','')}-{int(datetime.now().timestamp())%100000}" \
+              if (pricing_mode == "lote" or len(animais) > 1) else None
+
+    tot_receita = tot_custo = 0.0
+    with _conn() as con:
+        for a in animais:
+            if pricing_mode == "kg":
+                ppk = value
+                val = round(a["current_weight"] * value, 2)
+            elif pricing_mode == "cabeca":
+                ppk = None
+                val = round(value, 2)
+            else:  # lote: rateio proporcional ao peso
+                ppk = None
+                val = round(value * a["current_weight"] / peso_total, 2)
+
+            custo = get_total_cost(a["id"])
+            lucro = round(val - custo, 2)
+            tot_receita += val
+            tot_custo += custo
+
+            con.execute(
+                """INSERT INTO sales
+                   (animal_id,sale_date,sale_type,pricing_mode,weight_kg,price_per_kg,
+                    total_value,buyer,lot_ref,cost_at_sale,profit,operator,notes)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (a["id"], sale_date, sale_type, pricing_mode, a["current_weight"], ppk,
+                 val, buyer or None, lot_ref, custo, lucro, operator, notes),
+            )
+            con.execute("UPDATE animals SET status='vendido' WHERE id=?", (a["id"],))
+    return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
+            "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
+            "lot_ref": lot_ref}
+
+
+def get_sales(start_date: Optional[str] = None,
+              end_date: Optional[str] = None) -> list[dict]:
+    sql = ("SELECT s.*, a.breed, a.sex FROM sales s "
+           "LEFT JOIN animals a ON a.id=s.animal_id WHERE 1=1")
+    args: list = []
+    if start_date:
+        sql += " AND s.sale_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND s.sale_date <= ?"; args.append(end_date)
+    sql += " ORDER BY s.sale_date DESC, s.id DESC"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+# ─── Resumo Financeiro Consolidado ───────────────────────────────────────────
+
+def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
+    """Custo dos insumos consumidos (saída) por motivo, usando o custo unitário atual."""
+    sql = ("SELECT COALESCE(SUM(t.quantity * i.cost_per_unit),0) AS total "
+           "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
+           "WHERE t.type='saida' AND t.reason IN (%s)" % ",".join("?"*len(reasons)))
+    args = list(reasons)
+    if start:
+        sql += " AND t.transaction_date >= ?"; args.append(start)
+    if end:
+        sql += " AND t.transaction_date <= ?"; args.append(end)
+    row = con.execute(sql, args).fetchone()
+    return round(float(row["total"] or 0), 2)
+
+
+def get_financial_summary(start_date: Optional[str] = None,
+                          end_date: Optional[str] = None) -> dict:
+    """Planilha financeira consolidada do período (todas as saídas e entradas)."""
+    def _period(col):
+        s, a = "", []
+        if start_date: s += f" AND {col} >= ?"; a.append(start_date)
+        if end_date:   s += f" AND {col} <= ?"; a.append(end_date)
+        return s, a
+
+    with _conn() as con:
+        # Saídas
+        ps, pa = _period("cost_date")
+        compra = con.execute(
+            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='compra'"+ps, pa
+        ).fetchone()["t"]
+        operacional = con.execute(
+            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='operacional'"+ps, pa
+        ).fetchone()["t"]
+        fs, fa = _period("cost_date")
+        fixos = con.execute(
+            "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE 1=1"+fs, fa
+        ).fetchone()["t"]
+        medicamentos = _insumo_cost_by_reason(con, ("uso_animal",), start_date, end_date)
+        nutricao     = _insumo_cost_by_reason(con, ("trato_lote",), start_date, end_date)
+        # Entradas
+        ss, sa = _period("sale_date")
+        rows_v = con.execute(
+            "SELECT sale_type, COALESCE(SUM(total_value),0) receita, COALESCE(SUM(profit),0) lucro, COUNT(*) n "
+            "FROM sales WHERE 1=1"+ss+" GROUP BY sale_type", sa
+        ).fetchall()
+
+    vendas = {r["sale_type"]: {"receita": round(float(r["receita"]),2),
+                               "lucro": round(float(r["lucro"]),2),
+                               "n": r["n"]} for r in rows_v}
+    receita_total = round(sum(v["receita"] for v in vendas.values()), 2)
+    saidas_total = round(float(compra)+float(operacional)+float(fixos)+medicamentos+nutricao, 2)
+    return {
+        "compra_animais": round(float(compra), 2),
+        "operacional":    round(float(operacional), 2),
+        "custos_fixos":   round(float(fixos), 2),
+        "medicamentos":   medicamentos,
+        "nutricao":       nutricao,
+        "saidas_total":   saidas_total,
+        "vendas":         vendas,
+        "receita_total":  receita_total,
+        "resultado":      round(receita_total - saidas_total, 2),
+    }
+
 # ─── Administração: edição direta de tabelas ─────────────────────────────────
 
 ADMIN_TABLES = [
     "animals", "weighings", "medications", "insumos", "lotes",
     "fornecedores", "animal_costs", "fixed_costs", "insumo_transactions",
-    "animal_movements", "feeding_plans", "feeding_checks", "users",
+    "animal_movements", "feeding_plans", "feeding_checks",
+    "category_prices", "sales", "users",
 ]
 
 
