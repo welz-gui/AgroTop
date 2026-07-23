@@ -352,6 +352,7 @@ def page_login():
                                 cm.set(_COOKIE_NAME, token,
                                        expires_at=datetime.now()+timedelta(days=7),
                                        key="set_sid")
+                                import time as _t; _t.sleep(0.6)  # tempo p/ o navegador gravar
                             except Exception:
                                 pass
                     st.rerun()
@@ -2539,17 +2540,18 @@ OPERATOR_PAGES = {"campo", "cadastrar", "estoque"}
 
 _COOKIE_NAME = "agrotop_sid"
 
-def _cookie_manager():
-    """Gerenciador de cookies para login persistente seguro (token em cookie,
-    NUNCA na URL). Instância única por sessão; degrada com segurança se o
-    componente não estiver disponível."""
+def _init_cookies():
+    """Cria a instância de cookies para ESTA execução. Precisa ser recriada a
+    cada run para reler os cookies do navegador (o CookieManager lê no __init__)."""
     try:
         import extra_streamlit_components as stx
-        if "_cookie_mgr" not in st.session_state:
-            st.session_state["_cookie_mgr"] = stx.CookieManager(key="agrotop_cookie_mgr")
-        return st.session_state["_cookie_mgr"]
+        st.session_state["_cm"] = stx.CookieManager(key="agrotop_cookie_mgr")
     except Exception:
-        return None
+        st.session_state["_cm"] = None
+
+def _cookie_manager():
+    """Retorna a instância de cookies desta execução (ou None se indisponível)."""
+    return st.session_state.get("_cm")
 
 def _try_restore_session():
     """Restaura o login a partir do token guardado em cookie (mantém login ao recarregar)."""
@@ -2570,6 +2572,7 @@ def _try_restore_session():
             st.session_state.page = "dashboard" if u["role"] == "admin" else "campo"
 
 def main():
+    _init_cookies()          # instância nova a cada run (relê o cookie)
     _try_restore_session()
     if not st.session_state.authenticated:
         page_login(); return
