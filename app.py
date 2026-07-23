@@ -729,7 +729,32 @@ def _campo_animal():
         unsafe_allow_html=True)
 
     # ── Passo 3: Ação ─────────────────────────────────────────────────────────
-    t1,t2,t3,t4=st.tabs(["⚖️ Pesagem","💉 Medicamento","🚚 Movimentação","📜 Histórico"])
+    t1,t2,t3,t5,t4=st.tabs(["⚖️ Pesagem","💉 Medicamento","🚚 Movimentação","☠️ Óbito","📜 Histórico"])
+
+    with t5:  # ÓBITO
+        if animal["status"] == "morto":
+            st.info("Este animal já está registrado como morto.")
+        else:
+            st.warning("Registrar óbito é **irreversível** e muda o status do animal para 'morto'.")
+            with st.form("f_obito", clear_on_submit=True):
+                causa = st.selectbox("Causa do óbito *", db.DEATH_CAUSES)
+                od1, od2 = st.columns(2)
+                with od1:
+                    obito_data = st.date_input("Data do óbito", value=date.today())
+                with od2:
+                    st.metric("Perda estimada", f"R$ {db.get_total_cost(animal['id']):,.2f}",
+                              help="Custo investido no animal até agora")
+                obs_ob = st.text_area("Observações", height=60,
+                    placeholder="Ex: encontrado no piquete norte, suspeita de cobra")
+                confirmar = st.checkbox("Confirmo o registro do óbito deste animal")
+                if st.form_submit_button("☠️ Registrar Óbito", type="primary", use_container_width=True):
+                    if not confirmar:
+                        st.error("Marque a confirmação para registrar.")
+                    else:
+                        r = db.register_death(animal["id"], obito_data.strftime("%Y-%m-%d"),
+                            causa, operator=st.session_state.user["name"], notes=obs_ob)
+                        st.success(f"Óbito registrado. Perda contabilizada: R$ {r.get('perda',0):,.2f}")
+                        st.rerun()
 
     with t1:  # PESAGEM
         # Comparação com estimativa anterior pendente
@@ -1355,6 +1380,13 @@ def _fin_resultado():
     e[1].metric("Vendas p/ criação", f"R$ {criacao['receita']:,.0f}", help=f"{criacao['n']} animais")
     e[2].metric("Receita total",     f"R$ {fin['receita_total']:,.0f}")
 
+    if fin.get("perda_mortalidade", 0) > 0:
+        st.markdown(
+            f"<div class='card-red'>☠️ <b>Perda por mortalidade no período:</b> "
+            f"R$ {fin['perda_mortalidade']:,.2f} — investimento em animais que morreram "
+            f"e não vão gerar receita (já incluído nas saídas acima).</div>",
+            unsafe_allow_html=True)
+
     st.markdown("---")
     res = fin["resultado"]
     cor = "#4ade80" if res >= 0 else "#f87171"
@@ -1379,17 +1411,64 @@ def _fin_resultado():
     st.plotly_chart(fig,use_container_width=True)
 
 
+def _fin_mortalidade():
+    """Taxas de mortalidade: geral, por causa e por piquete."""
+    st.subheader("☠️ Mortalidade")
+    c1, c2 = st.columns(2)
+    with c1: start = st.date_input("De", value=date(date.today().year,1,1), key="mort_start")
+    with c2: end = st.date_input("Até", value=date.today(), key="mort_end")
+    m = db.get_mortality_stats(start.isoformat(), end.isoformat())
+
+    k = st.columns(4)
+    k[0].metric("Óbitos no período", m["n_deaths"])
+    k[1].metric("Taxa de mortalidade", f"{m['taxa_geral']:.1f}%",
+                help=f"{m['n_deaths']} mortes ÷ {m['expostos']} animais que entraram até a data")
+    k[2].metric("Animais expostos", m["expostos"])
+    k[3].metric("Perda financeira", f"R$ {m['perda_total']:,.2f}")
+
+    if m["n_deaths"] == 0:
+        st.success("✅ Nenhum óbito registrado no período."); return
+
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        st.markdown("**Por causa**")
+        dfc = pd.DataFrame([{"Causa":k2,"Mortes":v} for k2,v in m["por_causa"].items()]).sort_values("Mortes",ascending=False)
+        figc = px.pie(dfc, names="Causa", values="Mortes", hole=0.45,
+            color_discrete_sequence=["#f87171","#fb923c","#facc15","#a78bfa","#22d3ee","#4ade80","#f472b6"])
+        figc.update_layout(**_layout(height=260, margin=dict(l=0,r=0,t=10,b=10),
+            legend=dict(orientation="h",yanchor="bottom",y=-0.35)))
+        st.plotly_chart(figc, use_container_width=True)
+    with cc2:
+        st.markdown("**Por piquete**")
+        dfl = pd.DataFrame([{"Piquete":k2,"Mortes":v} for k2,v in m["por_lote"].items()]).sort_values("Mortes",ascending=True)
+        figl = px.bar(dfl, x="Mortes", y="Piquete", orientation="h",
+            color="Mortes", color_continuous_scale=["#fbbf24","#f87171"])
+        figl.update_layout(**_layout(height=260, coloraxis_showscale=False,
+            xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b",title="")))
+        st.plotly_chart(figl, use_container_width=True)
+
+    st.markdown("**📜 Registro de óbitos**")
+    deaths = db.get_deaths(start.isoformat(), end.isoformat())
+    df_d = pd.DataFrame(deaths)[["death_date","animal_id","breed","cause","lote_name",
+                                 "weight_at_death","cost_at_death","operator"]].copy()
+    df_d.columns=["Data","Animal","Raça","Causa","Piquete","Peso (kg)","Perda (R$)","Registrado por"]
+    st.dataframe(df_d, use_container_width=True, hide_index=True,
+        column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                       "Perda (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+
+
 def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_ven,t_pre,ft1,ft_fix,ft2,ft3,ft4)=st.tabs(
-        ["📒 Resultado","💵 Registrar Venda","🏷️ Preços/Categoria",
+    (t_res,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4)=st.tabs(
+        ["📒 Resultado","💵 Registrar Venda","🏷️ Preços/Categoria","☠️ Mortalidade",
          "📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem"])
 
     with t_res: _fin_resultado()
     with t_ven: _fin_venda(animals)
     with t_pre: _fin_precos()
+    with t_mort: _fin_mortalidade()
 
     if not animals:
         for t in (ft1,ft_fix,ft2,ft3,ft4):

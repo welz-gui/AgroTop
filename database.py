@@ -387,6 +387,21 @@ def init_db() -> None:
                 created_at   TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (animal_id) REFERENCES animals(id)
             );
+
+            -- Óbitos (mortalidade) com causa
+            CREATE TABLE IF NOT EXISTS deaths (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_id       TEXT NOT NULL,
+                death_date      TEXT NOT NULL,
+                cause           TEXT NOT NULL DEFAULT 'Desconhecida',
+                lote_id         TEXT,
+                weight_at_death REAL,
+                cost_at_death   REAL DEFAULT 0,
+                operator        TEXT,
+                notes           TEXT,
+                created_at      TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (animal_id) REFERENCES animals(id)
+            );
         """)
         _migrate(con)
         _seed_users(con)
@@ -1493,6 +1508,84 @@ def get_sales(start_date: Optional[str] = None,
     with _conn() as con:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
 
+# ─── Mortalidade ─────────────────────────────────────────────────────────────
+
+DEATH_CAUSES = [
+    "Doença", "Predação", "Acidente", "Intoxicação (planta tóxica)",
+    "Cobra/Picada", "Parto/Distocia", "Raio", "Afogamento",
+    "Timpanismo", "Desnutrição", "Desconhecida", "Outra",
+]
+
+
+@_writes
+def register_death(animal_id: str, death_date: str, cause: str,
+                   operator: str = "", notes: str = "") -> dict:
+    """Registra o óbito de um animal: muda status para 'morto', grava a causa e
+    contabiliza o custo investido como perda."""
+    a = get_animal(animal_id)
+    if not a:
+        return {"ok": False}
+    custo = get_total_cost(animal_id)
+    with _conn() as con:
+        con.execute(
+            """INSERT INTO deaths
+               (animal_id,death_date,cause,lote_id,weight_at_death,cost_at_death,operator,notes)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (animal_id, death_date, cause, a.get("lote_id"),
+             a["current_weight"], custo, operator, notes),
+        )
+        con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
+    return {"ok": True, "perda": round(custo, 2)}
+
+
+def get_deaths(start_date: Optional[str] = None,
+               end_date: Optional[str] = None) -> list[dict]:
+    sql = ("SELECT d.*, a.breed, a.sex, l.name AS lote_name "
+           "FROM deaths d LEFT JOIN animals a ON a.id=d.animal_id "
+           "LEFT JOIN lotes l ON l.id=d.lote_id WHERE 1=1")
+    args: list = []
+    if start_date:
+        sql += " AND d.death_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND d.death_date <= ?"; args.append(end_date)
+    sql += " ORDER BY d.death_date DESC, d.id DESC"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
+def get_mortality_stats(start_date: Optional[str] = None,
+                        end_date: Optional[str] = None) -> dict:
+    """Taxas de mortalidade: geral, por causa e por piquete."""
+    deaths = get_deaths(start_date, end_date)
+    n_deaths = len(deaths)
+    # População exposta: animais que já haviam entrado até a data final
+    with _conn() as con:
+        if end_date:
+            expostos = con.execute(
+                "SELECT COUNT(*) c FROM animals WHERE entry_date <= ?", (end_date,)
+            ).fetchone()["c"]
+        else:
+            expostos = con.execute("SELECT COUNT(*) c FROM animals").fetchone()["c"]
+    taxa_geral = round(n_deaths / expostos * 100, 1) if expostos else 0.0
+
+    por_causa: dict = {}
+    por_lote: dict = {}
+    perda_total = 0.0
+    for d in deaths:
+        por_causa[d["cause"]] = por_causa.get(d["cause"], 0) + 1
+        chave_lote = d.get("lote_name") or d.get("lote_id") or "Sem piquete"
+        por_lote[chave_lote] = por_lote.get(chave_lote, 0) + 1
+        perda_total += float(d.get("cost_at_death") or 0)
+
+    return {
+        "n_deaths":    n_deaths,
+        "expostos":    expostos,
+        "taxa_geral":  taxa_geral,
+        "por_causa":   por_causa,
+        "por_lote":    por_lote,
+        "perda_total": round(perda_total, 2),
+    }
+
 # ─── Resumo Financeiro Consolidado ───────────────────────────────────────────
 
 def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
@@ -1535,6 +1628,10 @@ def get_financial_summary(start_date: Optional[str] = None,
             "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE 1=1"+fs, fa)
         medicamentos = _insumo_cost_by_reason(con, ("uso_animal",), start_date, end_date)
         nutricao     = _insumo_cost_by_reason(con, ("trato_lote",), start_date, end_date)
+        # Perda por mortalidade (informativa — o custo já está nas saídas acima)
+        ds, dd = _period("death_date")
+        perda_mort = _scalar(con,
+            "SELECT COALESCE(SUM(cost_at_death),0) t FROM deaths WHERE 1=1"+ds, dd)
         # Entradas
         ss, sa = _period("sale_date")
         rows_v = con.execute(
@@ -1548,15 +1645,16 @@ def get_financial_summary(start_date: Optional[str] = None,
     receita_total = round(sum(v["receita"] for v in vendas.values()), 2)
     saidas_total = round(float(compra)+float(operacional)+float(fixos)+medicamentos+nutricao, 2)
     return {
-        "compra_animais": round(float(compra), 2),
-        "operacional":    round(float(operacional), 2),
-        "custos_fixos":   round(float(fixos), 2),
-        "medicamentos":   medicamentos,
-        "nutricao":       nutricao,
-        "saidas_total":   saidas_total,
-        "vendas":         vendas,
-        "receita_total":  receita_total,
-        "resultado":      round(receita_total - saidas_total, 2),
+        "compra_animais":    round(float(compra), 2),
+        "operacional":       round(float(operacional), 2),
+        "custos_fixos":      round(float(fixos), 2),
+        "medicamentos":      medicamentos,
+        "nutricao":          nutricao,
+        "saidas_total":      saidas_total,
+        "perda_mortalidade": round(perda_mort, 2),
+        "vendas":            vendas,
+        "receita_total":     receita_total,
+        "resultado":         round(receita_total - saidas_total, 2),
     }
 
 # ─── Administração: edição direta de tabelas ─────────────────────────────────
@@ -1565,7 +1663,7 @@ ADMIN_TABLES = [
     "animals", "weighings", "medications", "insumos", "lotes",
     "fornecedores", "animal_costs", "fixed_costs", "insumo_transactions",
     "animal_movements", "feeding_plans", "feeding_checks",
-    "category_prices", "sales", "users",
+    "category_prices", "sales", "deaths", "users",
 ]
 
 
