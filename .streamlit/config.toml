@@ -1,0 +1,21 @@
+[theme]
+base                  = "dark"
+primaryColor          = "#4ade80"
+backgroundColor       = "#0f172a"
+secondaryBackgroundColor = "#1e293b"
+textColor             = "#f1f5f9"
+font                  = "sans serif"
+
+[server]
+headless              = true
+port                  = 8501
+enableCORS            = false
+enableXsrfProtection  = true
+
+[browser]
+gatherUsageStats      = false
+serverAddress         = "localhost"
+
+[runner]
+# Impede que expressões "soltas" sejam exibidas automaticamente (evita "None" na tela)
+magicEnabled          = false

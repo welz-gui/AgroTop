@@ -1,0 +1,20 @@
+# Segredos — NUNCA enviar ao GitHub
+.streamlit/secrets.toml
+
+# Configuração local de ferramentas
+.claude/settings.local.json
+
+# Banco de dados local (na nuvem usamos o Supabase)
+agrotop.db
+agrotop.db-wal
+agrotop.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Temporários
+_migracao*.sql
+_teste.xlsx
