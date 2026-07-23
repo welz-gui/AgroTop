@@ -335,6 +335,7 @@ def page_login():
         with st.form("login"):
             user = st.text_input("👤 Usuário", placeholder="seu.usuario")
             pwd  = st.text_input("🔑 Senha", type="password", placeholder="••••••••")
+            lembrar = st.checkbox("Manter conectado neste dispositivo", value=True)
             if st.form_submit_button("🔓  Entrar no Sistema", use_container_width=True, type="primary"):
                 u = db.verify_login(user.strip(), pwd)
                 if u:
@@ -342,20 +343,20 @@ def page_login():
                     st.session_state.user = u
                     # Página inicial conforme o perfil
                     st.session_state.page = "dashboard" if u["role"]=="admin" else "campo"
-                    # Token de sessão na URL para manter o login ao recarregar
-                    try:
-                        st.query_params["sid"] = db.create_session(u["id"])
-                    except Exception:
-                        pass
+                    # Login persistente: token em COOKIE (nunca na URL)
+                    if lembrar:
+                        cm = _cookie_manager()
+                        if cm is not None:
+                            try:
+                                token = db.create_session(u["id"])
+                                cm.set(_COOKIE_NAME, token,
+                                       expires_at=datetime.now()+timedelta(days=7),
+                                       key="set_sid")
+                            except Exception:
+                                pass
                     st.rerun()
                 else:
                     st.error("Usuário ou senha inválidos.")
-        st.markdown("""
-        <div class="card" style="font-size:.82rem;color:#64748b;text-align:center;margin-top:.8rem">
-            <strong style="color:#94a3b8">Demo:</strong><br>
-            Admin → <code>admin</code> / <code>admin123</code><br>
-            Operador → <code>op1</code> / <code>op1234</code>
-        </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
@@ -439,10 +440,20 @@ def _sidebar():
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
         if st.button("🚪  Sair", use_container_width=True, type="secondary"):
-            tok = st.query_params.get("sid")
-            if tok:
-                db.delete_session(tok)
-            st.query_params.clear()
+            cm = _cookie_manager()
+            if cm is not None:
+                try:
+                    tok = cm.get(_COOKIE_NAME)
+                    if tok:
+                        db.delete_session(tok)
+                    cm.delete(_COOKIE_NAME, key="del_sid")
+                except Exception:
+                    pass
+            # Limpa também qualquer resquício de token antigo na URL
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
             for k,v in _DEFAULTS.items(): st.session_state[k] = v
             st.rerun()
 
@@ -2526,11 +2537,31 @@ def page_admin():
 # Páginas que o operador pode acessar (as demais são exclusivas do admin)
 OPERATOR_PAGES = {"campo", "cadastrar", "estoque"}
 
+_COOKIE_NAME = "agrotop_sid"
+
+def _cookie_manager():
+    """Gerenciador de cookies para login persistente seguro (token em cookie,
+    NUNCA na URL). Instância única por sessão; degrada com segurança se o
+    componente não estiver disponível."""
+    try:
+        import extra_streamlit_components as stx
+        if "_cookie_mgr" not in st.session_state:
+            st.session_state["_cookie_mgr"] = stx.CookieManager(key="agrotop_cookie_mgr")
+        return st.session_state["_cookie_mgr"]
+    except Exception:
+        return None
+
 def _try_restore_session():
-    """Tenta restaurar o login a partir do token na URL (mantém login ao recarregar)."""
+    """Restaura o login a partir do token guardado em cookie (mantém login ao recarregar)."""
     if st.session_state.authenticated:
         return
-    token = st.query_params.get("sid")
+    cm = _cookie_manager()
+    if cm is None:
+        return
+    try:
+        token = cm.get(_COOKIE_NAME)
+    except Exception:
+        token = None
     if token:
         u = db.get_session_user(token)
         if u:
