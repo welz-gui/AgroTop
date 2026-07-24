@@ -394,6 +394,7 @@ def _sidebar():
                 ("💰","Financeiro","financeiro",""),
                 ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
                 ("🌾","Nutrição","nutricao",""),
+                ("💉","Sanitário","sanitario",""),
                 ("🔔","Alertas","alertas",f" 🔴{n_alerts}" if n_alerts else ""),
                 ("📄","Relatórios","relatorios",""),
                 ("➕","Cadastrar Animal","cadastrar",""),
@@ -2338,6 +2339,120 @@ def _admin_users():
                     st.rerun()
 
 
+def page_sanitario():
+    if st.session_state.user["role"] != "admin":
+        st.error("🔒 Acesso restrito ao Administrador."); return
+    st.markdown('<div class="page-title">💉 Calendário Sanitário</div>', unsafe_allow_html=True)
+    insumos = [i for i in db.get_all_insumos() if i["category"] in ("vacina","medicamento")]
+
+    tp1, tp2 = st.tabs(["📋 Plano de Vacinação", "⚙️ Protocolos"])
+
+    # ── Plano de vacinação ────────────────────────────────────────────────────
+    with tp1:
+        prots = db.get_protocols(active_only=True)
+        if not prots:
+            st.info("Nenhum protocolo ativo. Cadastre em **Protocolos** (aba ao lado) "
+                    "as vacinações obrigatórias da sua região.")
+        for p in prots:
+            plan = db.get_protocol_plan(p)
+            freq = db.PROTOCOL_FREQUENCIES.get(p["frequency"], p["frequency"])
+            sexo = db.SEX_TARGETS.get(p["sex_target"], p["sex_target"])
+            dose_desc = (f"{p['dose_value']:g} {p['dose_unit']} a cada {p['dose_ref_kg']:.0f} kg"
+                         if (p.get("dose_ref_kg") or 0) > 0
+                         else f"{p['dose_value']:g} {p['dose_unit']} por animal")
+            st.markdown(f"#### 💉 {p['name']}")
+            st.caption(f"{sexo} · {p['age_min']}–{p['age_max']} meses · {freq} · dose: {dose_desc}"
+                       + (f" · insumo: {p['insumo_name']}" if p.get('insumo_name') else ""))
+            k = st.columns(5)
+            k[0].metric("Elegíveis", plan["n_eligible"])
+            k[1].metric("Pendentes", plan["n_pending"])
+            k[2].metric("Doses necessárias", f"{plan['doses_needed']:g} {p['dose_unit']}")
+            if p.get("insumo_id"):
+                k[3].metric("Estoque", f"{plan['stock']:g} {p.get('insumo_unit') or ''}")
+                if plan["shortfall"] > 0:
+                    k[4].metric("Faltam comprar", f"{plan['shortfall']:g}", delta="repor",
+                                delta_color="inverse")
+                else:
+                    k[4].metric("Estoque", "✅ suficiente")
+            else:
+                k[3].metric("Estoque", "— (sem insumo)")
+            if plan["idade_desconhecida"]:
+                st.caption(f"⚠️ {_plural(plan['idade_desconhecida'],'animal','animais')} do sexo-alvo "
+                           f"sem idade definida — verifique se precisam.")
+            if plan["n_pending"] > 0:
+                with st.form(f"camp_{p['id']}", clear_on_submit=True):
+                    cc1, cc2 = st.columns([1,2])
+                    with cc1:
+                        cd = st.date_input("Data", value=date.today(), key=f"cd_{p['id']}")
+                    with cc2:
+                        if plan["shortfall"] > 0:
+                            st.warning(f"Estoque insuficiente (faltam {plan['shortfall']:g}). "
+                                       "A aplicação prossegue e o estoque vai a zero.")
+                    if st.form_submit_button(
+                            f"💉 Aplicar campanha em {plan['n_pending']} animais",
+                            type="primary", use_container_width=True):
+                        r = db.apply_protocol_campaign(p["id"], cd.strftime("%Y-%m-%d"),
+                                                       st.session_state.user["name"])
+                        st.success(f"✅ Aplicado em {r['n']} animais ({r['doses']:g} {p['dose_unit']}).")
+                        st.rerun()
+            else:
+                st.success("✅ Todos os elegíveis já estão em dia com este protocolo.")
+            st.markdown("---")
+
+    # ── Gestão de protocolos ──────────────────────────────────────────────────
+    with tp2:
+        st.markdown("**Protocolos cadastrados**")
+        todos = db.get_protocols(active_only=False)
+        for p in todos:
+            c1, c2, c3 = st.columns([5,1,1])
+            with c1:
+                ativo = "🟢" if p["active"] else "⚪"
+                st.markdown(f"{ativo} **{p['name']}** — {db.SEX_TARGETS.get(p['sex_target'],'')} · "
+                            f"{p['age_min']}–{p['age_max']}m · {db.PROTOCOL_FREQUENCIES.get(p['frequency'],'')}")
+            with c2:
+                if st.button("Pausar" if p["active"] else "Ativar", key=f"tgp_{p['id']}",
+                             use_container_width=True):
+                    db.set_protocol_active(p["id"], 0 if p["active"] else 1); st.rerun()
+            with c3:
+                if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
+                    db.delete_protocol(p["id"]); st.rerun()
+
+        st.markdown("---")
+        st.markdown("**➕ Novo Protocolo**")
+        with st.form("f_prot", clear_on_submit=True):
+            pc1, pc2, pc3 = st.columns(3)
+            with pc1:
+                nome = st.text_input("Nome *", placeholder="Ex: Brucelose B19, Aftosa")
+                sexo_t = st.selectbox("Sexo-alvo", list(db.SEX_TARGETS.keys()),
+                    format_func=lambda s: db.SEX_TARGETS[s])
+                freq = st.selectbox("Frequência", list(db.PROTOCOL_FREQUENCIES.keys()),
+                    format_func=lambda f: db.PROTOCOL_FREQUENCIES[f])
+            with pc2:
+                a_min = st.number_input("Idade mínima (meses)", min_value=0, max_value=999, value=0)
+                a_max = st.number_input("Idade máxima (meses)", min_value=0, max_value=999, value=999)
+                carencia_p = st.number_input("Carência (dias)", min_value=0, max_value=180, value=0)
+            with pc3:
+                dose_v = st.number_input("Dose", min_value=0.0, value=2.0, step=0.5, format="%.2f")
+                dose_kg = st.number_input("A cada X kg (0 = dose fixa)", min_value=0.0, value=0.0,
+                    step=10.0, help="Ex: '1 ml a cada 50 kg' → dose=1, aqui=50. 0 = mesma dose p/ todos")
+                dose_u = st.selectbox("Unidade", ["ml","dose","mg","comprimido"])
+            ins_link = st.selectbox("Insumo do estoque (para projeção de doses)",
+                [None]+insumos,
+                format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({x['current_stock']:g} {x['unit']})")
+            via = st.selectbox("Via", ROUTES)
+            notas = st.text_input("Observações", placeholder="Opcional")
+            if st.form_submit_button("✅ Criar Protocolo", type="primary", use_container_width=True):
+                if not nome:
+                    st.error("Informe o nome do protocolo.")
+                elif a_max < a_min:
+                    st.error("Idade máxima deve ser ≥ mínima.")
+                else:
+                    db.add_protocol(nome.strip(), sexo_t, a_min, a_max, dose_v, dose_kg, dose_u,
+                        ins_link["id"] if ins_link else None, freq, carencia_p, via, notas)
+                    st.success(f"✅ Protocolo '{nome}' criado!")
+                    st.rerun()
+
+
 def page_desempenho():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -2725,6 +2840,7 @@ def main():
         "financeiro":page_financeiro,
         "estoque":   page_estoque,
         "nutricao":  page_nutricao,
+        "sanitario": page_sanitario,
         "alertas":   page_alertas,
         "relatorios":page_relatorios,
         "cadastrar": page_cadastrar,

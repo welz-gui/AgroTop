@@ -408,6 +408,25 @@ def init_db() -> None:
                 key   TEXT PRIMARY KEY,
                 value TEXT
             );
+
+            -- Protocolos sanitários (vacinação obrigatória por idade/sexo)
+            CREATE TABLE IF NOT EXISTS health_protocols (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                name            TEXT NOT NULL,
+                sex_target      TEXT NOT NULL DEFAULT 'ambos',
+                age_min         INTEGER DEFAULT 0,
+                age_max         INTEGER DEFAULT 999,
+                dose_value      REAL DEFAULT 1,
+                dose_ref_kg     REAL DEFAULT 0,
+                dose_unit       TEXT DEFAULT 'ml',
+                insumo_id       INTEGER,
+                frequency       TEXT NOT NULL DEFAULT 'anual',
+                withdrawal_days INTEGER DEFAULT 0,
+                route           TEXT DEFAULT 'Subcutânea',
+                active          INTEGER DEFAULT 1,
+                notes           TEXT,
+                created_at      TEXT DEFAULT (datetime('now','localtime'))
+            );
         """)
         _migrate(con)
         _seed_users(con)
@@ -441,6 +460,9 @@ def _migrate(con) -> None:
     tcols = {r["name"] for r in con.execute("PRAGMA table_info(insumo_transactions)").fetchall()}
     if "lote_id" not in tcols:
         con.execute("ALTER TABLE insumo_transactions ADD COLUMN lote_id TEXT")
+    mcols = {r["name"] for r in con.execute("PRAGMA table_info(medications)").fetchall()}
+    if "protocol_id" not in mcols:
+        con.execute("ALTER TABLE medications ADD COLUMN protocol_id INTEGER")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 
@@ -1042,15 +1064,16 @@ def get_medications(animal_id: str) -> list[dict]:
 @_writes
 def add_medication(animal_id, medication_name, dose, unit, application_route,
                    withdrawal_days, med_date, applied_by="",
-                   insumo_id=None, notes="") -> None:
+                   insumo_id=None, notes="", protocol_id=None) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO medications
                (animal_id,medication_name,dose,unit,application_route,
-                withdrawal_days,med_date,applied_by,insumo_id,notes)
-               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
             (animal_id, medication_name, dose, unit, application_route,
-             withdrawal_days, med_date, applied_by, insumo_id or None, notes),
+             withdrawal_days, med_date, applied_by, insumo_id or None, notes,
+             protocol_id or None),
         )
         # Baixa automática no estoque
         if insumo_id and dose > 0:
@@ -1714,7 +1737,7 @@ ADMIN_TABLES = [
     "animals", "weighings", "medications", "insumos", "lotes",
     "fornecedores", "animal_costs", "fixed_costs", "insumo_transactions",
     "animal_movements", "feeding_plans", "feeding_checks",
-    "category_prices", "sales", "deaths", "settings", "users",
+    "category_prices", "sales", "deaths", "settings", "health_protocols", "users",
 ]
 
 
@@ -2002,3 +2025,138 @@ def get_performance_by_lote() -> list[dict]:
             "custo_por_gmd": round(custo_por_animal / gmd_med, 2) if gmd_med > 0 else 0.0,
         })
     return sorted(result, key=lambda x: -x["gmd_medio"])
+
+# ─── Protocolos Sanitários / Calendário de Vacinação ─────────────────────────
+
+PROTOCOL_FREQUENCIES = {
+    "unica":      "Dose única (uma vez na vida)",
+    "anual":      "Anual",
+    "semestral":  "Semestral",
+    "trimestral": "Trimestral",
+    "mensal":     "Mensal",
+}
+_FREQ_DAYS = {"anual": 365, "semestral": 182, "trimestral": 91, "mensal": 30}
+SEX_TARGETS = {"ambos": "Machos e Fêmeas", "M": "Só Machos", "F": "Só Fêmeas"}
+
+
+@_writes
+def add_protocol(name, sex_target, age_min, age_max, dose_value, dose_ref_kg,
+                 dose_unit, insumo_id, frequency, withdrawal_days,
+                 route="Subcutânea", notes="") -> None:
+    with _conn() as con:
+        con.execute(
+            """INSERT INTO health_protocols
+               (name,sex_target,age_min,age_max,dose_value,dose_ref_kg,dose_unit,
+                insumo_id,frequency,withdrawal_days,route,notes)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (name, sex_target, int(age_min), int(age_max), dose_value, dose_ref_kg,
+             dose_unit, insumo_id or None, frequency, int(withdrawal_days), route, notes),
+        )
+
+
+def get_protocols(active_only: bool = True) -> list[dict]:
+    sql = ("SELECT p.*, i.name AS insumo_name, i.current_stock, i.unit AS insumo_unit "
+           "FROM health_protocols p LEFT JOIN insumos i ON i.id=p.insumo_id WHERE 1=1")
+    if active_only:
+        sql += " AND p.active=1"
+    sql += " ORDER BY p.name"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql).fetchall()]
+
+
+@_writes
+def set_protocol_active(pid: int, active: int) -> None:
+    with _conn() as con:
+        con.execute("UPDATE health_protocols SET active=? WHERE id=?", (int(active), pid))
+
+
+@_writes
+def delete_protocol(pid: int) -> None:
+    with _conn() as con:
+        con.execute("DELETE FROM health_protocols WHERE id=?", (pid,))
+
+
+def _dose_for_animal(protocol: dict, animal: dict) -> float:
+    """Dose para um animal: fixa, ou proporcional ao peso (dose_ref_kg > 0)."""
+    ref = protocol.get("dose_ref_kg") or 0
+    if ref > 0:
+        return round(animal["current_weight"] / ref * protocol["dose_value"], 2)
+    return round(protocol["dose_value"], 2)
+
+
+def _protocol_eligible(protocol: dict, animal: dict) -> bool:
+    stt = protocol.get("sex_target", "ambos")
+    if stt in ("M", "F") and animal["sex"] != stt:
+        return False
+    months = get_age_months(animal.get("birth_date"))
+    if months is None:
+        return False
+    return (protocol.get("age_min") or 0) <= months <= (protocol.get("age_max") or 999)
+
+
+def _protocol_pending(protocol: dict, animal: dict, ref_date: date) -> bool:
+    """True se o animal ainda precisa da aplicação no ciclo atual."""
+    freq = protocol.get("frequency", "anual")
+    aplicadas = [m for m in get_medications(animal["id"])
+                 if m.get("protocol_id") == protocol["id"]]
+    if not aplicadas:
+        return True
+    if freq == "unica":
+        return False
+    try:
+        ultima = datetime.strptime(aplicadas[0]["med_date"], "%Y-%m-%d").date()
+    except (ValueError, TypeError, KeyError):
+        return True
+    return (ref_date - ultima).days >= _FREQ_DAYS.get(freq, 365)
+
+
+def get_protocol_plan(protocol: dict, ref_date: Optional[date] = None) -> dict:
+    """Elegíveis, pendentes, doses necessárias e projeção de estoque."""
+    ref = ref_date or date.today()
+    animals = get_all_animals()
+    elegiveis, pendentes = [], []
+    idade_desconhecida = 0
+    for a in animals:
+        if get_age_months(a.get("birth_date")) is None:
+            stt = protocol.get("sex_target", "ambos")
+            if stt == "ambos" or a["sex"] == stt:
+                idade_desconhecida += 1
+            continue
+        if not _protocol_eligible(protocol, a):
+            continue
+        elegiveis.append(a)
+        if _protocol_pending(protocol, a, ref):
+            pendentes.append(a)
+    doses = round(sum(_dose_for_animal(protocol, a) for a in pendentes), 2)
+    stock = float(protocol.get("current_stock") or 0)
+    return {
+        "n_eligible": len(elegiveis),
+        "n_pending":  len(pendentes),
+        "pending":    pendentes,
+        "doses_needed": doses,
+        "stock":      round(stock, 2),
+        "shortfall":  round(max(0.0, doses - stock), 2),
+        "idade_desconhecida": idade_desconhecida,
+    }
+
+
+@_writes
+def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "") -> dict:
+    """Aplica o protocolo a todos os animais pendentes (registra + baixa estoque)."""
+    prot = next((p for p in get_protocols(active_only=False) if p["id"] == protocol_id), None)
+    if not prot:
+        return {"n": 0, "doses": 0}
+    try:
+        ref = datetime.strptime(med_date, "%Y-%m-%d").date()
+    except ValueError:
+        ref = date.today()
+    plan = get_protocol_plan(prot, ref)
+    n = 0
+    for a in plan["pending"]:
+        dose = _dose_for_animal(prot, a)
+        add_medication(a["id"], prot["name"], dose, prot["dose_unit"],
+                       prot.get("route", "Subcutânea"), prot.get("withdrawal_days", 0),
+                       med_date, applied_by=operator, insumo_id=prot.get("insumo_id"),
+                       notes="Campanha sanitária", protocol_id=prot["id"])
+        n += 1
+    return {"n": n, "doses": plan["doses_needed"]}
