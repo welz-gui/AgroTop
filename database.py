@@ -409,6 +409,18 @@ def init_db() -> None:
                 value TEXT
             );
 
+            -- Fotos dos animais (imagem comprimida, com histórico)
+            CREATE TABLE IF NOT EXISTS animal_photos (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_id  TEXT NOT NULL,
+                image      BLOB NOT NULL,
+                mime       TEXT DEFAULT 'image/jpeg',
+                taken_date TEXT NOT NULL,
+                operator   TEXT,
+                created_at TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (animal_id) REFERENCES animals(id)
+            );
+
             -- Protocolos sanitários (vacinação obrigatória por idade/sexo)
             CREATE TABLE IF NOT EXISTS health_protocols (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2160,3 +2172,60 @@ def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "")
                        notes="Campanha sanitária", protocol_id=prot["id"])
         n += 1
     return {"n": n, "doses": plan["doses_needed"]}
+
+# ─── Fotos dos Animais ───────────────────────────────────────────────────────
+
+@_writes
+def add_photo(animal_id: str, image_bytes: bytes, mime: str = "image/jpeg",
+              taken_date: Optional[str] = None, operator: str = "") -> None:
+    taken_date = taken_date or date.today().isoformat()
+    with _conn() as con:
+        img = psycopg2.Binary(image_bytes) if USE_PG else image_bytes
+        con.execute(
+            "INSERT INTO animal_photos (animal_id,image,mime,taken_date,operator) VALUES(?,?,?,?,?)",
+            (animal_id, img, mime, taken_date, operator),
+        )
+
+
+def get_photos(animal_id: str) -> list[dict]:
+    """Metadados das fotos (sem os bytes da imagem)."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT id,taken_date,operator,mime FROM animal_photos "
+            "WHERE animal_id=? ORDER BY taken_date DESC, id DESC",
+            (animal_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_photo_image(photo_id: int):
+    with _conn() as con:
+        row = con.execute("SELECT image, mime FROM animal_photos WHERE id=?",
+                          (photo_id,)).fetchone()
+    if not row:
+        return None
+    return bytes(row["image"]), row["mime"]
+
+
+def get_latest_photo(animal_id: str):
+    with _conn() as con:
+        row = con.execute(
+            "SELECT image, mime FROM animal_photos WHERE animal_id=? "
+            "ORDER BY taken_date DESC, id DESC LIMIT 1", (animal_id,)
+        ).fetchone()
+    if not row:
+        return None
+    return bytes(row["image"]), row["mime"]
+
+
+def count_photos(animal_id: str) -> int:
+    with _conn() as con:
+        row = con.execute("SELECT COUNT(*) c FROM animal_photos WHERE animal_id=?",
+                          (animal_id,)).fetchone()
+    return int(row["c"])
+
+
+@_writes
+def delete_photo(photo_id: int) -> None:
+    with _conn() as con:
+        con.execute("DELETE FROM animal_photos WHERE id=?", (photo_id,))

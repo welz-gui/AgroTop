@@ -204,6 +204,81 @@ def _fmt_dose(dose, unit: str) -> str:
     u = plurais.get(unit, unit) if d != 1 else unit
     return f"{_num_br(d)} {u}"
 
+# ─── Câmera: imagem, QR Code e OCR ───────────────────────────────────────────
+def _compress_image(raw: bytes, max_side: int = 1000, quality: int = 75) -> bytes:
+    """Redimensiona e comprime a foto para JPEG (economiza espaço no banco)."""
+    try:
+        from PIL import Image, ImageOps
+        import io as _io
+        img = Image.open(_io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img)          # corrige rotação do celular
+        img = img.convert("RGB")
+        img.thumbnail((max_side, max_side))
+        buf = _io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return raw
+
+def _decode_qr(raw: bytes) -> Optional[str]:
+    """Tenta decodificar um QR Code na imagem. Retorna o texto ou None."""
+    try:
+        import cv2, numpy as np, io as _io
+        from PIL import Image
+        img = Image.open(_io.BytesIO(raw)).convert("RGB")
+        arr = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        detector = cv2.QRCodeDetector()
+        data, _pts, _ = detector.detectAndDecode(arr)
+        return data.strip() if data else None
+    except Exception:
+        return None
+
+def _ocr_number(raw: bytes) -> Optional[str]:
+    """Best-effort: tenta ler dígitos do brinco (OCR). Impreciso — sempre confirmar."""
+    try:
+        import pytesseract, io as _io
+        from PIL import Image, ImageOps
+        img = Image.open(_io.BytesIO(raw)).convert("L")
+        img = ImageOps.autocontrast(img)
+        txt = pytesseract.image_to_string(
+            img, config="--psm 7 -c tessedit_char_whitelist=0123456789")
+        digitos = "".join(c for c in txt if c.isdigit())
+        return digitos or None
+    except Exception:
+        return None
+
+def _photo_section(animal_id: str, key_prefix: str = ""):
+    """Widget de foto do animal: mostra a atual, tira nova (auto-salva) e histórico."""
+    fotos = db.get_photos(animal_id)
+    latest = db.get_latest_photo(animal_id)
+    if latest:
+        st.image(latest[0], caption=f"Foto mais recente · {fotos[0]['taken_date']}", width=300)
+    else:
+        st.caption("Sem foto ainda. Tire uma abaixo. 📷")
+
+    nova = st.camera_input("📷 Tirar/atualizar foto", key=f"{key_prefix}cam_foto")
+    if nova is not None:
+        raw = nova.getvalue()
+        sig = f"{animal_id}:{hash(raw)}"
+        if st.session_state.get("_last_photo_sig") != sig:
+            comp = _compress_image(raw)
+            db.add_photo(animal_id, comp, operator=st.session_state.user["name"])
+            st.session_state["_last_photo_sig"] = sig
+            st.success("📷 Foto salva!")
+            st.rerun()
+
+    if len(fotos) > 1:
+        with st.expander(f"📸 Histórico de fotos ({len(fotos)})"):
+            for f in fotos:
+                img = db.get_photo_image(f["id"])
+                if img:
+                    fc1, fc2 = st.columns([3,1])
+                    with fc1:
+                        st.image(img[0], caption=f["taken_date"], width=200)
+                    with fc2:
+                        if st.button("🗑️", key=f"{key_prefix}delph_{f['id']}"):
+                            db.delete_photo(f["id"]); st.rerun()
+
 def _df_to_csv(df: pd.DataFrame) -> bytes:
     buf = io.StringIO()
     df.where(pd.notna(df), "").to_csv(buf, index=False, encoding="utf-8-sig")
@@ -666,7 +741,7 @@ def _campo_trato():
 
 def _campo_animal():
     # ── Passo 1: Localizar animal ─────────────────────────────────────────────
-    tab_dig, tab_qr, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Simular QR Code","🔢 Teclado Numérico"])
+    tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
 
     with tab_dig:
         c1,c2=st.columns([3,1])
@@ -678,15 +753,27 @@ def _campo_animal():
             if st.button("🔍 Buscar",type="primary",use_container_width=True):
                 st.session_state.campo_id=typed; st.rerun()
 
-    with tab_qr:
-        st.caption("Simula leitura de QR Code — em produção integre câmera ou leitor Bluetooth.")
-        animals_all=db.get_all_animals()
-        qcols=st.columns(4)
-        for i,a in enumerate(animals_all[:12]):
-            with qcols[i%4]:
-                lbl=f"🐄 {a['id']}\n{a['breed'][:7]}"
-                if st.button(lbl,key=f"qr_{a['id']}",use_container_width=True):
-                    st.session_state.campo_id=a["id"]; st.rerun()
+    with tab_cam:
+        st.caption("Aponte a câmera para o brinco. Se tiver **QR Code**, é lido automaticamente. "
+                   "Senão, o app tenta ler o **número** — confira sempre antes de buscar.")
+        foto = st.camera_input("📷 Foto do brinco", key="cam_brinco")
+        if foto is not None:
+            raw = foto.getvalue()
+            qr = _decode_qr(raw)
+            if qr:
+                cand = qr.strip().upper()
+                st.success(f"✅ QR Code lido: **{cand}**")
+                if st.button(f"🔍 Buscar {cand}", type="primary", use_container_width=True):
+                    st.session_state.campo_id = cand; st.rerun()
+            else:
+                ocr = _ocr_number(raw)
+                sug = f"BR{ocr.zfill(4)}" if ocr else ""
+                st.info("QR não encontrado. Leitura automática do número (confira!):")
+                lido = st.text_input("Número lido / digite o ID", value=sug,
+                    key="cam_ocr_id").strip().upper()
+                if st.button("🔍 Buscar", type="primary", use_container_width=True, key="cam_busca"):
+                    if lido:
+                        st.session_state.campo_id = lido; st.rerun()
 
     with tab_kbd:
         st.caption("Teclado grande para uso ao sol / com luvas.")
@@ -744,7 +831,11 @@ def _campo_animal():
         unsafe_allow_html=True)
 
     # ── Passo 3: Ação ─────────────────────────────────────────────────────────
-    t1,t2,t3,t5,t4=st.tabs(["⚖️ Pesagem","💉 Medicamento","🚚 Movimentação","☠️ Óbito","📜 Histórico"])
+    t1,t2,t3,t6,t5,t4=st.tabs(["⚖️ Pesagem","💉 Medicamento","🚚 Movimentação",
+                               "📷 Foto","☠️ Óbito","📜 Histórico"])
+
+    with t6:  # FOTO
+        _photo_section(animal["id"], key_prefix="campo_")
 
     with t5:  # ÓBITO
         if animal["status"] == "morto":
@@ -1050,7 +1141,11 @@ def page_animal():
                    f"({(wd-date.today()).days} dias restantes). Não pode ser abatido.")
 
     st.markdown("---")
-    tl_peso,tl_med,tl_mov,tl_fin=st.tabs(["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro"])
+    tl_peso,tl_med,tl_mov,tl_fin,tl_foto=st.tabs(
+        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto"])
+
+    with tl_foto:
+        _photo_section(aid, key_prefix="ficha_")
 
     with tl_peso:
         if len(ws)>=2:
