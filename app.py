@@ -365,9 +365,10 @@ def page_login():
 def _sidebar():
     alerts  = db.get_alert_animals()
     low_stk  = db.check_low_stock()
+    n_low_perf = len(db.get_low_performance())
     # Badge conta TODOS os itens exibidos na página de Alertas (mesma regra)
     n_alerts = (len(alerts["sumidos"]) + len(alerts["carencia"])
-                + len(alerts["prontos"]) + len(low_stk))
+                + len(alerts["prontos"]) + len(low_stk) + n_low_perf)
     user     = st.session_state.user
 
     with st.sidebar:
@@ -389,6 +390,7 @@ def _sidebar():
                 ("📱","Modo Campo","campo",""),
                 ("📋","Rebanho","rebanho",""),
                 ("🌿","Lotes / Pastagem","lotes",""),
+                ("📈","Desempenho","desempenho",""),
                 ("💰","Financeiro","financeiro",""),
                 ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
                 ("🌾","Nutrição","nutricao",""),
@@ -1926,6 +1928,24 @@ def page_alertas():
     else:
         st.success("✅ Todos os insumos com estoque adequado.")
 
+    # Baixo desempenho (GMD abaixo da meta) — só admin gerencia a meta
+    st.markdown("---")
+    meta = db.get_gmd_target()
+    low_perf = db.get_low_performance(meta)
+    st.subheader(f"📉 Baixo Desempenho ({len(low_perf)})")
+    st.caption(f"Animais com GMD abaixo da meta ({meta:.3f} kg/dia).")
+    if low_perf:
+        df_lp = pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],
+            "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
+            "GMD (kg/dia)":round(a["gmd"],3)} for a in low_perf])
+        st.dataframe(df_lp, use_container_width=True, hide_index=True,
+            column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+        if st.session_state.user["role"]=="admin" and st.button("📈 Ir para Desempenho",type="primary"):
+            _go("desempenho"); st.rerun()
+    else:
+        st.success("✅ Nenhum animal abaixo da meta de GMD.")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # RELATÓRIOS  (CSV + PDF)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2318,6 +2338,118 @@ def _admin_users():
                     st.rerun()
 
 
+def page_desempenho():
+    if st.session_state.user["role"] != "admin":
+        st.error("🔒 Acesso restrito ao Administrador."); return
+    st.markdown('<div class="page-title">📈 Desempenho do Rebanho</div>', unsafe_allow_html=True)
+    animals = db.get_all_animals()
+    if not animals:
+        st.info("Sem animais ativos."); return
+
+    dt1, dt2, dt3 = st.tabs(["🎯 Meta & Baixo Desempenho", "📅 Projeção de Abate",
+                             "🌿 Comparativo por Piquete"])
+
+    # ── Meta de GMD e baixo desempenho ────────────────────────────────────────
+    with dt1:
+        meta_atual = db.get_gmd_target()
+        c1, c2 = st.columns([1,2])
+        with c1:
+            nova = st.number_input("Meta de GMD (kg/dia)", min_value=0.0, max_value=3.0,
+                value=float(meta_atual), step=0.05, format="%.3f",
+                help="Ganho médio diário mínimo esperado")
+            if st.button("💾 Salvar meta", use_container_width=True):
+                db.set_setting("gmd_meta", round(nova, 3))
+                st.success("Meta salva!"); st.rerun()
+        with c2:
+            st.caption("Animais com GMD **abaixo da meta** são candidatos a investigação "
+                       "(saúde, verminose, pasto ruim) ou descarte. A meta também aparece "
+                       "como alerta na página **Alertas**.")
+
+        low = db.get_low_performance(meta_atual)
+        st.markdown(f"**{_plural(len(low),'animal','animais')} abaixo da meta "
+                    f"({meta_atual:.3f} kg/dia)**")
+        if low:
+            rows = [{"ID":a["id"],"Raça":a["breed"],
+                     "Categoria":db.get_age_category(a.get("birth_date")),
+                     "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
+                     "GMD (kg/dia)":round(a["gmd"],3)} for a in low]
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True,
+                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                    "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+            fig = px.bar(df.sort_values("GMD (kg/dia)"), x="GMD (kg/dia)", y="ID",
+                orientation="h", color="GMD (kg/dia)",
+                color_continuous_scale=["#f87171","#fbbf24","#4ade80"])
+            fig.add_vline(x=meta_atual, line_dash="dash", line_color="#4ade80",
+                annotation_text="Meta", annotation_position="top")
+            fig.update_layout(**PLOTLY, height=max(180,len(df)*30), coloraxis_showscale=False,
+                xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b",title=""))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.success("✅ Todos os animais estão na meta ou acima!")
+
+    # ── Projeção de abate ─────────────────────────────────────────────────────
+    with dt2:
+        st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD atual.")
+        rows = []
+        for a in animals:
+            p = db.projecao_abate(a)
+            rows.append({"ID":a["id"],"Raça":a["breed"],
+                "Peso Atual (kg)":a["current_weight"],
+                "Peso-Alvo (kg)":a.get("target_weight") or 500,
+                "Falta (kg)":p["falta"],
+                "GMD (kg/dia)":round(p["gmd"],3) if p["gmd"] else None,
+                "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
+                "Data estimada":p["data"] or "— (sem GMD)"})
+        df = pd.DataFrame(rows)
+        # Prontos primeiro, depois por menor tempo
+        st.dataframe(df, use_container_width=True, hide_index=True, height=420,
+            column_config={
+                "Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
+                "Peso-Alvo (kg)":st.column_config.NumberColumn(format="%.0f"),
+                "Falta (kg)":st.column_config.NumberColumn(format="%.1f"),
+                "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+        prontos = [r for r in rows if r["Dias p/ abate"] == 0]
+        if prontos:
+            st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "
+                       f"(peso-alvo atingido).")
+
+    # ── Comparativo por piquete ───────────────────────────────────────────────
+    with dt3:
+        st.caption("GMD médio × investimento em nutrição de cada piquete. Um pasto com muito "
+                   "trato tende a ter **GMD maior**, mas também **custo por GMD maior** — "
+                   "aqui você compara a eficiência.")
+        perf = db.get_performance_by_lote()
+        if not perf:
+            st.info("Sem dados por piquete ainda.")
+        else:
+            rows = [{"Piquete":f"{p['lote_id']} — {p['lote_name']}","Animais":p["n"],
+                     "GMD médio (kg/dia)":p["gmd_medio"],
+                     "Nutrição/animal (R$)":p["custo_nut_por_animal"],
+                     "Custo por GMD (R$)":p["custo_por_gmd"]} for p in perf]
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True,
+                column_config={
+                    "GMD médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
+                    "Nutrição/animal (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Custo por GMD (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+            fig = go.Figure()
+            fig.add_bar(x=[p["lote_name"] for p in perf], y=[p["gmd_medio"] for p in perf],
+                name="GMD médio", marker_color="#4ade80", yaxis="y")
+            fig.add_trace(go.Scatter(x=[p["lote_name"] for p in perf],
+                y=[p["custo_nut_por_animal"] for p in perf], name="Nutrição/animal (R$)",
+                mode="lines+markers", line=dict(color="#fbbf24",width=3), yaxis="y2"))
+            fig.update_layout(**_layout(height=320,
+                legend=dict(orientation="h",y=1.1),
+                xaxis=dict(gridcolor="#1e293b"),
+                yaxis=dict(title="GMD (kg/dia)",gridcolor="#1e293b"),
+                yaxis2=dict(title="R$/animal",overlaying="y",side="right",showgrid=False)))
+            st.plotly_chart(fig, use_container_width=True)
+            if all(p["custo_nutricao"]==0 for p in perf):
+                st.info("💡 O custo de nutrição por piquete começa a ser contabilizado a partir "
+                        "das próximas confirmações de trato (na aba Trato do Modo Campo).")
+
+
 def page_nutricao():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -2589,6 +2721,7 @@ def main():
         "rebanho":   page_rebanho,
         "animal":    page_animal,
         "lotes":     page_lotes,
+        "desempenho":page_desempenho,
         "financeiro":page_financeiro,
         "estoque":   page_estoque,
         "nutricao":  page_nutricao,

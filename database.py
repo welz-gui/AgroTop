@@ -402,6 +402,12 @@ def init_db() -> None:
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (animal_id) REFERENCES animals(id)
             );
+
+            -- Configurações gerais (chave/valor)
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
         """)
         _migrate(con)
         _seed_users(con)
@@ -432,6 +438,9 @@ def _migrate(con) -> None:
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")
+    tcols = {r["name"] for r in con.execute("PRAGMA table_info(insumo_transactions)").fetchall()}
+    if "lote_id" not in tcols:
+        con.execute("ALTER TABLE insumo_transactions ADD COLUMN lote_id TEXT")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 
@@ -1364,9 +1373,9 @@ def add_feeding_check(plan_id, lote_id, check_date, status,
             )
             con.execute(
                 """INSERT INTO insumo_transactions
-                   (insumo_id,type,quantity,reason,transaction_date,operator)
-                   VALUES(?,?,?,?,?,?)""",
-                (insumo_id, "saida", deduct, "trato_lote", check_date, operator),
+                   (insumo_id,type,quantity,reason,transaction_date,operator,lote_id)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (insumo_id, "saida", deduct, "trato_lote", check_date, operator, lote_id),
             )
 
 
@@ -1705,7 +1714,7 @@ ADMIN_TABLES = [
     "animals", "weighings", "medications", "insumos", "lotes",
     "fornecedores", "animal_costs", "fixed_costs", "insumo_transactions",
     "animal_movements", "feeding_plans", "feeding_checks",
-    "category_prices", "sales", "deaths", "users",
+    "category_prices", "sales", "deaths", "settings", "users",
 ]
 
 
@@ -1901,3 +1910,95 @@ def refresh_carencia_status() -> None:
         end = get_withdrawal_end(a["id"])
         if end is None or end < today:
             update_animal_status(a["id"], "ativo")
+
+# ─── Configurações (chave/valor) ─────────────────────────────────────────────
+
+def get_setting(key: str, default=None):
+    with _conn() as con:
+        row = con.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+@_writes
+def set_setting(key: str, value) -> None:
+    with _conn() as con:
+        if USE_PG:
+            con.execute(
+                "INSERT INTO settings (key,value) VALUES(?,?) "
+                "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+                (key, str(value)),
+            )
+        else:
+            con.execute("INSERT OR REPLACE INTO settings (key,value) VALUES(?,?)",
+                        (key, str(value)))
+
+# ─── Desempenho (GMD, projeção de abate, comparativo por piquete) ────────────
+
+def get_gmd_target() -> float:
+    try:
+        return float(get_setting("gmd_meta", "0.500"))
+    except (TypeError, ValueError):
+        return 0.5
+
+
+def get_low_performance(meta: Optional[float] = None) -> list[dict]:
+    """Animais com GMD abaixo da meta."""
+    meta = meta if meta is not None else get_gmd_target()
+    out = []
+    for a in get_all_animals():
+        g = calculate_gmd(a["id"])
+        if g is not None and g < meta:
+            out.append({**a, "gmd": g})
+    return sorted(out, key=lambda x: x["gmd"])
+
+
+def projecao_abate(animal: dict) -> dict:
+    """Dias e data estimada para atingir o peso-alvo, pelo GMD atual."""
+    g = calculate_gmd(animal["id"])
+    target = animal.get("target_weight") or 500
+    falta = target - animal["current_weight"]
+    if falta <= 0:
+        return {"dias": 0, "data": date.today().isoformat(), "gmd": g, "falta": 0}
+    if g is None or g <= 0:
+        return {"dias": None, "data": None, "gmd": g, "falta": round(falta, 1)}
+    dias = int(round(falta / g))
+    data = (date.today() + timedelta(days=dias)).isoformat()
+    return {"dias": dias, "data": data, "gmd": g, "falta": round(falta, 1)}
+
+
+def get_performance_by_lote() -> list[dict]:
+    """Por piquete: GMD médio × investimento em nutrição → custo por GMD."""
+    animals = get_all_animals()
+    lotes = {l["id"]: l for l in get_all_lotes()}
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT t.lote_id AS lid, COALESCE(SUM(t.quantity*i.cost_per_unit),0) AS c "
+            "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
+            "WHERE t.reason='trato_lote' AND t.lote_id IS NOT NULL GROUP BY t.lote_id"
+        ).fetchall()
+    nut = {r["lid"]: float(r["c"]) for r in rows}
+
+    by_lote: dict = {}
+    for a in animals:
+        by_lote.setdefault(a.get("lote_id"), []).append(a)
+
+    result = []
+    for lid, ans in by_lote.items():
+        if not lid:
+            continue
+        gmds = [g for g in (calculate_gmd(a["id"]) for a in ans) if g is not None]
+        gmd_med = sum(gmds) / len(gmds) if gmds else 0.0
+        n = len(ans)
+        custo_nut = nut.get(lid, 0.0)
+        custo_por_animal = custo_nut / n if n else 0.0
+        result.append({
+            "lote_id":  lid,
+            "lote_name": (lotes.get(lid) or {}).get("name", lid),
+            "n":        n,
+            "gmd_medio": round(gmd_med, 3),
+            "custo_nutricao": round(custo_nut, 2),
+            "custo_nut_por_animal": round(custo_por_animal, 2),
+            # R$ de nutrição por animal para cada kg/dia de GMD (eficiência)
+            "custo_por_gmd": round(custo_por_animal / gmd_med, 2) if gmd_med > 0 else 0.0,
+        })
+    return sorted(result, key=lambda x: -x["gmd_medio"])
