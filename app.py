@@ -248,24 +248,35 @@ def _ocr_number(raw: bytes) -> Optional[str]:
         return None
 
 def _photo_section(animal_id: str, key_prefix: str = ""):
-    """Widget de foto do animal: mostra a atual, tira nova (auto-salva) e histórico."""
+    """Widget de foto do animal: mostra a atual, tira nova (auto-salva) e histórico.
+    A câmera só liga após clicar em 'Abrir câmera' (evita pedir permissão sempre)."""
     fotos = db.get_photos(animal_id)
     latest = db.get_latest_photo(animal_id)
     if latest:
         st.image(latest[0], caption=f"Foto mais recente · {fotos[0]['taken_date']}", width=300)
     else:
-        st.caption("Sem foto ainda. Tire uma abaixo. 📷")
+        st.info("📷 Sem foto ainda. Clique em **Abrir câmera** para tirar a primeira.")
 
-    nova = st.camera_input("📷 Tirar/atualizar foto", key=f"{key_prefix}cam_foto")
-    if nova is not None:
-        raw = nova.getvalue()
-        sig = f"{animal_id}:{hash(raw)}"
-        if st.session_state.get("_last_photo_sig") != sig:
-            comp = _compress_image(raw)
-            db.add_photo(animal_id, comp, operator=st.session_state.user["name"])
-            st.session_state["_last_photo_sig"] = sig
-            st.success("📷 Foto salva!")
-            st.rerun()
+    open_key = f"{key_prefix}foto_cam_on"
+    if not st.session_state.get(open_key):
+        if st.button("📷 Abrir câmera para tirar foto", key=f"{key_prefix}foto_open",
+                     use_container_width=True, type="primary"):
+            st.session_state[open_key] = True; st.rerun()
+    else:
+        nova = st.camera_input("Tirar/atualizar foto", key=f"{key_prefix}cam_foto")
+        if nova is not None:
+            raw = nova.getvalue()
+            sig = f"{animal_id}:{hash(raw)}"
+            if st.session_state.get("_last_photo_sig") != sig:
+                comp = _compress_image(raw)
+                db.add_photo(animal_id, comp, operator=st.session_state.user["name"])
+                st.session_state["_last_photo_sig"] = sig
+                st.success("📷 Foto salva!")
+                st.session_state[open_key] = False
+                st.rerun()
+        if st.button("✖️ Fechar câmera", key=f"{key_prefix}foto_close",
+                     use_container_width=True):
+            st.session_state[open_key] = False; st.rerun()
 
     if len(fotos) > 1:
         with st.expander(f"📸 Histórico de fotos ({len(fotos)})"):
@@ -756,24 +767,33 @@ def _campo_animal():
     with tab_cam:
         st.caption("Aponte a câmera para o brinco. Se tiver **QR Code**, é lido automaticamente. "
                    "Senão, o app tenta ler o **número** — confira sempre antes de buscar.")
-        foto = st.camera_input("📷 Foto do brinco", key="cam_brinco")
-        if foto is not None:
-            raw = foto.getvalue()
-            qr = _decode_qr(raw)
-            if qr:
-                cand = qr.strip().upper()
-                st.success(f"✅ QR Code lido: **{cand}**")
-                if st.button(f"🔍 Buscar {cand}", type="primary", use_container_width=True):
-                    st.session_state.campo_id = cand; st.rerun()
-            else:
-                ocr = _ocr_number(raw)
-                sug = f"BR{ocr.zfill(4)}" if ocr else ""
-                st.info("QR não encontrado. Leitura automática do número (confira!):")
-                lido = st.text_input("Número lido / digite o ID", value=sug,
-                    key="cam_ocr_id").strip().upper()
-                if st.button("🔍 Buscar", type="primary", use_container_width=True, key="cam_busca"):
-                    if lido:
-                        st.session_state.campo_id = lido; st.rerun()
+        if not st.session_state.get("cam_brinco_on"):
+            if st.button("📷 Abrir câmera para ler o brinco", type="primary",
+                         use_container_width=True, key="brinco_open"):
+                st.session_state["cam_brinco_on"] = True; st.rerun()
+        else:
+            foto = st.camera_input("Foto do brinco", key="cam_brinco")
+            if foto is not None:
+                raw = foto.getvalue()
+                qr = _decode_qr(raw)
+                if qr:
+                    cand = qr.strip().upper()
+                    st.success(f"✅ QR Code lido: **{cand}**")
+                    if st.button(f"🔍 Buscar {cand}", type="primary", use_container_width=True):
+                        st.session_state.campo_id = cand
+                        st.session_state["cam_brinco_on"] = False; st.rerun()
+                else:
+                    ocr = _ocr_number(raw)
+                    sug = f"BR{ocr.zfill(4)}" if ocr else ""
+                    st.info("QR não encontrado. Leitura automática do número (confira!):")
+                    lido = st.text_input("Número lido / digite o ID", value=sug,
+                        key="cam_ocr_id").strip().upper()
+                    if st.button("🔍 Buscar", type="primary", use_container_width=True, key="cam_busca"):
+                        if lido:
+                            st.session_state.campo_id = lido
+                            st.session_state["cam_brinco_on"] = False; st.rerun()
+            if st.button("✖️ Fechar câmera", use_container_width=True, key="brinco_close"):
+                st.session_state["cam_brinco_on"] = False; st.rerun()
 
     with tab_kbd:
         st.caption("Teclado grande para uso ao sol / com luvas.")
