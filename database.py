@@ -409,6 +409,17 @@ def init_db() -> None:
                 value TEXT
             );
 
+            -- Pluviometria (chuva medida, por piquete)
+            CREATE TABLE IF NOT EXISTS pluviometria (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                read_date  TEXT NOT NULL,
+                rain_mm    REAL NOT NULL DEFAULT 0,
+                lote_id    TEXT,
+                operator   TEXT,
+                notes      TEXT,
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            );
+
             -- Fotos dos animais (imagem comprimida, com histórico)
             CREATE TABLE IF NOT EXISTS animal_photos (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1772,7 +1783,8 @@ ADMIN_TABLES = [
     "animals", "weighings", "medications", "insumos", "lotes",
     "fornecedores", "animal_costs", "fixed_costs", "insumo_transactions",
     "animal_movements", "feeding_plans", "feeding_checks",
-    "category_prices", "sales", "deaths", "settings", "health_protocols", "users",
+    "category_prices", "sales", "deaths", "settings", "health_protocols",
+    "pluviometria", "users",
 ]
 
 
@@ -2062,6 +2074,45 @@ def get_performance_by_lote() -> list[dict]:
             "custo_por_gmd": round(custo_por_animal / gmd_med, 2) if gmd_med > 0 else 0.0,
         })
     return sorted(result, key=lambda x: -x["gmd_medio"])
+
+# ─── Pluviometria (chuva medida por piquete) ─────────────────────────────────
+
+@_writes
+def add_rain(read_date: str, rain_mm: float, lote_id: Optional[str] = None,
+             operator: str = "", notes: str = "") -> None:
+    with _conn() as con:
+        con.execute(
+            "INSERT INTO pluviometria (read_date,rain_mm,lote_id,operator,notes) VALUES(?,?,?,?,?)",
+            (read_date, rain_mm, lote_id or None, operator, notes),
+        )
+
+
+def get_rain(start_date: Optional[str] = None, end_date: Optional[str] = None,
+             lote_id: Optional[str] = None) -> list[dict]:
+    sql = ("SELECT p.*, l.name AS lote_name FROM pluviometria p "
+           "LEFT JOIN lotes l ON l.id=p.lote_id WHERE 1=1")
+    args: list = []
+    if start_date:
+        sql += " AND p.read_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND p.read_date <= ?"; args.append(end_date)
+    if lote_id:
+        sql += " AND p.lote_id = ?"; args.append(lote_id)
+    sql += " ORDER BY p.read_date DESC, p.id DESC"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
+def get_rain_total(start_date: Optional[str] = None,
+                   end_date: Optional[str] = None) -> float:
+    sql, args = "SELECT COALESCE(SUM(rain_mm),0) t FROM pluviometria WHERE 1=1", []
+    if start_date:
+        sql += " AND read_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND read_date <= ?"; args.append(end_date)
+    with _conn() as con:
+        row = con.execute(sql, args).fetchone()
+    return round(float(row["t"] or 0), 1)
 
 # ─── Protocolos Sanitários / Calendário de Vacinação ─────────────────────────
 
