@@ -750,6 +750,31 @@ def _campo_trato():
                     st.rerun()
 
 
+@st.fragment
+def _teclado_numerico():
+    """Teclado numérico isolado em fragmento: digitar não re-roda a página toda."""
+    st.caption("Teclado grande para uso ao sol / com luvas.")
+    disp = st.session_state.keypad_value or "——"
+    st.markdown(f'<div class="keypad-display">BR {disp}</div>', unsafe_allow_html=True)
+    rows_kbd = [["7","8","9"],["4","5","6"],["1","2","3"],["C","0","✓"]]
+    for row in rows_kbd:
+        kc = st.columns(3)
+        for i, k in enumerate(row):
+            with kc[i]:
+                if st.button(k, key=f"kp_{k}_{row[0]}", use_container_width=True):
+                    if k == "C":
+                        st.session_state.keypad_value = ""
+                        st.rerun(scope="fragment")
+                    elif k == "✓":
+                        st.session_state.campo_id = f"BR{st.session_state.keypad_value.zfill(4)}"
+                        st.session_state.keypad_value = ""
+                        st.rerun(scope="app")   # recarrega a página p/ localizar o animal
+                    else:
+                        if len(st.session_state.keypad_value) < 4:
+                            st.session_state.keypad_value += k
+                        st.rerun(scope="fragment")
+
+
 def _campo_animal():
     # ── Passo 1: Localizar animal ─────────────────────────────────────────────
     tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
@@ -796,23 +821,7 @@ def _campo_animal():
                 st.session_state["cam_brinco_on"] = False; st.rerun()
 
     with tab_kbd:
-        st.caption("Teclado grande para uso ao sol / com luvas.")
-        disp=st.session_state.keypad_value or "——"
-        st.markdown(f'<div class="keypad-display">BR {disp}</div>',unsafe_allow_html=True)
-        rows_kbd=[["7","8","9"],["4","5","6"],["1","2","3"],["C","0","✓"]]
-        for row in rows_kbd:
-            kc=st.columns(3)
-            for i,k in enumerate(row):
-                with kc[i]:
-                    if st.button(k,key=f"kp_{k}_{row[0]}",use_container_width=True):
-                        if k=="C":   st.session_state.keypad_value=""
-                        elif k=="✓":
-                            st.session_state.campo_id=f"BR{st.session_state.keypad_value.zfill(4)}"
-                            st.session_state.keypad_value=""
-                        else:
-                            if len(st.session_state.keypad_value)<4:
-                                st.session_state.keypad_value+=k
-                        st.rerun()
+        _teclado_numerico()
 
     # ── Passo 2: Exibir animal ────────────────────────────────────────────────
     eid=st.session_state.campo_id
@@ -1134,8 +1143,14 @@ def page_animal():
                 help="Peso atual menos o peso de entrada")
     m[4].metric("@ Atuais",   f"{arrobas:.2f} @",
                 help="Arrobas equivalentes ao peso vivo atual (rendimento de carcaça)")
-    m[5].metric("GMD",        f"{gmd:.3f} kg/dia" if gmd else "N/A",
-                delta=f"{gmd:.3f}" if gmd else None)
+    gmd_total = db.calculate_gmd_total(animal)
+    gmd_txt = f"{gmd:.3f} kg/dia" if gmd else "N/A"
+    tot_txt = f"{gmd_total:.3f} kg/dia" if gmd_total else "N/A"
+    m[5].metric("GMD recente", gmd_txt,
+                delta=f"{gmd:.3f}" if gmd else None,
+                help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
+    st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
+               f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
 
     src_label = db.AGE_SOURCES.get(animal.get("age_source","propriedade"),"—")
     doc_parts = []
@@ -2620,25 +2635,28 @@ def page_desempenho():
 
     # ── Projeção de abate ─────────────────────────────────────────────────────
     with dt2:
-        st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD atual.")
+        st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
+                   "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
         rows = []
         for a in animals:
             p = db.projecao_abate(a)
+            g_total = db.calculate_gmd_total(a)
             rows.append({"ID":a["id"],"Raça":a["breed"],
                 "Peso Atual (kg)":a["current_weight"],
                 "Peso-Alvo (kg)":a.get("target_weight") or 500,
                 "Falta (kg)":p["falta"],
-                "GMD (kg/dia)":round(p["gmd"],3) if p["gmd"] else None,
+                "GMD recente":round(p["gmd"],3) if p["gmd"] else None,
+                "GMD total":round(g_total,3) if g_total else None,
                 "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
                 "Data estimada":p["data"] or "— (sem GMD)"})
         df = pd.DataFrame(rows)
-        # Prontos primeiro, depois por menor tempo
         st.dataframe(df, use_container_width=True, hide_index=True, height=420,
             column_config={
                 "Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
                 "Peso-Alvo (kg)":st.column_config.NumberColumn(format="%.0f"),
                 "Falta (kg)":st.column_config.NumberColumn(format="%.1f"),
-                "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+                "GMD recente":st.column_config.NumberColumn(format="%.3f"),
+                "GMD total":st.column_config.NumberColumn(format="%.3f")})
         prontos = [r for r in rows if r["Dias p/ abate"] == 0]
         if prontos:
             st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "

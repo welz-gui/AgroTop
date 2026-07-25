@@ -439,6 +439,15 @@ def init_db() -> None:
                 notes           TEXT,
                 created_at      TEXT DEFAULT (datetime('now','localtime'))
             );
+
+            -- Índices para performance (volume futuro)
+            CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings (animal_id, weigh_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications (animal_id);
+            CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications (protocol_id);
+            CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs (animal_id);
+            CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions (lote_id);
+            CREATE INDEX IF NOT EXISTS idx_animals_status ON animals (status);
+            CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos (animal_id);
         """)
         _migrate(con)
         _seed_users(con)
@@ -1056,6 +1065,7 @@ def get_last_estimate(animal_id: str) -> Optional[dict]:
 
 
 def calculate_gmd(animal_id: str) -> Optional[float]:
+    """GMD recente: entre as duas últimas pesagens (como o animal está agora)."""
     ws = get_weighings(animal_id)
     if len(ws) < 2:
         return None
@@ -1065,6 +1075,19 @@ def calculate_gmd(animal_id: str) -> Optional[float]:
         days = abs((d0 - d1).days)
         return round((ws[0]["weight"] - ws[1]["weight"]) / days, 3) if days else None
     except (ValueError, KeyError):
+        return None
+
+
+def calculate_gmd_total(animal: dict) -> Optional[float]:
+    """GMD de vida: (peso atual − peso de entrada) ÷ dias desde a entrada.
+    Tendência geral do animal na fazenda (recebe o dict do animal)."""
+    try:
+        entrada = datetime.strptime(animal["entry_date"], "%Y-%m-%d").date()
+        dias = (date.today() - entrada).days
+        if dias <= 0:
+            return None
+        return round((animal["current_weight"] - animal["entry_weight"]) / dias, 3)
+    except (ValueError, KeyError, TypeError):
         return None
 
 # ─── Medicamentos ─────────────────────────────────────────────────────────────
@@ -1861,6 +1884,7 @@ def get_fornecedor_performance() -> list[dict]:
 
 # ─── Alertas ─────────────────────────────────────────────────────────────────
 
+@_cache
 def get_alert_animals() -> dict:
     animals = get_all_animals()
     today   = date.today()
@@ -1898,6 +1922,7 @@ def check_low_stock() -> list[dict]:
 
 # ─── KPIs e Estatísticas ─────────────────────────────────────────────────────
 
+@_cache
 def get_rebanho_stats() -> dict:
     animals = get_all_animals()
     lotes   = get_all_lotes()
