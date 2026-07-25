@@ -18,3 +18,6 @@ venv/
 # Temporários
 _migracao*.sql
 _teste.xlsx
+
+# Notas locais da sessão (não versionar)
+NOTAS_SESSAO.md
