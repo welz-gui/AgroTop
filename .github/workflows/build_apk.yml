@@ -24,6 +24,7 @@ jobs:
       - name: Set up Flutter SDK
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.19.6'
           channel: 'stable'
 
       - name: Install Dependencies
@@ -34,7 +35,7 @@ jobs:
       - name: Build Android APK
         run: |
           cd agrotop_mobile
-          flutter build apk --debug --no-tree-shake-icons
+          flutter build apk --debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
