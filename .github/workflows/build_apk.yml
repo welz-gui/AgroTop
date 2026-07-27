@@ -1,0 +1,44 @@
+name: Build AgroTop Mobile APK
+
+on:
+  push:
+    branches:
+      - feature/app-mobile
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: |
+          cd agrotop_mobile
+          flutter pub get
+
+      - name: Build Android APK
+        run: |
+          cd agrotop_mobile
+          flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgroTop-Mobile-APK
+          path: agrotop_mobile/build/app/outputs/flutter-apk/app-debug.apk
