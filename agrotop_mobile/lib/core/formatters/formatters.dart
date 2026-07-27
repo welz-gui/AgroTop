@@ -38,7 +38,7 @@ class AppFormatters {
 
   /// Converte kg para Arrobas (@) considerando rendimento padrão de 54%
   static String formatArrobas(double weightKg, {double yieldFraction = 0.54}) {
-    final @prod = (weightKg * yieldFraction) / 15.0;
-    return '${@prod.toStringAsFixed(2)} @';
+    final arrobas = (weightKg * yieldFraction) / 15.0;
+return '${arrobas.toStringAsFixed(2)} @';
   }
 }
