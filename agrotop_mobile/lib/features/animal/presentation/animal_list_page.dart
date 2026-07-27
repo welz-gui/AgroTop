@@ -123,7 +123,7 @@ class _AnimalListPageState extends State<AnimalListPage> {
                                 ),
                               ),
                               trailing: Column(
-                                mainCenter: MainAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
