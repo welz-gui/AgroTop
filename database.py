@@ -1878,24 +1878,57 @@ def add_fornecedor(name, city, state, contact="", notes="") -> None:
         )
 
 
-def get_fornecedor_performance() -> list[dict]:
-    """GMD médio agrupado por fornecedor de origem."""
-    animals = get_all_animals()
-    rows = []
-    forn_map: dict[str, list[float]] = {}
+def get_fornecedor_ranking() -> list[dict]:
+    """Ranking ampliado por fornecedor de origem, sobre **todo o histórico**
+    (animais ativos, vendidos e mortos):
+      - GMD médio (dos animais com pesagem suficiente)
+      - taxa de mortalidade (mortos ÷ total do fornecedor)
+      - custo por @ produzida (custo acumulado ÷ arrobas de carcaça ganhas)
+    Peso final por animal: peso registrado no óbito, se houver; senão o peso atual.
+    """
+    animals = get_all_animals(status=None)  # todos os status
+    with _conn() as con:
+        drows = con.execute("SELECT animal_id, weight_at_death FROM deaths").fetchall()
+    death_w = {r["animal_id"]: r["weight_at_death"] for r in drows}
+
+    agg: dict[str, dict] = {}
     for a in animals:
-        gmd = calculate_gmd(a["id"])
         fname = a.get("fornecedor_name") or "Não informado"
-        forn_map.setdefault(fname, [])
-        if gmd is not None:
-            forn_map[fname].append(gmd)
-    for fname, gmds in forn_map.items():
-        rows.append({
-            "Fornecedor":   fname,
-            "Animais":      len(gmds),
-            "GMD Médio":    round(sum(gmds)/len(gmds), 3) if gmds else 0,
+        d = agg.setdefault(fname, {"n": 0, "ativos": 0, "vendidos": 0, "mortos": 0,
+                                   "gmds": [], "custo_total": 0.0, "arrobas": 0.0})
+        d["n"] += 1
+        status = a.get("status")
+        if status == "morto":
+            d["mortos"] += 1
+        elif status == "vendido":
+            d["vendidos"] += 1
+        else:
+            d["ativos"] += 1
+
+        g = calculate_gmd(a["id"])
+        if g is not None:
+            d["gmds"].append(g)
+
+        d["custo_total"] += get_total_cost(a["id"])
+
+        peso_final = death_w.get(a["id"]) or a.get("current_weight") or 0
+        ganho = peso_final - (a.get("entry_weight") or 0)
+        if ganho > 0:
+            d["arrobas"] += ganho * CARCASS_YIELD / KG_PER_ARROBA
+
+    out = []
+    for fname, d in agg.items():
+        n, gmds = d["n"], d["gmds"]
+        out.append({
+            "fornecedor": fname, "n": n,
+            "ativos": d["ativos"], "vendidos": d["vendidos"], "mortos": d["mortos"],
+            "gmd_medio": round(sum(gmds)/len(gmds), 3) if gmds else 0.0,
+            "taxa_mortalidade": round(d["mortos"]/n*100, 1) if n else 0.0,
+            "custo_total": round(d["custo_total"], 2),
+            "arrobas_produzidas": round(d["arrobas"], 2),
+            "custo_por_arroba": round(d["custo_total"]/d["arrobas"], 2) if d["arrobas"] > 0 else 0.0,
         })
-    return sorted(rows, key=lambda x: -x["GMD Médio"])
+    return sorted(out, key=lambda x: -x["gmd_medio"])
 
 # ─── Alertas ─────────────────────────────────────────────────────────────────
 

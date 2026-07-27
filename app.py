@@ -1904,18 +1904,56 @@ def page_financeiro():
                 be_col:st.column_config.NumberColumn(format="R$ %.2f")})
 
     with ft4:  # DESEMPENHO POR ORIGEM
-        st.subheader("🏆 Desempenho por Fornecedor / Origem")
-        perf=db.get_fornecedor_performance()
-        if perf:
-            df_p=pd.DataFrame(perf)
-            fig_p=px.bar(df_p,x="Fornecedor",y="GMD Médio",color="GMD Médio",
-                color_continuous_scale=["#f87171","#fbbf24","#4ade80"],
-                text="GMD Médio",labels={"GMD Médio":"GMD Médio (kg/dia)"})
-            fig_p.update_traces(texttemplate="%{text:.3f}",textposition="outside")
-            fig_p.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
-                xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
-            st.plotly_chart(fig_p,use_container_width=True)
-            st.dataframe(df_p,use_container_width=True,hide_index=True)
+        st.subheader("🏆 Ranking de Fornecedor / Origem")
+        st.caption("Comparativo por origem sobre **todo o histórico** (ativos, vendidos e mortos): "
+                   "quem entrega o melhor **GMD**, a menor **mortalidade** e o menor "
+                   "**custo por @ produzida**.")
+        rank=db.get_fornecedor_ranking()
+        if not rank:
+            st.info("Sem animais com fornecedor informado ainda.")
+        else:
+            rows=[{"Fornecedor":r["fornecedor"],"Animais":r["n"],
+                   "Ativos":r["ativos"],"Vendidos":r["vendidos"],"Mortos":r["mortos"],
+                   "GMD Médio (kg/dia)":r["gmd_medio"],
+                   "Mortalidade (%)":r["taxa_mortalidade"],
+                   "@ produzidas":r["arrobas_produzidas"],
+                   "Custo/@ produzida (R$)":r["custo_por_arroba"]} for r in rank]
+            df_p=pd.DataFrame(rows)
+            st.dataframe(df_p,use_container_width=True,hide_index=True,
+                column_config={
+                    "GMD Médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
+                    "Mortalidade (%)":st.column_config.NumberColumn(format="%.1f%%"),
+                    "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
+                    "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+
+            c1,c2=st.columns(2)
+            with c1:
+                fig_p=px.bar(df_p,x="Fornecedor",y="GMD Médio (kg/dia)",
+                    color="GMD Médio (kg/dia)",
+                    color_continuous_scale=["#f87171","#fbbf24","#4ade80"],
+                    text="GMD Médio (kg/dia)")
+                fig_p.update_traces(texttemplate="%{text:.3f}",textposition="outside")
+                fig_p.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
+                    title="GMD médio por fornecedor",
+                    xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+                st.plotly_chart(fig_p,use_container_width=True)
+            with c2:
+                fig_m=px.bar(df_p,x="Fornecedor",y="Mortalidade (%)",
+                    color="Mortalidade (%)",
+                    color_continuous_scale=["#4ade80","#fbbf24","#f87171"],
+                    text="Mortalidade (%)")
+                fig_m.update_traces(texttemplate="%{text:.1f}%",textposition="outside")
+                fig_m.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
+                    title="Taxa de mortalidade por fornecedor",
+                    xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+                st.plotly_chart(fig_m,use_container_width=True)
+
+            melhor=next((r for r in rank if r["arrobas_produzidas"]>0),None)
+            if melhor:
+                st.success(f"🥇 Melhor GMD médio: **{rank[0]['fornecedor']}** "
+                           f"({rank[0]['gmd_medio']:.3f} kg/dia). "
+                           f"Compare com o **custo por @** e a **mortalidade** na tabela para "
+                           f"decidir de quem vale a pena comprar de novo.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ESTOQUE DE INSUMOS
