@@ -267,6 +267,7 @@ def init_db() -> None:
                 applied_by        TEXT,
                 insumo_id         INTEGER,
                 notes             TEXT,
+                protocol_id       INTEGER,
                 created_at        TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id)
@@ -297,6 +298,7 @@ def init_db() -> None:
                 transaction_date TEXT NOT NULL,
                 operator         TEXT,
                 notes            TEXT,
+                lote_id          TEXT,
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id)
             );
