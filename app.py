@@ -2730,8 +2730,8 @@ def page_desempenho():
     if not animals:
         st.info("Sem animais ativos."); return
 
-    dt1, dt2, dt3 = st.tabs(["🎯 Meta & Baixo Desempenho", "📅 Projeção de Abate",
-                             "🌿 Comparativo por Piquete"])
+    dt1, dt2, dt3, dt4 = st.tabs(["🎯 Meta & Baixo Desempenho", "📅 Projeção de Abate",
+                                  "🌿 Comparativo por Piquete", "🐂 Simulador de Terminação"])
 
     # ── Meta de GMD e baixo desempenho ────────────────────────────────────────
     with dt1:
@@ -2835,6 +2835,118 @@ def page_desempenho():
             if all(p["custo_nutricao"]==0 for p in perf):
                 st.info("💡 O custo de nutrição por piquete começa a ser contabilizado a partir "
                         "das próximas confirmações de trato (na aba Trato do Modo Campo).")
+
+    # ── Simulador de terminação ───────────────────────────────────────────────
+    with dt4:
+        st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
+                   "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
+                   "de cada estratégia — os valores são **editáveis** e salvos para as "
+                   "próximas simulações.")
+
+        pesos = sorted(a["current_weight"] for a in animals)
+        peso_medio = round(pesos[len(pesos)//2], 0) if pesos else 380.0
+        metas = [a.get("target_weight") for a in animals if a.get("target_weight")]
+        meta_pad = round(sum(metas)/len(metas), 0) if metas else 500.0
+        try:
+            arroba_pad = float(db.get_setting("preco_arroba", "300"))
+        except (TypeError, ValueError):
+            arroba_pad = 300.0
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            peso_atual = st.number_input("Peso atual (kg)", min_value=50.0, max_value=900.0,
+                value=float(peso_medio), step=10.0,
+                help="Padrão: peso mediano do rebanho ativo")
+        with c2:
+            peso_meta = st.number_input("Peso de abate (kg)", min_value=100.0, max_value=1000.0,
+                value=float(meta_pad), step=10.0)
+        with c3:
+            preco_arroba = st.number_input("Preço da @ (R$)", min_value=0.0, max_value=2000.0,
+                value=float(arroba_pad), step=5.0, format="%.2f",
+                help="Preço do boi gordo por arroba na venda")
+        with c4:
+            custo_boi = st.number_input("Custo do boi magro (R$)", min_value=0.0,
+                max_value=100000.0, value=0.0, step=50.0, format="%.2f",
+                help="Opcional — aquisição/valor do animal hoje. Igual para todos os "
+                     "cenários; deixe 0 para analisar só a etapa de terminação.")
+
+        st.markdown("**Cenários** — edite GMD (kg/dia), custo/dia (R$) e rendimento de carcaça (%)")
+        cen = db.get_terminacao_cenarios()
+        df_cen = pd.DataFrame(cen)[["nome", "gmd", "custo_dia", "rendimento"]]
+        edited = st.data_editor(df_cen, use_container_width=True, hide_index=True,
+            num_rows="dynamic", key="term_editor",
+            column_config={
+                "nome": st.column_config.TextColumn("Estratégia"),
+                "gmd": st.column_config.NumberColumn("GMD (kg/dia)", min_value=0.0,
+                    max_value=3.0, step=0.05, format="%.3f"),
+                "custo_dia": st.column_config.NumberColumn("Custo/dia (R$)", min_value=0.0,
+                    step=0.5, format="R$ %.2f"),
+                "rendimento": st.column_config.NumberColumn("Rendimento (%)", min_value=0.30,
+                    max_value=0.70, step=0.01, format="%.2f")})
+
+        cA, cB = st.columns([1, 3])
+        with cA:
+            if st.button("💾 Salvar cenários", use_container_width=True):
+                db.set_terminacao_cenarios(edited.to_dict("records"))
+                db.set_setting("preco_arroba", round(preco_arroba, 2))
+                st.success("Cenários e preço da @ salvos!"); st.rerun()
+
+        cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
+        sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+
+        if peso_meta - peso_atual <= 0:
+            st.warning("O peso de abate precisa ser maior que o peso atual.")
+        elif not any(s["dias"] for s in sim):
+            st.info("Informe um GMD maior que zero em pelo menos um cenário.")
+        else:
+            ganho = round(peso_meta - peso_atual, 1)
+            st.markdown(f"Ganho necessário: **{ganho:.0f} kg** por cabeça.")
+            rows = [{"Estratégia":s["nome"],"Dias no trato":s["dias"],
+                     "@ produzidas":s["arrobas_produzidas"],
+                     "Custo alimentar (R$)":s["custo_alimentar"],
+                     "Custo/@ produzida (R$)":s["custo_por_arroba"],
+                     "Receita (R$)":s["receita"],"Lucro (R$)":s["lucro"],
+                     "Lucro/dia (R$)":s["lucro_por_dia"],
+                     "Margem (%)":s["margem"]} for s in sim]
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True,
+                column_config={
+                    "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
+                    "Custo alimentar (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Lucro/dia (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                    "Margem (%)":st.column_config.NumberColumn(format="%.1f%%")})
+
+            validos = [s for s in sim if s["lucro"] is not None]
+            best = validos[0] if validos else None
+            if best and best["viavel"]:
+                st.success(f"🏆 Estratégia mais rentável: **{best['nome']}** — "
+                           f"lucro de **R$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
+                           f"(R$ {best['lucro_por_dia']:,.2f}/dia).")
+            elif best:
+                st.warning(f"⚠️ Nenhuma estratégia dá lucro positivo com estes parâmetros. "
+                           f"A menos ruim é **{best['nome']}** (R$ {best['lucro']:,.2f}).")
+
+            fig = go.Figure()
+            nomes = [s["nome"] for s in validos]
+            fig.add_bar(x=nomes, y=[s["lucro"] for s in validos], name="Lucro (R$)",
+                marker_color=["#4ade80" if s["viavel"] else "#f87171" for s in validos],
+                yaxis="y")
+            fig.add_trace(go.Scatter(x=nomes, y=[s["dias"] for s in validos],
+                name="Dias no trato", mode="lines+markers",
+                line=dict(color="#fbbf24", width=3), yaxis="y2"))
+            fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
+                xaxis=dict(gridcolor="#1e293b"),
+                yaxis=dict(title="Lucro (R$)", gridcolor="#1e293b", zeroline=True,
+                    zerolinecolor="#475569"),
+                yaxis2=dict(title="Dias", overlaying="y", side="right", showgrid=False)))
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption("Receita = peso de abate × rendimento ÷ 15 × preço da @. "
+                       "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
+                       "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
+                       "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
 
 
 def page_nutricao():
