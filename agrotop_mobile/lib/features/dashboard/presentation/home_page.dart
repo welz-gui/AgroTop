@@ -3,8 +3,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../shared/widgets/sync_status_badge.dart';
 import '../../animal/presentation/animal_list_page.dart';
 import '../../animal/presentation/animal_form_page.dart';
+import '../../weighings/presentation/weighing_form_page.dart';
+import '../../camera_ocr/presentation/camera_ocr_page.dart';
 import '../../terminacao/presentation/simulador_terminacao_page.dart';
-import '../../auth/presentation/login_page.dart';
+import '../../profile/presentation/profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -34,20 +36,20 @@ class _HomePageState extends State<HomePage> {
           children: const [
             Icon(Icons.agriculture_rounded, size: 24),
             SizedBox(width: 8),
-            Text('AgroTop'),
+            Text('AgroTop Mobile'),
           ],
         ),
         actions: [
           const Padding(
-            padding: EdgeInsets.only(right: 12.0),
+            padding: EdgeInsets.only(right: 8.0),
             child: SyncStatusBadge(isOnline: true, pendingSyncCount: 0),
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Sair',
+            icon: const Icon(Icons.person_outline_rounded),
+            tooltip: 'Perfil & Configurações',
             onPressed: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
               );
             },
           ),
@@ -168,11 +170,11 @@ class _HomePageState extends State<HomePage> {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.3,
+              childAspectRatio: 1.25,
               children: [
                 _buildActionCard(
                   context,
-                  title: 'Ver Animais',
+                  title: 'Ver Rebanho',
                   subtitle: 'Listagem e buscas',
                   icon: Icons.format_list_bulleted_rounded,
                   color: AppColors.primary,
@@ -184,13 +186,13 @@ class _HomePageState extends State<HomePage> {
                 ),
                 _buildActionCard(
                   context,
-                  title: 'Novo Cadastro',
-                  subtitle: 'Inserir animal',
-                  icon: Icons.add_circle_outline_rounded,
+                  title: 'Registrar Pesagem',
+                  subtitle: 'Manejo no curral',
+                  icon: Icons.scale_rounded,
                   color: AppColors.primaryLight,
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AnimalFormPage()),
+                      MaterialPageRoute(builder: (_) => const WeighingFormPage()),
                     );
                   },
                 ),
@@ -201,8 +203,20 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.qr_code_scanner_rounded,
                   color: AppColors.accent,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Leitor de Brinco/QR Code via Câmera ativado.')),
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const CameraOcrPage()),
+                    );
+                  },
+                ),
+                _buildActionCard(
+                  context,
+                  title: 'Novo Cadastro',
+                  subtitle: 'Inserir animal',
+                  icon: Icons.add_circle_outline_rounded,
+                  color: Colors.teal,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AnimalFormPage()),
                     );
                   },
                 ),
@@ -215,6 +229,18 @@ class _HomePageState extends State<HomePage> {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const SimuladorTerminacaoPage()),
+                    );
+                  },
+                ),
+                _buildActionCard(
+                  context,
+                  title: 'Perfil & Config',
+                  subtitle: 'Sincronização / Conta',
+                  icon: Icons.settings_outlined,
+                  color: Colors.purple,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ProfilePage()),
                     );
                   },
                 ),
@@ -305,7 +331,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
@@ -313,7 +339,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 subtitle,
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: AppColors.textSecondary,
                 ),
               ),
