@@ -1815,8 +1815,8 @@ def page_financeiro():
             total_fix_ano = db.get_total_fixed_costs(
                 date(date.today().year,1,1).isoformat(), date.today().isoformat())
             rateio_fixo = total_fix_ano / len(animals)
-            st.info(f"Rateio de custos fixos: **R$ {rateio_fixo:,.2f}** por animal "
-                    f"(total R$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
+            st.info(f"Rateio de custos fixos: **R\\$ {rateio_fixo:,.2f}** por animal "
+                    f"(total R\\$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
 
         sim_rows=[]
         sem_preco=[]
@@ -2359,7 +2359,7 @@ def page_cadastrar():
                     preco_kg_compra = st.number_input("Preço por kg (R$)",
                         min_value=0.0, step=0.10, format="%.2f")
                     purchase_price = round(entry_weight * preco_kg_compra, 2)
-                    st.caption(f"→ Total: **R$ {purchase_price:,.2f}** ({entry_weight:.0f} kg × R$ {preco_kg_compra:.2f})")
+                    st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({entry_weight:.0f} kg × R\\$ {preco_kg_compra:.2f})")
                 else:
                     purchase_price=st.number_input("Valor de Compra (R$)",
                         min_value=0.0,step=10.0,format="%.2f")
@@ -2961,11 +2961,11 @@ def page_desempenho():
             best = validos[0] if validos else None
             if best and best["viavel"]:
                 st.success(f"🏆 Estratégia mais rentável: **{best['nome']}** — "
-                           f"lucro de **R$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
-                           f"(R$ {best['lucro_por_dia']:,.2f}/dia).")
+                           f"lucro de **R\\$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
+                           f"(R\\$ {best['lucro_por_dia']:,.2f}/dia).")
             elif best:
                 st.warning(f"⚠️ Nenhuma estratégia dá lucro positivo com estes parâmetros. "
-                           f"A menos ruim é **{best['nome']}** (R$ {best['lucro']:,.2f}).")
+                           f"A menos ruim é **{best['nome']}** (R\\$ {best['lucro']:,.2f}).")
 
             fig = go.Figure()
             nomes = [s["nome"] for s in validos]
