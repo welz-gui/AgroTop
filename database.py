@@ -3,6 +3,11 @@ AgroTop — Camada de acesso ao banco de dados.
 Funciona com SQLite (local) ou PostgreSQL/Supabase (nuvem), conforme a
 variável de ambiente/segredo DATABASE_URL. Schema completo: animais,
 pesagens, medicamentos, lotes, movimentações, insumos, custos, nutrição.
+
+⚠️ Em transição (ROADMAP.md, Fase A2): as regras de negócio estão migrando para
+`services/` e as consultas migrarão para `repositories/`. Este módulo segue como
+fachada, reexportando o que já saiu — assim `app.py` e os testes não quebram de
+uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`.
 """
 
 import os
@@ -14,10 +19,24 @@ from datetime import datetime, date, timedelta
 from contextlib import contextmanager
 from typing import Optional
 
+# ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
+# Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
+# os chamadores existentes. Código novo deve importar de `services/` diretamente.
+from services.constantes import (  # noqa: F401
+    CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT, AGE_BANDS,
+)
+from services.zootecnia import (  # noqa: F401
+    _months_between, get_age_months, get_age_category, get_age_display,
+    kg_to_arrobas, estimate_weight_by_measurement, calculate_gmd_total,
+)
+from services.terminacao import (  # noqa: F401
+    TERMINACAO_DEFAULTS, simular_terminacao,
+)
+from services.seguranca import (  # noqa: F401
+    _hash, _is_legacy_hash, _verify_password,
+)
+
 DB_PATH       = "agrotop.db"
-CARCASS_YIELD = 0.52    # rendimento de carcaça padrão (52 %)
-KG_PER_ARROBA = 15.0    # kg por arroba
-UA_WEIGHT     = 450.0   # kg por Unidade Animal padrão
 
 # ─── Seleção de backend (SQLite local x Postgres/Supabase nuvem) ─────────────
 
@@ -691,43 +710,15 @@ def _seed_insumos(con):
 
 # ─── Utilidades ───────────────────────────────────────────────────────────────
 
-_PBKDF2_ITERATIONS = 260_000
 
 
-def _hash(pwd: str) -> str:
-    """Gera hash de senha com PBKDF2-SHA256 + salt aleatório.
-    Formato: pbkdf2_sha256$<iteracoes>$<salt_hex>$<hash_hex>."""
-    import secrets
-    salt = secrets.token_bytes(16)
-    dk = hashlib.pbkdf2_hmac("sha256", pwd.encode(), salt, _PBKDF2_ITERATIONS)
-    return f"pbkdf2_sha256${_PBKDF2_ITERATIONS}${salt.hex()}${dk.hex()}"
 
 
-def _is_legacy_hash(stored: str) -> bool:
-    """True se o hash está no formato antigo (SHA-256 sem salt)."""
-    return not (stored or "").startswith("pbkdf2_sha256$")
 
 
-def _verify_password(pwd: str, stored: str) -> bool:
-    """Verifica a senha contra o hash armazenado (PBKDF2 novo ou SHA-256 legado)."""
-    import hmac
-    if not stored:
-        return False
-    if stored.startswith("pbkdf2_sha256$"):
-        try:
-            _, iters, salt_hex, dk_hex = stored.split("$")
-            dk = hashlib.pbkdf2_hmac("sha256", pwd.encode(),
-                                     bytes.fromhex(salt_hex), int(iters))
-            return hmac.compare_digest(dk.hex(), dk_hex)
-        except (ValueError, TypeError):
-            return False
-    # Legado: SHA-256 sem salt
-    legacy = hashlib.sha256(pwd.encode()).hexdigest()
-    return hmac.compare_digest(legacy, stored)
 
 
 # Rótulos das faixas etárias (registro por idade)
-AGE_BANDS = ["Até 12 meses", "13 a 24 meses", "25 a 36 meses", "+ de 36 meses"]
 
 # Formas de definição da idade
 AGE_SOURCES = {
@@ -738,12 +729,6 @@ AGE_SOURCES = {
 }
 
 
-def _months_between(d_start: date, d_end: date) -> int:
-    """Diferença em meses cheios entre duas datas."""
-    months = (d_end.year - d_start.year) * 12 + (d_end.month - d_start.month)
-    if d_end.day < d_start.day:
-        months -= 1
-    return max(months, 0)
 
 
 def birth_date_from_age(age_months: int, ref_date: Optional[date] = None) -> str:
@@ -761,46 +746,12 @@ def birth_date_from_age(age_months: int, ref_date: Optional[date] = None) -> str
         return date(year, month, 1).isoformat()
 
 
-def get_age_months(birth_date_str: Optional[str]) -> Optional[int]:
-    """Idade atual em meses (avança automaticamente com o tempo)."""
-    if not birth_date_str:
-        return None
-    try:
-        birth = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-        return _months_between(birth, date.today())
-    except ValueError:
-        return None
 
 
-def get_age_category(birth_date_str: Optional[str], sex: Optional[str] = None) -> str:
-    """Categoria por faixa etária. O parâmetro sex é mantido por compatibilidade."""
-    months = get_age_months(birth_date_str)
-    if months is None:
-        return "Sem idade"
-    if months <= 12: return AGE_BANDS[0]
-    if months <= 24: return AGE_BANDS[1]
-    if months <= 36: return AGE_BANDS[2]
-    return AGE_BANDS[3]
 
 
-def get_age_display(animal: dict) -> str:
-    """Texto de idade para exibição, indicando se é estimada."""
-    months = get_age_months(animal.get("birth_date"))
-    if months is None:
-        return "—"
-    est = " (est.)" if animal.get("birth_estimated") else ""
-    years, rem = divmod(months, 12)
-    if years and rem:
-        base = f"{years}a {rem}m"
-    elif years:
-        base = f"{years} ano{'s' if years > 1 else ''}"
-    else:
-        base = f"{months} mes{'es' if months != 1 else ''}"
-    return f"{base}{est}"
 
 
-def kg_to_arrobas(weight_kg: float, yield_: float = CARCASS_YIELD) -> float:
-    return round(weight_kg * yield_ / KG_PER_ARROBA, 2)
 
 
 def get_withdrawal_end(animal_id: str) -> Optional[date]:
@@ -1077,14 +1028,6 @@ def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
         con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
 
 
-def estimate_weight_by_measurement(girth_cm: float, length_cm: float) -> float:
-    """Estima o peso vivo (kg) a partir do perímetro torácico e do comprimento
-    corporal, usando a fórmula de Schaeffer convertida para o sistema métrico:
-        Peso(lb) = (PT_pol² × Comp_pol) / 300
-    Convertida para cm→kg resulta no fator ~1/10838."""
-    if girth_cm <= 0 or length_cm <= 0:
-        return 0.0
-    return round((girth_cm ** 2) * length_cm / 10838.0, 1)
 
 
 def get_last_estimate(animal_id: str) -> Optional[dict]:
@@ -1113,17 +1056,6 @@ def calculate_gmd(animal_id: str) -> Optional[float]:
         return None
 
 
-def calculate_gmd_total(animal: dict) -> Optional[float]:
-    """GMD de vida: (peso atual − peso de entrada) ÷ dias desde a entrada.
-    Tendência geral do animal na fazenda (recebe o dict do animal)."""
-    try:
-        entrada = datetime.strptime(animal["entry_date"], "%Y-%m-%d").date()
-        dias = (date.today() - entrada).days
-        if dias <= 0:
-            return None
-        return round((animal["current_weight"] - animal["entry_weight"]) / dias, 3)
-    except (ValueError, KeyError, TypeError):
-        return None
 
 # ─── Medicamentos ─────────────────────────────────────────────────────────────
 
@@ -2135,55 +2067,8 @@ def get_performance_by_lote() -> list[dict]:
 # ─── Simulador de terminação (pasto × semi × confinamento) ───────────────────
 
 # Cenários-padrão editáveis (o usuário calibra na tela e salva em settings).
-TERMINACAO_DEFAULTS = [
-    {"nome": "Pasto",            "gmd": 0.500, "custo_dia":  3.50, "rendimento": 0.50},
-    {"nome": "Semiconfinamento", "gmd": 0.900, "custo_dia":  8.00, "rendimento": 0.53},
-    {"nome": "Confinamento",     "gmd": 1.350, "custo_dia": 14.00, "rendimento": 0.55},
-]
 
 
-def simular_terminacao(peso_atual: float, peso_meta: float, preco_arroba: float,
-                       cenarios: list[dict], custo_boi_magro: float = 0.0) -> list[dict]:
-    """Compara a viabilidade econômica de terminar o boi por estratégia.
-
-    peso_atual/peso_meta em kg; preco_arroba = R$ por @ do boi gordo (venda).
-    Cada cenário: {'nome', 'gmd' (kg/dia), 'custo_dia' (R$/cab/dia), 'rendimento' (fração)}.
-    custo_boi_magro: custo/valor de aquisição do animal hoje (R$, igual p/ todos;
-      opcional — se 0, o lucro reflete só a etapa de terminação).
-
-    Retorna, por cenário (mais lucrativo primeiro): dias, ganho_kg, arrobas_produzidas,
-    custo_alimentar, receita, lucro, lucro_por_dia, custo_por_arroba, margem, viavel.
-    """
-    ganho_kg = round(peso_meta - peso_atual, 1)
-    out = []
-    for c in cenarios:
-        gmd  = float(c.get("gmd") or 0)
-        cd   = float(c.get("custo_dia") or 0)
-        rend = float(c.get("rendimento") or CARCASS_YIELD)
-        if ganho_kg <= 0 or gmd <= 0:
-            dias = None
-            custo_alim = arrobas_prod = receita = lucro = None
-            lpd = cpa = margem = None
-            viavel = False
-        else:
-            dias = int(round(ganho_kg / gmd))
-            custo_alim   = round(dias * cd, 2)
-            arrobas_prod = round(ganho_kg * rend / KG_PER_ARROBA, 2)
-            receita      = round(peso_meta * rend / KG_PER_ARROBA * preco_arroba, 2)
-            lucro        = round(receita - custo_alim - custo_boi_magro, 2)
-            lpd    = round(lucro / dias, 2) if dias else None
-            cpa    = round(custo_alim / arrobas_prod, 2) if arrobas_prod > 0 else None
-            margem = round(lucro / receita * 100, 1) if receita > 0 else None
-            viavel = lucro > 0
-        out.append({
-            "nome": c.get("nome", "—"), "gmd": round(gmd, 3), "custo_dia": round(cd, 2),
-            "rendimento": round(rend, 3), "dias": dias, "ganho_kg": ganho_kg,
-            "arrobas_produzidas": arrobas_prod, "custo_alimentar": custo_alim,
-            "receita": receita, "lucro": lucro, "lucro_por_dia": lpd,
-            "custo_por_arroba": cpa, "margem": margem, "viavel": viavel,
-        })
-    # ordena: viáveis primeiro, maior lucro primeiro; inválidos ao final
-    return sorted(out, key=lambda x: (x["lucro"] is None, -(x["lucro"] or 0)))
 
 
 def get_terminacao_cenarios() -> list[dict]:
