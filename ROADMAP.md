@@ -424,6 +424,8 @@ python -m compileall app.py database.py tests tools # verificação de compilaç
 python tools/dump_schema_nuvem.py --baseline        # regenerar baseline + retrato
 python tools/testar_baseline.py                     # validar que o baseline recria o schema
 python tools/gerar_hash_senha.py --usuario admin    # recuperar acesso perdido
+python tools/backup_banco.py                        # backup local do banco
+python tools/restaurar_banco.py <arquivo.zip>       # restaurar (schema de conferência)
 ```
 
 Forçar SQLite localmente: `AGROTOP_FORCE_SQLITE=1`.
@@ -492,8 +494,28 @@ completo da tabela removida, justamente para permitir recriá-la.
 
 Antes de migration **destrutiva** (`DROP`, `ALTER ... DROP COLUMN`, mudança de tipo):
 1. verificar o alvo (linhas, FKs, triggers, views dependentes — como foi feito com `profiles`);
-2. exportar backup dos dados afetados;
+2. **rodar `python tools/backup_banco.py`**;
 3. registrar no arquivo da migration o que foi verificado e como reverter.
+
+### R27. Backup local do banco
+
+O plano free do Supabase **não tem point-in-time recovery**. A rede de proteção é local:
+
+```bash
+python tools/backup_banco.py                    # backup completo + verificação
+python tools/restaurar_banco.py <arquivo.zip>   # restaura em schema de conferência
+```
+
+O backup é lido numa transação `REPEATABLE READ` (retrato coerente mesmo com o sistema
+em uso) e inclui **tudo**, até as fotos em `bytea` — diferente do backup em Excel do app,
+que as omite de propósito. Todo backup é verificado logo após ser gerado.
+
+A restauração cai por padrão num **schema de conferência descartável**, nunca por cima dos
+dados vivos. Testar a recuperação de tempos em tempos:
+`python tools/restaurar_banco.py <arquivo> --apagar-depois`.
+
+⚠️ O arquivo contém todos os dados, **inclusive hashes de senha**. `backups/` está no
+`.gitignore` — mantenha assim e guarde uma cópia fora desta máquina.
 
 ⚠️ **Confirme a situação de backup do seu plano Supabase.** O projeto está no plano **free**,
 que não oferece point-in-time recovery. Não assuma que existe backup automático suficiente —

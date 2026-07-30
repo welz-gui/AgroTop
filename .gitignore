@@ -21,3 +21,8 @@ _teste.xlsx
 
 # Notas locais da sessão (não versionar)
 NOTAS_SESSAO.md
+
+# Backups do banco — contêm TODOS os dados, inclusive hashes de senha.
+# Nunca versionar. Guarde fora do repositório e, de preferência, com cópia
+# em outro dispositivo ou nuvem pessoal.
+backups/
