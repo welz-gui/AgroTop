@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
+from typing import Optional
 import database as db
 
 # ─── Configuração da página ───────────────────────────────────────────────────
