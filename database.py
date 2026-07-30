@@ -21,8 +21,19 @@ UA_WEIGHT     = 450.0   # kg por Unidade Animal padrão
 
 # ─── Seleção de backend (SQLite local x Postgres/Supabase nuvem) ─────────────
 
+FORCE_SQLITE_ENV = "AGROTOP_FORCE_SQLITE"
+
+
 def _database_url() -> str:
-    """Lê a URL do Postgres de env var ou dos segredos do Streamlit."""
+    """Lê a URL do Postgres de env var ou dos segredos do Streamlit.
+
+    `AGROTOP_FORCE_SQLITE=1` ignora as duas fontes e devolve string vazia,
+    forçando o backend SQLite. Serve para testes: com `.streamlit/secrets.toml`
+    presente, o padrão seria conectar em PRODUÇÃO — e um teste que chame
+    `init_db()` gravaria lá. Ver `tests/__init__.py`.
+    """
+    if os.environ.get(FORCE_SQLITE_ENV, "").strip().lower() in ("1", "true", "yes"):
+        return ""
     url = os.environ.get("DATABASE_URL", "")
     if not url:
         try:

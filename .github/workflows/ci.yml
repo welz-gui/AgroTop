@@ -24,5 +24,8 @@ jobs:
       - name: Verificação de compilação
         run: python -m compileall app.py database.py tests
 
+      # `-t .` é obrigatório: faz `tests` ser importado como pacote, o que executa
+      # tests/__init__.py e isola a suíte do banco de produção. Sem isso, o teste
+      # tests/test_isolamento.py falha de propósito.
       - name: Testes unitários
-        run: python -m unittest discover -s tests -v
+        run: python -m unittest discover -s tests -t . -v

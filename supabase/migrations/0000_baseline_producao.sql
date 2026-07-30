@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-07-29 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-07-30 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.
@@ -237,18 +237,6 @@ CREATE TABLE IF NOT EXISTS pluviometria (
     CONSTRAINT pluviometria_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS profiles (
-    id uuid NOT NULL,
-    username text NOT NULL,
-    full_name text NOT NULL,
-    role text DEFAULT 'operador'::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT profiles_pkey PRIMARY KEY (id),
-    CONSTRAINT profiles_role_check CHECK ((role = ANY (ARRAY['admin'::text, 'gestor'::text, 'operador'::text, 'usuario'::text]))),
-    CONSTRAINT profiles_username_key UNIQUE (username)
-);
-
 CREATE TABLE IF NOT EXISTS sales (
     id bigserial,
     animal_id text NOT NULL,
@@ -319,7 +307,6 @@ ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FORE
 ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE medications ADD CONSTRAINT medications_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
-ALTER TABLE profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
 ALTER TABLE sales ADD CONSTRAINT sales_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE weighings ADD CONSTRAINT weighings_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 

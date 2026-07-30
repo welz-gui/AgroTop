@@ -47,9 +47,11 @@ use apenas o baseline — não é preciso reproduzir a sequência histórica.
    ```
 5. Rode os testes e confira o diff:
    ```bash
-   python -m unittest discover -s tests
-   git diff supabase/ docs/
+   python -m unittest discover -s tests -t . && git diff supabase/ docs/
    ```
+   O `-t .` **não é opcional**: ele faz `tests` ser importado como pacote, o que
+   executa `tests/__init__.py` e isola a suíte do banco de produção. Sem ele,
+   `tests/test_isolamento.py` falha de propósito.
 
 O passo 5 falha se você esquecer o passo 2 — é para isso que os guardas de
 `tests/test_schema.py` existem.
@@ -80,14 +82,24 @@ novo, habilite-o também. Quando houver Supabase CLI ou `pg_dump` disponível, u
 
 ---
 
-## Pendências conhecidas
+## Isolamento dos testes
 
-- **Tabela `profiles`** — resíduo do app mobile obsoleto (branch arquivado em
-  `archive/app-mobile-obsoleto`). Existe em produção, logo entra no baseline, mas
-  não é usada pelo app: não aparece no DDL de `init_db()`. Decidir entre remover de
-  produção (e regenerar) ou documentar como intencional.
-- **Testes e produção** — `tests/test_auth.py` força `db.USE_PG = False` antes de
-  `init_db()`, e `test_schema.py`/`test_portabilidade.py` bloqueiam o import de
-  `streamlit` (o que impede `st.secrets` de apontar para a nuvem). Todo teste novo
-  que chame `init_db()` **precisa** fazer o mesmo: com `.streamlit/secrets.toml`
-  presente, o padrão é conectar em **produção**.
+Com `.streamlit/secrets.toml` presente, `_database_url()` cai no `st.secrets` e o
+backend padrão passa a ser o **Postgres de produção** — um teste que chamasse
+`init_db()` gravaria lá.
+
+A proteção é `tests/__init__.py`, que define `AGROTOP_FORCE_SQLITE=1` antes de
+qualquer import de `database`. Por isso os testes precisam rodar com `-t .`
+(ver passo 5 acima), e `tests/test_isolamento.py` verifica que a proteção
+continua ativa — inclusive que a flag vence uma `DATABASE_URL` presente.
+
+Não inclua `DATABASE_URL` em mensagens de teste ou log: ela contém a senha do banco.
+
+## Histórico de decisões aplicadas
+
+- **`profiles` removida** de produção em 2026-07-30
+  (`migrations/0001_drop_profiles.sql`). Era resíduo do app mobile obsoleto, com PK
+  referenciando `auth.users` — o padrão do Supabase Auth que o
+  [ADR 0002](../docs/adr/0002-fronteira-de-portabilidade.md) vetou. Estava vazia e
+  sem dependências. Com isso, o DDL local e a produção passaram a ter
+  **paridade total**: 194 colunas / 21 tabelas em ambos.

@@ -1,0 +1,38 @@
+-- Remove a tabela órfã `profiles`.
+--
+-- CONTEXTO
+--   Criada durante o desenvolvimento do app mobile abandonado (branch arquivado
+--   em `archive/app-mobile-obsoleto`) para o padrão de perfis do Supabase Auth:
+--   sua PK referenciava `auth.users(id)`.
+--
+--   O ADR 0002 (docs/adr/0002-fronteira-de-portabilidade.md) vetou Supabase Auth
+--   — a identidade dos usuários deve permanecer na tabela `users` do próprio banco,
+--   para não ficar presa a um provedor. A `profiles` é, portanto, vestígio de uma
+--   arquitetura rejeitada.
+--
+--   O app nunca a usou: ela não aparece no DDL de `init_db()` em `database.py`
+--   nem em qualquer consulta do código.
+--
+-- VERIFICADO ANTES DE REMOVER (2026-07-30)
+--   linhas ................... 0
+--   FKs apontando para ela ... nenhuma
+--   triggers ................. nenhum
+--   políticas de RLS ......... nenhuma (RLS habilitado, porém sem policy)
+--   views dependentes ........ nenhuma
+--
+-- DEFINIÇÃO REMOVIDA (para o registro, caso precise ser recriada)
+--   CREATE TABLE profiles (
+--       id         uuid NOT NULL,
+--       username   text NOT NULL,
+--       full_name  text NOT NULL,
+--       role       text DEFAULT 'operador' NOT NULL,
+--       created_at timestamptz DEFAULT now(),
+--       updated_at timestamptz DEFAULT now(),
+--       CONSTRAINT profiles_pkey PRIMARY KEY (id),
+--       CONSTRAINT profiles_username_key UNIQUE (username),
+--       CONSTRAINT profiles_role_check
+--           CHECK (role IN ('admin','gestor','operador','usuario')),
+--       CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+--   );
+
+DROP TABLE IF EXISTS profiles;
