@@ -113,6 +113,19 @@ Streamlit engole os cifrões. Em f-string: `R\\$`. `column_config` com
 **R15. Câmera só sob demanda.** `st.camera_input` apenas depois de clicar "Abrir câmera".
 O Streamlit renderiza todas as abas, então instanciar direto liga a câmera em aba de fundo.
 
+**R20. Cor vem do dicionário de temas, nunca hex literal.** Ver [DESIGN.md](DESIGN.md).
+Escolher pelo significado (`sucesso`, `atencao`, `perigo`), não pela aparência. Hoje há
+200+ hex hardcoded em `app.py` — a extração acontece na Fase A2, e depois dela a regra vale
+sem exceção. **O tema é escolha do usuário (escuro/claro), no web e no mobile**, o que torna
+a extração pré-requisito: hex literal não responde à troca de tema.
+
+**R21. Informação nunca depende só de cor.** Sempre com ícone ou texto. No sol, com tela
+suja ou para quem tem daltonismo, cor sozinha não comunica.
+
+**R22. Componente visual novo entra no inventário do [DESIGN.md](DESIGN.md)** (seção 5), com
+o equivalente mobile. É o que impede web e app de virarem dois produtos diferentes — o app
+abandonado divergiu exatamente assim (tema claro e paleta própria).
+
 ### 2.4 Testes e segurança
 
 **R16. Rodar os testes SEMPRE com `-t .`:**
@@ -206,6 +219,15 @@ exportando os mesmos nomes (re-export) até o fim, para `app.py` não quebrar de
 **Pronto quando:** nenhuma regra de negócio contém SQL; nenhum repositório importa
 `streamlit`; os testes de A1 passam sem alteração; `test_portabilidade` continua verde.
 
+### A2b — Extrair a paleta de cores
+
+Junto do refactor, porque os mesmos arquivos já estão sendo tocados: trocar os 200+ hex
+literais de `app.py` pelo dicionário de temas do [DESIGN.md](DESIGN.md). Sem alteração
+visual — o tema escuro atual passa a ser o padrão do dicionário.
+
+Habilita o **seletor de tema (escuro/claro) pelo usuário**, que é decisão de produto já
+tomada. Fazer depois custa muito mais: hex literal não responde a troca de tema.
+
 ### A3 — Auditoria
 
 `audit_logs` + `created_by`/`updated_by` nos registros relevantes. Aditivo, baixo risco.
@@ -265,6 +287,11 @@ Regras gerais para trabalho paralelo:
 - **Não** copiar tela, repositório ou fluxo do app obsoleto. Ele tinha login simulado,
   consultava colunas inexistentes (`animal_id`, `gmd`, `category`, `origin`) e devolvia
   **3 animais fictícios** num `catch` silencioso.
+- **Design espelha o [DESIGN.md](DESIGN.md).** O `app_colors.dart` é **gerado** a partir da
+  mesma paleta semântica, nunca escrito à mão — foi assim que o app abandonado virou um
+  produto visualmente diferente (tema claro, verde floresta, acento dourado).
+  Suportar **escuro, claro e "seguir o sistema"** desde a v1: retrofitar tema depois custa
+  mais que nascer com os dois. Ver também as regras de campo (DESIGN.md seção 6).
 
 **Decisões operacionais pendentes:** hospedar a API (não roda no Streamlit Cloud —
 Render/Fly/Railway); build iOS exige Mac ou serviço em nuvem; contas de loja (Apple
