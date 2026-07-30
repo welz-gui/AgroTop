@@ -4,6 +4,7 @@ PWA responsivo: Streamlit + SQLite + Plotly
 """
 
 import io
+from typing import Optional
 import csv
 import streamlit as st
 import pandas as pd
