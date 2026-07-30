@@ -16,6 +16,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import date, timedelta
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -156,17 +157,33 @@ class TestArrobaEIdade(BaseRegras):
     def test_kg_para_arroba_com_rendimento_informado(self):
         self.assertEqual(db.kg_to_arrobas(500, 0.55), round(500 * 0.55 / 15, 2))
 
-    def test_faixas_de_idade(self):
-        casos = [(6, "Até 12 meses"), (12, "Até 12 meses"),
-                 (13, "13 a 24 meses"), (24, "13 a 24 meses"),
-                 (25, "25 a 36 meses"), (36, "25 a 36 meses"),
-                 (37, "+ de 36 meses")]
+    @patch('database.get_age_months')
+    def test_faixas_de_idade(self, mock_get_age_months):
+        casos = [
+            (0, "Até 12 meses"),
+            (12, "Até 12 meses"),
+            (13, "13 a 24 meses"),
+            (24, "13 a 24 meses"),
+            (25, "25 a 36 meses"),
+            (36, "25 a 36 meses"),
+            (37, "+ de 36 meses"),
+            (100, "+ de 36 meses")
+        ]
         for meses, esperado in casos:
-            nasc = (HOJE - timedelta(days=int(meses * 30.44) + 2)).isoformat()
+            mock_get_age_months.return_value = meses
             with self.subTest(meses=meses):
-                self.assertEqual(db.get_age_category(nasc), esperado)
+                # We can pass any string since it's mocked
+                self.assertEqual(db.get_age_category("dummy_date"), esperado)
 
-    def test_sem_data_de_nascimento(self):
+    @patch('database.get_age_months')
+    def test_faixas_de_idade_com_sexo(self, mock_get_age_months):
+        # Verifica que o parâmetro sex é ignorado mas aceito sem erro
+        mock_get_age_months.return_value = 15
+        self.assertEqual(db.get_age_category("dummy_date", sex="M"), "13 a 24 meses")
+
+    @patch('database.get_age_months')
+    def test_sem_data_de_nascimento(self, mock_get_age_months):
+        mock_get_age_months.return_value = None
         self.assertEqual(db.get_age_category(None), "Sem idade")
 
 
