@@ -1,9 +1,9 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Fonte: information_schema.columns — extraído em 2026-07-29
-# Gerado por: docs/../tools/dump_schema_nuvem.py (ver README no ADR 0001)
+# Extraído em 2026-07-29 por tools/dump_schema_nuvem.py
 #
-# Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em diff de git.
-# Não é uma migration — é um retrato para conferência. Regenerar após cada migration.
+# Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
+# diff de git, e servir de referência para tests/test_schema.py.
+# Não é uma migration — é um retrato. Regenerar após cada migration.
 #
 # formato: uma linha por coluna, "tabela.coluna", na ordem ordinal.
 

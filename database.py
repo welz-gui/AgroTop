@@ -220,6 +220,8 @@ def init_db() -> None:
                 lote_id          TEXT,
                 fornecedor_id    INTEGER,
                 purchase_price   REAL DEFAULT 0,
+                purchase_mode    TEXT DEFAULT 'cabeca',
+                purchase_lot_ref TEXT,
                 carcass_yield    REAL DEFAULT 0.52,
                 notes            TEXT,
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
@@ -511,13 +513,19 @@ def _migrate(con) -> None:
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 
 def _seed_users(con):
+    """Cria os usuários iniciais APENAS numa instalação nova (tabela vazia).
+
+    O guard é por tabela vazia, não por username: antes, checar `username`
+    fazia com que apagar o usuário `admin` o ressuscitasse com a senha padrão
+    `admin123` na próxima inicialização — uma porta aberta num app público.
+    Para recuperar acesso perdido use `tools/gerar_hash_senha.py`.
+    """
+    if con.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
+        return
     for u, p, n, r in [
         ("admin", "admin123", "Administrador",  "admin"),
         ("op1",   "op1234",   "Operador Campo", "operator"),
     ]:
-        existe = con.execute("SELECT 1 FROM users WHERE username=?", (u,)).fetchone()
-        if existe:
-            continue
         con.execute(
             "INSERT INTO users (username,password_hash,name,role) VALUES(?,?,?,?)",
             (u, _hash(p), n, r),
