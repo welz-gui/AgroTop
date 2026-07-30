@@ -4,8 +4,15 @@
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.
 -- Para um dump completo, prefira `supabase db dump` ou `pg_dump`.
+--
+-- SEM QUALIFICAÇÃO DE SCHEMA de propósito: os nomes são resolvidos
+-- pelo search_path, para que o mesmo arquivo sirva a qualquer tenant
+-- (ver docs/adr/0001-multi-fazenda-schema-por-tenant.md). Aplicar com:
+--     CREATE SCHEMA fazenda_2;  SET search_path TO fazenda_2;
+--     \i supabase/migrations/0000_baseline_producao.sql
+-- Validar com: python tools/testar_baseline.py
 
-CREATE TABLE IF NOT EXISTS public.animal_costs (
+CREATE TABLE IF NOT EXISTS animal_costs (
     id bigserial,
     animal_id text NOT NULL,
     cost_type text DEFAULT 'operacional'::text NOT NULL,
@@ -17,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.animal_costs (
     CONSTRAINT animal_costs_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.animal_movements (
+CREATE TABLE IF NOT EXISTS animal_movements (
     id bigserial,
     animal_id text NOT NULL,
     from_lote_id text,
@@ -30,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.animal_movements (
     CONSTRAINT animal_movements_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.animal_photos (
+CREATE TABLE IF NOT EXISTS animal_photos (
     id bigserial,
     animal_id text NOT NULL,
     image bytea NOT NULL,
@@ -41,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.animal_photos (
     CONSTRAINT animal_photos_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.animals (
+CREATE TABLE IF NOT EXISTS animals (
     id text NOT NULL,
     breed text NOT NULL,
     sex text DEFAULT 'M'::text NOT NULL,
@@ -66,7 +73,7 @@ CREATE TABLE IF NOT EXISTS public.animals (
     CONSTRAINT animals_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.category_prices (
+CREATE TABLE IF NOT EXISTS category_prices (
     id bigserial,
     age_band text NOT NULL,
     sex text NOT NULL,
@@ -77,7 +84,7 @@ CREATE TABLE IF NOT EXISTS public.category_prices (
     CONSTRAINT category_prices_age_band_sex_key UNIQUE (age_band, sex)
 );
 
-CREATE TABLE IF NOT EXISTS public.deaths (
+CREATE TABLE IF NOT EXISTS deaths (
     id bigserial,
     animal_id text NOT NULL,
     death_date text NOT NULL,
@@ -91,7 +98,7 @@ CREATE TABLE IF NOT EXISTS public.deaths (
     CONSTRAINT deaths_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.feeding_checks (
+CREATE TABLE IF NOT EXISTS feeding_checks (
     id bigserial,
     plan_id bigint,
     lote_id text NOT NULL,
@@ -104,7 +111,7 @@ CREATE TABLE IF NOT EXISTS public.feeding_checks (
     CONSTRAINT feeding_checks_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.feeding_plans (
+CREATE TABLE IF NOT EXISTS feeding_plans (
     id bigserial,
     lote_id text NOT NULL,
     product_name text NOT NULL,
@@ -118,7 +125,7 @@ CREATE TABLE IF NOT EXISTS public.feeding_plans (
     CONSTRAINT feeding_plans_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.fixed_costs (
+CREATE TABLE IF NOT EXISTS fixed_costs (
     id bigserial,
     category text DEFAULT 'outro'::text NOT NULL,
     description text,
@@ -130,7 +137,7 @@ CREATE TABLE IF NOT EXISTS public.fixed_costs (
     CONSTRAINT fixed_costs_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.fornecedores (
+CREATE TABLE IF NOT EXISTS fornecedores (
     id bigserial,
     name text NOT NULL,
     city text,
@@ -141,7 +148,7 @@ CREATE TABLE IF NOT EXISTS public.fornecedores (
     CONSTRAINT fornecedores_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.health_protocols (
+CREATE TABLE IF NOT EXISTS health_protocols (
     id bigserial,
     name text NOT NULL,
     sex_target text DEFAULT 'ambos'::text NOT NULL,
@@ -160,7 +167,7 @@ CREATE TABLE IF NOT EXISTS public.health_protocols (
     CONSTRAINT health_protocols_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.insumo_transactions (
+CREATE TABLE IF NOT EXISTS insumo_transactions (
     id bigserial,
     insumo_id bigint NOT NULL,
     type text NOT NULL,
@@ -175,7 +182,7 @@ CREATE TABLE IF NOT EXISTS public.insumo_transactions (
     CONSTRAINT insumo_transactions_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.insumos (
+CREATE TABLE IF NOT EXISTS insumos (
     id bigserial,
     name text NOT NULL,
     category text DEFAULT 'medicamento'::text NOT NULL,
@@ -189,7 +196,7 @@ CREATE TABLE IF NOT EXISTS public.insumos (
     CONSTRAINT insumos_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.lotes (
+CREATE TABLE IF NOT EXISTS lotes (
     id text NOT NULL,
     name text NOT NULL,
     area_ha double precision DEFAULT 0,
@@ -202,7 +209,7 @@ CREATE TABLE IF NOT EXISTS public.lotes (
     CONSTRAINT lotes_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.medications (
+CREATE TABLE IF NOT EXISTS medications (
     id bigserial,
     animal_id text NOT NULL,
     medication_name text NOT NULL,
@@ -219,7 +226,7 @@ CREATE TABLE IF NOT EXISTS public.medications (
     CONSTRAINT medications_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.pluviometria (
+CREATE TABLE IF NOT EXISTS pluviometria (
     id bigserial,
     read_date text NOT NULL,
     rain_mm double precision DEFAULT 0 NOT NULL,
@@ -230,7 +237,7 @@ CREATE TABLE IF NOT EXISTS public.pluviometria (
     CONSTRAINT pluviometria_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.profiles (
+CREATE TABLE IF NOT EXISTS profiles (
     id uuid NOT NULL,
     username text NOT NULL,
     full_name text NOT NULL,
@@ -242,7 +249,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     CONSTRAINT profiles_username_key UNIQUE (username)
 );
 
-CREATE TABLE IF NOT EXISTS public.sales (
+CREATE TABLE IF NOT EXISTS sales (
     id bigserial,
     animal_id text NOT NULL,
     sale_date text NOT NULL,
@@ -261,20 +268,20 @@ CREATE TABLE IF NOT EXISTS public.sales (
     CONSTRAINT sales_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS public.sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     token text NOT NULL,
     user_id bigint,
     expires_at text,
     CONSTRAINT sessions_pkey PRIMARY KEY (token)
 );
 
-CREATE TABLE IF NOT EXISTS public.settings (
+CREATE TABLE IF NOT EXISTS settings (
     key text NOT NULL,
     value text,
     CONSTRAINT settings_pkey PRIMARY KEY (key)
 );
 
-CREATE TABLE IF NOT EXISTS public.users (
+CREATE TABLE IF NOT EXISTS users (
     id bigserial,
     username text NOT NULL,
     password_hash text NOT NULL,
@@ -284,7 +291,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     CONSTRAINT users_username_key UNIQUE (username)
 );
 
-CREATE TABLE IF NOT EXISTS public.weighings (
+CREATE TABLE IF NOT EXISTS weighings (
     id bigserial,
     animal_id text NOT NULL,
     weight double precision NOT NULL,
@@ -299,36 +306,36 @@ CREATE TABLE IF NOT EXISTS public.weighings (
 
 -- Chaves estrangeiras aplicadas ao final: assim a ordem de
 -- criação das tabelas acima não importa.
-ALTER TABLE public.animal_costs ADD CONSTRAINT animal_costs_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
-ALTER TABLE public.animal_movements ADD CONSTRAINT animal_movements_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
-ALTER TABLE public.animal_photos ADD CONSTRAINT animal_photos_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
-ALTER TABLE public.animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
-ALTER TABLE public.animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
-ALTER TABLE public.deaths ADD CONSTRAINT deaths_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
-ALTER TABLE public.feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
-ALTER TABLE public.feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
-ALTER TABLE public.feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
-ALTER TABLE public.health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
-ALTER TABLE public.insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
-ALTER TABLE public.medications ADD CONSTRAINT medications_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
-ALTER TABLE public.medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
-ALTER TABLE public.sales ADD CONSTRAINT sales_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
-ALTER TABLE public.weighings ADD CONSTRAINT weighings_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animal_costs ADD CONSTRAINT animal_costs_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animal_movements ADD CONSTRAINT animal_movements_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animal_photos ADD CONSTRAINT animal_photos_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
+ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE deaths ADD CONSTRAINT deaths_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
+ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE medications ADD CONSTRAINT medications_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE sales ADD CONSTRAINT sales_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE weighings ADD CONSTRAINT weighings_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 
 -- Índices (fora das constraints)
-CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON public.animal_costs USING btree (animal_id);
-CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON public.animal_photos USING btree (animal_id);
-CREATE INDEX IF NOT EXISTS idx_animals_lote ON public.animals USING btree (lote_id);
-CREATE INDEX IF NOT EXISTS idx_animals_status ON public.animals USING btree (status);
-CREATE INDEX IF NOT EXISTS idx_deaths_date ON public.deaths USING btree (death_date);
-CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON public.insumo_transactions USING btree (lote_id);
-CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON public.insumo_transactions USING btree (reason);
-CREATE INDEX IF NOT EXISTS idx_medications_animal ON public.medications USING btree (animal_id);
-CREATE INDEX IF NOT EXISTS idx_medications_protocol ON public.medications USING btree (protocol_id);
-CREATE INDEX IF NOT EXISTS idx_pluvio_date ON public.pluviometria USING btree (read_date);
-CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON public.pluviometria USING btree (lote_id);
-CREATE INDEX IF NOT EXISTS idx_sales_date ON public.sales USING btree (sale_date);
-CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON public.weighings USING btree (animal_id, weigh_date DESC);
-CREATE INDEX IF NOT EXISTS idx_weighings_date ON public.weighings USING btree (weigh_date DESC);
+CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
+CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
+CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications USING btree (protocol_id);
+CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_date);
+CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_sales_date ON sales USING btree (sale_date);
+CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings USING btree (animal_id, weigh_date DESC);
+CREATE INDEX IF NOT EXISTS idx_weighings_date ON weighings USING btree (weigh_date DESC);
 

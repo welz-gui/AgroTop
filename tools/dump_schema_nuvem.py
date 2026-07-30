@@ -118,11 +118,17 @@ def escrever_baseline(colunas, constraints, indices, data):
         fh.write(f"-- Gerado em {data} por tools/dump_schema_nuvem.py\n")
         fh.write("--\n-- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.\n")
         fh.write("-- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.\n")
-        fh.write("-- Para um dump completo, prefira `supabase db dump` ou `pg_dump`.\n\n")
+        fh.write("-- Para um dump completo, prefira `supabase db dump` ou `pg_dump`.\n")
+        fh.write("--\n-- SEM QUALIFICAÇÃO DE SCHEMA de propósito: os nomes são resolvidos\n")
+        fh.write("-- pelo search_path, para que o mesmo arquivo sirva a qualquer tenant\n")
+        fh.write("-- (ver docs/adr/0001-multi-fazenda-schema-por-tenant.md). Aplicar com:\n")
+        fh.write("--     CREATE SCHEMA fazenda_2;  SET search_path TO fazenda_2;\n")
+        fh.write("--     \\i supabase/migrations/0000_baseline_producao.sql\n")
+        fh.write("-- Validar com: python tools/testar_baseline.py\n\n")
 
         fks = []
         for tabela in sorted(por_tabela):
-            fh.write(f"CREATE TABLE IF NOT EXISTS public.{tabela} (\n")
+            fh.write(f"CREATE TABLE IF NOT EXISTS {tabela} (\n")
             partes = []
             for c in por_tabela[tabela]:
                 tipo, padrao = c["tipo"], c["padrao"]
@@ -153,7 +159,7 @@ def escrever_baseline(colunas, constraints, indices, data):
             fh.write("-- Chaves estrangeiras aplicadas ao final: assim a ordem de\n")
             fh.write("-- criação das tabelas acima não importa.\n")
             for tabela, con in fks:
-                fh.write(f"ALTER TABLE public.{tabela} "
+                fh.write(f"ALTER TABLE {tabela} "
                          f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
             fh.write("\n")
 
@@ -163,6 +169,8 @@ def escrever_baseline(colunas, constraints, indices, data):
                 definicao = i["definicao"].replace(
                     "CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", 1).replace(
                     "CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ", 1)
+                # remove a qualificação de schema: quem resolve é o search_path
+                definicao = definicao.replace(" ON public.", " ON ")
                 fh.write(f"{definicao};\n")
             fh.write("\n")
     return len(por_tabela)
