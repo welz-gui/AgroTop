@@ -155,11 +155,6 @@ def _live_weight(kg: float, yield_: float = 0.52) -> float:
         return db.kg_to_arrobas(kg, yield_)
     return round(kg, 1)
 
-def _fmt_prod(kg_gain: float, yield_: float = 0.52) -> str:
-    """Formata ganho na unidade configurada."""
-    val = _prod_weight(kg_gain, yield_)
-    return f"{val:.2f} {_unit_label()}" if _use_arroba() else f"{val:.1f} kg"
-
 def _fmt_live(kg: float, yield_: float = 0.52) -> str:
     """Formata peso vivo na unidade configurada."""
     val = _live_weight(kg, yield_)
