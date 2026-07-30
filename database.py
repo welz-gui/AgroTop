@@ -1245,12 +1245,6 @@ def get_all_insumos() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_insumo(insumo_id: int) -> Optional[dict]:
-    with _conn() as con:
-        row = con.execute("SELECT * FROM insumos WHERE id=?", (insumo_id,)).fetchone()
-    return dict(row) if row else None
-
-
 @_writes
 def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
                      operator: str = "") -> None:
