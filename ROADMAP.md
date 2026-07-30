@@ -440,9 +440,7 @@ Forçar SQLite localmente: `AGROTOP_FORCE_SQLITE=1`.
 1. **Rotacionar a senha do Postgres** — ela já apareceu em texto claro duas vezes.
    Supabase → Settings → Database → reset, e atualizar `secrets.toml` + Secrets do
    Streamlit Cloud. *(Adiada por decisão do usuário.)*
-2. **Trocar as senhas padrão** `admin/admin123` e `op1/op1234` — o app é público.
-   Use `tools/gerar_hash_senha.py`. *(Adiada por decisão do usuário.)*
-3. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
+2. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
 4. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
    servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
 5. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar
