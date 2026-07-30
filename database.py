@@ -462,6 +462,15 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions (lote_id);
             CREATE INDEX IF NOT EXISTS idx_animals_status ON animals (status);
             CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos (animal_id);
+
+            -- Sessões de login persistente (cookie). Definida aqui, e só aqui:
+            -- antes era criada sob demanda dentro de create_session/get_session_user/
+            -- delete_session, o que deixava um banco novo sem a tabela até o 1º login.
+            CREATE TABLE IF NOT EXISTS sessions (
+                token      TEXT PRIMARY KEY,
+                user_id    INTEGER,
+                expires_at TEXT
+            );
         """)
         _migrate(con)
         _seed_users(con)
@@ -820,9 +829,6 @@ def create_session(user_id: int, days: int = 7) -> str:
     token = secrets.token_urlsafe(24)
     expires = (datetime.now() + timedelta(days=days)).isoformat()
     with _conn() as con:
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER, expires_at TEXT)"
-        )
         if USE_PG:
             con.execute(
                 "INSERT INTO sessions (token,user_id,expires_at) VALUES(?,?,?) "
@@ -842,9 +848,6 @@ def get_session_user(token: str) -> Optional[dict]:
     if not token:
         return None
     with _conn() as con:
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER, expires_at TEXT)"
-        )
         row = con.execute(
             "SELECT user_id, expires_at FROM sessions WHERE token=?", (token,)
         ).fetchone()
@@ -866,7 +869,6 @@ def delete_session(token: str) -> None:
     if not token:
         return
     with _conn() as con:
-        con.execute("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER, expires_at TEXT)")
         con.execute("DELETE FROM sessions WHERE token=?", (token,))
 
 # ─── Gestão de Usuários ──────────────────────────────────────────────────────
