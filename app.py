@@ -11,6 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
 import database as db
+from services.qualidade import avaliar_pesagem
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -929,6 +930,24 @@ def _campo_animal():
         else:
             medida_nota = ""
 
+        _pend_alerta = st.session_state.get(f"alerta_peso_{animal['id']}")
+        if _pend_alerta:
+            st.error("⚠️ **Confira antes de salvar** — o peso informado parece fora do padrão:")
+            for _a in _pend_alerta["alertas"]:
+                _ic = "🔴" if _a["severidade"] == "alta" else "🟡"
+                st.markdown(f"{_ic} {_a['mensagem']}")
+            _cc1, _cc2 = st.columns(2)
+            if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
+                           use_container_width=True):
+                db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
+                    st.session_state.user["name"], _pend_alerta["notas"],
+                    method=_pend_alerta["metodo"])
+                st.session_state.pop(f"alerta_peso_{animal['id']}", None)
+                st.success(f"✅ {_pend_alerta['peso']:.1f} kg salvo."); st.rerun()
+            if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
+                           use_container_width=True):
+                st.session_state.pop(f"alerta_peso_{animal['id']}", None); st.rerun()
+
         with st.form("f_peso",clear_on_submit=True):
             pc1,pc2=st.columns(2)
             with pc1:
@@ -945,8 +964,26 @@ def _campo_animal():
             notes_p=st.text_area("Obs.",height=60,placeholder="Opcional",
                 value=medida_nota)
             if st.form_submit_button("✅ Salvar Pesagem",type="primary",use_container_width=True):
+                # Confere indícios de erro ANTES de gravar. Não bloqueia: se houver
+                # alerta de severidade alta, pede uma confirmação — peso errado
+                # contamina GMD, projeção de abate, custo por arroba e ranking.
+                _hist = [{"peso": w["weight"], "data": w["weigh_date"]}
+                         for w in db.get_weighings(animal["id"])]
+                _alertas = avaliar_pesagem(nw_final, wd_.strftime("%Y-%m-%d"), _hist)
+                _graves = [a for a in _alertas if a["severidade"] == "alta"]
+                _ja_confirmado = st.session_state.pop(f"conf_peso_{animal['id']}", False)
+
+                if _graves and not _ja_confirmado:
+                    st.session_state[f"alerta_peso_{animal['id']}"] = {
+                        "alertas": _alertas, "peso": nw_final,
+                        "data": wd_.strftime("%Y-%m-%d"), "notas": notes_p,
+                        "metodo": metodo_peso}
+                    st.rerun()
+
                 db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
                     st.session_state.user["name"], notes_p, method=metodo_peso)
+                for _a in _alertas:
+                    st.warning(f"⚠️ {_a['mensagem']}")
                 msg = f"✅ {nw_final:.1f} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
                 # Comparação estimativa × pesagem real
                 if metodo_peso == "pesado" and pend:

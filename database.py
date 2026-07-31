@@ -1099,11 +1099,30 @@ def get_all_insumos() -> list[dict]:
 @_writes
 def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
                      operator: str = "") -> None:
+    """Registra entrada de insumo, atualizando o custo por **média ponderada**.
+
+    Antes desta mudança o custo unitário era simplesmente sobrescrito pelo da
+    última entrada: comprar 10 kg a R$ 5 com 1.000 kg a R$ 2 em estoque fazia
+    todo o saldo passar a valer R$ 5/kg, inflando custo de trato e margem.
+
+    Ver docs/adr/0003-custo-medio-ponderado.md — a decisão é **não-retroativa**:
+    vale para entradas novas, e o histórico já lançado permanece como está.
+    """
+    from services.estoque import custo_medio_ponderado
+
     with _conn() as con:
         today_str = date.today().isoformat()
+        atual = con.execute(
+            "SELECT current_stock, cost_per_unit FROM insumos WHERE id=?", (insumo_id,)
+        ).fetchone()
+        novo_custo = custo_medio_ponderado(
+            float(atual["current_stock"] or 0), float(atual["cost_per_unit"] or 0),
+            float(quantity), float(cost_per_unit),
+        ) if atual else cost_per_unit
+
         con.execute(
             "UPDATE insumos SET current_stock=current_stock+?, cost_per_unit=? WHERE id=?",
-            (quantity, cost_per_unit, insumo_id),
+            (quantity, novo_custo, insumo_id),
         )
         con.execute(
             """INSERT INTO insumo_transactions

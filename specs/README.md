@@ -93,23 +93,47 @@ instaladas valem. Se a tarefa precisar de biblioteca nova, ela vai em
 `poc/<nome>/requirements.txt` — **nunca** no `requirements.txt` da raiz, que alimenta o
 deploy do Streamlit Cloud.
 
-### Prompt inicial (copie e ajuste a spec)
+### Prompt inicial
 
 A primeira frase precisa conter a palavra **worktree** — é o que autoriza o agente a se
-isolar. Sem ela, ele trabalha na pasta principal.
+isolar. Escolha a variante conforme **quantos agentes você vai iniciar**.
+
+#### Variante A — um agente por vez (ele pega a próxima livre)
+
+Cômoda: você não precisa escolher a spec. **Só use lançando um agente de cada vez** — a
+colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
-> AgroTop.
+> AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
 >
-> 1. Leia `specs/0008-importacao-pesagens-csv.md` — é a **sua** tarefa, e o escopo é fechado.
+> 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila.
+> 2. **Antes de qualquer outra coisa**, reivindique-a criando o branch no remoto:
+>    `git push origin HEAD:refs/heads/<branch-da-spec>`.
+>    Se falhar dizendo que a referência já existe, a tarefa está tomada: pegue a próxima e
+>    **não insista**. Não edite o quadro — quem atualiza é o mantenedor.
+> 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
+> 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
+> 5. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
+
+#### Variante B — vários agentes em paralelo (você atribui)
+
+**Obrigatória** quando houver mais de um agente ativo. Elimina a corrida por completo.
+
+> Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
+> AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
+>
+> 1. Leia `specs/0008-importacao-pesagens-csv.md` — é a **sua** tarefa, escopo fechado.
 >    *(Troque pelo arquivo da spec que está atribuindo. Fila em `specs/QUADRO.md`.)*
-> 2. Leia a seção **"Regras válidas para TODAS as specs"** em `specs/README.md`.
-> 3. Leia `ROADMAP.md` seções 2 (regras invioláveis) e 3 (o que pode mudar). Elas contêm
->    decisões já tomadas; violar qualquer regra ali quebra produção ou desfaz trabalho.
-> 4. Leia `DESIGN.md` se a tarefa tocar interface.
->
+> 2. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
+> 3. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
+
+#### Continuação, igual nas duas variantes
+
 > Faça **apenas** o que a spec pede. Se identificar outro problema, **anote no PR em vez de
 > corrigir** — mudança fora de escopo é rejeitada.
+>
+> Se a spec fixar a assinatura de uma função, respeite-a **exatamente**: ela será integrada
+> depois pelo mantenedor, e assinatura diferente inutiliza o trabalho.
 >
 > Antes de abrir o PR, rode e cole o resultado:
 > ```
@@ -117,10 +141,10 @@ isolar. Sem ela, ele trabalha na pasta principal.
 > python -m compileall app.py database.py repositories services ui tests tools
 > git diff --stat origin/main
 > ```
-> O `-t .` não é opcional (ROADMAP R16). No `git diff --stat`, só devem aparecer os
-> arquivos que a spec pediu — **não altere `specs/`, `ROADMAP.md` nem `README.md`**.
+> O `-t .` não é opcional (ROADMAP R16). No `git diff --stat`, só devem aparecer os arquivos
+> que a spec pediu — **não altere `specs/`, `ROADMAP.md` nem `README.md`**.
 >
-> Abra o PR para `main` **pronto para revisão, não como rascunho**, no formato descrito na
+> Abra o PR para `main` **pronto para revisão, nunca como rascunho**, no formato descrito na
 > spec. Depois, **remova o worktree** (`ExitWorktree` com ação `keep`).
 
 ### Ao terminar
