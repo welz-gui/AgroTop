@@ -16,15 +16,38 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0001](0001-ci-actions-node24.md) — actions do CI → Node 24 | — | ✅ [#15](https://github.com/welz-gui/AgroTop/pull/15) | | 2026-07-31 |
 | — | [0010](0010-custo-medio-ponderado.md) — custo médio ponderado 🏗️ | — | ✅ [#16](https://github.com/welz-gui/AgroTop/pull/16) | | 2026-07-31 |
 | — | [0009](0009-deteccao-peso-suspeito.md) — detecção de peso suspeito 🏗️ | — | ✅ [#17](https://github.com/welz-gui/AgroTop/pull/17) | | 2026-07-31 |
-| 1 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
-| 2 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
-| 3 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
-| 4 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
-| 5 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
-| 6 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
-| 7 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| 1 | [0012](0012-maquina-estados-animal.md) — máquina de estados do animal 🇧🇷 | `feat/estados-animal` | 🟢 livre | — | — |
+| 2 | [0013](0013-validacoes-consistencia-regulatoria.md) — validações de consistência 🇧🇷 | `feat/validacao-regulatoria` | 🟢 livre | — | — |
+| 3 | [0014](0014-validador-identificadores.md) — validador de identificadores 🇧🇷 | `feat/validador-identificadores` | 🟢 livre | — | — |
+| 4 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
+| 5 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
+| 6 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
+| 7 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
+| 8 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
+| 9 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
+| 10 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
 
-🏗️ = **avança trilha do roadmap** (implementação, não pesquisa). As demais são PoC ou manutenção.
+🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
+demais = PoC ou manutenção.
+
+### ⚠️ A maior parte da Fase B NÃO é delegável
+
+O [ADR 0004](../docs/adr/0004-conformidade-pnib.md) criou a Fase B (B1–B7). Dela, **só as
+partes puras entram nesta fila**. B1, B2, B3, B4, B6 e B7 são **mudança de schema** — e a R4
+manda serializar schema pelo mantenedor. A migração que troca a PK de 8 tabelas em produção
+é o item de maior risco da história do projeto; não vai para agente.
+
+As três specs 🇧🇷 acima são as **funções puras** que a Fase B precisa, e podem ser feitas em
+paralelo à migração:
+
+| Spec | Serve a | Por que é pura |
+|---|---|---|
+| 0012 estados | B1, B2 | recebe estado atual e novo, devolve se pode |
+| 0013 consistência | B3 | recebe animal e contexto, devolve problemas |
+| 0014 identificadores | B1 | recebe valor e regra, devolve se é válido |
+
+Assim o agente entrega a regra testada enquanto o mantenedor faz a migração — e a
+integração depois é ligar função pronta.
 
 **Concluídas em 2026-07-31:** 0001, 0009 e 0010 — 90 testes na suíte, todas as regras
 respeitadas. As duas funções novas (`services/qualidade.py` e `services/estoque.py`) estão
