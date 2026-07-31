@@ -19,13 +19,13 @@ baixo** — a ordem é prioridade, não sugestão.
 | 1 | [0012](0012-maquina-estados-animal.md) — máquina de estados do animal 🇧🇷 | `feat/estados-animal` | 🟢 livre | — | — |
 | 2 | [0013](0013-validacoes-consistencia-regulatoria.md) — validações de consistência 🇧🇷 | `feat/validacao-regulatoria` | 🟢 livre | — | — |
 | 3 | [0014](0014-validador-identificadores.md) — validador de identificadores 🇧🇷 | `feat/validador-identificadores` | 🟢 livre | — | — |
-| 4 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
-| 5 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
-| 6 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
-| 7 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
-| 8 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
-| 9 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
-| 10 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| — | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | — | ✅ [#19](https://github.com/welz-gui/AgroTop/pull/19) | | 2026-07-31 |
+| — | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | — | ✅ [#20](https://github.com/welz-gui/AgroTop/pull/20) | | 2026-07-31 |
+| 4 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
+| 5 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
+| 6 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
+| 7 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
+| 8 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
 
 🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
 demais = PoC ou manutenção.
@@ -49,8 +49,9 @@ paralelo à migração:
 Assim o agente entrega a regra testada enquanto o mantenedor faz a migração — e a
 integração depois é ligar função pronta.
 
-**Concluídas em 2026-07-31:** 0001, 0009 e 0010 — 90 testes na suíte, todas as regras
-respeitadas. As duas funções novas (`services/qualidade.py` e `services/estoque.py`) estão
+**Concluídas em 2026-07-31:** 0001, 0009, 0010, 0008 e **0003** — **105 testes** na suíte.
+A PoC 0003 recomendou **`streamlit-folium` + `shapely` + `pyproj`**, com ressalva de
+usabilidade de toque no celular — isso destrava a Trilha 2 (geometria dos piquetes). As duas funções novas (`services/qualidade.py` e `services/estoque.py`) estão
 entregues e testadas, mas **ainda não ligadas à interface**: isso é integração, e cabe ao
 mantenedor (R31).
 
