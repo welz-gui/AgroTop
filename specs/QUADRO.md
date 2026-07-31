@@ -56,7 +56,19 @@ mantenedor (R31).
 
 ## Como uma tarefa é atribuída
 
-### Modo padrão: **o mantenedor atribui** ⭐
+### Regra prática: depende de quantos agentes você inicia
+
+| Situação | Modo | Prompt |
+|---|---|---|
+| **Um agente por vez** | ele pega a próxima livre, reivindicando o branch **antes** de começar | Variante A |
+| **Vários em paralelo** | **você atribui** a spec no prompt | Variante B (obrigatória) |
+
+A colisão de 2026-07-31 aconteceu com **dois agentes iniciados em paralelo**. Sequencialmente
+o autoatendimento funciona, porque não há dois lendo a fila ao mesmo tempo.
+
+Prompts em [README.md](README.md).
+
+### Quando atribuir explicitamente ⭐
 
 Diga a spec no prompt do agente:
 
