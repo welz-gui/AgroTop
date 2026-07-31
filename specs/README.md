@@ -101,12 +101,12 @@ isolar. Sem ela, ele trabalha na pasta principal.
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop.
 >
-> 1. Leia `specs/0010-custo-medio-ponderado.md` — é a **sua** tarefa, e o escopo é fechado.
->    *(Troque pelo arquivo da spec que você está atribuindo. Ver a fila de prioridade em
->    `specs/QUADRO.md`.)*
-> 2. Leia `ROADMAP.md` seções 2 (regras invioláveis) e 3 (o que pode mudar). Elas contêm
+> 1. Leia `specs/0008-importacao-pesagens-csv.md` — é a **sua** tarefa, e o escopo é fechado.
+>    *(Troque pelo arquivo da spec que está atribuindo. Fila em `specs/QUADRO.md`.)*
+> 2. Leia a seção **"Regras válidas para TODAS as specs"** em `specs/README.md`.
+> 3. Leia `ROADMAP.md` seções 2 (regras invioláveis) e 3 (o que pode mudar). Elas contêm
 >    decisões já tomadas; violar qualquer regra ali quebra produção ou desfaz trabalho.
-> 3. Leia `DESIGN.md` se a tarefa tocar interface.
+> 4. Leia `DESIGN.md` se a tarefa tocar interface.
 >
 > Faça **apenas** o que a spec pede. Se identificar outro problema, **anote no PR em vez de
 > corrigir** — mudança fora de escopo é rejeitada.
@@ -115,10 +115,13 @@ isolar. Sem ela, ele trabalha na pasta principal.
 > ```
 > python -m unittest discover -s tests -t . -v
 > python -m compileall app.py database.py repositories services ui tests tools
+> git diff --stat origin/main
 > ```
-> O `-t .` não é opcional (ROADMAP R16).
+> O `-t .` não é opcional (ROADMAP R16). No `git diff --stat`, só devem aparecer os
+> arquivos que a spec pediu — **não altere `specs/`, `ROADMAP.md` nem `README.md`**.
 >
-> Abra o PR para `main` seguindo o formato de entrega descrito na spec.
+> Abra o PR para `main` **pronto para revisão, não como rascunho**, no formato descrito na
+> spec. Depois, **remova o worktree** (`ExitWorktree` com ação `keep`).
 
 ### Ao terminar
 
@@ -135,6 +138,49 @@ Conferir a qualquer momento: `git worktree list`.
 tiraria conclusões erradas e "consertaria" coisas fora de escopo — foi exatamente assim que
 surgiram os onze PRs de 2026-07-30. Ele **lê o estado** (ROADMAP + este índice) para se
 situar, mas **a tarefa é atribuída por você**, sempre.
+
+
+---
+
+## ⚠️ Regras válidas para TODAS as specs
+
+Estas valem sempre, mesmo que a spec individual não repita. Foram escritas a partir de
+problemas reais observados nas primeiras três entregas (2026-07-31).
+
+### 1. Não altere `specs/`, `ROADMAP.md` nem `README.md`
+
+Quem atualiza o quadro e a documentação é o **mantenedor**. Você não precisa marcar nada.
+
+*Por quê:* o PR #17 ficou limpo porque não tocou nesses arquivos. O PR #16 ficou em
+conflito **só** por causa de uma linha em `specs/QUADRO.md`, e o branch precisou ser
+reconstruído. Com a tarefa já atribuída no prompt, marcar o quadro é trabalho perdido que
+só gera conflito entre agentes paralelos.
+
+### 2. Remova o worktree ao terminar
+
+Depois que o PR for aberto, saia do worktree — `ExitWorktree` (ação `keep`) ou
+`git worktree remove <caminho>`.
+
+*Por quê:* três worktrees ficaram órfãos na primeira rodada, dois deles em `C:/tmp`. Eles
+**seguram o branch** e impedem o mantenedor de trabalhar nele: um `git checkout` falhou com
+`branch is already used by worktree`.
+
+### 3. Abra o PR pronto para revisão, nunca como rascunho
+
+*Por quê:* o PR #15 estava correto e com CI verde, mas em rascunho — o merge falhou com
+`Pull Request is still a draft` e a entrega ficou parada sem motivo.
+
+### 4. Antes de abrir o PR, confira o que está indo junto
+
+```bash
+git diff --stat origin/main
+```
+
+Só devem aparecer os arquivos que a spec pediu. Se aparecer mais, remova.
+
+### 5. Se a spec fixar a assinatura de uma função, respeite-a exatamente
+
+Ela será integrada depois pelo mantenedor. Assinatura diferente inutiliza o trabalho.
 
 ## Por que este diretório existe
 

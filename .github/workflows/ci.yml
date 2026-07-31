@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Verificação de compilação
-        run: python -m compileall app.py database.py tests
+        run: python -m compileall app.py database.py repositories services ui tests tools
 
       # `-t .` é obrigatório: faz `tests` ser importado como pacote, o que executa
       # tests/__init__.py e isola a suíte do banco de produção. Sem isso, o teste

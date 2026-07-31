@@ -13,18 +13,23 @@ baixo** — a ordem é prioridade, não sugestão.
 
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
-| 1 | [0001](0001-ci-actions-node24.md) — actions do CI → Node 24 | `manutencao/ci-actions-node24` | 🟡 em andamento | agente | 2026-07-31 |
-| 2 | [0010](0010-custo-medio-ponderado.md) — custo médio ponderado 🏗️ | `feat/custo-medio-ponderado` | 🟡 em andamento | agente | 2026-07-31 |
-| 3 | [0009](0009-deteccao-peso-suspeito.md) — detecção de peso suspeito 🏗️ | `feat/qualidade-pesagem` | 🟢 livre | — | — |
-| 4 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
-| 5 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
-| 6 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
-| 7 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
-| 8 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
-| 9 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
-| 10 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| — | [0001](0001-ci-actions-node24.md) — actions do CI → Node 24 | — | ✅ [#15](https://github.com/welz-gui/AgroTop/pull/15) | | 2026-07-31 |
+| — | [0010](0010-custo-medio-ponderado.md) — custo médio ponderado 🏗️ | — | ✅ [#16](https://github.com/welz-gui/AgroTop/pull/16) | | 2026-07-31 |
+| — | [0009](0009-deteccao-peso-suspeito.md) — detecção de peso suspeito 🏗️ | — | ✅ [#17](https://github.com/welz-gui/AgroTop/pull/17) | | 2026-07-31 |
+| 1 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
+| 2 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
+| 3 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
+| 4 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
+| 5 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
+| 6 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
+| 7 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
 
 🏗️ = **avança trilha do roadmap** (implementação, não pesquisa). As demais são PoC ou manutenção.
+
+**Concluídas em 2026-07-31:** 0001, 0009 e 0010 — 90 testes na suíte, todas as regras
+respeitadas. As duas funções novas (`services/qualidade.py` e `services/estoque.py`) estão
+entregues e testadas, mas **ainda não ligadas à interface**: isso é integração, e cabe ao
+mantenedor (R31).
 
 **Estados:** 🟢 livre · 🟡 em andamento · ✅ concluída (link do PR) · 🔴 bloqueada
 
