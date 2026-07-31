@@ -407,5 +407,22 @@ class TestEstatisticasDoRebanho(BaseRegras):
         self.assertEqual(db.get_rebanho_stats(), {})
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+class TestEstimativaPesoPorMedicao(unittest.TestCase):
+    def test_estimativa_peso_com_medidas_validas(self):
+        # 200² * 150 / 10838 = 553.6076... -> 553.6
+        self.assertEqual(db.estimate_weight_by_measurement(200.0, 150.0), 553.6)
+
+    def test_estimativa_peso_com_medida_zero(self):
+        self.assertEqual(db.estimate_weight_by_measurement(0.0, 150.0), 0.0)
+        self.assertEqual(db.estimate_weight_by_measurement(200.0, 0.0), 0.0)
+        self.assertEqual(db.estimate_weight_by_measurement(0.0, 0.0), 0.0)
+
+    def test_estimativa_peso_com_medida_negativa(self):
+        self.assertEqual(db.estimate_weight_by_measurement(-10.0, 150.0), 0.0)
+        self.assertEqual(db.estimate_weight_by_measurement(200.0, -5.0), 0.0)
+        self.assertEqual(db.estimate_weight_by_measurement(-10.0, -5.0), 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()
