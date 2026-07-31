@@ -31,8 +31,12 @@ simulador de terminação · ranking de fornecedor · exportação CSV/Excel/PDF
 login por cookie · câmera (QR + OCR de brinco + foto).
 
 ### Decisões de arquitetura já tomadas (não reabrir sem motivo novo)
-- **[ADR 0001](docs/adr/0001-multi-fazenda-schema-por-tenant.md)** — multi-fazenda por
-  **schema**, não por `farm_id`.
+- **[ADR 0004](docs/adr/0004-conformidade-pnib.md)** ⭐ — **conformidade com o PNIB**:
+  chave surrogate em `animals`, identificadores separados, hierarquia
+  Organização→Produtor→Propriedade e eventos imutáveis. **Reordena todo o roadmap.**
+- **[ADR 0001](docs/adr/0001-multi-fazenda-schema-por-tenant.md)** — ⚠️ **parcialmente
+  substituído pelo 0004**: tenancy passa a ser schema por **organização** + `property_id`,
+  e o cancelamento de `roles`/`permissions` fica revogado.
 - **[ADR 0002](docs/adr/0002-fronteira-de-portabilidade.md)** — Postgres é permanente,
   o provedor é substituível; **Supabase Auth vetado**.
 - **[supabase/README.md](supabase/README.md)** — fluxo de alteração de schema.
@@ -72,10 +76,17 @@ migration na nuvem → ajustar o DDL de `init_db()` → `python tools/dump_schem
 --baseline` → `python tools/testar_baseline.py` → rodar os testes.
 Pular o passo 2 faz `test_schema_local_nao_divergiu_da_producao` falhar.
 
-**R5. Datas são TEXT ISO (`YYYY-MM-DD`)** nos dois bancos. Não introduzir tipo `date`/
-`timestamp` em coluna nova de data de negócio — quebraria a compatibilidade dupla.
+**R5. Datas de negócio são TEXT ISO (`YYYY-MM-DD`)** nos dois bancos. Não introduzir tipo
+`date`/`timestamp` em coluna nova de data de negócio — quebraria a compatibilidade dupla.
 
-**R6. Não adicionar `farm_id` a nenhuma tabela** (ADR 0001). Nem "só por precaução".
+⚠️ **Exceção (ADR 0004):** `animal_events` e `audit_logs` usam **`timestamptz`**, com
+`ocorrido_em` e `registrado_em` separados. Em evento regulatório o momento da comunicação
+tem valor jurídico, e a diferença entre o fato e o registro é auditável (§6.2 do PNIB).
+
+**R6.** ~~Não adicionar `farm_id` a nenhuma tabela.~~ ⚠️ **REVOGADA** pelo
+[ADR 0004](docs/adr/0004-conformidade-pnib.md). O PNIB exige hierarquia com múltiplas
+propriedades por titular (§3.1) e movimentação entre elas (§8.1). O modelo passa a ser
+**schema por organização + `property_id`** nas tabelas de negócio.
 
 **R7. `INSERT OR REPLACE` precisa de ramo `ON CONFLICT ... DO UPDATE` para Postgres.**
 Ver `create_session`, `set_category_price`, `set_setting`.
@@ -239,6 +250,30 @@ tomada. Fazer depois custa muito mais: hex literal não responde a troca de tema
 Seguir R4 para o schema.
 
 ---
+
+## 4.1 ⚠️ Reordenação pelo ADR 0004 (PNIB)
+
+A decisão de conformidade com o PNIB **antecede** as trilhas 1–4. Construir Financeiro,
+Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que será trocada.
+
+**Nova Fase B — fundação regulatória**, na ordem:
+
+| # | Etapa | Por que aqui |
+|---|---|---|
+| B1 | **Chave surrogate + `animal_identifiers`** | Pré-requisito de tudo. Toca 8 tabelas com FK |
+| B2 | **`animal_events` + auditoria** | A3 já estava planejado; vira obrigatório (§6, §14) |
+| B3 | **Genealogia e nascimentos** | Mãe/pai não existem hoje (§4.3, §7) |
+| B4 | **Hierarquia de propriedades** | `properties` + `property_id` (§3) |
+| B5 | **Motor de regras regulatórias** | Estende a spec 0011 com vigência, UF e nível (§11) |
+| B6 | **Movimentações entre propriedades + GTA** | Hoje só piquete→piquete (§8) |
+| B7 | **Módulo de dispositivos (brincos)** | Estoque, lotes, conferência visual×RFID (§5) |
+| — | **Integrações oficiais** | ⛔ **Bloqueado**: as APIs não existem, e o §23 lista 19 pontos não confirmados |
+
+**A Fase A vira pré-requisito, não higiene:** a etapa 5 da migração do ADR 0004 depende de
+as consultas estarem concentradas em `repositories/`. Sem isso, a troca da chave espalha-se
+por todo o `database.py`.
+
+As trilhas 1–4 abaixo continuam válidas, mas **depois** de B1–B4.
 
 ## 5. Trilhas paralelas (abrem só depois da Fase A)
 
