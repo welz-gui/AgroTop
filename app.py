@@ -172,10 +172,6 @@ def _cost_per_unit(total_cost: float, kg: float, yield_: float = 0.52) -> float:
 def _breakeven_label() -> str:
     return "Breakeven (R$/@)" if _use_arroba() else "Breakeven (R$/kg)"
 
-def _revenue(kg: float, price_per_unit: float, yield_: float = 0.52) -> float:
-    """Receita = unidades × preço."""
-    return round(_live_weight(kg, yield_) * price_per_unit, 2)
-
 # ─── Formatação PT-BR (plural e números) ─────────────────────────────────────
 def _plural(n, singular: str, plural: str = None) -> str:
     """Ex.: _plural(1,'animal','animais') -> '1 animal'; _plural(3,...) -> '3 animais'."""
