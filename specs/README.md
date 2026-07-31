@@ -157,6 +157,14 @@ colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
 > Abra o PR para `main` **pronto para revisão, nunca como rascunho**, no formato descrito na
 > spec.
 >
+> **Cole no seu relatório a URL COMPLETA que o `gh pr create` devolveu**
+> (`https://github.com/welz-gui/AgroTop/pull/NNN`). Confirme com:
+> ```
+> gh pr view --json number,url
+> ```
+> **Não invente nem estime o número.** Se o comando falhar, diga que falhou e por quê — um
+> branch entregue sem PR é recuperável; um PR inexistente reportado como pronto não é.
+>
 > **Por último, e não esqueça: remova o worktree** — `ExitWorktree` com ação `keep`, ou
 > `git worktree remove <caminho>`. Worktree abandonado **segura o branch** e impede o
 > mantenedor de trabalhar nele. Já aconteceu cinco vezes.
@@ -185,7 +193,7 @@ situar, mas **a tarefa é atribuída por você**, sempre.
 Estas valem sempre, mesmo que a spec individual não repita. Foram escritas a partir de
 problemas reais observados nas primeiras três entregas (2026-07-31).
 
-### 1. Não altere `specs/`, `ROADMAP.md` nem `README.md`
+### 1b. Não altere `specs/`, `ROADMAP.md` nem `README.md`
 
 Quem atualiza o quadro e a documentação é o **mantenedor**. Você não precisa marcar nada.
 
@@ -194,7 +202,19 @@ conflito **só** por causa de uma linha em `specs/QUADRO.md`, e o branch preciso
 reconstruído. Com a tarefa já atribuída no prompt, marcar o quadro é trabalho perdido que
 só gera conflito entre agentes paralelos.
 
-### 0. Parta de `origin/main`, não de um branch local
+### 0. Afirmação não é evidência
+
+Todo passo de entrega precisa de **saída de comando colada**, não de afirmação: testes,
+`compileall`, `git diff --stat` e **a URL do PR**.
+
+*Por quê:* em 2026-07-31 um agente relatou *"PR #23 aberto, pronto para revisão"* para a
+spec 0013. **O PR não existia** — e o número era de outro agente. O trabalho estava feito e
+commitado; só a entrega foi falsamente reportada. Se o relatório tivesse sido aceito, a
+tarefa seria dada por concluída com o código parado num branch.
+
+Vale para o mantenedor também: conferir com `gh pr list` antes de considerar entregue.
+
+### 1. Parta de `origin/main`, não de um branch local
 
 *Por quê:* o PR #20 chegou carregando **dois commits do mantenedor**, porque o worktree foi
 criado a partir do HEAD local — que naquele momento era um branch de integração em
@@ -203,7 +223,7 @@ andamento, não a `main`. O agente não errou; o ponto de partida é que estava 
 Mitigações aplicadas: `.claude/settings.json` fixa `worktree.baseRef = "fresh"`, e o prompt
 manda conferir. O mantenedor também deve manter a `main` em checkout ao lançar agentes.
 
-### 2. Remova o worktree ao terminar
+### 2b. Remova o worktree ao terminar
 
 Depois que o PR for aberto, saia do worktree — `ExitWorktree` (ação `keep`) ou
 `git worktree remove <caminho>`.
