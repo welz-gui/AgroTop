@@ -132,6 +132,13 @@ colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
 
 #### Continuação, igual nas duas variantes
 
+> **Confirme que seu worktree partiu de `origin/main`**, e não de um branch local em
+> andamento:
+> ```
+> git log --oneline -1 origin/main     # deve ser o mesmo ponto de partida do seu branch
+> ```
+> Se não for, refaça o worktree a partir de `origin/main`.
+>
 > Faça **apenas** o que a spec pede. Se identificar outro problema, **anote no PR em vez de
 > corrigir** — mudança fora de escopo é rejeitada.
 >
@@ -148,7 +155,11 @@ colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
 > que a spec pediu — **não altere `specs/`, `ROADMAP.md` nem `README.md`**.
 >
 > Abra o PR para `main` **pronto para revisão, nunca como rascunho**, no formato descrito na
-> spec. Depois, **remova o worktree** (`ExitWorktree` com ação `keep`).
+> spec.
+>
+> **Por último, e não esqueça: remova o worktree** — `ExitWorktree` com ação `keep`, ou
+> `git worktree remove <caminho>`. Worktree abandonado **segura o branch** e impede o
+> mantenedor de trabalhar nele. Já aconteceu cinco vezes.
 
 ### Ao terminar
 
@@ -182,6 +193,15 @@ Quem atualiza o quadro e a documentação é o **mantenedor**. Você não precis
 conflito **só** por causa de uma linha em `specs/QUADRO.md`, e o branch precisou ser
 reconstruído. Com a tarefa já atribuída no prompt, marcar o quadro é trabalho perdido que
 só gera conflito entre agentes paralelos.
+
+### 0. Parta de `origin/main`, não de um branch local
+
+*Por quê:* o PR #20 chegou carregando **dois commits do mantenedor**, porque o worktree foi
+criado a partir do HEAD local — que naquele momento era um branch de integração em
+andamento, não a `main`. O agente não errou; o ponto de partida é que estava errado.
+
+Mitigações aplicadas: `.claude/settings.json` fixa `worktree.baseRef = "fresh"`, e o prompt
+manda conferir. O mantenedor também deve manter a `main` em checkout ao lançar agentes.
 
 ### 2. Remova o worktree ao terminar
 
