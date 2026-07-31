@@ -45,7 +45,7 @@ def _schema_sqlite_novo():
 
         assert not db.USE_PG, "o teste precisa rodar em SQLite, não em produção"
         caminho = os.path.join(tempfile.mkdtemp(), "schema_guard.db")
-        db.DB_PATH = caminho
+        db.configurar_sqlite(caminho)
         db.init_db()
         return db, caminho, _colunas(caminho)
     finally:
