@@ -536,7 +536,58 @@ verifique, e para dados críticos use exportação própria.
 commit novo desfazendo, preservando o histórico; `reset` reescreve o histórico e quebra o
 repositório de quem já tinha puxado.
 
-## 9. Dívidas conhecidas
+## 10. Delegando trabalho a outros agentes
+
+Agentes podem tocar **manutenção de baixo risco** e **funcionalidades específicas**, desde
+que recebam uma **especificação fechada** em [`specs/`](specs/README.md). Sem spec, o
+resultado é previsivelmente ruim — e isso não é teoria:
+
+> Em 2026-07-30, onze PRs foram abertos por automação sem especificação. Apenas quatro
+> tinham valor. Dois testavam a **mesma função** em arquivos diferentes (#9/#10); um
+> mockava `database.get_age_months`, que o refactor havia movido para `services/` (#6);
+> e um **removia do ROADMAP uma dívida de segurança ainda aberta** (#12). Nenhuma dessas
+> falhas foi de capacidade — todas foram de **contexto ausente**.
+
+### R28. Trabalho delegado exige spec em `specs/`
+
+Uma spec fecha: escopo, o que **não** tocar, critério de aceite verificável, proibições
+explícitas e formato de entrega. O índice de `specs/README.md` marca o estado de cada
+tarefa — é o que impede dois agentes de fazerem a mesma coisa.
+
+### R29. Agente trabalha em worktree próprio
+
+```bash
+git worktree add ../AgroTop-<tarefa> -b <tipo>/<slug>
+```
+
+O worktree dá isolamento **por construção**, não por disciplina: como
+`.streamlit/secrets.toml`, `agrotop.db` e `backups/` são gitignored, eles **não vão junto**
+— o agente fica fisicamente incapaz de alcançar o banco de produção. Com
+`AGROTOP_FORCE_SQLITE=1`, ele roda num SQLite local descartável.
+
+Dependências novas de PoC ficam em `poc/<nome>/requirements.txt`, **nunca** no
+`requirements.txt` da raiz, que alimenta o deploy do Streamlit Cloud.
+
+### R30. Código de PoC não é mesclado como está
+
+**O produto de uma PoC é o aprendizado, não o código.** PoC é escrita para responder uma
+pergunta rápido: sem testes, sem tratamento de erro, com atalhos. O que se mescla é a
+**decisão** (um ADR: "é viável, custa X, seguimos assim"); o código fica no branch como
+evidência, e a implementação de verdade é feita depois seguindo este roadmap.
+
+*Histórico: o app mobile arquivado era exatamente código de PoC — login simulado, `catch`
+devolvendo três animais fictícios, `sqflite` declarado e nunca importado — e quase virou a
+fundação do produto.*
+
+### Não delegue
+
+- Nada que toque `database.py`, `services/` ou `repositories/` enquanto a Fase A rodar.
+- Mudança de schema (R4) — sempre serializada pelo dono do schema.
+- Regra de negócio com efeito numérico (GMD, custo, carência, venda).
+- Nada que exija credencial de produção.
+- **Remover itens da seção 9 (Dívidas).** Quem fecha dívida é o mantenedor, na revisão.
+
+## 11. Dívidas conhecidas
 
 1. **Rotacionar a senha do Postgres** — ela já apareceu em texto claro duas vezes.
    Supabase → Settings → Database → reset, e atualizar `secrets.toml` + Secrets do
