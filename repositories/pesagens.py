@@ -1,0 +1,82 @@
+"""Pesagens e GMD recente.
+
+`_weighings_by_animal` é bulk loader cacheado (ROADMAP R11): 1 consulta traz tudo,
+o resto é leitura em memória. Não consultar por animal em laço.
+
+Camada de dados (ROADMAP.md R1/R9): aqui mora o SQL, e só aqui.
+Sem regra de negócio — cálculo e decisão ficam em `services/`.
+Sem Streamlit no topo do módulo.
+"""
+
+from datetime import datetime
+from typing import Optional
+
+from .conexao import _cache, _conn, _writes
+
+
+@_cache
+def _weighings_by_animal() -> dict:
+    """Todas as pesagens agrupadas por animal (mais recente primeiro). 1 consulta."""
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT * FROM weighings ORDER BY weigh_date DESC, id DESC"
+        ).fetchall()
+    out: dict = {}
+    for r in rows:
+        out.setdefault(r["animal_id"], []).append(dict(r))
+    return out
+
+
+def get_weighings(animal_id: str) -> list[dict]:
+    return list(_weighings_by_animal().get(animal_id, []))
+
+
+@_writes
+def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
+                 method="pesado") -> None:
+    with _conn() as con:
+        lote = con.execute(
+            "SELECT lote_id FROM animals WHERE id=?", (animal_id,)
+        ).fetchone()
+        lote_id = lote["lote_id"] if lote else None
+        con.execute(
+            "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?)",
+            (animal_id, weight, weigh_date, lote_id, operator, method, notes),
+        )
+        con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
+
+
+def get_all_weighings() -> list[dict]:
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT w.*, a.breed
+               FROM weighings w JOIN animals a ON a.id=w.animal_id
+               WHERE a.status='ativo' ORDER BY w.weigh_date""",
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def calculate_gmd(animal_id: str) -> Optional[float]:
+    """GMD recente: entre as duas últimas pesagens (como o animal está agora)."""
+    ws = get_weighings(animal_id)
+    if len(ws) < 2:
+        return None
+    try:
+        d0 = datetime.strptime(ws[0]["weigh_date"], "%Y-%m-%d").date()
+        d1 = datetime.strptime(ws[1]["weigh_date"], "%Y-%m-%d").date()
+        days = abs((d0 - d1).days)
+        return round((ws[0]["weight"] - ws[1]["weight"]) / days, 3) if days else None
+    except (ValueError, KeyError):
+        return None
+
+
+def get_last_estimate(animal_id: str) -> Optional[dict]:
+    """Retorna a pesagem estimada (operador ou medição) mais recente ainda não
+    confirmada por uma pesagem real posterior. Usada para comparação."""
+    ws = get_weighings(animal_id)  # já vem ordenado do mais recente ao mais antigo
+    for w in ws:
+        if w.get("method") in ("estimado", "medicao"):
+            return w
+        # se a mais recente já é 'pesado', não há estimativa pendente antes dela
+        return None
+    return None
