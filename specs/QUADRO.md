@@ -88,8 +88,11 @@ mantenedor (R31).
 
 | Situação | Modo | Prompt |
 |---|---|---|
-| **Um agente por vez** | ele pega a próxima livre, reivindicando o branch **antes** de começar | Variante A |
+| **Um agente por vez** ⭐ padrão | ele pega a próxima livre, reivindicando o branch **antes** de começar | **Variante A** |
 | **Vários em paralelo** | **você atribui** a spec no prompt | Variante B (obrigatória) |
+
+A fila abaixo é lida pelo agente: ele pega a **primeira com número de ordem** (as concluídas
+estão marcadas ✅ e sem número).
 
 A colisão de 2026-07-31 aconteceu com **dois agentes iniciados em paralelo**. Sequencialmente
 o autoatendimento funciona, porque não há dois lendo a fila ao mesmo tempo.

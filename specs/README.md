@@ -101,32 +101,36 @@ deploy do Streamlit Cloud.
 A primeira frase precisa conter a palavra **worktree** — é o que autoriza o agente a se
 isolar. Escolha a variante conforme **quantos agentes você vai iniciar**.
 
-#### Variante A — um agente por vez (ele pega a próxima livre)
+#### Variante A — padrão: o agente pega a próxima livre ⭐
 
-Cômoda: você não precisa escolher a spec. **Só use lançando um agente de cada vez** — a
-colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
+**Use esta.** Vale quando há **um agente por vez** — que é o modo de trabalho normal deste
+projeto. Você não precisa escolher a spec.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
 >
-> 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila.
+> 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila (as concluídas estão
+>    marcadas ✅ e não têm número de ordem).
 > 2. **Antes de qualquer outra coisa**, reivindique-a criando o branch no remoto:
->    `git push origin HEAD:refs/heads/<branch-da-spec>`.
->    Se falhar dizendo que a referência já existe, a tarefa está tomada: pegue a próxima e
->    **não insista**. Não edite o quadro — quem atualiza é o mantenedor.
+>    ```
+>    git ls-remote --heads origin                        # ver o que já está tomado
+>    git push origin HEAD:refs/heads/<branch-da-spec>    # reivindicar — ATÔMICO
+>    ```
+>    Se o push falhar dizendo que a referência já existe, a tarefa está tomada: **pegue a
+>    próxima e não insista**. Não edite o quadro — quem atualiza é o mantenedor.
 > 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
 > 5. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
 #### Variante B — vários agentes em paralelo (você atribui)
 
-**Obrigatória** quando houver mais de um agente ativo. Elimina a corrida por completo.
+**Obrigatória** quando houver mais de um agente ativo ao mesmo tempo. A colisão de
+2026-07-31 aconteceu com dois iniciados em paralelo lendo a fila juntos.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
 >
-> 1. Leia `specs/0008-importacao-pesagens-csv.md` — é a **sua** tarefa, escopo fechado.
->    *(Troque pelo arquivo da spec que está atribuindo. Fila em `specs/QUADRO.md`.)*
+> 1. Leia `specs/<arquivo-da-spec>.md` — é a **sua** tarefa, escopo fechado.
 > 2. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
 > 3. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
