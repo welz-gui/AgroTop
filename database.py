@@ -452,14 +452,28 @@ def _seed_users(con):
 
     O guard é por tabela vazia, não por username: antes, checar `username`
     fazia com que apagar o usuário `admin` o ressuscitasse com a senha padrão
-    `admin123` na próxima inicialização — uma porta aberta num app público.
+    na próxima inicialização — uma porta aberta num app público.
     Para recuperar acesso perdido use `tools/gerar_hash_senha.py`.
     """
     if con.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
         return
+
+    import secrets
+    import sys
+
+    admin_pass = os.environ.get("AGROTOP_ADMIN_PASSWORD")
+    if not admin_pass:
+        admin_pass = secrets.token_urlsafe(12)
+        print(f"ATENÇÃO: Senha gerada para o usuário 'admin': {admin_pass}", file=sys.stderr)
+
+    op_pass = os.environ.get("AGROTOP_OP_PASSWORD")
+    if not op_pass:
+        op_pass = secrets.token_urlsafe(12)
+        print(f"ATENÇÃO: Senha gerada para o usuário 'op1': {op_pass}", file=sys.stderr)
+
     for u, p, n, r in [
-        ("admin", "admin123", "Administrador",  "admin"),
-        ("op1",   "op1234",   "Operador Campo", "operator"),
+        ("admin", admin_pass, "Administrador",  "admin"),
+        ("op1",   op_pass,    "Operador Campo", "operator"),
     ]:
         con.execute(
             "INSERT INTO users (username,password_hash,name,role) VALUES(?,?,?,?)",
