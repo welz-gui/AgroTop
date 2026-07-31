@@ -338,14 +338,25 @@ class TestEstoque(BaseRegras):
                   ("Ração", "racao", "kg", 100.0, 20.0, 2.0))
         return db.get_all_insumos()[0]["id"]
 
-    def test_entrada_soma_estoque_e_atualiza_custo(self):
+    def test_entrada_soma_estoque_e_usa_media_ponderada(self):
+        """COMPORTAMENTO ALTERADO em 2026-07-31 — mudança deliberada.
+
+        Antes, o custo unitário era **sobrescrito** pelo da última entrada (o
+        `QUIRK` que este teste documentava). Comprar 10 kg a R$ 5 com 1.000 kg a
+        R$ 2 em estoque fazia todo o saldo valer R$ 5/kg, inflando custo de trato
+        e margem.
+
+        Agora usa **média ponderada** (`services.estoque.custo_medio_ponderado`),
+        conforme docs/adr/0003-custo-medio-ponderado.md. A decisão é
+        **não-retroativa**: vale para entradas novas; o histórico já lançado
+        permanece como estava.
+        """
         iid = self._insumo()
         db.add_insumo_entry(iid, 50.0, 2.50)
         i = [x for x in db.get_all_insumos() if x["id"] == iid][0]
         self.assertEqual(i["current_stock"], 150.0)
-        # QUIRK: o custo unitário é SOBRESCRITO pelo da última entrada,
-        # não é média ponderada. Alterar isso muda custo histórico (ver Trilha 3).
-        self.assertEqual(i["cost_per_unit"], 2.50)
+        # (100 × 2,00 + 50 × 2,50) ÷ 150 = 2,1666… → 2,17
+        self.assertEqual(i["cost_per_unit"], 2.17)
 
     def test_entrada_registra_movimentacao(self):
         iid = self._insumo()
