@@ -36,126 +36,31 @@ from services.seguranca import (  # noqa: F401
     _hash, _is_legacy_hash, _verify_password,
 )
 
-DB_PATH       = "agrotop.db"
+# ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
+# Movida para repositories/conexao.py. Reexportada aqui para os chamadores atuais.
+from repositories.conexao import (  # noqa: F401
+    FORCE_SQLITE_ENV, _database_url, _translate, _PGConn, _conn,
+    _cache, clear_cache, _writes, configurar_sqlite,
+)
+import repositories.conexao as _conexao
 
-# ─── Seleção de backend (SQLite local x Postgres/Supabase nuvem) ─────────────
 
-FORCE_SQLITE_ENV = "AGROTOP_FORCE_SQLITE"
+def __getattr__(name):
+    """Encaminha a configuração mutável para `repositories.conexao`.
 
+    `DB_PATH`, `DATABASE_URL`, `USE_PG` e `IntegrityError` mudam quando o backend é
+    reconfigurado (testes). Se fossem reexportados por `from ... import`, ficariam
+    congelados no valor do momento do import e `db.USE_PG` mentiria. Com este
+    encaminhamento, o valor lido é sempre o real.
 
-def _database_url() -> str:
-    """Lê a URL do Postgres de env var ou dos segredos do Streamlit.
-
-    `AGROTOP_FORCE_SQLITE=1` ignora as duas fontes e devolve string vazia,
-    forçando o backend SQLite. Serve para testes: com `.streamlit/secrets.toml`
-    presente, o padrão seria conectar em PRODUÇÃO — e um teste que chame
-    `init_db()` gravaria lá. Ver `tests/__init__.py`.
+    Para ALTERAR o backend use `configurar_sqlite()` — atribuir `db.DB_PATH = x`
+    não tem efeito (módulos não têm `__setattr__`), e falhar em silêncio aqui
+    significaria gravar no banco errado.
     """
-    if os.environ.get(FORCE_SQLITE_ENV, "").strip().lower() in ("1", "true", "yes"):
-        return ""
-    url = os.environ.get("DATABASE_URL", "")
-    if not url:
-        try:
-            import streamlit as st
-            url = st.secrets.get("DATABASE_URL", "")  # type: ignore
-        except Exception:
-            url = ""
-    return url or ""
+    if name in ("DB_PATH", "DATABASE_URL", "USE_PG", "IntegrityError"):
+        return getattr(_conexao, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-DATABASE_URL = _database_url()
-USE_PG = bool(DATABASE_URL)
-
-if USE_PG:
-    import psycopg2
-    import psycopg2.extras
-    IntegrityError = psycopg2.IntegrityError
-else:
-    IntegrityError = sqlite3.IntegrityError
-
-
-def _translate(sql: str) -> str:
-    """Adapta SQL escrito para SQLite ao dialeto Postgres."""
-    if not USE_PG:
-        return sql
-    sql = sql.replace("?", "%s")
-    sql = sql.replace("MAX(0,", "GREATEST(0,")
-    return sql
-
-
-class _PGConn:
-    """Adaptador para que o código escrito para sqlite3 (con.execute(...).fetchone())
-    funcione igual com psycopg2. Usa DictCursor (suporta row[0] e row['col'])."""
-    def __init__(self, raw):
-        self.raw = raw
-
-    def execute(self, sql, params=()):
-        cur = self.raw.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute(_translate(sql), params)
-        return cur
-
-    def executescript(self, sql):
-        cur = self.raw.cursor()
-        cur.execute(sql)
-        cur.close()
-
-    def commit(self):   self.raw.commit()
-    def rollback(self): self.raw.rollback()
-    def close(self):    self.raw.close()
-
-# ─── Conexão ──────────────────────────────────────────────────────────────────
-
-@contextmanager
-def _conn():
-    if USE_PG:
-        con = _PGConn(psycopg2.connect(DATABASE_URL))
-    else:
-        con = sqlite3.connect(DB_PATH, check_same_thread=False)
-        con.row_factory = sqlite3.Row
-        con.execute("PRAGMA journal_mode=WAL")
-        con.execute("PRAGMA foreign_keys=ON")
-    try:
-        yield con
-        con.commit()
-    except Exception:
-        con.rollback()
-        raise
-    finally:
-        con.close()
-
-# ─── Cache (reduz consultas repetidas; essencial na nuvem) ───────────────────
-# Estratégia: carregamento em lote. A 1ª chamada busca TODOS os registros de
-# uma vez; as demais são leituras em memória. clear_cache() é chamado após
-# qualquer gravação, para o usuário ver a alteração imediatamente.
-try:
-    import streamlit as _st
-
-    def _cache(fn):
-        return _st.cache_data(ttl=120, show_spinner=False)(fn)
-
-    def clear_cache() -> None:
-        try:
-            _st.cache_data.clear()
-        except Exception:
-            pass
-except Exception:
-    def _cache(fn):
-        return fn
-
-    def clear_cache() -> None:
-        pass
-
-
-def _writes(fn):
-    """Decorador para funções de gravação: limpa o cache após executar,
-    garantindo que a próxima leitura reflita a alteração imediatamente."""
-    import functools
-
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        result = fn(*args, **kwargs)
-        clear_cache()
-        return result
-    return wrapper
 
 
 @_cache
@@ -197,7 +102,7 @@ def _costs_by_animal() -> dict:
 
 def init_db() -> None:
     with _conn() as con:
-        if not USE_PG:
+        if not _conexao.USE_PG:
             con.executescript("""
             -- Usuários
             CREATE TABLE IF NOT EXISTS users (
@@ -515,7 +420,7 @@ def init_db() -> None:
 def _migrate(con) -> None:
     """Adiciona colunas novas a bancos SQLite criados por versões anteriores.
     No Postgres o schema já vem completo pela migração."""
-    if USE_PG:
+    if _conexao.USE_PG:
         return
     cols = {r["name"] for r in con.execute("PRAGMA table_info(animals)").fetchall()}
     if "birth_estimated" not in cols:
@@ -799,7 +704,7 @@ def create_session(user_id: int, days: int = 7) -> str:
     token = secrets.token_urlsafe(24)
     expires = (datetime.now() + timedelta(days=days)).isoformat()
     with _conn() as con:
-        if USE_PG:
+        if _conexao.USE_PG:
             con.execute(
                 "INSERT INTO sessions (token,user_id,expires_at) VALUES(?,?,?) "
                 "ON CONFLICT (token) DO UPDATE SET user_id=EXCLUDED.user_id, expires_at=EXCLUDED.expires_at",
@@ -1496,7 +1401,7 @@ def set_category_price(age_band: str, sex: str, price_per_kg: float) -> None:
     """Insere/atualiza o valor esperado por kg de uma categoria."""
     today = date.today().isoformat()
     with _conn() as con:
-        if USE_PG:
+        if _conexao.USE_PG:
             con.execute(
                 "INSERT INTO category_prices (age_band,sex,price_per_kg,updated_at) VALUES(?,?,?,?) "
                 "ON CONFLICT (age_band,sex) DO UPDATE SET price_per_kg=EXCLUDED.price_per_kg, updated_at=EXCLUDED.updated_at",
@@ -1749,7 +1654,7 @@ def admin_table_info(table: str) -> tuple[list[str], str]:
     if table not in ADMIN_TABLES:
         raise ValueError(f"Tabela não permitida: {table}")
     with _conn() as con:
-        if USE_PG:
+        if _conexao.USE_PG:
             cols = [r["name"] for r in con.execute(
                 "SELECT column_name AS name FROM information_schema.columns "
                 "WHERE table_schema='public' AND table_name=? ORDER BY ordinal_position",
@@ -1983,7 +1888,7 @@ def get_setting(key: str, default=None):
 @_writes
 def set_setting(key: str, value) -> None:
     with _conn() as con:
-        if USE_PG:
+        if _conexao.USE_PG:
             con.execute(
                 "INSERT INTO settings (key,value) VALUES(?,?) "
                 "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
@@ -2268,7 +2173,7 @@ def add_photo(animal_id: str, image_bytes: bytes, mime: str = "image/jpeg",
               taken_date: Optional[str] = None, operator: str = "") -> None:
     taken_date = taken_date or date.today().isoformat()
     with _conn() as con:
-        img = psycopg2.Binary(image_bytes) if USE_PG else image_bytes
+        img = _conexao.psycopg2.Binary(image_bytes) if _conexao.USE_PG else image_bytes
         con.execute(
             "INSERT INTO animal_photos (animal_id,image,mime,taken_date,operator) VALUES(?,?,?,?,?)",
             (animal_id, img, mime, taken_date, operator),
