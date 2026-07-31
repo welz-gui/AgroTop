@@ -587,9 +587,22 @@ evidência, e a implementação de verdade é feita depois seguindo este roadmap
 devolvendo três animais fictícios, `sqflite` declarado e nunca importado — e quase virou a
 fundação do produto.*
 
+### R31. Implementação delegada entrega função pura em módulo novo
+
+A restrição "não toque em `services/`" vale para **arquivos existentes**. **Criar módulo
+novo em `services/` é permitido e é o caminho recomendado** para delegar implementação sem
+colidir com a Fase A.
+
+O padrão: a spec fixa a **assinatura exata** da função; o agente entrega o módulo novo mais
+os testes; o mantenedor liga à interface e ao banco depois. Assim a trilha avança em
+paralelo ao refactor, e a integração fica barata — é ligar função pronta e testada.
+
+Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
+
 ### Não delegue
 
-- Nada que toque `database.py`, `services/` ou `repositories/` enquanto a Fase A rodar.
+- Alterar **arquivo existente** em `database.py`, `services/` ou `repositories/` enquanto a
+  Fase A rodar. (Criar módulo **novo** em `services/` é permitido — ver R31.)
 - Mudança de schema (R4) — sempre serializada pelo dono do schema.
 - Regra de negócio com efeito numérico (GMD, custo, carência, venda).
 - Nada que exija credencial de produção.

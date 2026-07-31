@@ -21,6 +21,10 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0004](0004-poc-ndvi-viabilidade.md) | PoC: NDVI é viável? (nuvem em MT) | pesquisa | baixo | 🟢 disponível |
 | [0005](0005-poc-flutter-api.md) | PoC: esqueleto Flutter + API autenticada | pesquisa | médio | 🟢 disponível |
 | [0006](0006-poc-dados-modelos-preditivos.md) | PoC: quanto histórico os modelos exigem | pesquisa | baixo | 🟢 disponível |
+| [0008](0008-importacao-pesagens-csv.md) | Importação de pesagens por CSV (parser puro) | implementação | baixo | 🟢 disponível |
+| [0009](0009-deteccao-peso-suspeito.md) | Detecção de pesagem suspeita | implementação | baixo | 🟢 disponível |
+| [0010](0010-custo-medio-ponderado.md) | Custo médio ponderado + ADR | implementação | baixo | 🟢 disponível |
+| [0011](0011-motor-de-regras.md) | Motor de regras de recomendação | implementação | baixo | 🟢 disponível |
 | 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada |
 
 **0007 está bloqueada de propósito:** são 198 substituições em `app.py` (3.280 linhas) sem
@@ -154,8 +158,10 @@ tinham valor. Os problemas não foram de capacidade do agente, e sim de **contex
 
 ## O que **não** delegar
 
-- Qualquer coisa que toque `database.py`, `services/`, `repositories/` enquanto a Fase A
-  estiver em andamento — é onde o refactor trabalha, e conflito ali custa caro.
+- Alterar **arquivo existente** em `database.py`, `services/` ou `repositories/` enquanto a
+  Fase A estiver em andamento — é onde o refactor trabalha, e conflito ali custa caro.
+  **Criar módulo novo em `services/` é permitido** e é como as tarefas de implementação
+  avançam trilha sem colidir (ROADMAP R31).
 - Mudança de schema (R4) — passa pelo dono do schema, sempre serializada.
 - Alteração de regra de negócio com efeito numérico (GMD, custo, carência, venda).
 - Qualquer coisa que exija credencial de produção.

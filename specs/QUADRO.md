@@ -14,13 +14,32 @@ baixo** — a ordem é prioridade, não sugestão.
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
 | 1 | [0001](0001-ci-actions-node24.md) — actions do CI → Node 24 | `manutencao/ci-actions-node24` | 🟢 livre | — | — |
-| 2 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
-| 3 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
-| 4 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
-| 5 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
-| 6 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| 2 | [0010](0010-custo-medio-ponderado.md) — custo médio ponderado 🏗️ | `feat/custo-medio-ponderado` | 🟢 livre | — | — |
+| 3 | [0009](0009-deteccao-peso-suspeito.md) — detecção de peso suspeito 🏗️ | `feat/qualidade-pesagem` | 🟢 livre | — | — |
+| 4 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
+| 5 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
+| 6 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
+| 7 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
+| 8 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
+| 9 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
+| 10 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+
+🏗️ = **avança trilha do roadmap** (implementação, não pesquisa). As demais são PoC ou manutenção.
 
 **Estados:** 🟢 livre · 🟡 em andamento · ✅ concluída (link do PR) · 🔴 bloqueada
+
+### Cobertura das trilhas
+
+| Trilha do [ROADMAP](../ROADMAP.md) | Specs | Tipo |
+|---|---|---|
+| 1 — API + Mobile | 0005, 0002 | pesquisa + ganho rápido |
+| 2 — Geometria e qualidade de dado | 0003, 0008, 0009 | pesquisa + **implementação** |
+| 3 — Estoque → Financeiro → Nutrição | **0010** | **implementação** |
+| 4 — Regras, NDVI, modelos | 0011, 0004, 0006 | **implementação** + pesquisa |
+
+**Como as tarefas de implementação avançam trilha sem colidir com a Fase A:** elas entregam
+**função pura em módulo novo** de `services/`, com contrato fixado na spec. O mantenedor liga
+à interface e ao banco depois. Nenhum arquivo existente é tocado.
 
 ### Fora da fila
 
