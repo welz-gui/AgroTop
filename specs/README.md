@@ -34,9 +34,8 @@ como provar que nada mudou de aparência.
 **Estados:** 🟢 disponível · 🟡 em andamento (anote quem pegou) · ✅ concluída (link do PR) ·
 ⚪ arquivada.
 
-> **Reivindique no [QUADRO.md](QUADRO.md) antes de começar.** Foi a ausência desse controle
-> que fez dois agentes escreverem testes para a mesma função `_num_br`, em arquivos
-> diferentes (PRs #9 e #10, ambos descartados).
+> **Atribua a spec no prompt.** Deixar o agente escolher foi tentado e falhou: dois agentes
+> começaram a mesma spec 0001 sem marcar o quadro. Ver [QUADRO.md](QUADRO.md).
 
 ---
 
@@ -102,9 +101,9 @@ isolar. Sem ela, ele trabalha na pasta principal.
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop.
 >
-> 1. Abra `specs/QUADRO.md`, pegue a **primeira tarefa livre** da fila e reivindique-a
->    seguindo o protocolo de lá. Se preferir atribuir uma tarefa específica, troque esta
->    linha por: "Leia `specs/<arquivo>.md` — é a sua tarefa".
+> 1. Leia `specs/0010-custo-medio-ponderado.md` — é a **sua** tarefa, e o escopo é fechado.
+>    *(Troque pelo arquivo da spec que você está atribuindo. Ver a fila de prioridade em
+>    `specs/QUADRO.md`.)*
 > 2. Leia `ROADMAP.md` seções 2 (regras invioláveis) e 3 (o que pode mudar). Elas contêm
 >    decisões já tomadas; violar qualquer regra ali quebra produção ou desfaz trabalho.
 > 3. Leia `DESIGN.md` se a tarefa tocar interface.

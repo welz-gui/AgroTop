@@ -553,14 +553,24 @@ resultado é previsivelmente ruim — e isso não é teoria:
 Uma spec fecha: escopo, o que **não** tocar, critério de aceite verificável, proibições
 explícitas e formato de entrega.
 
-A fila fica em [`specs/QUADRO.md`](specs/QUADRO.md), em ordem de prioridade. **O agente
-pode pegar a primeira tarefa livre da fila** — a curadoria já foi feita ao escrever e
-ordenar as specs, então escolher dali não é decidir prioridade, é seguir a decidida.
-Continua proibido inventar tarefa fora da fila ou reordená-la.
+A fila fica em [`specs/QUADRO.md`](specs/QUADRO.md), em ordem de prioridade. Ela é a lista
+de prioridade **do mantenedor**, não um balcão de autoatendimento.
 
-⚠️ **A reivindicação é feita criando o branch no remoto, não editando o arquivo.** Arquivo
-em git não é lock: dois agentes podem lê-lo simultaneamente e reivindicar a mesma tarefa.
-`git push origin HEAD:refs/heads/<branch>` é atômico — só um vence.
+**Atribua a spec explicitamente no prompt do agente.** Uma linha —
+`Leia specs/0010-....md — é a sua tarefa` — elimina corrida, coordenação e dependência de o
+agente lembrar de um passo extra.
+
+⚠️ **Autoatendimento por agente foi tentado e falhou.** A primeira versão deixava o agente
+escolher e "reivindicar" empurrando um branch vazio antes de começar. Em 2026-07-31, **dois
+agentes começaram a mesma spec 0001, e nenhum marcou o quadro**.
+
+A causa é estrutural, não de capacidade do agente: reivindicar exige um passo **fora do
+fluxo natural** (empurrar branch vazio *antes* de trabalhar) e marcar o quadro exige um
+terceiro. Agente otimiza para começar a tarefa. **Protocolo que depende de adesão voluntária
+a passo não óbvio falha** — e falhou.
+
+Lição geral: prefira mecanismo que torna o erro **impossível** (worktree sem `secrets.toml`,
+branch protection, teste-guarda no CI) a mecanismo que depende de alguém lembrar.
 
 ### R29. Agente trabalha em worktree próprio
 
