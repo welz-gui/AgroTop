@@ -25,6 +25,9 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0009](0009-deteccao-peso-suspeito.md) | Detecção de pesagem suspeita | implementação | baixo | 🟢 disponível |
 | [0010](0010-custo-medio-ponderado.md) | Custo médio ponderado + ADR | implementação | baixo | 🟢 disponível |
 | [0011](0011-motor-de-regras.md) | Motor de regras de recomendação | implementação | baixo | 🟢 disponível |
+| [0012](0012-maquina-estados-animal.md) | 🇧🇷 Máquina de estados do animal (PNIB §4.4) | implementação | baixo | 🟢 disponível |
+| [0013](0013-validacoes-consistencia-regulatoria.md) | 🇧🇷 Validações de consistência (PNIB §17.3) | implementação | baixo | 🟢 disponível |
+| [0014](0014-validador-identificadores.md) | 🇧🇷 Validador de identificadores (PNIB §4.2) | implementação | baixo | 🟢 disponível |
 | 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada |
 
 **0007 está bloqueada de propósito:** são 198 substituições em `app.py` (3.280 linhas) sem
