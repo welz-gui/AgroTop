@@ -9,6 +9,10 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
 ## Índice
 
+> Para **pegar uma tarefa**, use o [QUADRO.md](QUADRO.md) — ele tem a fila em ordem de
+> prioridade e o protocolo de reivindicação à prova de corrida. A tabela abaixo é o
+> catálogo; o quadro é a fila.
+
 | # | Tarefa | Tipo | Risco | Estado |
 |---|---|---|---|---|
 | [0001](0001-ci-actions-node24.md) | Atualizar actions do CI (Node 20 → 24) | manutenção | baixo | 🟢 disponível |
@@ -26,9 +30,9 @@ como provar que nada mudou de aparência.
 **Estados:** 🟢 disponível · 🟡 em andamento (anote quem pegou) · ✅ concluída (link do PR) ·
 ⚪ arquivada.
 
-> **Atualize a tabela ao pegar uma tarefa.** Foi a ausência desse controle que fez dois
-> agentes escreverem testes para a mesma função `_num_br`, em arquivos diferentes
-> (PRs #9 e #10, ambos descartados).
+> **Reivindique no [QUADRO.md](QUADRO.md) antes de começar.** Foi a ausência desse controle
+> que fez dois agentes escreverem testes para a mesma função `_num_br`, em arquivos
+> diferentes (PRs #9 e #10, ambos descartados).
 
 ---
 
@@ -92,9 +96,11 @@ A primeira frase precisa conter a palavra **worktree** — é o que autoriza o a
 isolar. Sem ela, ele trabalha na pasta principal.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
-> AgroTop. **Não escolha sua própria tarefa.**
+> AgroTop.
 >
-> 1. Leia `specs/0002-pwa-instalavel.md` — é a sua tarefa, e o escopo dela é fechado.
+> 1. Abra `specs/QUADRO.md`, pegue a **primeira tarefa livre** da fila e reivindique-a
+>    seguindo o protocolo de lá. Se preferir atribuir uma tarefa específica, troque esta
+>    linha por: "Leia `specs/<arquivo>.md` — é a sua tarefa".
 > 2. Leia `ROADMAP.md` seções 2 (regras invioláveis) e 3 (o que pode mudar). Elas contêm
 >    decisões já tomadas; violar qualquer regra ali quebra produção ou desfaz trabalho.
 > 3. Leia `DESIGN.md` se a tarefa tocar interface.

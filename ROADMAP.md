@@ -551,8 +551,16 @@ resultado é previsivelmente ruim — e isso não é teoria:
 ### R28. Trabalho delegado exige spec em `specs/`
 
 Uma spec fecha: escopo, o que **não** tocar, critério de aceite verificável, proibições
-explícitas e formato de entrega. O índice de `specs/README.md` marca o estado de cada
-tarefa — é o que impede dois agentes de fazerem a mesma coisa.
+explícitas e formato de entrega.
+
+A fila fica em [`specs/QUADRO.md`](specs/QUADRO.md), em ordem de prioridade. **O agente
+pode pegar a primeira tarefa livre da fila** — a curadoria já foi feita ao escrever e
+ordenar as specs, então escolher dali não é decidir prioridade, é seguir a decidida.
+Continua proibido inventar tarefa fora da fila ou reordená-la.
+
+⚠️ **A reivindicação é feita criando o branch no remoto, não editando o arquivo.** Arquivo
+em git não é lock: dois agentes podem lê-lo simultaneamente e reivindicar a mesma tarefa.
+`git push origin HEAD:refs/heads/<branch>` é atômico — só um vence.
 
 ### R29. Agente trabalha em worktree próprio
 
