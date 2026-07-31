@@ -44,6 +44,11 @@ login por cookie · câmera (QR + OCR de brinco + foto).
 Violar qualquer uma destas quebra produção, desfaz decisão registrada, ou reintroduz
 um bug que já custou tempo. Cada regra tem histórico.
 
+> O número da regra é **identificador estável**, não ordem de leitura: regras novas recebem
+> o próximo número livre e ficam na seção temática a que pertencem. Por isso a sequência
+> aparece fora de ordem entre as seções. Nunca renumere — os números são citados em commits,
+> em PRs e no [DESIGN.md](DESIGN.md).
+
 ### 2.1 Banco de dados
 
 **R1. `_conn()` é o único ponto de acesso ao banco.** Nunca chamar `psycopg2.connect`
@@ -419,6 +424,8 @@ python -m compileall app.py database.py tests tools # verificação de compilaç
 python tools/dump_schema_nuvem.py --baseline        # regenerar baseline + retrato
 python tools/testar_baseline.py                     # validar que o baseline recria o schema
 python tools/gerar_hash_senha.py --usuario admin    # recuperar acesso perdido
+python tools/backup_banco.py                        # backup local do banco
+python tools/restaurar_banco.py <arquivo.zip>       # restaurar (schema de conferência)
 ```
 
 Forçar SQLite localmente: `AGROTOP_FORCE_SQLITE=1`.
@@ -434,15 +441,107 @@ Forçar SQLite localmente: `AGROTOP_FORCE_SQLITE=1`.
 - [ ] Nenhum diretório `pages/` criado (R12)
 - [ ] Nenhum segredo ou `DATABASE_URL` em código, log ou mensagem (R18, R19)
 - [ ] Comportamento numérico das regras inalterado — ou mudança declarada no PR
+- [ ] Se criou migration: rollback documentado no próprio arquivo (R26)
+- [ ] Veio de um branch, não de push direto na `main` (R23)
 
-## 8. Dívidas conhecidas
+## 8. Segurança de mudanças e reversão
+
+**O Git já é o sistema de versões.** Cada commit é um ponto de restauração; não é preciso
+criar cópias, pastas `_old` ou arquivos `v2`. O que protege de verdade não é *poder
+reverter*, é **impedir que a quebra chegue em produção** — porque a `main` faz deploy
+automático no Streamlit Cloud.
+
+### R23. Trabalho de agente vai em branch e PR, nunca direto na `main`
+
+Um push direto na `main` publica em produção **antes de qualquer verificação**. Com mais de
+um agente, isso vira colisão e quebra silenciosa.
+
+```bash
+git checkout -b trilha-2/geometria-piquetes
+# ... trabalho, commits pequenos ...
+git push -u origin trilha-2/geometria-piquetes
+gh pr create --fill
+```
+
+Mesclar só com **CI verde**. Recomendado ativar no GitHub: *Settings → Branches → Branch
+protection* na `main`, exigindo PR e checks aprovados. Sem isso, a regra depende de
+disciplina; com isso, é imposta.
+
+### R24. Commits pequenos e coerentes
+
+Reversão só funciona bem se cada commit fizer **uma coisa**. Um commit "vários ajustes"
+não dá para reverter sem levar junto o que estava certo. Se um commit mistura correção e
+funcionalidade nova, separe.
+
+### R25. Tag antes de mudança arriscada
+
+Ponto de restauração com nome, mais fácil de achar depois que um SHA:
+
+```bash
+git tag estavel-antes-refactor-services && git push origin estavel-antes-refactor-services
+```
+
+Usar antes de: refactor grande, migration destrutiva, troca de dependência.
+
+### R26. Toda migration precisa de rollback documentado
+
+**Esta é a lacuna que o Git não cobre: `git revert` desfaz código, não schema.** Reverter o
+commit de uma migration deixa o banco no estado novo e o código no antigo — pior que antes.
+
+Portanto, cada arquivo em `supabase/migrations/` deve trazer, em comentário, **como
+desfazer**. O exemplo já feito é `0001_drop_profiles.sql`: ele guarda o `CREATE TABLE`
+completo da tabela removida, justamente para permitir recriá-la.
+
+Antes de migration **destrutiva** (`DROP`, `ALTER ... DROP COLUMN`, mudança de tipo):
+1. verificar o alvo (linhas, FKs, triggers, views dependentes — como foi feito com `profiles`);
+2. **rodar `python tools/backup_banco.py`**;
+3. registrar no arquivo da migration o que foi verificado e como reverter.
+
+### R27. Backup local do banco
+
+O plano free do Supabase **não tem point-in-time recovery**. A rede de proteção é local:
+
+```bash
+python tools/backup_banco.py                    # backup completo + verificação
+python tools/restaurar_banco.py <arquivo.zip>   # restaura em schema de conferência
+```
+
+O backup é lido numa transação `REPEATABLE READ` (retrato coerente mesmo com o sistema
+em uso) e inclui **tudo**, até as fotos em `bytea` — diferente do backup em Excel do app,
+que as omite de propósito. Todo backup é verificado logo após ser gerado.
+
+A restauração cai por padrão num **schema de conferência descartável**, nunca por cima dos
+dados vivos. Testar a recuperação de tempos em tempos:
+`python tools/restaurar_banco.py <arquivo> --apagar-depois`.
+
+⚠️ O arquivo contém todos os dados, **inclusive hashes de senha**. `backups/` está no
+`.gitignore` — mantenha assim e guarde uma cópia fora desta máquina.
+
+⚠️ **Confirme a situação de backup do seu plano Supabase.** O projeto está no plano **free**,
+que não oferece point-in-time recovery. Não assuma que existe backup automático suficiente —
+verifique, e para dados críticos use exportação própria.
+
+### Como reverter, na prática
+
+| Situação | O que fazer |
+|---|---|
+| Commit ruim já na `main` | `git revert <sha> && git push` — o Streamlit Cloud redeploya sozinho |
+| Vários commits ruins | `git revert <sha_antigo>..<sha_novo>` |
+| Voltar a um ponto conhecido | `git checkout <tag>` para inspecionar; `git revert` para desfazer de fato |
+| Branch de trabalho bagunçado | descartar o branch; a `main` nunca foi tocada |
+| Schema quebrado | aplicar o rollback documentado na migration — **não** basta reverter o commit |
+| App fora do ar após deploy | Manage app → Reboot; se persistir, `git revert` e push |
+
+**Preferir `git revert` a `git reset --hard`** em branch compartilhado: `revert` cria um
+commit novo desfazendo, preservando o histórico; `reset` reescreve o histórico e quebra o
+repositório de quem já tinha puxado.
+
+## 9. Dívidas conhecidas
 
 1. **Rotacionar a senha do Postgres** — ela já apareceu em texto claro duas vezes.
    Supabase → Settings → Database → reset, e atualizar `secrets.toml` + Secrets do
    Streamlit Cloud. *(Adiada por decisão do usuário.)*
-2. **Trocar as senhas padrão** `admin/admin123` e `op1/op1234` — o app é público.
-   Use `tools/gerar_hash_senha.py`. *(Adiada por decisão do usuário.)*
-3. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
+2. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
 4. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
    servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
 5. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar

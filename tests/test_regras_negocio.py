@@ -40,8 +40,7 @@ class BaseRegras(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        db.DB_PATH = os.path.join(self.dir, "regras.db")
-        db.USE_PG = False
+        db.configurar_sqlite(os.path.join(self.dir, "regras.db"))
 
         # Neutraliza os seeds: queremos um rebanho controlado, não os dados de demo.
         seeds = ["_seed_users", "_seed_fornecedores", "_seed_lotes",

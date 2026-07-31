@@ -38,8 +38,9 @@ class TestPasswordHashing(unittest.TestCase):
 class TestLegacyMigration(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        db.DB_PATH = os.path.join(self.tmp, "test.db")
-        db.USE_PG = False
+        # Aponta a conexão para um SQLite descartável. Ver repositories/conexao.py:
+        # atribuir db.DB_PATH não tem efeito desde que a camada foi separada.
+        db.configurar_sqlite(os.path.join(self.tmp, "test.db"))
         db.init_db()
 
     def test_migration_on_login(self):

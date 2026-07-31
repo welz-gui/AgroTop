@@ -44,13 +44,15 @@ O sistema vai inicializar um banco SQLite local (`agrotop.db`) e popular algumas
 
 ## 🔐 Credenciais Padrão (Seed Inicial)
 
-O banco é criado com 2 usuários padrão de teste.
+O banco é criado com 2 usuários padrão na primeira inicialização, com senhas configuráveis via variáveis de ambiente.
 *   **Administrador:**
     *   Usuário: `admin`
-    *   Senha: `admin123`
+    *   Senha: Definida pela variável de ambiente `AGROTOP_ADMIN_PASSWORD`
 *   **Operador de Campo:** (Não vê abas financeiras, apenas leitura e operação rápida)
     *   Usuário: `op1`
-    *   Senha: `op1234`
+    *   Senha: Definida pela variável de ambiente `AGROTOP_OP_PASSWORD`
+
+Se as variáveis de ambiente não estiverem definidas, senhas seguras e aleatórias serão geradas e exibidas no log (stdout) durante a inicialização.
 
 ## 🗄️ Banco de Dados
 
