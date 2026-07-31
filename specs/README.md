@@ -13,10 +13,10 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 |---|---|---|---|---|
 | [0001](0001-ci-actions-node24.md) | Atualizar actions do CI (Node 20 → 24) | manutenção | baixo | 🟢 disponível |
 | [0002](0002-pwa-instalavel.md) | PWA: AgroTop instalável no celular | funcionalidade | baixo | 🟢 disponível |
-| 0003 | PoC: biblioteca de mapa para desenhar piquete no Streamlit | pesquisa | baixo | ⚪ a escrever |
-| 0004 | PoC: NDVI é viável? (cobertura de nuvem em MT) | pesquisa | baixo | ⚪ a escrever |
-| 0005 | PoC: esqueleto Flutter + API autenticada | pesquisa | médio | ⚪ a escrever |
-| 0006 | PoC: quanto histórico os modelos preditivos exigem | pesquisa | baixo | ⚪ a escrever |
+| [0003](0003-poc-mapa-piquetes.md) | PoC: biblioteca de mapa para desenhar piquete | pesquisa | baixo | 🟢 disponível |
+| [0004](0004-poc-ndvi-viabilidade.md) | PoC: NDVI é viável? (nuvem em MT) | pesquisa | baixo | 🟢 disponível |
+| [0005](0005-poc-flutter-api.md) | PoC: esqueleto Flutter + API autenticada | pesquisa | médio | 🟢 disponível |
+| [0006](0006-poc-dados-modelos-preditivos.md) | PoC: quanto histórico os modelos exigem | pesquisa | baixo | 🟢 disponível |
 | 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada |
 
 **0007 está bloqueada de propósito:** são 198 substituições em `app.py` (3.280 linhas) sem
