@@ -36,6 +36,32 @@ from services.seguranca import (  # noqa: F401
     _hash, _is_legacy_hash, _verify_password,
 )
 
+# ─── Reexportação da camada de dados (Fase A2, fatia 3) ──────────────────────
+# As consultas migraram para repositories/<agregado>.py. Reexportadas aqui para
+# `app.py` e os testes seguirem funcionando durante a transição. Código novo deve
+# importar do repositório diretamente. **Não adicione consulta nova aqui.**
+from repositories.animais import (  # noqa: F401
+    get_all_animals, get_animal, add_animal, move_animal, get_movements,
+    _seed_animals,
+)
+from repositories.pesagens import (  # noqa: F401
+    _weighings_by_animal, get_weighings, add_weighing, get_all_weighings,
+    calculate_gmd, get_last_estimate,
+)
+from repositories.sanidade import (  # noqa: F401
+    _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
+    get_protocols, add_protocol, set_protocol_active, delete_protocol,
+    _protocol_pending, get_protocol_plan, apply_protocol_campaign, _dose_for_animal,
+)
+from repositories.financeiro import (  # noqa: F401
+    _costs_by_animal, get_total_cost, get_animal_costs, add_animal_cost,
+    add_fixed_cost, get_fixed_costs, get_total_fixed_costs, delete_fixed_cost,
+    get_fixed_costs_by_category, register_sale, get_sales, get_financial_summary,
+    register_death, get_deaths, get_mortality_stats, get_category_prices,
+    set_category_price, get_expected_price_kg, expected_sale_value,
+    get_category_prices_list,
+)
+
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
 # Movida para repositories/conexao.py. Reexportada aqui para os chamadores atuais.
 from repositories.conexao import (  # noqa: F401
@@ -63,40 +89,10 @@ def __getattr__(name):
 
 
 
-@_cache
-def _weighings_by_animal() -> dict:
-    """Todas as pesagens agrupadas por animal (mais recente primeiro). 1 consulta."""
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT * FROM weighings ORDER BY weigh_date DESC, id DESC"
-        ).fetchall()
-    out: dict = {}
-    for r in rows:
-        out.setdefault(r["animal_id"], []).append(dict(r))
-    return out
 
 
-@_cache
-def _medications_by_animal() -> dict:
-    """Todos os medicamentos agrupados por animal (mais recente primeiro). 1 consulta."""
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT * FROM medications ORDER BY med_date DESC, id DESC"
-        ).fetchall()
-    out: dict = {}
-    for r in rows:
-        out.setdefault(r["animal_id"], []).append(dict(r))
-    return out
 
 
-@_cache
-def _costs_by_animal() -> dict:
-    """Soma de custos por animal. 1 consulta."""
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT animal_id, COALESCE(SUM(amount),0) AS total FROM animal_costs GROUP BY animal_id"
-        ).fetchall()
-    return {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
 
 # ─── Inicialização ────────────────────────────────────────────────────────────
 
@@ -512,96 +508,6 @@ def _seed_lotes(con):
         )
 
 
-def _seed_animals(con):
-    if con.execute("SELECT COUNT(*) FROM animals").fetchone()[0]:
-        return
-
-    random.seed(7)
-    today  = date.today()
-    breeds = ["Nelore", "Angus", "Brahman", "Senepol", "Brangus", "Canchim"]
-    lotes  = ["P01", "P01", "P01", "P02", "P02", "P03", "P03", "P03", "CRL"]
-
-    for i in range(1, 15):
-        aid          = f"BR{i:04d}"
-        breed        = random.choice(breeds)
-        sex          = random.choice(["M", "F"])
-        days_in      = random.randint(60, 220)
-        days_old     = random.randint(400, 900)
-        birth_date   = (today - timedelta(days=days_old)).isoformat()
-        entry_date   = (today - timedelta(days=days_in)).isoformat()
-        e_weight     = round(random.uniform(220, 320), 1)
-        c_weight     = round(e_weight + random.uniform(30, 110), 1)
-        target_w     = round(random.uniform(480, 520), 1)
-        lote_id      = random.choice(lotes)
-        forn_id      = random.randint(1, 4)
-        price        = round(e_weight * 0.52 / 15 * random.uniform(280, 320), 2)
-        status       = "ativo"
-        # Variedade de origens de idade para demonstração
-        src, est = random.choice([
-            ("propriedade", 0), ("propriedade", 0),
-            ("nf_gta", 1), ("operador", 1), ("estimado", 1),
-        ])
-        # make 1 animal vendido and 1 morto for demo
-        if i == 13: status = "vendido"
-        if i == 14: status = "morto"
-
-        con.execute(
-            """INSERT INTO animals
-               (id,breed,sex,birth_date,birth_estimated,age_source,entry_date,
-                entry_weight,current_weight,target_weight,status,lote_id,
-                fornecedor_id,purchase_price)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (aid, breed, sex, birth_date, est, src, entry_date, e_weight, c_weight,
-             target_w, status, lote_id, forn_id, price),
-        )
-
-        # Pesagens: entrada, meio, recente
-        for step, days_back in [(0.0, days_in), (0.5, days_in//2), (1.0, 0)]:
-            w_date   = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
-            w_weight = round(e_weight + (c_weight - e_weight) * step, 1)
-            con.execute(
-                "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator) VALUES(?,?,?,?,?)",
-                (aid, w_weight, w_date, lote_id, "Sistema"),
-            )
-
-        # Medicamentos (1-2 por animal)
-        meds_pool = [
-            ("Ivermectina 1%",  "ml",  10, 21),
-            ("Vacina FMD",      "dose", 2,  0),
-            ("Closantel 10%",   "ml",  10, 28),
-            ("Vitamina ADE",    "ml",  10,  0),
-            ("Oxitetraciclina", "ml",  20, 14),
-        ]
-        for _ in range(random.randint(1, 2)):
-            mn, mu, dose, wd = random.choice(meds_pool)
-            md = (today - timedelta(days=random.randint(0, 60))).isoformat()
-            con.execute(
-                """INSERT INTO medications
-                   (animal_id,medication_name,dose,unit,application_route,
-                    withdrawal_days,med_date,applied_by)
-                   VALUES(?,?,?,?,?,?,?,?)""",
-                (aid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"),
-            )
-
-        # Custo de compra
-        con.execute(
-            "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-            (aid, "compra", "Valor de compra", price, entry_date),
-        )
-        # Custo operacional
-        op_cost = round(days_in * 0.85, 2)
-        con.execute(
-            "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-            (aid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()),
-        )
-
-        # Movimentação inicial para o lote
-        con.execute(
-            """INSERT INTO animal_movements
-               (animal_id,from_lote_id,to_lote_id,movement_date,reason,operator)
-               VALUES(?,?,?,?,?,?)""",
-            (aid, None, lote_id, entry_date, "entrada", "Sistema"),
-        )
 
 
 def _seed_insumos(con):
@@ -673,20 +579,6 @@ def birth_date_from_age(age_months: int, ref_date: Optional[date] = None) -> str
 
 
 
-def get_withdrawal_end(animal_id: str) -> Optional[date]:
-    """Retorna a maior data de fim de carência ativa do animal, ou None."""
-    rows = _medications_by_animal().get(animal_id, [])
-    latest = None
-    for r in rows:
-        if not r["withdrawal_days"]:
-            continue
-        try:
-            end = datetime.strptime(r["med_date"], "%Y-%m-%d").date() + timedelta(days=r["withdrawal_days"])
-            if end > date.today() and (latest is None or end > latest):
-                latest = end
-        except ValueError:
-            pass
-    return latest
 
 # ─── Autenticação ─────────────────────────────────────────────────────────────
 
@@ -836,71 +728,10 @@ def count_admins() -> int:
 
 # ─── Animais ──────────────────────────────────────────────────────────────────
 
-@_cache
-def get_all_animals(status: Optional[str] = "ativo",
-                    lote_id: Optional[str] = None,
-                    breed: Optional[str] = None) -> list[dict]:
-    sql  = "SELECT a.*, f.name as fornecedor_name FROM animals a LEFT JOIN fornecedores f ON f.id=a.fornecedor_id WHERE 1=1"
-    args: list = []
-    if status:
-        sql += " AND a.status=?"; args.append(status)
-    if lote_id:
-        sql += " AND a.lote_id=?"; args.append(lote_id)
-    if breed:
-        sql += " AND a.breed=?"; args.append(breed)
-    sql += " ORDER BY a.id"
-    with _conn() as con:
-        return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
-def get_animal(animal_id: str) -> Optional[dict]:
-    with _conn() as con:
-        row = con.execute(
-            """SELECT a.*, f.name as fornecedor_name, l.name as lote_name
-               FROM animals a
-               LEFT JOIN fornecedores f ON f.id=a.fornecedor_id
-               LEFT JOIN lotes l ON l.id=a.lote_id
-               WHERE a.id=?""",
-            (animal_id,),
-        ).fetchone()
-    return dict(row) if row else None
 
 
-@_writes
-def add_animal(animal_id, breed, sex, birth_date, entry_date,
-               entry_weight, target_weight, purchase_price,
-               lote_id, fornecedor_id, notes="",
-               birth_estimated=0, age_source="propriedade",
-               nf_number="", gta_number="", weight_method="pesado",
-               purchase_mode="cabeca") -> None:
-    with _conn() as con:
-        con.execute(
-            """INSERT INTO animals
-               (id,breed,sex,birth_date,birth_estimated,age_source,nf_number,
-                gta_number,entry_date,entry_weight,current_weight,target_weight,
-                purchase_price,purchase_mode,lote_id,fornecedor_id,notes)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, breed, sex, birth_date or None,
-             int(birth_estimated), age_source,
-             nf_number or None, gta_number or None, entry_date,
-             entry_weight, entry_weight, target_weight, purchase_price,
-             purchase_mode, lote_id or None, fornecedor_id or None, notes),
-        )
-        con.execute(
-            "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
-            (animal_id, entry_weight, entry_date, lote_id or None, "Cadastro", weight_method),
-        )
-        # Registra custo de compra apenas para animais adquiridos
-        if age_source != "propriedade" and purchase_price and purchase_price > 0:
-            con.execute(
-                "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-                (animal_id, "compra", "Valor de compra", purchase_price, entry_date),
-            )
-        if lote_id:
-            con.execute(
-                "INSERT INTO animal_movements (animal_id,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?)",
-                (animal_id, None, lote_id, entry_date, "entrada", "Cadastro"),
-            )
 
 
 @_writes
@@ -921,8 +752,6 @@ def update_animal_age(animal_id: str, birth_date: str,
 
 # ─── Pesagens ────────────────────────────────────────────────────────────────
 
-def get_weighings(animal_id: str) -> list[dict]:
-    return list(_weighings_by_animal().get(animal_id, []))
 
 
 WEIGH_METHODS = {
@@ -932,88 +761,19 @@ WEIGH_METHODS = {
 }
 
 
-@_writes
-def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
-                 method="pesado") -> None:
-    with _conn() as con:
-        lote = con.execute(
-            "SELECT lote_id FROM animals WHERE id=?", (animal_id,)
-        ).fetchone()
-        lote_id = lote["lote_id"] if lote else None
-        con.execute(
-            "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?)",
-            (animal_id, weight, weigh_date, lote_id, operator, method, notes),
-        )
-        con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
 
 
 
 
-def get_last_estimate(animal_id: str) -> Optional[dict]:
-    """Retorna a pesagem estimada (operador ou medição) mais recente ainda não
-    confirmada por uma pesagem real posterior. Usada para comparação."""
-    ws = get_weighings(animal_id)  # já vem ordenado do mais recente ao mais antigo
-    for w in ws:
-        if w.get("method") in ("estimado", "medicao"):
-            return w
-        # se a mais recente já é 'pesado', não há estimativa pendente antes dela
-        return None
-    return None
 
 
-def calculate_gmd(animal_id: str) -> Optional[float]:
-    """GMD recente: entre as duas últimas pesagens (como o animal está agora)."""
-    ws = get_weighings(animal_id)
-    if len(ws) < 2:
-        return None
-    try:
-        d0 = datetime.strptime(ws[0]["weigh_date"], "%Y-%m-%d").date()
-        d1 = datetime.strptime(ws[1]["weigh_date"], "%Y-%m-%d").date()
-        days = abs((d0 - d1).days)
-        return round((ws[0]["weight"] - ws[1]["weight"]) / days, 3) if days else None
-    except (ValueError, KeyError):
-        return None
 
 
 
 # ─── Medicamentos ─────────────────────────────────────────────────────────────
 
-def get_medications(animal_id: str) -> list[dict]:
-    return list(_medications_by_animal().get(animal_id, []))
 
 
-@_writes
-def add_medication(animal_id, medication_name, dose, unit, application_route,
-                   withdrawal_days, med_date, applied_by="",
-                   insumo_id=None, notes="", protocol_id=None) -> None:
-    with _conn() as con:
-        con.execute(
-            """INSERT INTO medications
-               (animal_id,medication_name,dose,unit,application_route,
-                withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, medication_name, dose, unit, application_route,
-             withdrawal_days, med_date, applied_by, insumo_id or None, notes,
-             protocol_id or None),
-        )
-        # Baixa automática no estoque
-        if insumo_id and dose > 0:
-            con.execute(
-                "UPDATE insumos SET current_stock = MAX(0, current_stock - ?) WHERE id=?",
-                (dose, insumo_id),
-            )
-            con.execute(
-                """INSERT INTO insumo_transactions
-                   (insumo_id,type,quantity,reason,animal_id,transaction_date,operator)
-                   VALUES(?,?,?,?,?,?,?)""",
-                (insumo_id, "saida", dose, "uso_animal", animal_id, med_date, applied_by),
-            )
-        # Atualiza status do animal se há carência
-        if withdrawal_days and withdrawal_days > 0:
-            con.execute(
-                "UPDATE animals SET status='carencia' WHERE id=? AND status='ativo'",
-                (animal_id,),
-            )
 
 # ─── Lotes / Piquetes ────────────────────────────────────────────────────────
 
@@ -1052,40 +812,8 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="") -> None:
         )
 
 
-@_writes
-def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator="", notes="") -> None:
-    with _conn() as con:
-        row = con.execute("SELECT lote_id FROM animals WHERE id=?", (animal_id,)).fetchone()
-        from_lote = row["lote_id"] if row else None
-        con.execute(
-            "UPDATE animals SET lote_id=? WHERE id=?", (to_lote_id, animal_id)
-        )
-        con.execute(
-            """INSERT INTO animal_movements
-               (animal_id,from_lote_id,to_lote_id,movement_date,reason,operator,notes)
-               VALUES(?,?,?,?,?,?,?)""",
-            (animal_id, from_lote, to_lote_id, movement_date, reason, operator, notes),
-        )
-        con.execute(
-            "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)
-        )
-        if from_lote:
-            con.execute(
-                "UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote)
-            )
 
 
-def get_movements(animal_id: str) -> list[dict]:
-    with _conn() as con:
-        rows = con.execute(
-            """SELECT m.*, l1.name as from_name, l2.name as to_name
-               FROM animal_movements m
-               LEFT JOIN lotes l1 ON l1.id=m.from_lote_id
-               LEFT JOIN lotes l2 ON l2.id=m.to_lote_id
-               WHERE m.animal_id=? ORDER BY m.movement_date DESC""",
-            (animal_id,),
-        ).fetchall()
-    return [dict(r) for r in rows]
 
 # ─── Insumos / Estoque ───────────────────────────────────────────────────────
 
@@ -1142,26 +870,10 @@ def add_new_insumo(name, category, unit, initial_stock, min_stock, cost_per_unit
 
 # ─── Custos por Animal ───────────────────────────────────────────────────────
 
-def get_animal_costs(animal_id: str) -> list[dict]:
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT * FROM animal_costs WHERE animal_id=? ORDER BY cost_date DESC",
-            (animal_id,),
-        ).fetchall()
-    return [dict(r) for r in rows]
 
 
-@_writes
-def add_animal_cost(animal_id, cost_type, description, amount, cost_date, notes="") -> None:
-    with _conn() as con:
-        con.execute(
-            "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date,notes) VALUES(?,?,?,?,?,?)",
-            (animal_id, cost_type, description, amount, cost_date, notes),
-        )
 
 
-def get_total_cost(animal_id: str) -> float:
-    return _costs_by_animal().get(animal_id, 0.0)
 
 # ─── Custos Fixos (nível da fazenda) ─────────────────────────────────────────
 
@@ -1177,57 +889,14 @@ FIXED_COST_CATEGORIES = [
 ]
 
 
-@_writes
-def add_fixed_cost(category, description, amount, cost_date, recurring=0, notes="") -> None:
-    with _conn() as con:
-        con.execute(
-            """INSERT INTO fixed_costs (category,description,amount,cost_date,recurring,notes)
-               VALUES(?,?,?,?,?,?)""",
-            (category, description, amount, cost_date, int(recurring), notes),
-        )
 
 
-def get_fixed_costs(start_date: Optional[str] = None,
-                    end_date: Optional[str] = None) -> list[dict]:
-    sql, args = "SELECT * FROM fixed_costs WHERE 1=1", []
-    if start_date:
-        sql += " AND cost_date >= ?"; args.append(start_date)
-    if end_date:
-        sql += " AND cost_date <= ?"; args.append(end_date)
-    sql += " ORDER BY cost_date DESC, id DESC"
-    with _conn() as con:
-        return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
-def get_total_fixed_costs(start_date: Optional[str] = None,
-                          end_date: Optional[str] = None) -> float:
-    sql, args = "SELECT COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE 1=1", []
-    if start_date:
-        sql += " AND cost_date >= ?"; args.append(start_date)
-    if end_date:
-        sql += " AND cost_date <= ?"; args.append(end_date)
-    with _conn() as con:
-        row = con.execute(sql, args).fetchone()
-    return round(float(row["total"]), 2)
 
 
-@_writes
-def delete_fixed_cost(cost_id: int) -> None:
-    with _conn() as con:
-        con.execute("DELETE FROM fixed_costs WHERE id=?", (cost_id,))
 
 
-def get_fixed_costs_by_category(start_date: Optional[str] = None,
-                                end_date: Optional[str] = None) -> list[dict]:
-    sql = "SELECT category, COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE 1=1"
-    args: list = []
-    if start_date:
-        sql += " AND cost_date >= ?"; args.append(start_date)
-    if end_date:
-        sql += " AND cost_date <= ?"; args.append(end_date)
-    sql += " GROUP BY category ORDER BY total DESC"
-    with _conn() as con:
-        return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 # ─── Programação de Trato / Ração / Mineral ──────────────────────────────────
 
@@ -1408,113 +1077,19 @@ PRICING_MODES = {"kg": "Por kg (peso × preço)",
                  "lote": "Por lote fechado (valor único do grupo)"}
 
 
-def get_category_prices() -> dict:
-    """Retorna {(age_band, sex): price_per_kg} para consulta rápida."""
-    with _conn() as con:
-        rows = con.execute("SELECT age_band, sex, price_per_kg FROM category_prices").fetchall()
-    return {(r["age_band"], r["sex"]): r["price_per_kg"] for r in rows}
 
 
-def get_category_prices_list() -> list[dict]:
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT * FROM category_prices ORDER BY age_band, sex"
-        ).fetchall()
-    return [dict(r) for r in rows]
 
 
-@_writes
-def set_category_price(age_band: str, sex: str, price_per_kg: float) -> None:
-    """Insere/atualiza o valor esperado por kg de uma categoria."""
-    today = date.today().isoformat()
-    with _conn() as con:
-        if _conexao.USE_PG:
-            con.execute(
-                "INSERT INTO category_prices (age_band,sex,price_per_kg,updated_at) VALUES(?,?,?,?) "
-                "ON CONFLICT (age_band,sex) DO UPDATE SET price_per_kg=EXCLUDED.price_per_kg, updated_at=EXCLUDED.updated_at",
-                (age_band, sex, price_per_kg, today),
-            )
-        else:
-            con.execute(
-                "INSERT OR REPLACE INTO category_prices (age_band,sex,price_per_kg,updated_at) VALUES(?,?,?,?)",
-                (age_band, sex, price_per_kg, today),
-            )
 
 
-def get_expected_price_kg(age_band: str, sex: str) -> float:
-    return get_category_prices().get((age_band, sex), 0.0)
 
 
-def expected_sale_value(animal: dict) -> float:
-    """Valor esperado de venda do animal = peso atual × preço/kg da categoria."""
-    band = get_age_category(animal.get("birth_date"))
-    price = get_expected_price_kg(band, animal["sex"])
-    return round(animal["current_weight"] * price, 2)
 
 # ─── Vendas ──────────────────────────────────────────────────────────────────
 
-@_writes
-def register_sale(animal_ids: list, sale_date: str, sale_type: str,
-                  pricing_mode: str, value: float, buyer: str = "",
-                  operator: str = "", notes: str = "") -> dict:
-    """Registra a venda de um ou mais animais.
-    - pricing_mode='kg':     `value` é o preço por kg (cada animal: peso × preço).
-    - pricing_mode='cabeca': `value` é o valor por cabeça (igual para cada animal).
-    - pricing_mode='lote':   `value` é o valor TOTAL do lote, rateado pelo peso.
-    Retorna {'receita':..., 'custo':..., 'lucro':..., 'n':...}."""
-    animais = [get_animal(a) for a in animal_ids]
-    animais = [a for a in animais if a]
-    if not animais:
-        return {"receita": 0, "custo": 0, "lucro": 0, "n": 0}
-
-    peso_total = sum(a["current_weight"] for a in animais) or 1
-    lot_ref = f"V{sale_date.replace('-','')}-{int(datetime.now().timestamp())%100000}" \
-              if (pricing_mode == "lote" or len(animais) > 1) else None
-
-    tot_receita = tot_custo = 0.0
-    with _conn() as con:
-        for a in animais:
-            if pricing_mode == "kg":
-                ppk = value
-                val = round(a["current_weight"] * value, 2)
-            elif pricing_mode == "cabeca":
-                ppk = None
-                val = round(value, 2)
-            else:  # lote: rateio proporcional ao peso
-                ppk = None
-                val = round(value * a["current_weight"] / peso_total, 2)
-
-            custo = get_total_cost(a["id"])
-            lucro = round(val - custo, 2)
-            tot_receita += val
-            tot_custo += custo
-
-            con.execute(
-                """INSERT INTO sales
-                   (animal_id,sale_date,sale_type,pricing_mode,weight_kg,price_per_kg,
-                    total_value,buyer,lot_ref,cost_at_sale,profit,operator,notes)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (a["id"], sale_date, sale_type, pricing_mode, a["current_weight"], ppk,
-                 val, buyer or None, lot_ref, custo, lucro, operator, notes),
-            )
-            con.execute("UPDATE animals SET status='vendido' WHERE id=?", (a["id"],))
-    return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
-            "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
-            "lot_ref": lot_ref}
 
 
-def get_sales(start_date: Optional[str] = None,
-              end_date: Optional[str] = None) -> list[dict]:
-    sql = ("SELECT s.*, a.breed, a.sex FROM sales s "
-           "LEFT JOIN animals a ON a.id=s.animal_id WHERE 1=1")
-    args: list = []
-    if start_date:
-        sql += " AND s.sale_date >= ?"; args.append(start_date)
-    if end_date:
-        sql += " AND s.sale_date <= ?"; args.append(end_date)
-    sql += " ORDER BY s.sale_date DESC, s.id DESC"
-    with _conn() as con:
-        return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 # ─── Mortalidade ─────────────────────────────────────────────────────────────
 
@@ -1525,74 +1100,10 @@ DEATH_CAUSES = [
 ]
 
 
-@_writes
-def register_death(animal_id: str, death_date: str, cause: str,
-                   operator: str = "", notes: str = "") -> dict:
-    """Registra o óbito de um animal: muda status para 'morto', grava a causa e
-    contabiliza o custo investido como perda."""
-    a = get_animal(animal_id)
-    if not a:
-        return {"ok": False}
-    custo = get_total_cost(animal_id)
-    with _conn() as con:
-        con.execute(
-            """INSERT INTO deaths
-               (animal_id,death_date,cause,lote_id,weight_at_death,cost_at_death,operator,notes)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (animal_id, death_date, cause, a.get("lote_id"),
-             a["current_weight"], custo, operator, notes),
-        )
-        con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
-    return {"ok": True, "perda": round(custo, 2)}
 
 
-def get_deaths(start_date: Optional[str] = None,
-               end_date: Optional[str] = None) -> list[dict]:
-    sql = ("SELECT d.*, a.breed, a.sex, l.name AS lote_name "
-           "FROM deaths d LEFT JOIN animals a ON a.id=d.animal_id "
-           "LEFT JOIN lotes l ON l.id=d.lote_id WHERE 1=1")
-    args: list = []
-    if start_date:
-        sql += " AND d.death_date >= ?"; args.append(start_date)
-    if end_date:
-        sql += " AND d.death_date <= ?"; args.append(end_date)
-    sql += " ORDER BY d.death_date DESC, d.id DESC"
-    with _conn() as con:
-        return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
-def get_mortality_stats(start_date: Optional[str] = None,
-                        end_date: Optional[str] = None) -> dict:
-    """Taxas de mortalidade: geral, por causa e por piquete."""
-    deaths = get_deaths(start_date, end_date)
-    n_deaths = len(deaths)
-    # População exposta: animais que já haviam entrado até a data final
-    with _conn() as con:
-        if end_date:
-            expostos = con.execute(
-                "SELECT COUNT(*) c FROM animals WHERE entry_date <= ?", (end_date,)
-            ).fetchone()["c"]
-        else:
-            expostos = con.execute("SELECT COUNT(*) c FROM animals").fetchone()["c"]
-    taxa_geral = round(n_deaths / expostos * 100, 1) if expostos else 0.0
-
-    por_causa: dict = {}
-    por_lote: dict = {}
-    perda_total = 0.0
-    for d in deaths:
-        por_causa[d["cause"]] = por_causa.get(d["cause"], 0) + 1
-        chave_lote = d.get("lote_name") or d.get("lote_id") or "Sem piquete"
-        por_lote[chave_lote] = por_lote.get(chave_lote, 0) + 1
-        perda_total += float(d.get("cost_at_death") or 0)
-
-    return {
-        "n_deaths":    n_deaths,
-        "expostos":    expostos,
-        "taxa_geral":  taxa_geral,
-        "por_causa":   por_causa,
-        "por_lote":    por_lote,
-        "perda_total": round(perda_total, 2),
-    }
 
 # ─── Resumo Financeiro Consolidado ───────────────────────────────────────────
 
@@ -1611,59 +1122,6 @@ def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
     return round(float((row["total"] if row else 0) or 0), 2)
 
 
-def get_financial_summary(start_date: Optional[str] = None,
-                          end_date: Optional[str] = None) -> dict:
-    """Planilha financeira consolidada do período (todas as saídas e entradas)."""
-    def _period(col):
-        s, a = "", []
-        if start_date: s += f" AND {col} >= ?"; a.append(start_date)
-        if end_date:   s += f" AND {col} <= ?"; a.append(end_date)
-        return s, a
-
-    def _scalar(con, sql, args):
-        row = con.execute(sql, args).fetchone()
-        return float((row["t"] if row else 0) or 0)
-
-    with _conn() as con:
-        # Saídas
-        ps, pa = _period("cost_date")
-        compra = _scalar(con,
-            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='compra'"+ps, pa)
-        operacional = _scalar(con,
-            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='operacional'"+ps, pa)
-        fs, fa = _period("cost_date")
-        fixos = _scalar(con,
-            "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE 1=1"+fs, fa)
-        medicamentos = _insumo_cost_by_reason(con, ("uso_animal",), start_date, end_date)
-        nutricao     = _insumo_cost_by_reason(con, ("trato_lote",), start_date, end_date)
-        # Perda por mortalidade (informativa — o custo já está nas saídas acima)
-        ds, dd = _period("death_date")
-        perda_mort = _scalar(con,
-            "SELECT COALESCE(SUM(cost_at_death),0) t FROM deaths WHERE 1=1"+ds, dd)
-        # Entradas
-        ss, sa = _period("sale_date")
-        rows_v = con.execute(
-            "SELECT sale_type, COALESCE(SUM(total_value),0) receita, COALESCE(SUM(profit),0) lucro, COUNT(*) n "
-            "FROM sales WHERE 1=1"+ss+" GROUP BY sale_type", sa
-        ).fetchall()
-
-    vendas = {r["sale_type"]: {"receita": round(float(r["receita"]),2),
-                               "lucro": round(float(r["lucro"]),2),
-                               "n": r["n"]} for r in rows_v}
-    receita_total = round(sum(v["receita"] for v in vendas.values()), 2)
-    saidas_total = round(float(compra)+float(operacional)+float(fixos)+medicamentos+nutricao, 2)
-    return {
-        "compra_animais":    round(float(compra), 2),
-        "operacional":       round(float(operacional), 2),
-        "custos_fixos":      round(float(fixos), 2),
-        "medicamentos":      medicamentos,
-        "nutricao":          nutricao,
-        "saidas_total":      saidas_total,
-        "perda_mortalidade": round(perda_mort, 2),
-        "vendas":            vendas,
-        "receita_total":     receita_total,
-        "resultado":         round(receita_total - saidas_total, 2),
-    }
 
 # ─── Administração: edição direta de tabelas ─────────────────────────────────
 
@@ -1885,14 +1343,6 @@ def get_rebanho_stats() -> dict:
     }
 
 
-def get_all_weighings() -> list[dict]:
-    with _conn() as con:
-        rows = con.execute(
-            """SELECT w.*, a.breed
-               FROM weighings w JOIN animals a ON a.id=w.animal_id
-               WHERE a.status='ativo' ORDER BY w.weigh_date""",
-        ).fetchall()
-    return [dict(r) for r in rows]
 
 
 def refresh_carencia_status() -> None:
@@ -2071,49 +1521,14 @@ _FREQ_DAYS = {"anual": 365, "semestral": 182, "trimestral": 91, "mensal": 30}
 SEX_TARGETS = {"ambos": "Machos e Fêmeas", "M": "Só Machos", "F": "Só Fêmeas"}
 
 
-@_writes
-def add_protocol(name, sex_target, age_min, age_max, dose_value, dose_ref_kg,
-                 dose_unit, insumo_id, frequency, withdrawal_days,
-                 route="Subcutânea", notes="") -> None:
-    with _conn() as con:
-        con.execute(
-            """INSERT INTO health_protocols
-               (name,sex_target,age_min,age_max,dose_value,dose_ref_kg,dose_unit,
-                insumo_id,frequency,withdrawal_days,route,notes)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (name, sex_target, int(age_min), int(age_max), dose_value, dose_ref_kg,
-             dose_unit, insumo_id or None, frequency, int(withdrawal_days), route, notes),
-        )
 
 
-def get_protocols(active_only: bool = True) -> list[dict]:
-    sql = ("SELECT p.*, i.name AS insumo_name, i.current_stock, i.unit AS insumo_unit "
-           "FROM health_protocols p LEFT JOIN insumos i ON i.id=p.insumo_id WHERE 1=1")
-    if active_only:
-        sql += " AND p.active=1"
-    sql += " ORDER BY p.name"
-    with _conn() as con:
-        return [dict(r) for r in con.execute(sql).fetchall()]
 
 
-@_writes
-def set_protocol_active(pid: int, active: int) -> None:
-    with _conn() as con:
-        con.execute("UPDATE health_protocols SET active=? WHERE id=?", (int(active), pid))
 
 
-@_writes
-def delete_protocol(pid: int) -> None:
-    with _conn() as con:
-        con.execute("DELETE FROM health_protocols WHERE id=?", (pid,))
 
 
-def _dose_for_animal(protocol: dict, animal: dict) -> float:
-    """Dose para um animal: fixa, ou proporcional ao peso (dose_ref_kg > 0)."""
-    ref = protocol.get("dose_ref_kg") or 0
-    if ref > 0:
-        return round(animal["current_weight"] / ref * protocol["dose_value"], 2)
-    return round(protocol["dose_value"], 2)
 
 
 def _protocol_eligible(protocol: dict, animal: dict) -> bool:
@@ -2126,72 +1541,10 @@ def _protocol_eligible(protocol: dict, animal: dict) -> bool:
     return (protocol.get("age_min") or 0) <= months <= (protocol.get("age_max") or 999)
 
 
-def _protocol_pending(protocol: dict, animal: dict, ref_date: date) -> bool:
-    """True se o animal ainda precisa da aplicação no ciclo atual."""
-    freq = protocol.get("frequency", "anual")
-    aplicadas = [m for m in get_medications(animal["id"])
-                 if m.get("protocol_id") == protocol["id"]]
-    if not aplicadas:
-        return True
-    if freq == "unica":
-        return False
-    try:
-        ultima = datetime.strptime(aplicadas[0]["med_date"], "%Y-%m-%d").date()
-    except (ValueError, TypeError, KeyError):
-        return True
-    return (ref_date - ultima).days >= _FREQ_DAYS.get(freq, 365)
 
 
-def get_protocol_plan(protocol: dict, ref_date: Optional[date] = None) -> dict:
-    """Elegíveis, pendentes, doses necessárias e projeção de estoque."""
-    ref = ref_date or date.today()
-    animals = get_all_animals()
-    elegiveis, pendentes = [], []
-    idade_desconhecida = 0
-    for a in animals:
-        if get_age_months(a.get("birth_date")) is None:
-            stt = protocol.get("sex_target", "ambos")
-            if stt == "ambos" or a["sex"] == stt:
-                idade_desconhecida += 1
-            continue
-        if not _protocol_eligible(protocol, a):
-            continue
-        elegiveis.append(a)
-        if _protocol_pending(protocol, a, ref):
-            pendentes.append(a)
-    doses = round(sum(_dose_for_animal(protocol, a) for a in pendentes), 2)
-    stock = float(protocol.get("current_stock") or 0)
-    return {
-        "n_eligible": len(elegiveis),
-        "n_pending":  len(pendentes),
-        "pending":    pendentes,
-        "doses_needed": doses,
-        "stock":      round(stock, 2),
-        "shortfall":  round(max(0.0, doses - stock), 2),
-        "idade_desconhecida": idade_desconhecida,
-    }
 
 
-@_writes
-def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "") -> dict:
-    """Aplica o protocolo a todos os animais pendentes (registra + baixa estoque)."""
-    prot = next((p for p in get_protocols(active_only=False) if p["id"] == protocol_id), None)
-    if not prot:
-        return {"n": 0, "doses": 0}
-    try:
-        ref = datetime.strptime(med_date, "%Y-%m-%d").date()
-    except ValueError:
-        ref = date.today()
-    plan = get_protocol_plan(prot, ref)
-    n = 0
-    for a in plan["pending"]:
-        dose = _dose_for_animal(prot, a)
-        add_medication(a["id"], prot["name"], dose, prot["dose_unit"],
-                       prot.get("route", "Subcutânea"), prot.get("withdrawal_days", 0),
-                       med_date, applied_by=operator, insumo_id=prot.get("insumo_id"),
-                       notes="Campanha sanitária", protocol_id=prot["id"])
-        n += 1
-    return {"n": n, "doses": plan["doses_needed"]}
 
 # ─── Fotos dos Animais ───────────────────────────────────────────────────────
 
