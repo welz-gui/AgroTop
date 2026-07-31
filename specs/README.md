@@ -34,24 +34,48 @@ como provar que nada mudou de aparência.
 
 ## Como iniciar um agente numa tarefa
 
-### 1. Você cria o worktree (não o agente)
+Há dois caminhos. **O primeiro é o mais simples** e é o recomendado.
 
-A partir da pasta do projeto principal:
+### Caminho A — o próprio agente cria o worktree (recomendado)
+
+Inicie o agente **na pasta normal do projeto**. Ele mesmo cria o worktree e move a sessão
+para dentro dele, usando a ferramenta `EnterWorktree` do Claude Code.
+
+**Condição obrigatória:** a ferramenta só é acionada quando o pedido **menciona "worktree"
+explicitamente**. Se o prompt não disser a palavra, o agente trabalhará na pasta principal.
+O prompt da seção 4 já contempla isso.
+
+O worktree nasce em `.claude/worktrees/<nome>`, num branch novo. Por padrão ele parte de
+`origin/main` (configuração `worktree.baseRef = fresh`), e não do seu HEAD local — ou seja,
+o agente começa do que está publicado, não do que você tem em andamento.
+
+Ao final, `ExitWorktree` devolve a sessão à pasta original, com opção de **manter** (para
+revisar depois) ou **remover** o worktree e o branch.
+
+⚠️ **Janela de exposição:** antes de chamar `EnterWorktree`, o agente está na pasta
+principal, onde `.streamlit/secrets.toml` existe e dá acesso ao banco de **produção**. A
+janela é de uma chamada de ferramenta, mas é real. Para fechá-la, defina no ambiente da
+sessão do agente:
+
+```
+AGROTOP_FORCE_SQLITE=1
+```
+
+Com isso, `_database_url()` devolve string vazia **mesmo com o `secrets.toml` presente**, e
+não há como conectar em produção nem por acidente nem por descuido.
+
+### Caminho B — você cria o worktree antes
+
+Se preferir controle total, crie você e inicie a sessão já dentro da pasta:
 
 ```bash
 git worktree add ../AgroTop-pwa -b feat/pwa-instalavel
 ```
 
-Isso cria a pasta irmã `AgroTop-pwa/` com um checkout próprio no branch novo.
-**Crie você, não peça ao agente** — se ele começar na pasta principal, pode alterá-la antes
-de se isolar.
+Vantagem: não existe janela de exposição, porque a sessão nunca esteve na pasta principal.
+Desvantagem: um passo manual a mais, e o worktree fica fora de `.claude/worktrees/`.
 
-### 2. Abra a sessão do agente **dentro** da pasta do worktree
-
-O diretório de trabalho é definido ao iniciar a sessão. Comece em `AgroTop-pwa/`, nunca na
-pasta principal.
-
-### 3. O que o agente NÃO recebe (e é proposital)
+### O que o agente NÃO recebe (e é proposital)
 
 `.streamlit/secrets.toml`, `agrotop.db` e `backups/` são gitignored, então **não vão para o
 worktree**. Consequência: o agente **não alcança o banco de produção** — ele roda em SQLite
@@ -62,10 +86,13 @@ instaladas valem. Se a tarefa precisar de biblioteca nova, ela vai em
 `poc/<nome>/requirements.txt` — **nunca** no `requirements.txt` da raiz, que alimenta o
 deploy do Streamlit Cloud.
 
-### 4. Prompt inicial (copie e ajuste a spec)
+### Prompt inicial (copie e ajuste a spec)
 
-> Você vai trabalhar no projeto AgroTop, num worktree isolado. **Não escolha sua própria
-> tarefa.**
+A primeira frase precisa conter a palavra **worktree** — é o que autoriza o agente a se
+isolar. Sem ela, ele trabalha na pasta principal.
+
+> Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
+> AgroTop. **Não escolha sua própria tarefa.**
 >
 > 1. Leia `specs/0002-pwa-instalavel.md` — é a sua tarefa, e o escopo dela é fechado.
 > 2. Leia `ROADMAP.md` seções 2 (regras invioláveis) e 3 (o que pode mudar). Elas contêm
@@ -84,12 +111,14 @@ deploy do Streamlit Cloud.
 >
 > Abra o PR para `main` seguindo o formato de entrega descrito na spec.
 
-### 5. Ao terminar
+### Ao terminar
 
-```bash
-git worktree remove ../AgroTop-pwa     # depois do PR mesclado
-git worktree list                      # conferir
-```
+- **Caminho A:** peça ao agente para sair com `ExitWorktree` — `keep` mantém para revisão,
+  `remove` apaga worktree e branch. Ele se recusa a remover se houver trabalho não
+  commitado, o que é a proteção certa.
+- **Caminho B:** `git worktree remove ../AgroTop-pwa` depois do PR mesclado.
+
+Conferir a qualquer momento: `git worktree list`.
 
 ### O agente descobre sozinho o que fazer?
 

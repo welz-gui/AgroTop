@@ -4,6 +4,10 @@
 # Configuração local de ferramentas
 .claude/settings.local.json
 
+# Worktrees criados por agentes (EnterWorktree cria aqui). São checkouts do
+# próprio repositório — versionar seria recursivo e sem sentido.
+.claude/worktrees/
+
 # Banco de dados local (na nuvem usamos o Supabase)
 agrotop.db
 agrotop.db-wal
