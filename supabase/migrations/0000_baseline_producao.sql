@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-07-30 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-07-31 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.
@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS animals (
     created_at timestamp with time zone DEFAULT now(),
     purchase_mode text DEFAULT 'cabeca'::text,
     purchase_lot_ref text,
+    uuid text,
     CONSTRAINT animals_pkey PRIMARY KEY (id)
 );
 
@@ -315,6 +316,7 @@ CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_id);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_animals_uuid ON animals USING btree (uuid);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
