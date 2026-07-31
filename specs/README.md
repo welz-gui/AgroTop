@@ -101,32 +101,36 @@ deploy do Streamlit Cloud.
 A primeira frase precisa conter a palavra **worktree** — é o que autoriza o agente a se
 isolar. Escolha a variante conforme **quantos agentes você vai iniciar**.
 
-#### Variante A — um agente por vez (ele pega a próxima livre)
+#### Variante A — padrão: o agente pega a próxima livre ⭐
 
-Cômoda: você não precisa escolher a spec. **Só use lançando um agente de cada vez** — a
-colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
+**Use esta.** Vale quando há **um agente por vez** — que é o modo de trabalho normal deste
+projeto. Você não precisa escolher a spec.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
 >
-> 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila.
+> 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila (as concluídas estão
+>    marcadas ✅ e não têm número de ordem).
 > 2. **Antes de qualquer outra coisa**, reivindique-a criando o branch no remoto:
->    `git push origin HEAD:refs/heads/<branch-da-spec>`.
->    Se falhar dizendo que a referência já existe, a tarefa está tomada: pegue a próxima e
->    **não insista**. Não edite o quadro — quem atualiza é o mantenedor.
+>    ```
+>    git ls-remote --heads origin                        # ver o que já está tomado
+>    git push origin HEAD:refs/heads/<branch-da-spec>    # reivindicar — ATÔMICO
+>    ```
+>    Se o push falhar dizendo que a referência já existe, a tarefa está tomada: **pegue a
+>    próxima e não insista**. Não edite o quadro — quem atualiza é o mantenedor.
 > 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
 > 5. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
 #### Variante B — vários agentes em paralelo (você atribui)
 
-**Obrigatória** quando houver mais de um agente ativo. Elimina a corrida por completo.
+**Obrigatória** quando houver mais de um agente ativo ao mesmo tempo. A colisão de
+2026-07-31 aconteceu com dois iniciados em paralelo lendo a fila juntos.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
 >
-> 1. Leia `specs/0008-importacao-pesagens-csv.md` — é a **sua** tarefa, escopo fechado.
->    *(Troque pelo arquivo da spec que está atribuindo. Fila em `specs/QUADRO.md`.)*
+> 1. Leia `specs/<arquivo-da-spec>.md` — é a **sua** tarefa, escopo fechado.
 > 2. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
 > 3. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
@@ -157,6 +161,14 @@ colisão de 2026-07-31 aconteceu com dois iniciados em paralelo.
 > Abra o PR para `main` **pronto para revisão, nunca como rascunho**, no formato descrito na
 > spec.
 >
+> **Cole no seu relatório a URL COMPLETA que o `gh pr create` devolveu**
+> (`https://github.com/welz-gui/AgroTop/pull/NNN`). Confirme com:
+> ```
+> gh pr view --json number,url
+> ```
+> **Não invente nem estime o número.** Se o comando falhar, diga que falhou e por quê — um
+> branch entregue sem PR é recuperável; um PR inexistente reportado como pronto não é.
+>
 > **Por último, e não esqueça: remova o worktree** — `ExitWorktree` com ação `keep`, ou
 > `git worktree remove <caminho>`. Worktree abandonado **segura o branch** e impede o
 > mantenedor de trabalhar nele. Já aconteceu cinco vezes.
@@ -185,7 +197,7 @@ situar, mas **a tarefa é atribuída por você**, sempre.
 Estas valem sempre, mesmo que a spec individual não repita. Foram escritas a partir de
 problemas reais observados nas primeiras três entregas (2026-07-31).
 
-### 1. Não altere `specs/`, `ROADMAP.md` nem `README.md`
+### 1b. Não altere `specs/`, `ROADMAP.md` nem `README.md`
 
 Quem atualiza o quadro e a documentação é o **mantenedor**. Você não precisa marcar nada.
 
@@ -194,7 +206,19 @@ conflito **só** por causa de uma linha em `specs/QUADRO.md`, e o branch preciso
 reconstruído. Com a tarefa já atribuída no prompt, marcar o quadro é trabalho perdido que
 só gera conflito entre agentes paralelos.
 
-### 0. Parta de `origin/main`, não de um branch local
+### 0. Afirmação não é evidência
+
+Todo passo de entrega precisa de **saída de comando colada**, não de afirmação: testes,
+`compileall`, `git diff --stat` e **a URL do PR**.
+
+*Por quê:* em 2026-07-31 um agente relatou *"PR #23 aberto, pronto para revisão"* para a
+spec 0013. **O PR não existia** — e o número era de outro agente. O trabalho estava feito e
+commitado; só a entrega foi falsamente reportada. Se o relatório tivesse sido aceito, a
+tarefa seria dada por concluída com o código parado num branch.
+
+Vale para o mantenedor também: conferir com `gh pr list` antes de considerar entregue.
+
+### 1. Parta de `origin/main`, não de um branch local
 
 *Por quê:* o PR #20 chegou carregando **dois commits do mantenedor**, porque o worktree foi
 criado a partir do HEAD local — que naquele momento era um branch de integração em
@@ -203,7 +227,7 @@ andamento, não a `main`. O agente não errou; o ponto de partida é que estava 
 Mitigações aplicadas: `.claude/settings.json` fixa `worktree.baseRef = "fresh"`, e o prompt
 manda conferir. O mantenedor também deve manter a `main` em checkout ao lançar agentes.
 
-### 2. Remova o worktree ao terminar
+### 2b. Remova o worktree ao terminar
 
 Depois que o PR for aberto, saia do worktree — `ExitWorktree` (ação `keep`) ou
 `git worktree remove <caminho>`.
