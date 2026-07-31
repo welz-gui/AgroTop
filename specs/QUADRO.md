@@ -13,8 +13,8 @@ baixo** — a ordem é prioridade, não sugestão.
 
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
-| 1 | [0001](0001-ci-actions-node24.md) — actions do CI → Node 24 | `manutencao/ci-actions-node24` | 🟢 livre | — | — |
-| 2 | [0010](0010-custo-medio-ponderado.md) — custo médio ponderado 🏗️ | `feat/custo-medio-ponderado` | 🟢 livre | — | — |
+| 1 | [0001](0001-ci-actions-node24.md) — actions do CI → Node 24 | `manutencao/ci-actions-node24` | 🟡 em andamento | agente | 2026-07-31 |
+| 2 | [0010](0010-custo-medio-ponderado.md) — custo médio ponderado 🏗️ | `feat/custo-medio-ponderado` | 🟡 em andamento | agente | 2026-07-31 |
 | 3 | [0009](0009-deteccao-peso-suspeito.md) — detecção de peso suspeito 🏗️ | `feat/qualidade-pesagem` | 🟢 livre | — | — |
 | 4 | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | `feat/importacao-pesagens` | 🟢 livre | — | — |
 | 5 | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | `poc/mapa-piquetes` | 🟢 livre | — | — |
@@ -49,49 +49,41 @@ baixo** — a ordem é prioridade, não sugestão.
 
 ---
 
-## Protocolo de reivindicação
+## Como uma tarefa é atribuída
 
-### 1. Veja o que já está tomado — **esta é a fonte de verdade**
+### Modo padrão: **o mantenedor atribui** ⭐
 
-```bash
-git ls-remote --heads origin
-```
+Diga a spec no prompt do agente:
 
-Se o branch da spec **já existe**, a tarefa está tomada. Vá para a próxima da fila.
+> `Leia specs/0010-custo-medio-ponderado.md — é a sua tarefa.`
 
-### 2. Reivindique criando o branch no remoto
+**Zero corrida, zero coordenação, zero dependência de o agente lembrar de um passo.**
+A fila abaixo é a sua lista de prioridade, não um balcão de autoatendimento.
 
-```bash
-git push origin HEAD:refs/heads/<branch-da-spec>
-```
+> ⚠️ **Por que este virou o modo padrão.** A primeira versão deste quadro deixava o agente
+> escolher e "reivindicar" empurrando um branch vazio antes de começar. **Não funcionou:**
+> em 2026-07-31, dois agentes começaram a mesma spec 0001 e nenhum marcou o quadro.
+>
+> O motivo é estrutural, não de capacidade: reivindicar exige um passo **fora do fluxo
+> natural** do agente (empurrar branch vazio *antes* de trabalhar), e marcar o quadro exige
+> um terceiro. Agente otimiza para começar a tarefa. Qualquer protocolo que dependa de
+> adesão voluntária a passo não óbvio falha — e falhou.
 
-Esta operação é **atômica**: se dois agentes tentarem ao mesmo tempo, apenas um vence. O
-outro recebe erro de referência já existente — e nesse caso **não insista**: pegue a
-próxima tarefa livre.
+### Modo alternativo: autoatendimento (só com um agente por vez)
 
-É isso que torna o protocolo à prova de corrida. Editar este arquivo, não.
-
-### 3. Só então registre no quadro
-
-Marque a linha como 🟡, preencha "Quem" (identifique-se de forma reconhecível) e a data.
-Commit e push. Se der conflito aqui, resolva mantendo **as duas** reivindicações — a
-autoridade é o branch, e o conflito é só de texto.
-
-### 4. Ao concluir
-
-Marque ✅ com o link do PR. Não apague a linha: o histórico da fila é útil.
-
-### 5. Se desistir ou travar
-
-Marque 🟢 de novo, explique em uma linha o motivo, e **apague o branch remoto**:
+Se ainda assim quiser que o agente escolha, o **primeiro comando** dele deve ser este,
+literalmente, antes de qualquer outra coisa:
 
 ```bash
-git push origin --delete <branch-da-spec>
+git ls-remote --heads origin        # ver o que já está tomado
+git push origin HEAD:refs/heads/<branch-da-spec>   # reivindicar — ATÔMICO
 ```
 
-Reivindicação abandonada sem liberar trava a fila para todo mundo.
+Se o push falhar com referência já existente, a tarefa está tomada: **pegue a próxima e não
+insista**. A operação é atômica, então dois agentes simultâneos não vencem os dois.
 
----
+Mas note: isso protege contra colisão **no push**, não contra dois agentes trabalharem em
+paralelo antes de empurrar. Só use com um agente ativo por vez.
 
 ## Reivindicações paradas
 
