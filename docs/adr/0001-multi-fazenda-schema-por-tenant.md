@@ -1,6 +1,20 @@
 # ADR 0001 — Isolamento multi-fazenda: um schema por fazenda
 
-- **Status:** Aceito
+- **Status:** ⚠️ **Parcialmente substituído pelo [ADR 0004](0004-conformidade-pnib.md)** (2026-07-31)
+
+> **O que mudou:** a decisão de conformidade com o PNIB derruba os dois argumentos centrais
+> deste ADR. (1) *"`animals.id` é o brinco e trocar a PK seria caro"* — a chave surrogate
+> será feita de qualquer forma. (2) *"o comprador é o produtor de uma fazenda"* — o PNIB
+> exige hierarquia com múltiplas propriedades por titular e movimentação entre elas, o que
+> schema-por-propriedade torna uma transação entre schemas.
+>
+> **Novo modelo:** schema por **organização** + `property_id`. Também ficam revogados o
+> cancelamento de `roles`/`permissions` e a proibição de coluna de tenancy.
+>
+> **Continua válido:** o pré-requisito de migrations versionadas e replay validado — que
+> hoje existe e é o que torna a migração do ADR 0004 segura.
+
+- **Status original:** Aceito
 - **Data:** 2026-07-29
 - **Decisores:** proprietário do produto (welz-gui)
 - **Substitui:** a proposta de `farm_id` + tabelas `farms`/`farm_users`/`roles`/`permissions`/`role_permissions`
