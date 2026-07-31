@@ -6,10 +6,20 @@ Sem Streamlit no topo do módulo.
 """
 
 import random
+import uuid as _uuid
 from datetime import date, timedelta
 from typing import Optional
 
 from .conexao import _cache, _conn, _writes
+
+
+def novo_uuid() -> str:
+    """Identificador interno imutável de um animal (ADR 0004, §4.1 do PNIB).
+
+    Gerado em Python, e não pelo banco, porque o `gen_random_uuid()` do Postgres
+    não existe no SQLite — e a compatibilidade dupla é requisito do projeto.
+    """
+    return str(_uuid.uuid4())
 
 
 @_cache
@@ -52,11 +62,11 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
     with _conn() as con:
         con.execute(
             """INSERT INTO animals
-               (id,breed,sex,birth_date,birth_estimated,age_source,nf_number,
+               (id,uuid,breed,sex,birth_date,birth_estimated,age_source,nf_number,
                 gta_number,entry_date,entry_weight,current_weight,target_weight,
                 purchase_price,purchase_mode,lote_id,fornecedor_id,notes)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, breed, sex, birth_date or None,
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (animal_id, novo_uuid(), breed, sex, birth_date or None,
              int(birth_estimated), age_source,
              nf_number or None, gta_number or None, entry_date,
              entry_weight, entry_weight, target_weight, purchase_price,

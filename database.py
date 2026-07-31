@@ -135,7 +135,12 @@ def init_db() -> None:
 
             -- Animais
             CREATE TABLE IF NOT EXISTS animals (
+                -- `id` é o número do brinco e HOJE ainda é a PK. Ver ADR 0004:
+                -- o PNIB (§4.1) exige identificador interno imutável e separado
+                -- do brinco, porque trocar brinco não pode trocar a identidade.
+                -- `uuid` é essa chave; a troca da PK acontece por etapas.
                 id               TEXT PRIMARY KEY,
+                uuid             TEXT UNIQUE,
                 breed            TEXT NOT NULL,
                 sex              TEXT NOT NULL DEFAULT 'M',
                 birth_date       TEXT,
@@ -411,6 +416,8 @@ def init_db() -> None:
         _seed_lotes(con)
         _seed_animals(con)
         _seed_insumos(con)
+        # Depois dos seeds: animais semeados também precisam de UUID.
+        _backfill_uuids(con)
 
 
 def _migrate(con) -> None:
@@ -419,6 +426,10 @@ def _migrate(con) -> None:
     if _conexao.USE_PG:
         return
     cols = {r["name"] for r in con.execute("PRAGMA table_info(animals)").fetchall()}
+    if "uuid" not in cols:
+        # ADR 0004 etapa 1. Sem UNIQUE aqui: o ALTER do SQLite não aceita, e a
+        # restrição vem do CREATE TABLE em bancos novos.
+        con.execute("ALTER TABLE animals ADD COLUMN uuid TEXT")
     if "birth_estimated" not in cols:
         con.execute("ALTER TABLE animals ADD COLUMN birth_estimated INTEGER DEFAULT 0")
     if "age_source" not in cols:
@@ -442,6 +453,21 @@ def _migrate(con) -> None:
         con.execute("ALTER TABLE medications ADD COLUMN protocol_id INTEGER")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
+
+def _backfill_uuids(con) -> int:
+    """Gera UUID para animais que ainda não têm (ADR 0004, etapa 1).
+
+    Idempotente: roda a cada `init_db()` e só toca em linhas com `uuid` nulo.
+    Existe porque a coluna nasceu depois dos dados — animais cadastrados antes
+    da migração não teriam identificador interno.
+    """
+    from repositories.animais import novo_uuid
+
+    sem = con.execute("SELECT id FROM animals WHERE uuid IS NULL").fetchall()
+    for row in sem:
+        con.execute("UPDATE animals SET uuid=? WHERE id=?", (novo_uuid(), row["id"]))
+    return len(sem)
+
 
 def _seed_users(con):
     """Cria os usuários iniciais APENAS numa instalação nova (tabela vazia).
