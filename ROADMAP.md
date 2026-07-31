@@ -541,7 +541,13 @@ repositório de quem já tinha puxado.
 1. **Rotacionar a senha do Postgres** — ela já apareceu em texto claro duas vezes.
    Supabase → Settings → Database → reset, e atualizar `secrets.toml` + Secrets do
    Streamlit Cloud. *(Adiada por decisão do usuário.)*
-2. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
+2. **Trocar as senhas dos usuários que JÁ existem em produção.** O PR #12 fez as
+   instalações **novas** usarem `AGROTOP_ADMIN_PASSWORD`/`AGROTOP_OP_PASSWORD` (ou senha
+   aleatória), mas **não altera contas existentes** — e `_seed_users` só roda com a tabela
+   `users` vazia. Ou seja: no app público, `admin` e `op1` continuam com as senhas antigas.
+   Trocar com `python tools/gerar_hash_senha.py --usuario admin`.
+   *(Adiada por decisão do usuário — mas segue aberta.)*
+3. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
 4. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
    servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
 5. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar
