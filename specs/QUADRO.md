@@ -21,11 +21,11 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0014](0014-validador-identificadores.md) — validador de identificadores 🇧🇷 | — | ✅ [#26](https://github.com/welz-gui/AgroTop/pull/26) | | 2026-07-31 |
 | — | [0008](0008-importacao-pesagens-csv.md) — importação de pesagens CSV 🏗️ | — | ✅ [#19](https://github.com/welz-gui/AgroTop/pull/19) | | 2026-07-31 |
 | — | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | — | ✅ [#20](https://github.com/welz-gui/AgroTop/pull/20) | | 2026-07-31 |
-| 1 | [0002](0002-pwa-instalavel.md) — PWA instalável | `feat/pwa-instalavel` | 🟢 livre | — | — |
-| 2 | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | `feat/motor-de-regras` | 🟢 livre | — | — |
-| 3 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
-| 4 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
-| 5 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| — | [0002](0002-pwa-instalavel.md) — PWA instalável | — | ✅ [#31](https://github.com/welz-gui/AgroTop/pull/31) | | 2026-07-31 |
+| — | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | — | ✅ [#29](https://github.com/welz-gui/AgroTop/pull/29) | | 2026-07-31 |
+| 1 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
+| 2 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
+| 3 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
 
 🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
 demais = PoC ou manutenção.
@@ -73,6 +73,15 @@ mantenedor (R31).
 **Como as tarefas de implementação avançam trilha sem colidir com a Fase A:** elas entregam
 **função pura em módulo novo** de `services/`, com contrato fixado na spec. O mantenedor liga
 à interface e ao banco depois. Nenhum arquivo existente é tocado.
+
+### ⚠️ Pendência do PWA (spec 0002, PR #31)
+
+O agente validou a persistência do cookie `agrotop_sid` **no contexto web** (fechar e reabrir
+a aba mantém a sessão), mas **não conseguiu testar o fluxo do ícone instalado** — exige
+HTTPS. Ele declarou isso explicitamente, em vez de afirmar o que não verificou.
+
+**Falta confirmar no deploy:** instalar pela tela inicial, fechar, reabrir pelo ícone e
+verificar que a sessão persiste. Um PWA instalado tem contexto de armazenamento próprio.
 
 ### Fora da fila
 
