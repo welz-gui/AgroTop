@@ -67,10 +67,21 @@ class TestTelaStatusAnimal(unittest.TestCase):
                                     "name": "Admin", "role": "admin"}
         at.session_state["page"] = "admin"
         at.run()
+        # Sem isto, um erro dentro do app vira `KeyError: 'Animal'` lá embaixo e
+        # esconde a causa — foi o que aconteceu na primeira execução no CI.
+        self.assertEqual(list(at.exception), [],
+                         f"app levantou exceção: {[e.value for e in at.exception]}")
+
         caixas = {s.label: s for s in at.selectbox}
+        self.assertIn("Animal", caixas,
+                      "a aba de status não renderizou. Widgets encontrados: "
+                      f"{sorted(caixas)}")
         caixas["Animal"].set_value(animal)
         caixas["Novo Status"].set_value(novo_status)
         at.run()
+        self.assertEqual(list(at.exception), [],
+                         f"app levantou exceção após selecionar: "
+                         f"{[e.value for e in at.exception]}")
         return at
 
     def _botao_atualizar(self, at):
