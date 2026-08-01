@@ -25,6 +25,20 @@ CREATE TABLE IF NOT EXISTS animal_costs (
     CONSTRAINT animal_costs_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS animal_identifiers (
+    id bigserial,
+    animal_uuid text NOT NULL,
+    tipo text NOT NULL,
+    valor text NOT NULL,
+    status text DEFAULT 'ativo'::text NOT NULL,
+    aplicado_em text,
+    removido_em text,
+    motivo_remocao text,
+    aplicado_por text,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT animal_identifiers_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS animal_movements (
     id bigserial,
     animal_id text NOT NULL,
@@ -321,6 +335,8 @@ ALTER TABLE weighings ADD CONSTRAINT weighings_animal_id_fkey FOREIGN KEY (anima
 
 -- Índices (fora das constraints)
 CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_ident_animal ON animal_identifiers USING btree (animal_uuid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers USING btree (tipo, valor) WHERE (status = 'ativo'::text);
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_id);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
