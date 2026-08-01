@@ -121,22 +121,25 @@ class TestEspelhoNasFilhas(BaseSurrogate):
             n = db._backfill_animal_uuid(con)
         self.assertEqual(n, 0, "backfill reescreveu linha que já tinha animal_uuid")
 
-    def test_escrita_nova_ainda_nao_preenche_o_espelho(self):
-        """Documenta o estado ATUAL da migração, não o desejado.
+    def test_escrita_nova_ja_preenche_o_espelho(self):
+        """MUDANÇA DECLARADA na etapa B1.4 — antes afirmava o contrário.
 
-        Hoje só o backfill preenche. Na etapa 5 as consultas passam a gravar o
-        uuid direto — e este teste muda junto, deliberadamente.
+        Na etapa 2 este teste documentava que só o backfill preenchia, e o
+        docstring anunciava que mudaria quando as escritas passassem a gravar o
+        uuid. Foi o que aconteceu: agora a escrita já chega completa, e o
+        backfill vira rede de segurança para dados anteriores.
+
+        A troca é deliberada, não regressão silenciosa.
         """
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
         db.add_weighing(aid, 400.0, "2026-07-31")
         pendente = self._linhas(
             "SELECT id FROM weighings WHERE animal_uuid IS NULL AND animal_id=?", (aid,))
-        self.assertTrue(pendente, "esperado: escrita nova ainda não preenche o espelho")
+        self.assertEqual(pendente, [], "escrita nova deixou o espelho vazio")
 
+        # O backfill continua idempotente: não há o que preencher.
         with db._conn() as con:
-            db._backfill_animal_uuid(con)
-        self.assertEqual(
-            self._linhas("SELECT id FROM weighings WHERE animal_uuid IS NULL"), [])
+            self.assertEqual(db._backfill_animal_uuid(con), 0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -213,6 +216,139 @@ class TestIdentificadores(BaseSurrogate):
         r = ident_repo.aplicar(a["uuid"], "sisbov", "105000000000001")
         self.assertTrue(r["ok"])
         self.assertTrue(r["ja_existia"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+class TestEscritaPreencheUuid(BaseSurrogate):
+    """Etapa B1.4 — toda escrita preenche `animal_uuid` na hora.
+
+    Antes desta etapa só o backfill preenchia, então uma linha recém-criada
+    ficava com o espelho nulo até o próximo `init_db()`. Isso impede adicionar a
+    FK (etapa 5): a restrição existiria, mas o dado chegaria incompleto.
+
+    Por isso a ordem do ADR 0004 foi invertida — escrita antes da FK.
+    """
+
+    def _sem_espelho(self, tabela, animal_id):
+        return self._linhas(
+            f"SELECT id FROM {tabela} WHERE animal_id=? AND animal_uuid IS NULL",
+            (animal_id,))
+
+    def test_cadastro_de_animal_preenche_tudo(self):
+        db.add_animal("E4A", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 1000.0, None, None)
+        for t in ("weighings", "animal_costs"):
+            with self.subTest(tabela=t):
+                self.assertEqual(self._sem_espelho(t, "E4A"), [])
+
+    def test_pesagem_preenche(self):
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        db.add_weighing(aid, 411.0, "2026-07-31")
+        self.assertEqual(self._sem_espelho("weighings", aid), [])
+
+    def test_medicacao_preenche(self):
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        db.add_medication(aid, "Ivermectina", 5.0, "ml", "Subcutânea", 30,
+                          "2026-07-31")
+        self.assertEqual(self._sem_espelho("medications", aid), [])
+
+    def test_custo_preenche(self):
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        db.add_animal_cost(aid, "sanitario", "Vacina", 25.0, "2026-07-31")
+        self.assertEqual(self._sem_espelho("animal_costs", aid), [])
+
+    def test_movimentacao_preenche(self):
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        lote = self._linhas("SELECT id FROM lotes LIMIT 1")[0]["id"]
+        db.move_animal(aid, lote, "manejo", "teste")
+        self.assertEqual(self._sem_espelho("animal_movements", aid), [])
+
+    def test_venda_preenche(self):
+        db.add_animal("E4V", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 0.0, None, None)
+        db.register_sale(["E4V"], "2026-07-31", "abate", "kg", 10.0)
+        self.assertEqual(self._sem_espelho("sales", "E4V"), [])
+
+    def test_obito_preenche(self):
+        db.add_animal("E4M", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 0.0, None, None)
+        db.register_death("E4M", "2026-07-31", "Cobra")
+        self.assertEqual(self._sem_espelho("deaths", "E4M"), [])
+
+    def test_nenhuma_tabela_fica_com_espelho_pendente(self):
+        """Varredura final: depois de exercitar as escritas, zero pendências."""
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        db.add_weighing(aid, 420.0, "2026-07-31")
+        db.add_animal_cost(aid, "operacional", "Sal", 10.0, "2026-07-31")
+
+        pendentes = {}
+        for t in ("weighings", "medications", "animal_costs", "animal_movements",
+                  "animal_photos", "deaths", "sales", "insumo_transactions"):
+            n = self._linhas(
+                f"SELECT id FROM {t} WHERE animal_id IS NOT NULL AND animal_uuid IS NULL")
+            if n:
+                pendentes[t] = len(n)
+        self.assertEqual(pendentes, {}, f"escritas deixaram espelho pendente: {pendentes}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+class TestIntegridadeReferencial(BaseSurrogate):
+    """Etapa B1.5 — as FKs passam a apontar para `animals(uuid)`.
+
+    Primeira etapa que **restringe** em vez de acrescentar. Só foi possível
+    porque a etapa 4 garantiu que toda escrita preenche o espelho: a restrição
+    encontra dado consistente.
+    """
+
+    TABELAS = ["weighings", "medications", "animal_costs", "animal_movements",
+               "animal_photos", "deaths", "sales", "insumo_transactions"]
+
+    def test_fk_declarada_nas_oito_tabelas(self):
+        for t in self.TABELAS:
+            with self.subTest(tabela=t):
+                fks = self._linhas(f"PRAGMA foreign_key_list({t})")
+                alvos = {(f["from"], f["table"], f["to"]) for f in fks}
+                self.assertIn(("animal_uuid", "animals", "uuid"), alvos,
+                              f"{t} sem FK de animal_uuid para animals(uuid)")
+
+    def test_uuid_inexistente_e_recusado(self):
+        """A restrição precisa BLOQUEAR de verdade, não só existir."""
+        con = sqlite3.connect(db.DB_PATH)
+        con.execute("PRAGMA foreign_keys=ON")
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                con.execute(
+                    "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date) "
+                    "VALUES(?,?,?,?)", (aid, "uuid-que-nao-existe", 400.0, "2026-07-31"))
+                con.commit()
+        finally:
+            con.close()
+
+    def test_uuid_valido_e_aceito(self):
+        """O contraponto: a FK não pode bloquear dado correto."""
+        con = sqlite3.connect(db.DB_PATH)
+        con.execute("PRAGMA foreign_keys=ON")
+        a = self._linhas("SELECT id, uuid FROM animals LIMIT 1")[0]
+        try:
+            con.execute(
+                "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date) "
+                "VALUES(?,?,?,?)", (a["id"], a["uuid"], 405.0, "2026-07-31"))
+            con.commit()
+        finally:
+            con.close()
+        self.assertTrue(self._linhas(
+            "SELECT id FROM weighings WHERE animal_uuid=? AND weight=405.0", (a["uuid"],)))
+
+    def test_animals_uuid_e_unico_no_schema(self):
+        """A FK só é possível porque `uuid` é UNIQUE — sem isso, não há alvo."""
+        idx = self._linhas("PRAGMA index_list(animals)")
+        unicos = [i for i in idx if i["unique"]]
+        colunas = set()
+        for i in unicos:
+            for c in self._linhas(f"PRAGMA index_info({i['name']})"):
+                colunas.add(c["name"])
+        self.assertIn("uuid", colunas, "animals.uuid não é único — a FK não se sustenta")
 
 
 if __name__ == "__main__":

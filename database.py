@@ -41,6 +41,7 @@ from services.seguranca import (  # noqa: F401
 # `app.py` e os testes seguirem funcionando durante a transição. Código novo deve
 # importar do repositório diretamente. **Não adicione consulta nova aqui.**
 from repositories import identificadores as identificadores  # noqa: F401
+from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
     _seed_animals,
@@ -178,7 +179,8 @@ def init_db() -> None:
                 method      TEXT DEFAULT 'pesado',
                 notes       TEXT,
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id)
+                FOREIGN KEY (animal_id) REFERENCES animals(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Insumos (estoque)
@@ -212,7 +214,8 @@ def init_db() -> None:
                 protocol_id       INTEGER,
                 created_at        TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (animal_id) REFERENCES animals(id),
-                FOREIGN KEY (insumo_id) REFERENCES insumos(id)
+                FOREIGN KEY (insumo_id) REFERENCES insumos(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Movimentações entre lotes
@@ -227,7 +230,8 @@ def init_db() -> None:
                 operator      TEXT,
                 notes         TEXT,
                 created_at    TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id)
+                FOREIGN KEY (animal_id) REFERENCES animals(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Transações de estoque de insumos
@@ -244,7 +248,8 @@ def init_db() -> None:
                 notes            TEXT,
                 lote_id          TEXT,
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (insumo_id) REFERENCES insumos(id)
+                FOREIGN KEY (insumo_id) REFERENCES insumos(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Custos por animal
@@ -258,7 +263,8 @@ def init_db() -> None:
                 cost_date   TEXT NOT NULL,
                 notes       TEXT,
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id)
+                FOREIGN KEY (animal_id) REFERENCES animals(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Custos fixos (nível da fazenda: aluguel, salários, impostos, taxas)
@@ -333,7 +339,8 @@ def init_db() -> None:
                 operator     TEXT,
                 notes        TEXT,
                 created_at   TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id)
+                FOREIGN KEY (animal_id) REFERENCES animals(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Óbitos (mortalidade) com causa
@@ -349,7 +356,8 @@ def init_db() -> None:
                 operator        TEXT,
                 notes           TEXT,
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id)
+                FOREIGN KEY (animal_id) REFERENCES animals(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Configurações gerais (chave/valor)
@@ -379,7 +387,8 @@ def init_db() -> None:
                 taken_date TEXT NOT NULL,
                 operator   TEXT,
                 created_at TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id)
+                FOREIGN KEY (animal_id) REFERENCES animals(id),
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Protocolos sanitários (vacinação obrigatória por idade/sexo)
@@ -1668,8 +1677,8 @@ def add_photo(animal_id: str, image_bytes: bytes, mime: str = "image/jpeg",
     with _conn() as con:
         img = _conexao.psycopg2.Binary(image_bytes) if _conexao.USE_PG else image_bytes
         con.execute(
-            "INSERT INTO animal_photos (animal_id,image,mime,taken_date,operator) VALUES(?,?,?,?,?)",
-            (animal_id, img, mime, taken_date, operator),
+            "INSERT INTO animal_photos (animal_id,animal_uuid,image,mime,taken_date,operator) VALUES(?,?,?,?,?,?)",
+            (animal_id, uuid_de(con, animal_id), img, mime, taken_date, operator),
         )
 
 
