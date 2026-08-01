@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
+from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
 from services.qualidade import avaliar_pesagem
 from ui.tema import cores
@@ -1080,17 +1081,94 @@ def _campo_animal():
                     f'</div>',unsafe_allow_html=True)
 
 
+def _campo_importar():
+    """Importa pesagens de um CSV exportado pelo indicador da balança."""
+    st.subheader("📥 Importar pesagens de CSV")
+    st.caption("Três colunas: **brinco, peso, data**. Aceita `;` ou `,` como separador, "
+               "data em `AAAA-MM-DD` ou `DD/MM/AAAA`, e peso com vírgula decimal. "
+               "Cabeçalho é opcional.")
+
+    arquivo = st.file_uploader("Arquivo do indicador", type=["csv", "txt"])
+    if arquivo is None:
+        return
+
+    bruto = arquivo.getvalue()
+    try:
+        texto = bruto.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        # Indicadores de balança costumam exportar em cp1252/latin-1.
+        texto = bruto.decode("latin-1")
+
+    ativos = {a["id"] for a in db.get_all_animals(status="ativo")}
+    resultado = db.parse_pesagens(texto, ids_conhecidos=ativos)
+    aceitas, rejeitadas = resultado["aceitas"], resultado["rejeitadas"]
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Linhas lidas", resultado["total_linhas"])
+    m2.metric("Aceitas", len(aceitas))
+    m3.metric("Rejeitadas", len(rejeitadas))
+
+    if rejeitadas:
+        st.error(f"{len(rejeitadas)} linha(s) não serão importadas:")
+        st.dataframe(pd.DataFrame([
+            {"Linha": r["linha"], "Motivo": r["motivo"], "Conteúdo": r["conteudo"]}
+            for r in rejeitadas
+        ]), use_container_width=True, hide_index=True)
+
+    if not aceitas:
+        st.info("Nada a importar.")
+        return
+
+    # Qualidade: o histórico acumula as próprias linhas do arquivo, senão duas
+    # pesagens do mesmo animal no mesmo CSV não se enxergariam.
+    hist = {}
+    for a_id in {linha["animal_id"] for linha in aceitas}:
+        hist[a_id] = [{"peso": w["weight"], "data": w["weigh_date"]}
+                      for w in db.get_weighings(a_id)]
+
+    previa, graves = [], 0
+    for linha in sorted(aceitas, key=lambda x: (x["animal_id"], x["data"])):
+        alertas = avaliar_pesagem(linha["peso"], linha["data"], hist[linha["animal_id"]])
+        altos = [a["mensagem"] for a in alertas if a["severidade"] == "alta"]
+        graves += 1 if altos else 0
+        previa.append({"Animal": linha["animal_id"], "Peso (kg)": linha["peso"],
+                       "Data": linha["data"],
+                       "⚠️": " · ".join(altos) if altos else ""})
+        hist[linha["animal_id"]].insert(
+            0, {"peso": linha["peso"], "data": linha["data"]})
+
+    st.markdown("**Prévia do que será gravado**")
+    st.dataframe(pd.DataFrame(previa), use_container_width=True, hide_index=True)
+
+    if graves:
+        st.warning(f"⚠️ {graves} pesagem(ns) com indício de erro — confira antes de gravar. "
+                   "Peso errado contamina GMD, projeção de abate e custo por arroba.")
+
+    if st.button(f"💾 Gravar {len(aceitas)} pesagem(ns)", type="primary"):
+        gravadas = 0
+        for linha in aceitas:
+            db.add_weighing(linha["animal_id"], linha["peso"], linha["data"],
+                            operator=st.session_state.user["name"],
+                            notes=f"importado de {arquivo.name}")
+            gravadas += 1
+        st.success(f"✅ {gravadas} pesagem(ns) importada(s).")
+        st.rerun()
+
+
 def page_campo():
     st.markdown('<div class="page-title">📱 Modo Campo</div>', unsafe_allow_html=True)
     # Badge com nº de tratos pendentes na aba
     pend = db.get_pending_feedings()
     n_pend = sum(1 for p in pend if not p["done_this_period"])
     trato_label = f"🌾 Trato do Dia{' 🔴'+str(n_pend) if n_pend else ''}"
-    tab_trato, tab_animal = st.tabs([trato_label, "🐄 Manejo do Animal"])
+    tab_trato, tab_animal, tab_import = st.tabs(
+        [trato_label, "🐄 Manejo do Animal", "📥 Importar CSV"])
     with tab_trato:
         _campo_trato()
     with tab_animal:
         _campo_animal()
+    with tab_import:
+        _campo_importar()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # REBANHO
@@ -3192,14 +3270,43 @@ def page_admin():
     with at2:
         st.subheader("Alterar Status de Animal")
         all_a=db.get_all_animals(status=None)
-        ac1,ac2,ac3=st.columns(3)
+        por_id={a["id"]:a for a in all_a}
+        ac1,ac2=st.columns(2)
         with ac1: sel_a=st.selectbox("Animal",[a["id"] for a in all_a])
         with ac2: new_st=st.selectbox("Novo Status",["ativo","vendido","morto","carencia"])
-        with ac3:
-            st.markdown("<br>",unsafe_allow_html=True)
-            if st.button("✅ Atualizar",type="primary",use_container_width=True):
-                db.update_animal_status(sel_a,new_st)
-                st.success(f"{sel_a} → {new_st}"); st.rerun()
+
+        atual = por_id[sel_a]["status"] if sel_a in por_id else ""
+        # A autorização vem do PAPEL, e não de ter chegado nesta página. O
+        # dispatch já restringe operador a OPERATOR_PAGES, mas quem decide uma
+        # transição sensível é a permissão do usuário (§14.2) — não a rota.
+        eh_admin = st.session_state.user["role"] == "admin"
+        veredito = db.transicao_permitida(atual, new_st, tem_autorizacao=eh_admin)
+
+        st.caption(f"Status atual: **{atual or '—'}** → **{new_st}**")
+
+        justificativa = ""
+        if veredito["exige_justificativa"]:
+            st.warning(f"⚠️ {veredito['motivo']}")
+            justificativa = st.text_area(
+                "Justificativa (obrigatória)",
+                placeholder="Por que este animal está saindo de um estado final?",
+                key=f"just_{sel_a}_{new_st}")
+        elif not veredito["permitida"]:
+            st.error(f"🚫 {veredito['motivo']}")
+
+        pode = veredito["permitida"] and (
+            not veredito["exige_justificativa"] or justificativa.strip())
+        if st.button("✅ Atualizar",type="primary",disabled=not pode):
+            r = db.update_animal_status(
+                sel_a, new_st,
+                tem_autorizacao=eh_admin,
+                justificativa=justificativa,
+                operador=st.session_state.user["name"])
+            if r.get("ok"):
+                st.success(f"{sel_a}: {r['de']} → {r['para']}")
+                st.rerun()
+            else:
+                st.error(f"🚫 {r.get('motivo','Transição recusada.')}")
 
     with at3:
         import os
