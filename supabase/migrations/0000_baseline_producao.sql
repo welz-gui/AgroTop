@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS animal_costs (
     cost_date text NOT NULL,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    animal_uuid text,
     CONSTRAINT animal_costs_pkey PRIMARY KEY (id)
 );
 
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS animal_movements (
     operator text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    animal_uuid text,
     CONSTRAINT animal_movements_pkey PRIMARY KEY (id)
 );
 
@@ -45,6 +47,7 @@ CREATE TABLE IF NOT EXISTS animal_photos (
     taken_date text NOT NULL,
     operator text,
     created_at timestamp with time zone DEFAULT now(),
+    animal_uuid text,
     CONSTRAINT animal_photos_pkey PRIMARY KEY (id)
 );
 
@@ -96,6 +99,7 @@ CREATE TABLE IF NOT EXISTS deaths (
     operator text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    animal_uuid text,
     CONSTRAINT deaths_pkey PRIMARY KEY (id)
 );
 
@@ -180,6 +184,7 @@ CREATE TABLE IF NOT EXISTS insumo_transactions (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     lote_id text,
+    animal_uuid text,
     CONSTRAINT insumo_transactions_pkey PRIMARY KEY (id)
 );
 
@@ -224,6 +229,7 @@ CREATE TABLE IF NOT EXISTS medications (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     protocol_id bigint,
+    animal_uuid text,
     CONSTRAINT medications_pkey PRIMARY KEY (id)
 );
 
@@ -254,6 +260,7 @@ CREATE TABLE IF NOT EXISTS sales (
     operator text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    animal_uuid text,
     CONSTRAINT sales_pkey PRIMARY KEY (id)
 );
 
@@ -290,6 +297,7 @@ CREATE TABLE IF NOT EXISTS weighings (
     method text DEFAULT 'pesado'::text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    animal_uuid text,
     CONSTRAINT weighings_pkey PRIMARY KEY (id)
 );
 

@@ -15,6 +15,7 @@ animal_costs.amount
 animal_costs.cost_date
 animal_costs.notes
 animal_costs.created_at
+animal_costs.animal_uuid
 animal_movements.id
 animal_movements.animal_id
 animal_movements.from_lote_id
@@ -24,6 +25,7 @@ animal_movements.reason
 animal_movements.operator
 animal_movements.notes
 animal_movements.created_at
+animal_movements.animal_uuid
 animal_photos.id
 animal_photos.animal_id
 animal_photos.image
@@ -31,6 +33,7 @@ animal_photos.mime
 animal_photos.taken_date
 animal_photos.operator
 animal_photos.created_at
+animal_photos.animal_uuid
 animals.id
 animals.breed
 animals.sex
@@ -69,6 +72,7 @@ deaths.cost_at_death
 deaths.operator
 deaths.notes
 deaths.created_at
+deaths.animal_uuid
 feeding_checks.id
 feeding_checks.plan_id
 feeding_checks.lote_id
@@ -129,6 +133,7 @@ insumo_transactions.operator
 insumo_transactions.notes
 insumo_transactions.created_at
 insumo_transactions.lote_id
+insumo_transactions.animal_uuid
 insumos.id
 insumos.name
 insumos.category
@@ -161,6 +166,7 @@ medications.insumo_id
 medications.notes
 medications.created_at
 medications.protocol_id
+medications.animal_uuid
 pluviometria.id
 pluviometria.read_date
 pluviometria.rain_mm
@@ -183,6 +189,7 @@ sales.profit
 sales.operator
 sales.notes
 sales.created_at
+sales.animal_uuid
 sessions.token
 sessions.user_id
 sessions.expires_at
@@ -202,3 +209,4 @@ weighings.operator
 weighings.method
 weighings.notes
 weighings.created_at
+weighings.animal_uuid
