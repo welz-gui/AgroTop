@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app.dart';
@@ -34,7 +35,8 @@ void main() {
   testWidgets('captura login, lista e ficha sem cálculo ou fallback no Dart', (
     tester,
   ) async {
-    await loadAppFonts();
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -112,10 +114,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Gestão do rebanho'), findsOneWidget);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/01-login.png'),
-    );
+    if (captureGoldens) {
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/01-login.png'),
+      );
+    }
 
     await tester.enterText(find.byType(TextFormField).at(0), 'admin');
     await tester.enterText(find.byType(TextFormField).at(1), 'senha-da-poc');
@@ -123,18 +127,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('BR0001'), findsOneWidget);
     expect(find.text('BR0002'), findsOneWidget);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/02-lista.png'),
-    );
+    if (captureGoldens) {
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/02-lista.png'),
+      );
+    }
 
     await tester.tap(find.text('BR0001'));
     await tester.pumpAndSettle();
     expect(find.text('0.742 kg/dia'), findsOneWidget);
     expect(find.text('GMD calculado no servidor'), findsOneWidget);
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/03-ficha.png'),
-    );
+    if (captureGoldens) {
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/03-ficha.png'),
+      );
+    }
   });
 }

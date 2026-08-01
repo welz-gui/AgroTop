@@ -36,8 +36,13 @@ python poc/mobile/tool/generate_app_colors.py
 flutter pub get
 flutter analyze
 flutter test
+$env:CAPTURE_GOLDENS = "1"  # PowerShell: só para regenerar as capturas
+flutter test --update-goldens
 flutter build apk --debug --dart-define=AGROTOP_API_URL=http://10.0.2.2:8000
 ```
+
+As comparações pixel a pixel ficam fora do teste normal porque a rasterização de fonte
+varia entre Windows e Linux; as asserções funcionais do fluxo rodam em qualquer sistema.
 
 O workflow arquivado não pode ser reutilizado sem alteração: fixa Flutter 3.19.6 e o
 diretório antigo `agrotop_mobile`. A sequência ainda é válida com Flutter 3.44.8, Java 17,
