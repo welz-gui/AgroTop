@@ -5,7 +5,14 @@
   entregou o levantamento de nuvem, que é válido e está mesclado, mas **não fechou a
   pergunta**. Leia "O que a primeira tentativa deixou pendente" antes de começar.
 - **Branch:** `poc/ndvi-viabilidade-v2` (o da 1ª tentativa foi mesclado e apagado)
-- **Trabalhe apenas em:** `poc/ndvi/` (pasta nova). Nada fora dela.
+- **Trabalhe apenas em:** `poc/ndvi/` — **que já existe na `main`** e contém o código da 1ª
+  tentativa. Você vai corrigi-lo e completá-lo. Nada fora dessa pasta.
+
+> 🛑 **Antes de qualquer coisa: `git fetch origin && git checkout -B poc/ndvi-viabilidade-v2 origin/main`.**
+> Um agente já falhou esta spec por trabalhar sobre um checkout velho: viu a versão antiga do
+> quadro, concluiu que a 0004 "já estava integrada pelo PR #33" e passou para a próxima
+> tarefa. **Está integrada mesmo — e é exatamente por isso que existe uma 2ª tentativa.**
+> O PR #33 entregou metade. Sua tarefa é a outra metade.
 
 ---
 
@@ -106,9 +113,12 @@ se o NDVI observado tem amplitude suficiente para ser informativo.
 ## Como verificar antes de abrir o PR
 
 ```bash
-python -m unittest discover -s tests -t . -v   # 72 testes, verde
-git diff --stat origin/main                    # só arquivos em poc/ndvi/
+AGROTOP_FORCE_SQLITE=1 python -m unittest discover -s tests -t .   # 184 testes, verde
+git diff --stat origin/main                                        # só arquivos em poc/ndvi/
 ```
+
+O `-t .` **não é opcional** (R16): sem ele os testes podem conectar em produção. O
+`AGROTOP_FORCE_SQLITE=1` é a segunda trava.
 
 ## Entrega
 

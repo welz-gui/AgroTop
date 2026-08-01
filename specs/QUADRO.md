@@ -25,7 +25,7 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | — | ✅ [#29](https://github.com/welz-gui/AgroTop/pull/29) | | 2026-07-31 |
 | 1 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT (2ª tentativa) | `poc/ndvi-viabilidade-v2` | 🟢 livre | — | — |
 | — | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | — | ✅ [#35](https://github.com/welz-gui/AgroTop/pull/35) | | 2026-08-01 |
-| 2 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| — | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | — | ✅ [#40](https://github.com/welz-gui/AgroTop/pull/40) | | 2026-08-01 |
 
 🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
 demais = PoC ou manutenção.
@@ -95,6 +95,27 @@ estação chuvosa inviabiliza monitoramento contínuo em MT.
 
 **Antes de decidir sobre o módulo de satélite:** corrigir `largest_gap` e rodar o cálculo de
 NDVI de fato. O mérito da PoC — mostrar que nuvem é o gargalo, não resolução — está de pé.
+
+### ✅ Resultado do Flutter + API (spec 0005, PR #40)
+
+**Seguir com ressalvas.** A fronteira arquitetural está provada: Flutter → FastAPI →
+`services/` e `repositories/` existentes, **sem fórmula de GMD no Dart** e sem criar um
+segundo modelo de identidade — a API usa a tabela `users` e o PBKDF2 de
+`services/seguranca.py`, confirmando o veto a Supabase Auth do [ADR 0002](../docs/adr/0002-fronteira-de-portabilidade.md).
+
+A PoC **se recusa a iniciar sem `AGROTOP_FORCE_SQLITE=1`** e exige `AGROTOP_API_SECRET`
+com 32+ caracteres, falhando fechado — não há segredo padrão.
+
+**Custo:** ~US$ 5/mês (Railway Hobby) ou US$ 7 (Render Starter). iOS exige **US$ 99/ano**.
+
+**Falta antes de produção** (integração, não PoC): rate limiting no login, revogação e
+renovação de token, HTTPS obrigatório, configuração PostgreSQL, autorização por tenant e
+pipeline de release assinado. O `build_apk.yml` está em `poc/mobile/` e **não** está ligado
+ao CI — ligar é decisão do mantenedor.
+
+**Dívida anotada:** `_login()` da PoC faz SQL cru porque **não existe
+`repositories/usuarios.py`** — o SQL de `users` ainda mora em `database.py`, que a spec
+proibia tocar. Se a API virar produção, extrair esse repositório primeiro (R1/R9).
 
 ### ⚠️ Pendência do PWA (spec 0002, PR #31)
 
