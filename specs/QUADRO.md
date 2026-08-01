@@ -23,9 +23,9 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | — | ✅ [#20](https://github.com/welz-gui/AgroTop/pull/20) | | 2026-07-31 |
 | — | [0002](0002-pwa-instalavel.md) — PWA instalável | — | ✅ [#31](https://github.com/welz-gui/AgroTop/pull/31) | | 2026-07-31 |
 | — | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | — | ✅ [#29](https://github.com/welz-gui/AgroTop/pull/29) | | 2026-07-31 |
-| — | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | — | ✅ [#33](https://github.com/welz-gui/AgroTop/pull/33) | | 2026-08-01 |
+| 1 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT (2ª tentativa) | `poc/ndvi-viabilidade-v2` | 🟢 livre | — | — |
 | — | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | — | ✅ [#35](https://github.com/welz-gui/AgroTop/pull/35) | | 2026-08-01 |
-| 1 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| 2 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
 
 🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
 demais = PoC ou manutenção.
