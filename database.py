@@ -40,6 +40,7 @@ from services.seguranca import (  # noqa: F401
 # As consultas migraram para repositories/<agregado>.py. Reexportadas aqui para
 # `app.py` e os testes seguirem funcionando durante a transição. Código novo deve
 # importar do repositório diretamente. **Não adicione consulta nova aqui.**
+from repositories import identificadores as identificadores  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
     _seed_animals,
@@ -412,6 +413,31 @@ def init_db() -> None:
             -- Sessões de login persistente (cookie). Definida aqui, e só aqui:
             -- antes era criada sob demanda dentro de create_session/get_session_user/
             -- delete_session, o que deixava um banco novo sem a tabela até o 1º login.
+            -- Identificadores do animal (ADR 0004 · PNIB §4.1 e §4.2).
+            -- O brinco deixa de ser a identidade e vira UM identificador entre
+            -- vários, com vigência própria. Trocar brinco passa a ser encerrar
+            -- um registro e abrir outro — sem apagar o anterior (§4.2.3).
+            CREATE TABLE IF NOT EXISTS animal_identifiers (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_uuid    TEXT NOT NULL,
+                tipo           TEXT NOT NULL,
+                valor          TEXT NOT NULL,
+                -- 'ativo' | 'removido' | 'inutilizado'
+                status         TEXT NOT NULL DEFAULT 'ativo',
+                aplicado_em    TEXT,
+                removido_em    TEXT,
+                motivo_remocao TEXT,
+                aplicado_por   TEXT,
+                created_at     TEXT DEFAULT (datetime('now','localtime'))
+            );
+            -- §4.2.1 e §4.2.2: um código oficial ou RFID não pode estar ATIVO em
+            -- dois animais. O índice parcial permite o mesmo valor no histórico
+            -- (status='removido'), que é o que preserva a rastreabilidade.
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico
+                ON animal_identifiers (tipo, valor) WHERE status = 'ativo';
+            CREATE INDEX IF NOT EXISTS idx_ident_animal
+                ON animal_identifiers (animal_uuid);
+
             CREATE TABLE IF NOT EXISTS sessions (
                 token      TEXT PRIMARY KEY,
                 user_id    INTEGER,
@@ -427,6 +453,7 @@ def init_db() -> None:
         # Depois dos seeds: animais semeados também precisam de UUID.
         _backfill_uuids(con)
         _backfill_animal_uuid(con)
+        _backfill_identificadores(con)
 
 
 def _migrate(con) -> None:
@@ -502,6 +529,31 @@ def _backfill_animal_uuid(con) -> int:
         )
         total += getattr(cur, "rowcount", 0) or 0
     return total
+
+
+def _backfill_identificadores(con) -> int:
+    """Migra o brinco atual (`animals.id`) para `animal_identifiers` (etapa B1.3).
+
+    O número que hoje é a PK passa a existir também como identificador de tipo
+    `manejo`, vigente. Não remove nada de `animals` — as duas representações
+    convivem até a etapa 6.
+
+    Idempotente: só insere para quem ainda não tem um `manejo` ativo.
+    """
+    faltando = con.execute(
+        "SELECT a.uuid, a.id FROM animals a "
+        "WHERE a.uuid IS NOT NULL AND NOT EXISTS ("
+        "  SELECT 1 FROM animal_identifiers i "
+        "  WHERE i.animal_uuid = a.uuid AND i.tipo = 'manejo' AND i.status = 'ativo')"
+    ).fetchall()
+    for row in faltando:
+        con.execute(
+            "INSERT INTO animal_identifiers "
+            "(animal_uuid,tipo,valor,status,aplicado_por) "
+            "VALUES(?,'manejo',?,'ativo','migração ADR 0004')",
+            (row["uuid"], row["id"]),
+        )
+    return len(faltando)
 
 
 def _seed_users(con):

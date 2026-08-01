@@ -16,6 +16,16 @@ animal_costs.cost_date
 animal_costs.notes
 animal_costs.created_at
 animal_costs.animal_uuid
+animal_identifiers.id
+animal_identifiers.animal_uuid
+animal_identifiers.tipo
+animal_identifiers.valor
+animal_identifiers.status
+animal_identifiers.aplicado_em
+animal_identifiers.removido_em
+animal_identifiers.motivo_remocao
+animal_identifiers.aplicado_por
+animal_identifiers.created_at
 animal_movements.id
 animal_movements.animal_id
 animal_movements.from_lote_id

@@ -16,6 +16,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
+from repositories import identificadores as ident_repo  # noqa: E402
 from repositories.animais import novo_uuid  # noqa: E402
 
 
@@ -136,6 +137,82 @@ class TestEspelhoNasFilhas(BaseSurrogate):
             db._backfill_animal_uuid(con)
         self.assertEqual(
             self._linhas("SELECT id FROM weighings WHERE animal_uuid IS NULL"), [])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+class TestIdentificadores(BaseSurrogate):
+    """Etapa B1.3 — o brinco vira um identificador, não a identidade.
+
+    É a etapa que torna possível o §4.2.3: trocar brinco sem apagar o anterior.
+    Antes do ADR 0004 isso exigiria trocar a chave primária.
+    """
+
+    def _uuid_de(self, animal_id):
+        return self._linhas("SELECT uuid FROM animals WHERE id=?", (animal_id,))[0]["uuid"]
+
+    def test_todo_animal_tem_manejo_ativo(self):
+        sem = self._linhas(
+            "SELECT a.id FROM animals a WHERE NOT EXISTS ("
+            "  SELECT 1 FROM animal_identifiers i WHERE i.animal_uuid=a.uuid"
+            "  AND i.tipo='manejo' AND i.status='ativo')")
+        self.assertEqual(sem, [], f"animais sem identificador de manejo: {sem}")
+
+    def test_manejo_guarda_o_brinco_atual(self):
+        for a in self._linhas("SELECT id, uuid FROM animals LIMIT 3"):
+            with self.subTest(animal=a["id"]):
+                ident = ident_repo.get_ativo(a["uuid"], "manejo")
+                self.assertIsNotNone(ident)
+                self.assertEqual(ident["valor"], a["id"])
+
+    def test_backfill_de_identificadores_e_idempotente(self):
+        with db._conn() as con:
+            n = db._backfill_identificadores(con)
+        self.assertEqual(n, 0, "backfill duplicou identificador já existente")
+
+    def test_substituicao_preserva_o_anterior(self):
+        """O coração do §4.2.3: trocar brinco não apaga o histórico."""
+        a = self._linhas("SELECT id, uuid FROM animals LIMIT 1")[0]
+        antigo = ident_repo.get_ativo(a["uuid"], "manejo")["valor"]
+
+        r = ident_repo.substituir(a["uuid"], "manejo", "BRINCO-NOVO",
+                                  motivo="perda do brinco original")
+        self.assertTrue(r["ok"])
+        db.clear_cache()
+
+        todos = ident_repo.get_identificadores(a["uuid"])
+        valores = {i["valor"]: i for i in todos}
+        self.assertIn(antigo, valores, "identificador anterior foi APAGADO")
+        self.assertEqual(valores[antigo]["status"], "removido")
+        self.assertEqual(valores[antigo]["motivo_remocao"], "perda do brinco original")
+        self.assertEqual(valores["BRINCO-NOVO"]["status"], "ativo")
+        self.assertEqual(ident_repo.get_ativo(a["uuid"], "manejo")["valor"], "BRINCO-NOVO")
+
+    def test_mesmo_valor_ativo_em_dois_animais_e_recusado(self):
+        """§4.2.1/§4.2.2 — código ativo não pode estar em dois animais."""
+        animais = self._linhas("SELECT uuid FROM animals LIMIT 2")
+        ident_repo.aplicar(animais[0]["uuid"], "rfid", "982000123456789")
+        db.clear_cache()
+        r = ident_repo.aplicar(animais[1]["uuid"], "rfid", "982000123456789")
+        self.assertFalse(r["ok"])
+        self.assertIn("já está ativo", r["erro"])
+
+    def test_valor_liberado_apos_remocao(self):
+        """Removido não bloqueia: o histórico convive com a reutilização."""
+        animais = self._linhas("SELECT uuid FROM animals LIMIT 2")
+        ident_repo.aplicar(animais[0]["uuid"], "visual", "V-100")
+        db.clear_cache()
+        ident_repo.remover(animais[0]["uuid"], "visual", motivo="danificado")
+        db.clear_cache()
+        r = ident_repo.aplicar(animais[1]["uuid"], "visual", "V-100")
+        self.assertTrue(r["ok"], "valor não foi liberado após remoção")
+
+    def test_reaplicar_no_mesmo_animal_nao_duplica(self):
+        a = self._linhas("SELECT uuid FROM animals LIMIT 1")[0]
+        ident_repo.aplicar(a["uuid"], "sisbov", "105000000000001")
+        db.clear_cache()
+        r = ident_repo.aplicar(a["uuid"], "sisbov", "105000000000001")
+        self.assertTrue(r["ok"])
+        self.assertTrue(r["ja_existia"])
 
 
 if __name__ == "__main__":
