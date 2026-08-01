@@ -55,6 +55,21 @@ para dentro dele, usando a ferramenta `EnterWorktree` do Claude Code.
 explicitamente**. Se o prompt não disser a palavra, o agente trabalhará na pasta principal.
 O prompt da seção 4 já contempla isso.
 
+> 🛑 **Isto falha silenciosamente e já falhou.** Em 2026-08-01 um prompt escrito à mão para a
+> spec 0004 começava direto com `git fetch && git checkout -B ...` e **não continha a palavra
+> "worktree"**. O agente executou exatamente o que foi pedido — na pasta principal do
+> mantenedor, que ficou com o branch do agente em checkout. Nada quebrou por sorte: não havia
+> trabalho em andamento naquele momento.
+>
+> **Antes de colar qualquer prompt, procure a palavra "worktree" na primeira frase.** Se não
+> estiver lá, o isolamento não vai acontecer, por mais explícito que o resto seja.
+>
+> Conferir depois de lançar o agente, na pasta principal:
+> ```bash
+> git branch --show-current    # deve ser o SEU branch, não o do agente
+> git worktree list            # o agente deve aparecer numa linha própria
+> ```
+
 O worktree nasce em `.claude/worktrees/<nome>`, num branch novo. Por padrão ele parte de
 `origin/main` (configuração `worktree.baseRef = fresh`), e não do seu HEAD local — ou seja,
 o agente começa do que está publicado, não do que você tem em andamento.
@@ -136,12 +151,24 @@ projeto. Você não precisa escolher a spec.
 
 #### Continuação, igual nas duas variantes
 
-> **Confirme que seu worktree partiu de `origin/main`**, e não de um branch local em
-> andamento:
+> **Antes de escrever qualquer arquivo, prove que está dentro do worktree** — não na pasta
+> principal do mantenedor:
 > ```
+> git rev-parse --show-toplevel
+> test "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" \
+>   && echo "OK: dentro de um worktree" \
+>   || echo "PARE: esta e a pasta principal"
+> ```
+> Se der `PARE`, não continue: crie o worktree e entre nele. Já houve agente escrevendo no
+> checkout do mantenedor achando estar isolado.
+>
+> **Confirme que seu worktree partiu de `origin/main` atualizada:**
+> ```
+> git fetch origin                     # NÃO é opcional
 > git log --oneline -1 origin/main     # deve ser o mesmo ponto de partida do seu branch
 > ```
-> Se não for, refaça o worktree a partir de `origin/main`.
+> Se não for, refaça o worktree a partir de `origin/main`. Sem o `fetch` você pode estar
+> lendo um quadro desatualizado e concluir que sua tarefa já foi feita — já aconteceu.
 >
 > Faça **apenas** o que a spec pede. Se identificar outro problema, **anote no PR em vez de
 > corrigir** — mudança fora de escopo é rejeitada.
@@ -151,12 +178,14 @@ projeto. Você não precisa escolher a spec.
 >
 > Antes de abrir o PR, rode e cole o resultado:
 > ```
-> python -m unittest discover -s tests -t . -v
+> AGROTOP_FORCE_SQLITE=1 python -m unittest discover -s tests -t . -v
 > python -m compileall app.py database.py repositories services ui tests tools
 > git diff --stat origin/main
 > ```
-> O `-t .` não é opcional (ROADMAP R16). No `git diff --stat`, só devem aparecer os arquivos
-> que a spec pediu — **não altere `specs/`, `ROADMAP.md` nem `README.md`**.
+> O `-t .` não é opcional (ROADMAP R16) e o `AGROTOP_FORCE_SQLITE=1` é a segunda trava:
+> **sem os dois, os testes podem conectar no banco de produção.** No `git diff --stat`, só
+> devem aparecer os arquivos que a spec pediu — **não altere `specs/`, `ROADMAP.md` nem
+> `README.md`**.
 >
 > Abra o PR para `main` **pronto para revisão, nunca como rascunho**, no formato descrito na
 > spec.
@@ -218,14 +247,78 @@ tarefa seria dada por concluída com o código parado num branch.
 
 Vale para o mantenedor também: conferir com `gh pr list` antes de considerar entregue.
 
-### 1. Parta de `origin/main`, não de um branch local
+### 1. Parta de `origin/main` **atualizada** — `git fetch` primeiro
 
-*Por quê:* o PR #20 chegou carregando **dois commits do mantenedor**, porque o worktree foi
-criado a partir do HEAD local — que naquele momento era um branch de integração em
-andamento, não a `main`. O agente não errou; o ponto de partida é que estava errado.
+```bash
+git fetch origin                     # NÃO é opcional
+git log --oneline -1 origin/main     # deve ser o ponto de partida do seu branch
+```
+
+*Por quê, duas vezes:*
+
+O PR #20 chegou carregando **dois commits do mantenedor**, porque o worktree foi criado a
+partir do HEAD local — naquele momento um branch de integração em andamento, não a `main`.
+O agente não errou; o ponto de partida é que estava errado.
+
+Em 2026-08-01 o problema foi **`origin/main` velha**, que é mais traiçoeiro: um agente
+recebeu a spec 0004, leu um checkout parado em `0af0b3b`, viu ali a versão anterior do
+quadro, concluiu que a tarefa "já estava integrada pelo PR #33" e **passou para outra
+tarefa**. O raciocínio estava certo; os dados é que tinham 3 commits de atraso. Sem `fetch`,
+você não está olhando o projeto — está olhando uma fotografia dele.
 
 Mitigações aplicadas: `.claude/settings.json` fixa `worktree.baseRef = "fresh"`, e o prompt
 manda conferir. O mantenedor também deve manter a `main` em checkout ao lançar agentes.
+
+### 1c. Se você liberar uma tarefa, apague o branch que reivindicou
+
+Reivindicar cria um branch no remoto. Se você concluir que a tarefa não é sua (já feita,
+tomada, bloqueada), **desfaça a reivindicação**:
+
+```bash
+git push origin --delete <branch-que-voce-criou>
+```
+
+*Por quê:* dois branches vazios (`poc/ndvi-viabilidade`, `poc/dados-modelos-claim`) ficaram
+no remoto depois de agentes liberarem tarefas. Um deles tinha o nome da 1ª tentativa de uma
+spec que ganhou 2ª — o agente seguinte encontraria um branch já existente com o nome certo e
+concluiria que a tarefa estava tomada. Reivindicação abandonada **é armadilha para o
+próximo**, não resíduo inofensivo.
+
+E **não invente arquivo marcador** (`CLAIM.md` e afins) só para o branch ter um commit. O
+branch reivindicado pode ficar vazio; seu primeiro commit de verdade basta para abrir o PR.
+
+### 2. Trabalhe DENTRO do worktree — e prove, antes de escrever qualquer arquivo
+
+**Não basta criar o worktree. É preciso estar dentro dele.** Rode isto como primeiro
+comando depois de criá-lo:
+
+```bash
+git rev-parse --show-toplevel      # onde você está
+test "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" \
+  && echo "OK: dentro de um worktree" \
+  || echo "PARE: esta e a pasta principal do mantenedor"
+```
+
+Num worktree, `--git-dir` aponta para `.../.git/worktrees/<nome>` enquanto `--git-common-dir`
+aponta para `.../.git`. **Se os dois forem iguais, você está na pasta principal** — pare,
+crie o worktree e entre nele antes de tocar em arquivo.
+
+*Por quê:* em 2026-08-01 apareceram **254 linhas não commitadas** em `poc/modelos/` na pasta
+principal do mantenedor — um rascunho da PoC 0006 concatenado por cima da versão já mesclada,
+deixando dois títulos de nível 1 no mesmo README. O conteúdo não estava em commit nenhum, de
+branch nenhum. Depois de limpo, um `CLAIM.md` reapareceu no mesmo lugar. Em ambos os casos um
+agente escrevia no checkout do mantenedor achando estar isolado.
+
+**Por que isso é pior do que parece:** o dano não aparece no seu PR. Ele aparece semanas
+depois, no commit de outra pessoa, misturado a trabalho sem nenhuma relação com o seu — e
+quem for investigar não terá como saber de onde veio. Um arquivo corrompido quase entrou
+numa migração de chave primária por esse caminho.
+
+⚠️ **A ferramenta `EnterWorktree` só dispara se o pedido mencionar "worktree"
+explicitamente.** Se o prompt que você recebeu não usa a palavra, o isolamento **não
+acontece** e você trabalhará na pasta principal sem perceber. Nesse caso, diga isso a quem
+te instruiu em vez de seguir — foi assim que a spec 0004 acabou reivindicada dentro do
+checkout do mantenedor.
 
 ### 2b. Remova o worktree ao terminar
 
