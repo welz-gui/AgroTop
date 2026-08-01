@@ -35,13 +35,15 @@ def get_weighings(animal_id: str) -> list[dict]:
 def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
                  method="pesado") -> None:
     with _conn() as con:
-        lote = con.execute(
-            "SELECT lote_id FROM animals WHERE id=?", (animal_id,)
+        # Busca lote e uuid na mesma consulta (ADR 0004 etapa B1.4).
+        a = con.execute(
+            "SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)
         ).fetchone()
-        lote_id = lote["lote_id"] if lote else None
+        lote_id = a["lote_id"] if a else None
         con.execute(
-            "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?)",
-            (animal_id, weight, weigh_date, lote_id, operator, method, notes),
+            "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?,?)",
+            (animal_id, a["uuid"] if a else None, weight, weigh_date, lote_id,
+             operator, method, notes),
         )
         con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
 

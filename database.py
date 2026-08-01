@@ -41,6 +41,7 @@ from services.seguranca import (  # noqa: F401
 # `app.py` e os testes seguirem funcionando durante a transição. Código novo deve
 # importar do repositório diretamente. **Não adicione consulta nova aqui.**
 from repositories import identificadores as identificadores  # noqa: F401
+from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
     _seed_animals,
@@ -1668,8 +1669,8 @@ def add_photo(animal_id: str, image_bytes: bytes, mime: str = "image/jpeg",
     with _conn() as con:
         img = _conexao.psycopg2.Binary(image_bytes) if _conexao.USE_PG else image_bytes
         con.execute(
-            "INSERT INTO animal_photos (animal_id,image,mime,taken_date,operator) VALUES(?,?,?,?,?)",
-            (animal_id, img, mime, taken_date, operator),
+            "INSERT INTO animal_photos (animal_id,animal_uuid,image,mime,taken_date,operator) VALUES(?,?,?,?,?,?)",
+            (animal_id, uuid_de(con, animal_id), img, mime, taken_date, operator),
         )
 
 

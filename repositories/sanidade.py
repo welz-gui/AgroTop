@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from .animais import get_all_animals
+from .animais import uuid_de
 from .conexao import _cache, _conn, _writes
 
 
@@ -36,10 +37,11 @@ def add_medication(animal_id, medication_name, dose, unit, application_route,
     with _conn() as con:
         con.execute(
             """INSERT INTO medications
-               (animal_id,medication_name,dose,unit,application_route,
+               (animal_id,animal_uuid,medication_name,dose,unit,application_route,
                 withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, medication_name, dose, unit, application_route,
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (animal_id, uuid_de(con, animal_id), medication_name, dose, unit,
+             application_route,
              withdrawal_days, med_date, applied_by, insumo_id or None, notes,
              protocol_id or None),
         )

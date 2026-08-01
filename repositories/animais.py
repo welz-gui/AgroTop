@@ -13,6 +13,19 @@ from typing import Optional
 from .conexao import _cache, _conn, _writes
 
 
+def uuid_de(con, animal_id: str) -> str | None:
+    """UUID interno a partir do número do brinco (ADR 0004, etapa B1.4).
+
+    Usado nas escritas das tabelas filhas enquanto `animal_id` ainda é o que
+    chega da interface. Some na etapa 6, quando as funções passarem a receber o
+    uuid direto.
+    """
+    if not animal_id:
+        return None
+    row = con.execute("SELECT uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
+    return row["uuid"] if row else None
+
+
 def novo_uuid() -> str:
     """Identificador interno imutável de um animal (ADR 0004, §4.1 do PNIB).
 
@@ -59,6 +72,7 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                birth_estimated=0, age_source="propriedade",
                nf_number="", gta_number="", weight_method="pesado",
                purchase_mode="cabeca") -> None:
+    _uuid_novo = novo_uuid()
     with _conn() as con:
         con.execute(
             """INSERT INTO animals
@@ -66,42 +80,46 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                 gta_number,entry_date,entry_weight,current_weight,target_weight,
                 purchase_price,purchase_mode,lote_id,fornecedor_id,notes)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, novo_uuid(), breed, sex, birth_date or None,
+            (animal_id, _uuid_novo, breed, sex, birth_date or None,
              int(birth_estimated), age_source,
              nf_number or None, gta_number or None, entry_date,
              entry_weight, entry_weight, target_weight, purchase_price,
              purchase_mode, lote_id or None, fornecedor_id or None, notes),
         )
         con.execute(
-            "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
-            (animal_id, entry_weight, entry_date, lote_id or None, "Cadastro", weight_method),
+            "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?,?)",
+            (animal_id, _uuid_novo, entry_weight, entry_date, lote_id or None,
+             "Cadastro", weight_method),
         )
         # Registra custo de compra apenas para animais adquiridos
         if age_source != "propriedade" and purchase_price and purchase_price > 0:
             con.execute(
-                "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-                (animal_id, "compra", "Valor de compra", purchase_price, entry_date),
+                "INSERT INTO animal_costs (animal_id,animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?,?)",
+                (animal_id, _uuid_novo, "compra", "Valor de compra", purchase_price,
+                 entry_date),
             )
         if lote_id:
             con.execute(
-                "INSERT INTO animal_movements (animal_id,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?)",
-                (animal_id, None, lote_id, entry_date, "entrada", "Cadastro"),
+                "INSERT INTO animal_movements (animal_id,animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?,?)",
+                (animal_id, _uuid_novo, None, lote_id, entry_date, "entrada", "Cadastro"),
             )
 
 
 @_writes
 def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator="", notes="") -> None:
     with _conn() as con:
-        row = con.execute("SELECT lote_id FROM animals WHERE id=?", (animal_id,)).fetchone()
+        row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
         from_lote = row["lote_id"] if row else None
         con.execute(
             "UPDATE animals SET lote_id=? WHERE id=?", (to_lote_id, animal_id)
         )
         con.execute(
             """INSERT INTO animal_movements
-               (animal_id,from_lote_id,to_lote_id,movement_date,reason,operator,notes)
-               VALUES(?,?,?,?,?,?,?)""",
-            (animal_id, from_lote, to_lote_id, movement_date, reason, operator, notes),
+               (animal_id,animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
+                operator,notes)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (animal_id, row["uuid"] if row else None, from_lote, to_lote_id,
+             movement_date, reason, operator, notes),
         )
         con.execute(
             "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)

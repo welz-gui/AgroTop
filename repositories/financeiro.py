@@ -9,7 +9,7 @@ from datetime import date, datetime
 from typing import Optional
 
 from . import conexao as _conexao
-from .animais import get_animal
+from .animais import get_animal, uuid_de
 from .conexao import _cache, _conn, _writes
 
 # `expected_sale_value` é regra de negócio (peso × preço da categoria) que ficou
@@ -45,8 +45,9 @@ def get_animal_costs(animal_id: str) -> list[dict]:
 def add_animal_cost(animal_id, cost_type, description, amount, cost_date, notes="") -> None:
     with _conn() as con:
         con.execute(
-            "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date,notes) VALUES(?,?,?,?,?,?)",
-            (animal_id, cost_type, description, amount, cost_date, notes),
+            "INSERT INTO animal_costs (animal_id,animal_uuid,cost_type,description,amount,cost_date,notes) VALUES(?,?,?,?,?,?,?)",
+            (animal_id, uuid_de(con, animal_id), cost_type, description, amount,
+             cost_date, notes),
         )
 
 
@@ -141,10 +142,12 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
 
             con.execute(
                 """INSERT INTO sales
-                   (animal_id,sale_date,sale_type,pricing_mode,weight_kg,price_per_kg,
-                    total_value,buyer,lot_ref,cost_at_sale,profit,operator,notes)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (a["id"], sale_date, sale_type, pricing_mode, a["current_weight"], ppk,
+                   (animal_id,animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
+                    price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
+                    operator,notes)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (a["id"], a.get("uuid"), sale_date, sale_type, pricing_mode,
+                 a["current_weight"], ppk,
                  val, buyer or None, lot_ref, custo, lucro, operator, notes),
             )
             con.execute("UPDATE animals SET status='vendido' WHERE id=?", (a["id"],))
@@ -234,9 +237,10 @@ def register_death(animal_id: str, death_date: str, cause: str,
     with _conn() as con:
         con.execute(
             """INSERT INTO deaths
-               (animal_id,death_date,cause,lote_id,weight_at_death,cost_at_death,operator,notes)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (animal_id, death_date, cause, a.get("lote_id"),
+               (animal_id,animal_uuid,death_date,cause,lote_id,weight_at_death,
+                cost_at_death,operator,notes)
+               VALUES(?,?,?,?,?,?,?,?,?)""",
+            (animal_id, a.get("uuid"), death_date, cause, a.get("lote_id"),
              a["current_weight"], custo, operator, notes),
         )
         con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
