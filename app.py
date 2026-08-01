@@ -13,6 +13,9 @@ from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
 from services.qualidade import avaliar_pesagem
+from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
+from services.validacao_regulatoria import validar_animal
+from services.recomendacoes import avaliar as avaliar_recomendacoes
 from ui.tema import cores
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -1234,6 +1237,154 @@ def page_rebanho():
 # ══════════════════════════════════════════════════════════════════════════════
 # FICHA DO ANIMAL  (Linha do Tempo)
 # ══════════════════════════════════════════════════════════════════════════════
+_ICONE_GRAVIDADE = {"bloqueio": "🔴", "alerta": "🟡", "informativo": "🔵"}
+
+# Validações que hoje disparam em TODO animal porque cobram campo que o schema
+# ainda não tem: `propriedade_id` chega na etapa B4 e genealogia na B3 do ADR
+# 0004. Não são erro de cadastro — são funcionalidade ausente, e mostrá-las em
+# cada ficha ensina o usuário a ignorar o aviso inteiro. Voltam quando os campos
+# existirem e o pecuarista puder de fato preenchê-los.
+_CODIGOS_AGUARDANDO_SCHEMA = {"animal_sem_origem", "nascimento_sem_mae"}
+
+
+def _consistencia_regulatoria(animal: dict, movs: list):
+    """Problemas de consistência do cadastro (PNIB §17.3).
+
+    A checagem é `services/validacao_regulatoria.py`, função pura: tudo o que ela
+    precisa entra por parâmetro. Chave ausente no contexto faz a validação
+    correspondente ser **pulada**, não falhar — por isso genealogia (que só chega
+    na etapa B3) simplesmente não é avaliada hoje.
+    """
+    uuid = animal.get("uuid")
+    ids = db.identificadores.get_identificadores(uuid) if uuid else []
+
+    morte = None
+    for d in db.get_deaths():
+        if d.get("animal_id") == animal["id"]:
+            morte = d.get("death_date")
+            break
+
+    eventos = [{"tipo": "movimentacao", "data": m.get("movement_date"),
+                "propriedade_id": None} for m in movs]
+    if morte:
+        eventos.append({"tipo": "morte", "data": morte, "propriedade_id": None})
+
+    problemas = validar_animal(
+        {"id": animal["id"],
+         "sexo": animal.get("sex"),
+         "nascimento": animal.get("birth_date"),
+         "nascimento_estimado": bool(animal.get("birth_estimated")),
+         "morte": morte},
+        {"eventos": eventos,
+         "identificadores": [{"tipo": i["tipo"], "valor": i["valor"],
+                              "ativo": i["status"] == "ativo"} for i in ids],
+         "hoje": date.today().isoformat()},
+    )
+    problemas = [p for p in problemas
+                 if p["codigo"] not in _CODIGOS_AGUARDANDO_SCHEMA]
+    if not problemas:
+        return
+
+    graves = [p for p in problemas if p["gravidade"] == "bloqueio"]
+    rotulo = f"⚠️ {len(problemas)} inconsistência(s) no cadastro"
+    with st.expander(rotulo, expanded=bool(graves)):
+        for p in problemas:
+            icone = _ICONE_GRAVIDADE.get(p["gravidade"], "•")
+            st.markdown(f"{icone} **{p['gravidade'].capitalize()}** — {p['mensagem']}")
+        st.caption("Regras do §17.3 do PNIB. Genealogia e propriedade de origem ainda "
+                   "não são avaliadas: dependem das etapas B3 e B4.")
+
+
+def _identificadores_do_animal(animal: dict):
+    """Brincos e demais identificadores, com histórico (PNIB §4.1 e §4.2).
+
+    Trocar brinco **não** apaga o anterior: encerra a vigência e abre outra. É o
+    que permite reconstruir qual brinco o animal usava em cada data (§4.2.3), e é
+    a razão de a identidade ter passado para o uuid no ADR 0004.
+    """
+    uuid = animal.get("uuid")
+    if not uuid:
+        st.warning("Este animal ainda não tem identificador interno (uuid). "
+                   "Rode a migração do ADR 0004 antes de gerenciar brincos.")
+        return
+
+    itens = db.identificadores.get_identificadores(uuid)
+    ativos = [i for i in itens if i["status"] == "ativo"]
+
+    if itens:
+        st.dataframe(pd.DataFrame([{
+            "Tipo": i["tipo"], "Valor": i["valor"],
+            "Situação": "✅ vigente" if i["status"] == "ativo" else "histórico",
+            "Aplicado em": i.get("aplicado_em") or "—",
+            "Removido em": i.get("removido_em") or "—",
+            "Motivo da remoção": i.get("motivo_remocao") or "—",
+        } for i in itens]), use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhum identificador registrado para este animal.")
+
+    st.markdown("---")
+    c_novo, c_troca = st.columns(2)
+
+    with c_novo:
+        st.markdown("**Aplicar identificador**")
+        tipo = st.selectbox("Tipo", db.identificadores.TIPOS, key=f"id_tipo_{uuid}")
+        valor = st.text_input("Valor", key=f"id_valor_{uuid}").strip()
+
+        erros = []
+        if valor:
+            erros = validar_formato_id(valor, REGRAS_PADRAO.get(tipo, {})).get("erros", [])
+            for e in erros:
+                st.error(f"🚫 {e}")
+            if any(i["tipo"] == tipo for i in ativos):
+                st.warning(f"Já existe um `{tipo}` vigente. Use a troca ao lado para "
+                           "preservar o histórico.")
+
+        if st.button("➕ Aplicar", disabled=not valor or bool(erros),
+                     key=f"id_aplicar_{uuid}"):
+            r = db.identificadores.aplicar(
+                uuid, tipo, valor, aplicado_por=st.session_state.user["name"])
+            if r.get("ok"):
+                st.success("Já estava aplicado." if r.get("ja_existia")
+                           else f"✅ {tipo} {valor} aplicado.")
+                st.rerun()
+            else:
+                st.error(f"🚫 {r.get('erro')}")
+
+    with c_troca:
+        st.markdown("**Trocar / remover**")
+        if not ativos:
+            st.caption("Nenhum identificador vigente para trocar.")
+            return
+        # Opções são texto, não dicionário: opção-dicionário quebra quando a lista
+        # é reconstruída no rerun, porque o valor guardado é outro objeto.
+        rotulos = {f"{i['tipo']} — {i['valor']}": i for i in ativos}
+        alvo = rotulos[st.selectbox("Vigente", list(rotulos), key=f"id_alvo_{uuid}")]
+        motivo = st.text_input("Motivo (obrigatório)", key=f"id_motivo_{uuid}").strip()
+        novo = st.text_input("Novo valor (deixe vazio para só remover)",
+                             key=f"id_novo_{uuid}").strip()
+
+        erros_novo = []
+        if novo:
+            erros_novo = validar_formato_id(
+                novo, REGRAS_PADRAO.get(alvo["tipo"], {})).get("erros", [])
+            for e in erros_novo:
+                st.error(f"🚫 {e}")
+
+        rotulo = "🔄 Substituir" if novo else "🗑️ Encerrar vigência"
+        if st.button(rotulo, disabled=not motivo or bool(erros_novo),
+                     key=f"id_trocar_{uuid}"):
+            if novo:
+                r = db.identificadores.substituir(
+                    uuid, alvo["tipo"], novo, motivo,
+                    aplicado_por=st.session_state.user["name"])
+                if not r.get("ok"):
+                    st.error(f"🚫 {r.get('erro')}"); return
+            else:
+                db.identificadores.remover(uuid, alvo["tipo"], motivo)
+            st.success("✅ Registrado — o valor anterior fica no histórico.")
+            st.rerun()
+
+
 def page_animal():
     aid=st.session_state.animal_detail
     if not aid: st.warning("Nenhum animal selecionado."); return
@@ -1298,8 +1449,14 @@ def page_animal():
                    f"({(wd-date.today()).days} dias restantes). Não pode ser abatido.")
 
     st.markdown("---")
-    tl_peso,tl_med,tl_mov,tl_fin,tl_foto=st.tabs(
-        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto"])
+    _consistencia_regulatoria(animal, movs)
+
+    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id=st.tabs(
+        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto",
+         "🏷️ Identificadores"])
+
+    with tl_id:
+        _identificadores_do_animal(animal)
 
     with tl_foto:
         _photo_section(aid, key_prefix="ficha_")
@@ -2150,8 +2307,123 @@ def page_estoque():
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERTAS
 # ══════════════════════════════════════════════════════════════════════════════
+_FREQ_POR_DIA = {"diario": 1.0, "semanal": 1/7, "mensal": 1/30}
+
+
+def _consumo_diario_por_insumo() -> dict:
+    """Consumo diário previsto de cada insumo, somando os planos de trato ativos.
+
+    É consumo **planejado**, não realizado — que é justamente o que a regra de
+    estoque precisa: ela pergunta se o saldo cobre os próximos dias de trato.
+    Plano com unidade incompatível com a do estoque é ignorado, porque converter
+    saco para kg exige densidade que o sistema não guarda.
+    """
+    insumos = {i["id"]: i for i in db.get_all_insumos()}
+    consumo: dict = {}
+    for p in db.get_feeding_plans(active_only=True):
+        iid = p.get("insumo_id")
+        if not iid or iid not in insumos:
+            continue
+        qtd = db.convert_quantity(p.get("quantity") or 0,
+                                  p.get("unit"), insumos[iid].get("unit"))
+        if qtd is None:
+            continue
+        consumo[iid] = consumo.get(iid, 0.0) + qtd * _FREQ_POR_DIA.get(
+            p.get("frequency"), 1.0)
+    return consumo
+
+
+def _contexto_recomendacoes() -> dict:
+    """Monta o retrato da fazenda que o motor de regras consome.
+
+    O motor é função pura e não toca banco (R31) — quem apura é aqui.
+    """
+    consumo = _consumo_diario_por_insumo()
+    hoje = date.today()
+
+    animais = []
+    for a in db.get_all_animals(status="ativo"):
+        fim = db.get_withdrawal_end(a["id"])
+        animais.append({
+            "id": a["id"],
+            "peso": a.get("current_weight"),
+            "peso_alvo": a.get("target_weight"),
+            "gmd": db.calculate_gmd(a["id"]),
+            "lote_id": a.get("lote_id"),
+            "carencia_ate": fim.isoformat() if fim and fim >= hoje else None,
+        })
+
+    lotes = [{"id": l["id"],
+              "capacidade_ua": l.get("capacity_ua"),
+              "ua_atual": l.get("total_ua")}
+             for l in db.get_all_lotes()]
+
+    insumos = [{"id": i["id"], "nome": i["name"],
+                "saldo": i.get("current_stock"),
+                "consumo_diario": consumo.get(i["id"], 0.0)}
+               for i in db.get_all_insumos()]
+
+    return {
+        "animais": animais,
+        "lotes": lotes,
+        "insumos": insumos,
+        "preco_arroba": _to_float(db.get_setting("preco_arroba")),
+        "custo_por_arroba": _custo_medio_por_arroba(),
+        "hoje": hoje.isoformat(),
+    }
+
+
+def _to_float(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _custo_medio_por_arroba():
+    """Custo médio por arroba do rebanho ativo, ou None se não der para apurar."""
+    ativos = db.get_all_animals(status="ativo")
+    if not ativos:
+        return None
+    custo = arrobas = 0.0
+    for a in ativos:
+        custo += db.get_total_cost(a["id"]) or 0
+        arrobas += db.kg_to_arrobas(a["current_weight"],
+                                    a.get("carcass_yield") or 0.52) or 0
+    return round(custo / arrobas, 2) if arrobas else None
+
+
+_GRAVIDADE_CARD = {"alta": "card-red", "media": "card-yellow", "baixa": "card-green"}
+
+
 def page_alertas():
     st.markdown('<div class="page-title">🔔 Alertas Ativos</div>', unsafe_allow_html=True)
+
+    # ── Recomendações do motor de regras (services/recomendacoes.py) ──────────
+    st.subheader("🧭 Recomendações")
+    st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "
+               "motivo e os números que a dispararam.")
+    try:
+        recs = avaliar_recomendacoes(_contexto_recomendacoes())
+    except Exception as e:   # regra nova com dado faltando não pode derrubar a página
+        recs = []
+        st.warning(f"Não foi possível avaliar as recomendações: {e}")
+
+    if recs:
+        ordem = {"alta": 0, "media": 1, "baixa": 2}
+        for r in sorted(recs, key=lambda x: ordem.get(x.get("severidade"), 9)):
+            classe = _GRAVIDADE_CARD.get(r.get("severidade"), "card-yellow")
+            acao = r.get("acao")
+            st.markdown(
+                f'<div class="{classe}"><b>{r.get("titulo","")}</b><br>'
+                f'{r.get("motivo","")}'
+                + (f'<br><i>👉 {acao}</i>' if acao else "")
+                + '</div>', unsafe_allow_html=True)
+    else:
+        st.success("✅ Nenhuma recomendação no momento.")
+
+    st.markdown("---")
+
     alerts=db.get_alert_animals()
     low   =db.check_low_stock()
 
