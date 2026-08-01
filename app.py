@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
 import database as db
 from services.qualidade import avaliar_pesagem
+from ui.tema import cores
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -3269,6 +3270,15 @@ def _try_restore_session():
             st.session_state.page = "dashboard" if u["role"] == "admin" else "campo"
 
 def main():
+    tema = cores("escuro")
+    st.markdown(
+        f"""
+        <link rel="manifest" href="/app/static/manifest.json">
+        <link rel="apple-touch-icon" href="/app/static/icon-192.png">
+        <meta name="theme-color" content="{tema['primaria']}">
+        """,
+        unsafe_allow_html=True,
+    )
     _init_cookies()          # instância nova a cada run (relê o cookie)
     _try_restore_session()
     if not st.session_state.authenticated:
