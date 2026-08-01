@@ -35,6 +35,10 @@ from services.terminacao import (  # noqa: F401
 from services.seguranca import (  # noqa: F401
     _hash, _is_legacy_hash, _verify_password,
 )
+from services.estados_animal import (  # noqa: F401
+    transicao_permitida, estados_finais,
+)
+from services.importacao import parse_pesagens  # noqa: F401
 
 # ─── Reexportação da camada de dados (Fase A2, fatia 3) ──────────────────────
 # As consultas migraram para repositories/<agregado>.py. Reexportadas aqui para
@@ -857,9 +861,55 @@ def count_admins() -> int:
 
 
 @_writes
-def update_animal_status(animal_id: str, status: str) -> None:
+def update_animal_status(animal_id: str, status: str, *,
+                         tem_autorizacao: bool = False,
+                         justificativa: str = "",
+                         operador: str = "") -> dict:
+    """Muda o status do animal **passando pela máquina de estados** (PNIB §14.2).
+
+    Este é o único funil de mudança de status, então a regra vale para todos os
+    chamadores. Transições cotidianas (ativo→vendido, carencia→ativo) seguem
+    livres; sair de um estado final — ressuscitar um animal vendido, morto ou
+    abatido — exige `tem_autorizacao` **e** justificativa.
+
+    Devolve dicionário em vez de levantar: a interface precisa do motivo para
+    mostrar ao usuário, e quem ignora o retorno mantém o comportamento anterior
+    nas transições livres.
+
+    ⚠️ A justificativa é anexada a `animals.notes` porque **ainda não existe
+    tabela de auditoria** — ela chega na etapa B2 do ADR 0004. Quando chegar,
+    este trecho passa a gravar lá.
+    """
+    with _conn() as con:
+        row = con.execute(
+            "SELECT status, notes FROM animals WHERE id=?", (animal_id,)
+        ).fetchone()
+    if row is None:
+        return {"ok": False, "motivo": f"Animal {animal_id} não encontrado."}
+
+    atual = row["status"]
+    veredito = transicao_permitida(atual, status, tem_autorizacao=tem_autorizacao)
+    if not veredito["permitida"]:
+        return {"ok": False, "de": atual, "para": status, **veredito}
+
+    if veredito["exige_justificativa"] and not justificativa.strip():
+        return {"ok": False, "de": atual, "para": status, **veredito,
+                "motivo": "Justificativa obrigatória para esta transição."}
+
     with _conn() as con:
         con.execute("UPDATE animals SET status=? WHERE id=?", (status, animal_id))
+        if justificativa.strip():
+            # Montado em Python, e não em SQL: concatenar com quebra de linha
+            # exigiria `char(10)` no SQLite e `chr(10)` no Postgres, e o
+            # `_translate()` não cobre diferença de função — só de placeholder.
+            marca = (f"[{date.today().isoformat()}] {operador or 'sistema'}: "
+                     f"{atual} → {status} — {justificativa.strip()}")
+            anterior = (row["notes"] or "").rstrip()
+            con.execute(
+                "UPDATE animals SET notes=? WHERE id=?",
+                (f"{anterior}\n{marca}" if anterior else marca, animal_id),
+            )
+    return {"ok": True, "de": atual, "para": status, **veredito}
 
 
 @_writes
