@@ -88,5 +88,55 @@ class TestFormatoDoUuid(unittest.TestCase):
         self.assertEqual([len(p) for p in v.split("-")], [8, 4, 4, 4, 12])
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+class TestEspelhoNasFilhas(BaseSurrogate):
+    """Etapa B1.2 — `animal_uuid` espelhado nas 8 tabelas filhas.
+
+    Enquanto as FKs ainda apontam para `animal_id`, as duas colunas convivem.
+    É o que torna a etapa reversível: nada depende do espelho ainda.
+    """
+
+    TABELAS = ["weighings", "medications", "animal_costs", "animal_movements",
+               "animal_photos", "deaths", "sales", "insumo_transactions"]
+
+    def test_todas_as_filhas_tem_a_coluna(self):
+        for t in self.TABELAS:
+            with self.subTest(tabela=t):
+                cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({t})")}
+                self.assertIn("animal_uuid", cols)
+
+    def test_espelho_confere_com_o_animal(self):
+        """Toda linha com animal_id tem o uuid do animal correspondente."""
+        for t in self.TABELAS:
+            with self.subTest(tabela=t):
+                divergentes = self._linhas(
+                    f"SELECT t.animal_id FROM {t} t JOIN animals a ON a.id = t.animal_id "
+                    f"WHERE t.animal_uuid IS NULL OR t.animal_uuid <> a.uuid")
+                self.assertEqual(divergentes, [],
+                                 f"{t}: espelho divergente do animals.uuid")
+
+    def test_backfill_das_filhas_e_idempotente(self):
+        with db._conn() as con:
+            n = db._backfill_animal_uuid(con)
+        self.assertEqual(n, 0, "backfill reescreveu linha que já tinha animal_uuid")
+
+    def test_escrita_nova_ainda_nao_preenche_o_espelho(self):
+        """Documenta o estado ATUAL da migração, não o desejado.
+
+        Hoje só o backfill preenche. Na etapa 5 as consultas passam a gravar o
+        uuid direto — e este teste muda junto, deliberadamente.
+        """
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        db.add_weighing(aid, 400.0, "2026-07-31")
+        pendente = self._linhas(
+            "SELECT id FROM weighings WHERE animal_uuid IS NULL AND animal_id=?", (aid,))
+        self.assertTrue(pendente, "esperado: escrita nova ainda não preenche o espelho")
+
+        with db._conn() as con:
+            db._backfill_animal_uuid(con)
+        self.assertEqual(
+            self._linhas("SELECT id FROM weighings WHERE animal_uuid IS NULL"), [])
+
+
 if __name__ == "__main__":
     unittest.main()

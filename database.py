@@ -169,6 +169,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS weighings (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id   TEXT NOT NULL,
+                animal_uuid   TEXT,
                 weight      REAL NOT NULL,
                 weigh_date  TEXT NOT NULL,
                 lote_id     TEXT,
@@ -197,6 +198,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS medications (
                 id                INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id         TEXT NOT NULL,
+                animal_uuid         TEXT,
                 medication_name   TEXT NOT NULL,
                 dose              REAL DEFAULT 0,
                 unit              TEXT DEFAULT 'ml',
@@ -216,6 +218,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS animal_movements (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id     TEXT NOT NULL,
+                animal_uuid     TEXT,
                 from_lote_id  TEXT,
                 to_lote_id    TEXT NOT NULL,
                 movement_date TEXT NOT NULL,
@@ -234,6 +237,7 @@ def init_db() -> None:
                 quantity         REAL NOT NULL,
                 reason           TEXT,
                 animal_id        TEXT,
+                animal_uuid        TEXT,
                 transaction_date TEXT NOT NULL,
                 operator         TEXT,
                 notes            TEXT,
@@ -246,6 +250,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS animal_costs (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id   TEXT NOT NULL,
+                animal_uuid   TEXT,
                 cost_type   TEXT NOT NULL DEFAULT 'operacional',
                 description TEXT,
                 amount      REAL NOT NULL,
@@ -313,6 +318,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS sales (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id    TEXT NOT NULL,
+                animal_uuid    TEXT,
                 sale_date    TEXT NOT NULL,
                 sale_type    TEXT NOT NULL DEFAULT 'abate',
                 pricing_mode TEXT NOT NULL DEFAULT 'kg',
@@ -333,6 +339,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS deaths (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id       TEXT NOT NULL,
+                animal_uuid       TEXT,
                 death_date      TEXT NOT NULL,
                 cause           TEXT NOT NULL DEFAULT 'Desconhecida',
                 lote_id         TEXT,
@@ -365,6 +372,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS animal_photos (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 animal_id  TEXT NOT NULL,
+                animal_uuid  TEXT,
                 image      BLOB NOT NULL,
                 mime       TEXT DEFAULT 'image/jpeg',
                 taken_date TEXT NOT NULL,
@@ -418,6 +426,7 @@ def init_db() -> None:
         _seed_insumos(con)
         # Depois dos seeds: animais semeados também precisam de UUID.
         _backfill_uuids(con)
+        _backfill_animal_uuid(con)
 
 
 def _migrate(con) -> None:
@@ -426,6 +435,13 @@ def _migrate(con) -> None:
     if _conexao.USE_PG:
         return
     cols = {r["name"] for r in con.execute("PRAGMA table_info(animals)").fetchall()}
+    # ADR 0004 etapa B1.2 — espelho do uuid nas tabelas filhas.
+    for _t in ("weighings", "medications", "animal_costs", "animal_movements",
+               "animal_photos", "deaths", "sales", "insumo_transactions"):
+        _c = {r["name"] for r in con.execute(f"PRAGMA table_info({_t})").fetchall()}
+        if "animal_uuid" not in _c:
+            con.execute(f"ALTER TABLE {_t} ADD COLUMN animal_uuid TEXT")
+
     if "uuid" not in cols:
         # ADR 0004 etapa 1. Sem UNIQUE aqui: o ALTER do SQLite não aceita, e a
         # restrição vem do CREATE TABLE em bancos novos.
@@ -467,6 +483,25 @@ def _backfill_uuids(con) -> int:
     for row in sem:
         con.execute("UPDATE animals SET uuid=? WHERE id=?", (novo_uuid(), row["id"]))
     return len(sem)
+
+
+def _backfill_animal_uuid(con) -> int:
+    """Espelha `animals.uuid` nas 8 tabelas filhas (ADR 0004, etapa B1.2).
+
+    Idempotente: só preenche linhas com `animal_uuid` nulo. Enquanto as FKs
+    ainda apontam para `animal_id`, as duas colunas convivem — é o que torna
+    esta etapa reversível.
+    """
+    total = 0
+    for t in ("weighings", "medications", "animal_costs", "animal_movements",
+              "animal_photos", "deaths", "sales", "insumo_transactions"):
+        cur = con.execute(
+            f"UPDATE {t} SET animal_uuid = ("
+            f"  SELECT a.uuid FROM animals a WHERE a.id = {t}.animal_id"
+            f") WHERE animal_uuid IS NULL AND animal_id IS NOT NULL"
+        )
+        total += getattr(cur, "rowcount", 0) or 0
+    return total
 
 
 def _seed_users(con):
