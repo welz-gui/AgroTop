@@ -131,9 +131,20 @@ class TestFonteUnicaDeVerdade(unittest.TestCase):
         self.assertIsNotNone(ini, "init_db() não encontrado em database.py")
         self.assertIsNotNone(fim, "fim do DDL de init_db() não identificado")
 
+        def _e_comentario(linha: str) -> bool:
+            """Comentário Python (#) ou SQL (--) — documentação, não instrução.
+
+            Sem isto, o teste acusa qualquer comentário que *mencione* CREATE
+            TABLE, o que aconteceu ao documentar a migração da chave surrogate.
+            """
+            t = linha.strip()
+            return t.startswith("#") or t.startswith("--")
+
         fora = [f"linha {n}: {l.strip()[:70]}"
                 for n, l in enumerate(linhas, 1)
-                if "CREATE TABLE" in l.upper() and not (ini <= n <= fim)]
+                if "CREATE TABLE" in l.upper()
+                and not _e_comentario(l)
+                and not (ini <= n <= fim)]
 
         self.assertEqual(
             fora, [],
