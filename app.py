@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
+from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
 from services.qualidade import avaliar_pesagem
 from ui.tema import cores
