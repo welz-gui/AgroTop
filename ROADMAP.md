@@ -274,6 +274,32 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 | B7 | **Módulo de dispositivos (brincos)** | Estoque, lotes, conferência visual×RFID (§5) |
 | — | **Integrações oficiais** | ⛔ **Bloqueado**: as APIs não existem, e o §23 lista 19 pontos não confirmados |
 
+### ⚠️ Revisão de 2026-08-01 — o gate é B1+B2, não B1–B7
+
+O ADR 0004 disse que a Fase B inteira antecede as trilhas. **Revisando com o que as PoCs
+mostraram, isso é conservador demais** e cria um risco maior que o que evita.
+
+**Só B1, B2 e B4 são fundacionais** — mudam identidade, como o estado é derivado, e o
+escopo de toda tabela. **B3, B5, B6 e B7 são módulos aditivos**: genealogia, regras
+regulatórias, movimentações e dispositivos não invalidam trabalho feito em Financeiro ou
+Nutrição. Podem intercalar com as trilhas.
+
+**O risco de não corrigir isso:** modo fundação permanente. Numa sessão inteira, o que
+chegou ao usuário foi custo médio ponderado, detecção de peso suspeito, importação CSV e
+PWA — todo o resto foi encanamento. Projetos não morrem por falha técnica; morrem por
+passar tempo demais sem entregar nada visível.
+
+**Regra prática:** depois de B1, entregar **uma coisa visível** antes de seguir para B2.
+
+### O que as PoCs mudaram
+
+| Achado | Efeito no plano |
+|---|---|
+| **NDVI é sazonal em MT** — dez com 90,2 % de nuvem, out/nov 60–66 % | Satélite vira ferramenta de **seca (mai–set)**, não monitoramento contínuo. **10b rebaixado**; 10a (geometria) **não** é afetada e se paga sozinha pela área calculada |
+| **Modelos batem a linha de base com 3 meses**; 12 meses para piloto sazonal | Corrige minha estimativa anterior de "2–3 anos". Mas o gate real **não é tempo, é a Trilha 3** — as features de custo e nutrição vêm dela |
+| **`streamlit-folium` + `shapely` + `pyproj`** recomendados | Trilha 2 destravada tecnicamente |
+| `services/` e `repositories/` existem | **A API da Trilha 1 está destravada** — é casca fina sobre o que já há |
+
 **A Fase A vira pré-requisito, não higiene:** a etapa 5 da migração do ADR 0004 depende de
 as consultas estarem concentradas em `repositories/`. Sem isso, a troca da chave espalha-se
 por todo o `database.py`.
@@ -663,7 +689,11 @@ Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 1. **Rotacionar a senha do Postgres** — ela já apareceu em texto claro duas vezes.
    Supabase → Settings → Database → reset, e atualizar `secrets.toml` + Secrets do
    Streamlit Cloud. *(Adiada por decisão do usuário.)*
-2. **Trocar as senhas dos usuários que JÁ existem em produção.** O PR #12 fez as
+2. **Trocar as senhas dos usuários que JÁ existem em produção.**
+   ⚠️ **O contexto mudou (2026-08-01):** com a decisão de conformidade PNIB, o sistema passa
+   a ter valor legal e trilha de auditoria. Um sistema de rastreabilidade oficial rodando com
+   `admin/admin123` num app público é contradição — e a auditoria da Fase B registra *quem*
+   fez cada operação, o que perde sentido se a conta for compartilhada por senha padrão. O PR #12 fez as
    instalações **novas** usarem `AGROTOP_ADMIN_PASSWORD`/`AGROTOP_OP_PASSWORD` (ou senha
    aleatória), mas **não altera contas existentes** — e `_seed_users` só roda com a tabela
    `users` vazia. Ou seja: no app público, `admin` e `op1` continuam com as senhas antigas.

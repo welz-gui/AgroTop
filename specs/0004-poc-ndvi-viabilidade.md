@@ -1,7 +1,10 @@
 # Spec 0004 — PoC: NDVI é viável para os piquetes desta fazenda?
 
 - **Tipo:** pesquisa (PoC) · **Risco:** baixo · **Esforço:** 2–3 dias
-- **Branch:** `poc/ndvi-viabilidade`
+- ⚠️ **Segunda tentativa.** A primeira ([PR #33](https://github.com/welz-gui/AgroTop/pull/33))
+  entregou o levantamento de nuvem, que é válido e está mesclado, mas **não fechou a
+  pergunta**. Leia "O que a primeira tentativa deixou pendente" antes de começar.
+- **Branch:** `poc/ndvi-viabilidade-v2` (o da 1ª tentativa foi mesclado e apagado)
 - **Trabalhe apenas em:** `poc/ndvi/` (pasta nova). Nada fora dela.
 
 ---
@@ -24,6 +27,39 @@ não tiver imagem limpa, o módulo entrega pouco justamente quando o pasto muda 
 Se a resposta for "só há imagem útil de maio a setembro", isso não mata o módulo — mas muda
 completamente o que se pode prometer ao usuário, e precisa estar decidido **antes** de
 escrever código de produção.
+
+## O que a primeira tentativa deixou pendente
+
+O código está em `poc/ndvi/` na `main`. **Aproveite o que funciona** — a busca STAC no
+`earth-search.aws.element84.com` traz cenas reais e não exige chave. Dois problemas:
+
+### 1. O "maior vão" está errado
+
+A primeira tentativa reportou **12 dias para os três limiares** (10 %, 20 % e 40 %). Isso é
+aritmeticamente implausível: apertar o limiar derruba cenas (32 → 27) e tem de **alargar** o
+vão, nunca mantê-lo igual. E o próprio levantamento mostra **dezembro com 90,2 % de nuvem
+média** — nesse mês, no limiar de 10 %, praticamente não sobra cena, o que produziria vão de
+~30 dias.
+
+Causas prováveis em `largest_gap()`:
+- mede só o intervalo **entre cenas filtradas**, ignorando o trecho do início do período até
+  a primeira cena e da última até o fim;
+- possivelmente recebe a série não filtrada.
+
+**Corrija e explique no relatório** por que o número mudou.
+
+### 2. O NDVI não foi calculado
+
+`compute_ndvi_mean()` existe no código mas **nunca foi executado** — o README admite ("se as
+bandas forem adicionadas numa etapa futura"). Logo:
+
+- a **pergunta 5** (a série mostra variação que um pecuarista reconheceria?) segue sem resposta;
+- o arquivo `ndvi_timeseries.png` **não contém série de NDVI**, apesar do nome.
+
+Calcular NDVI exige ler as bandas B04/B08 dos COGs remotos e recortar pelo polígono — é mais
+pesado que buscar metadados. **Se não conseguir executar, diga isso claramente** em vez de
+entregar um artefato com nome que promete mais do que contém. Foi essa lacuna entre o nome
+do arquivo e o conteúdo que reprovou a primeira entrega.
 
 ## O que fazer
 

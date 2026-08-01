@@ -23,9 +23,9 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | — | ✅ [#20](https://github.com/welz-gui/AgroTop/pull/20) | | 2026-07-31 |
 | — | [0002](0002-pwa-instalavel.md) — PWA instalável | — | ✅ [#31](https://github.com/welz-gui/AgroTop/pull/31) | | 2026-07-31 |
 | — | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | — | ✅ [#29](https://github.com/welz-gui/AgroTop/pull/29) | | 2026-07-31 |
-| 1 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT | `poc/ndvi-viabilidade` | 🟢 livre | — | — |
-| 2 | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | `poc/dados-modelos` | 🟢 livre | — | — |
-| 3 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
+| 1 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT (2ª tentativa) | `poc/ndvi-viabilidade-v2` | 🟢 livre | — | — |
+| — | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | — | ✅ [#35](https://github.com/welz-gui/AgroTop/pull/35) | | 2026-08-01 |
+| 2 | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | `poc/flutter-api` | 🟢 livre | — | — |
 
 🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
 demais = PoC ou manutenção.
@@ -49,7 +49,7 @@ paralelo à migração:
 Assim o agente entrega a regra testada enquanto o mantenedor faz a migração — e a
 integração depois é ligar função pronta.
 
-**Concluídas em 2026-07-31:** 0001, 0009, 0010, 0008, 0003, **0012, 0013 e 0014** — **145
+**Concluídas:** 0001, 0009, 0010, 0008, 0003, **0012, 0013 e 0014** — **145
 testes** na suíte. As três últimas são a fundação regulatória pura da Fase B.
 
 **Fase A concluída** (PR #24): `database.py` 2.224 → 1.604 linhas, com `repositories/`
@@ -73,6 +73,28 @@ mantenedor (R31).
 **Como as tarefas de implementação avançam trilha sem colidir com a Fase A:** elas entregam
 **função pura em módulo novo** de `services/`, com contrato fixado na spec. O mantenedor liga
 à interface e ao banco depois. Nenhum arquivo existente é tocado.
+
+### ⚠️ Resultado do NDVI (spec 0004, PR #33) — **não é decisão-grade ainda**
+
+A PoC entregou dado real e valioso: 56 cenas Sentinel-2 em 12 meses, com **nuvem média de
+90,2 % em dezembro** e 60–66 % de outubro a novembro. Isso já basta para concluir que a
+estação chuvosa inviabiliza monitoramento contínuo em MT.
+
+**Mas dois pontos impedem usar o número principal:**
+
+1. **"Maior vão de 12 dias" é inconsistente com os próprios dados.** O valor saiu idêntico
+   para os limiares de 10 %, 20 % e 40 %, o que não faz sentido — apertar o limiar derruba
+   cenas (32 → 27) e deveria alargar o vão. Com dezembro a 90 % de nuvem, o mês praticamente
+   desaparece no limiar de 10 %, o que produziria vão de ~30 dias, não 12.
+   `largest_gap()` também ignora o intervalo entre o início do período e a primeira cena, e
+   entre a última e o fim.
+2. **O NDVI não foi calculado.** `compute_ndvi_mean()` existe no código mas não foi
+   executado — o próprio README diz "se as bandas forem adicionadas numa etapa futura".
+   Logo, a pergunta 5 da spec (a série mostra variação que um pecuarista reconheceria?)
+   segue **sem resposta**, e o arquivo `ndvi_timeseries.png` não contém série de NDVI.
+
+**Antes de decidir sobre o módulo de satélite:** corrigir `largest_gap` e rodar o cálculo de
+NDVI de fato. O mérito da PoC — mostrar que nuvem é o gargalo, não resolução — está de pé.
 
 ### ⚠️ Pendência do PWA (spec 0002, PR #31)
 
