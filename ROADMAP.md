@@ -135,6 +135,11 @@ Escolher pelo significado (`sucesso`, `atencao`, `perigo`), não pela aparência
 sem exceção. **O tema é escolha do usuário (escuro/claro), no web e no mobile**, o que torna
 a extração pré-requisito: hex literal não responde à troca de tema.
 
+⚠️ **Exceção — ativos estáticos.** Arquivos que não executam Python (`manifest.json`,
+`favicon`, ícones) **não conseguem** importar a paleta, então repetem o valor. É duplicação
+inevitável, mas precisa ser **declarada**: ao alterar `primaria` ou `fundo` em
+`ui/tema.py`, atualize também `static/manifest.json`. *(Surgiu no PR #31, o PWA.)*
+
 **R21. Informação nunca depende só de cor.** Sempre com ícone ou texto. No sol, com tela
 suja ou para quem tem daltonismo, cor sozinha não comunica.
 
