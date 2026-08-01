@@ -23,9 +23,18 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0003](0003-poc-mapa-piquetes.md) — PoC biblioteca de mapa | — | ✅ [#20](https://github.com/welz-gui/AgroTop/pull/20) | | 2026-07-31 |
 | — | [0002](0002-pwa-instalavel.md) — PWA instalável | — | ✅ [#31](https://github.com/welz-gui/AgroTop/pull/31) | | 2026-07-31 |
 | — | [0011](0011-motor-de-regras.md) — motor de regras 🏗️ | — | ✅ [#29](https://github.com/welz-gui/AgroTop/pull/29) | | 2026-07-31 |
-| 1 | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT (2ª tentativa) | `poc/ndvi-viabilidade-v2` | 🟢 livre | — | — |
+| — | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT (2ª tentativa) | — | ✅ [#43](https://github.com/welz-gui/AgroTop/pull/43) ⚠️ | | 2026-08-01 |
 | — | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | — | ✅ [#35](https://github.com/welz-gui/AgroTop/pull/35) | | 2026-08-01 |
 | — | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | — | ✅ [#40](https://github.com/welz-gui/AgroTop/pull/40) | | 2026-08-01 |
+| 1 | [0015](0015-geometria-piquetes.md) — área do piquete pelo polígono 🏗️ | `feat/geometria-piquetes` | 🟢 livre | — | — |
+| 2 | [0016](0016-indicador-completude-dados.md) — indicador de completude 🏗️ | `feat/completude-dados` | 🟢 livre | — | — |
+| 3 | [0017](0017-lucro-por-raca.md) — lucro por raça e cruzamento 🏗️ | `feat/lucro-por-raca` | 🟢 livre | — | — |
+
+⚠️ **A 0004 foi entregue, mas o PR #43 foi fechado sem merge** — o conteúdo já estava na
+`main`, carregado por engano dentro do [#44](https://github.com/welz-gui/AgroTop/pull/44).
+O agente trabalhou no checkout do mantenedor em vez de um worktree, e o mantenedor não
+rodou `git diff --stat origin/main` antes de abrir o próprio PR. **A autoria de
+`poc/ndvi/` no commit `e980367` é do agente da 0004.**
 
 🇧🇷 = **fundação regulatória PNIB** (Fase B) · 🏗️ = avança trilha do roadmap ·
 demais = PoC ou manutenção.
@@ -49,15 +58,28 @@ paralelo à migração:
 Assim o agente entrega a regra testada enquanto o mantenedor faz a migração — e a
 integração depois é ligar função pronta.
 
-**Concluídas:** 0001, 0009, 0010, 0008, 0003, **0012, 0013 e 0014** — **145
-testes** na suíte. As três últimas são a fundação regulatória pura da Fase B.
+**Concluídas:** 0001 a 0006 e 0008 a 0014 — **198 testes** na suíte. Só a 0007 segue de
+fora, bloqueada.
 
 **Fase A concluída** (PR #24): `database.py` 2.224 → 1.604 linhas, com `repositories/`
-(5 módulos), `services/` (10) e `ui/`.
+(5 módulos), `services/` (11) e `ui/`.
+
+### Integração das funções entregues — situação em 2026-08-01
+
+Ligar à interface é do mantenedor (R31). Estado atual:
+
+| Função | Situação |
+|---|---|
+| `services/qualidade.py` | ✅ ligada (pesagem no campo e prévia da importação) |
+| `services/estoque.py` | ✅ ligada |
+| `services/estados_animal.py` | ✅ ligada em `update_animal_status` ([#44](https://github.com/welz-gui/AgroTop/pull/44)) |
+| `services/importacao.py` | ✅ ligada (aba "Importar CSV" no Modo Campo) |
+| `services/identificadores.py` | ⏳ **não ligada** — depende da interface de troca de brinco |
+| `services/validacao_regulatoria.py` | ⏳ **não ligada** |
+| `services/recomendacoes.py` | ⏳ **não ligada** — motor de regras sem tela |
+
 A PoC 0003 recomendou **`streamlit-folium` + `shapely` + `pyproj`**, com ressalva de
-usabilidade de toque no celular — isso destrava a Trilha 2 (geometria dos piquetes). As duas funções novas (`services/qualidade.py` e `services/estoque.py`) estão
-entregues e testadas, mas **ainda não ligadas à interface**: isso é integração, e cabe ao
-mantenedor (R31).
+usabilidade de toque no celular — é o que a **spec 0015** começa a destravar.
 
 **Estados:** 🟢 livre · 🟡 em andamento · ✅ concluída (link do PR) · 🔴 bloqueada
 
@@ -74,27 +96,34 @@ mantenedor (R31).
 **função pura em módulo novo** de `services/`, com contrato fixado na spec. O mantenedor liga
 à interface e ao banco depois. Nenhum arquivo existente é tocado.
 
-### ⚠️ Resultado do NDVI (spec 0004, PR #33) — **não é decisão-grade ainda**
+### ✅ Resultado do NDVI (spec 0004, 2ª tentativa) — **agora é decisão-grade**
 
-A PoC entregou dado real e valioso: 56 cenas Sentinel-2 em 12 meses, com **nuvem média de
-90,2 % em dezembro** e 60–66 % de outubro a novembro. Isso já basta para concluir que a
-estação chuvosa inviabiliza monitoramento contínuo em MT.
+**Seguir com ressalvas.** Em MT há imagem utilizável a cada ~5 dias na seca e a cada 53 na
+chuva; **o maior vão é de 105 dias** no limiar de 20 % (205 dias no de 10 %).
 
-**Mas dois pontos impedem usar o número principal:**
+Os dois defeitos da 1ª tentativa foram corrigidos, e os números foram **conferidos por
+recálculo independente a partir dos CSVs commitados** — batem em todas as casas decimais:
 
-1. **"Maior vão de 12 dias" é inconsistente com os próprios dados.** O valor saiu idêntico
-   para os limiares de 10 %, 20 % e 40 %, o que não faz sentido — apertar o limiar derruba
-   cenas (32 → 27) e deveria alargar o vão. Com dezembro a 90 % de nuvem, o mês praticamente
-   desaparece no limiar de 10 %, o que produziria vão de ~30 dias, não 12.
-   `largest_gap()` também ignora o intervalo entre o início do período e a primeira cena, e
-   entre a última e o fim.
-2. **O NDVI não foi calculado.** `compute_ndvi_mean()` existe no código mas não foi
-   executado — o próprio README diz "se as bandas forem adicionadas numa etapa futura".
-   Logo, a pergunta 5 da spec (a série mostra variação que um pecuarista reconheceria?)
-   segue **sem resposta**, e o arquivo `ndvi_timeseries.png` não contém série de NDVI.
+| | 10 % | 20 % | 40 % |
+|---|---:|---:|---:|
+| Cenas utilizáveis (de 99) | 30 | 36 | 46 |
+| Maior vão | 205 d | 105 d | 95 d |
 
-**Antes de decidir sobre o módulo de satélite:** corrigir `largest_gap` e rodar o cálculo de
-NDVI de fato. O mérito da PoC — mostrar que nuvem é o gargalo, não resolução — está de pé.
+O vão agora **responde ao limiar** (205 ≥ 105 ≥ 95). A causa do "12 dias para os três":
+a função media só o intervalo *entre* cenas e ignorava as bordas do período.
+
+**O NDVI foi calculado de verdade** — B04/B08 dos COGs, recorte pelo polígono, máscara SCL
+descartando nuvem, cirrus, sombra e neve. Amplitude de **0,3535 a 0,8055**, com queda
+coerente ao longo de agosto–setembro. É sinal, não ruído.
+
+**Achado que ninguém tinha visto:** a 1ª tentativa usava o Earth Search **v0, depreciado**,
+que devolvia 56 cenas parando em dezembro/2025 apesar do período pedido ir até abril/2026.
+Boa parte da inconsistência original vinha da **fonte**, não do cálculo.
+
+**Efeito no plano:** satélite é ferramenta de **seca (mai–set)**, não monitoramento
+contínuo. Novembro, dezembro, fevereiro e março não tiveram nenhuma cena utilizável — e é
+justamente quando a chuva acelera a mudança do pasto. NDVI segue **não equivalendo** a
+matéria seca sem calibração de campo.
 
 ### ✅ Resultado do Flutter + API (spec 0005, PR #40)
 
@@ -130,7 +159,17 @@ verificar que a sessão persiste. Um PWA instalado tem contexto de armazenamento
 
 | Spec | Motivo |
 |---|---|
-| 0007 — substituir os 198 hex por tokens de `ui/tema.py` | 🔴 **Bloqueada.** São 198 substituições em `app.py` (3.280 linhas) sem nenhum teste de UI; a verificação é visual, tela por tela. Não delegue enquanto não houver como provar que a aparência não mudou. |
+| 0007 — substituir os 198 hex por tokens de `ui/tema.py` | 🔴 **Continua bloqueada, mas o motivo mudou.** |
+
+**Sobre a 0007:** o [#44](https://github.com/welz-gui/AgroTop/pull/44) introduziu
+`streamlit.testing.v1.AppTest` (ver `tests/ui_estados_prova.py`), então **já existe** como
+executar o app em teste. Isso não basta: o `AppTest` prova que um widget existe e qual é o
+seu estado, **não qual cor ele tem**. As 198 substituições continuam verificáveis só a
+olho, tela por tela.
+
+**O que destravaria de verdade:** um teste que renderize as telas e compare com imagem de
+referência (golden), ou uma extração dos hex de `app.py` comparada token a token com
+`ui/tema.py`. A segunda é bem mais barata e pode virar spec — mas ainda não foi escrita.
 
 ---
 

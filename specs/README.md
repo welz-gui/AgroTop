@@ -28,6 +28,9 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0012](0012-maquina-estados-animal.md) | 🇧🇷 Máquina de estados do animal (PNIB §4.4) | implementação | baixo | 🟢 disponível |
 | [0013](0013-validacoes-consistencia-regulatoria.md) | 🇧🇷 Validações de consistência (PNIB §17.3) | implementação | baixo | 🟢 disponível |
 | [0014](0014-validador-identificadores.md) | 🇧🇷 Validador de identificadores (PNIB §4.2) | implementação | baixo | 🟢 disponível |
+| [0015](0015-geometria-piquetes.md) | Área e centroide do piquete pelo polígono | implementação | baixo | 🟢 disponível |
+| [0016](0016-indicador-completude-dados.md) | Indicador de completude de dados | implementação | baixo | 🟢 disponível |
+| [0017](0017-lucro-por-raca.md) | Lucro por raça e cruzamento | implementação | baixo | 🟢 disponível |
 | 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada |
 
 **0007 está bloqueada de propósito:** são 198 substituições em `app.py` (3.280 linhas) sem

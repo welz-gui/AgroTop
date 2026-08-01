@@ -291,11 +291,23 @@ passar tempo demais sem entregar nada visível.
 
 **Regra prática:** depois de B1, entregar **uma coisa visível** antes de seguir para B2.
 
+**Cumprida em 2026-08-01** ([#44](https://github.com/welz-gui/AgroTop/pull/44)): importação
+de pesagens por CSV e máquina de estados chegaram à interface. Eram funções puras entregues
+por agentes que estavam prontas e ligadas a nada — o sintoma exato do modo fundação.
+**Três ainda estão nessa situação:** `identificadores`, `validacao_regulatoria` e
+`recomendacoes` (ver `specs/QUADRO.md`).
+
+**Efeito colateral que vale registrar:** o teste de interface criado para provar a máquina
+de estados foi a **primeira coisa a importar `app.py` num teste** — e achou na hora um
+defeito que tornava o app inimportável em Python ≤ 3.13 (`Optional` usado sem import,
+mascarado pela PEP 649 no 3.14). Nenhum dos 197 testes anteriores tocava `app.py`.
+
 ### O que as PoCs mudaram
 
 | Achado | Efeito no plano |
 |---|---|
-| **NDVI é sazonal em MT** — dez com 90,2 % de nuvem, out/nov 60–66 % | Satélite vira ferramenta de **seca (mai–set)**, não monitoramento contínuo. **10b rebaixado**; 10a (geometria) **não** é afetada e se paga sozinha pela área calculada |
+| **NDVI é sazonal em MT** — 2ª tentativa: **maior vão de 105 dias** a 20 % de nuvem, 205 a 10 % | Satélite vira ferramenta de **seca (mai–set)**, não monitoramento contínuo. **10b rebaixado**; 10a (geometria) **não** é afetada e se paga sozinha pela área calculada |
+| **O NDVI tem sinal real** — amplitude 0,3535–0,8055 com queda coerente em ago–set | Vale construir o módulo **para tendência e conferência periódica**; não prometer alerta rápido na chuva. Segue **não equivalendo** a matéria seca sem calibração de campo |
 | **Modelos batem a linha de base com 3 meses**; 12 meses para piloto sazonal | Corrige minha estimativa anterior de "2–3 anos". Mas o gate real **não é tempo, é a Trilha 3** — as features de custo e nutrição vêm dela |
 | **`streamlit-folium` + `shapely` + `pyproj`** recomendados | Trilha 2 destravada tecnicamente |
 | `services/` e `repositories/` existem | **A API da Trilha 1 está destravada** — é casca fina sobre o que já há |
