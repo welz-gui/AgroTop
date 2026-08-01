@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-07-31 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-01 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.
@@ -87,8 +87,9 @@ CREATE TABLE IF NOT EXISTS animals (
     created_at timestamp with time zone DEFAULT now(),
     purchase_mode text DEFAULT 'cabeca'::text,
     purchase_lot_ref text,
-    uuid text,
-    CONSTRAINT animals_pkey PRIMARY KEY (id)
+    uuid text NOT NULL,
+    CONSTRAINT animals_pkey PRIMARY KEY (id),
+    CONSTRAINT animals_uuid_key UNIQUE (uuid)
 );
 
 CREATE TABLE IF NOT EXISTS category_prices (
@@ -318,19 +319,27 @@ CREATE TABLE IF NOT EXISTS weighings (
 -- Chaves estrangeiras aplicadas ao final: assim a ordem de
 -- criação das tabelas acima não importa.
 ALTER TABLE animal_costs ADD CONSTRAINT animal_costs_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animal_costs ADD CONSTRAINT fk_animal_costs_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animal_movements ADD CONSTRAINT animal_movements_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animal_photos ADD CONSTRAINT animal_photos_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
 ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
 ALTER TABLE deaths ADD CONSTRAINT deaths_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
 ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE medications ADD CONSTRAINT medications_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE sales ADD CONSTRAINT fk_sales_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE sales ADD CONSTRAINT sales_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
+ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE weighings ADD CONSTRAINT weighings_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 
 -- Índices (fora das constraints)
@@ -340,7 +349,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers US
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_id);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_animals_uuid ON animals USING btree (uuid);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
