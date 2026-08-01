@@ -174,8 +174,7 @@ def init_db() -> None:
             -- Pesagens
             CREATE TABLE IF NOT EXISTS weighings (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id   TEXT NOT NULL,
-                animal_uuid   TEXT,
+                animal_uuid   TEXT NOT NULL,
                 weight      REAL NOT NULL,
                 weigh_date  TEXT NOT NULL,
                 lote_id     TEXT,
@@ -183,7 +182,6 @@ def init_db() -> None:
                 method      TEXT DEFAULT 'pesado',
                 notes       TEXT,
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -204,8 +202,7 @@ def init_db() -> None:
             -- Medicamentos / Vacinas aplicados
             CREATE TABLE IF NOT EXISTS medications (
                 id                INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id         TEXT NOT NULL,
-                animal_uuid         TEXT,
+                animal_uuid         TEXT NOT NULL,
                 medication_name   TEXT NOT NULL,
                 dose              REAL DEFAULT 0,
                 unit              TEXT DEFAULT 'ml',
@@ -217,7 +214,6 @@ def init_db() -> None:
                 notes             TEXT,
                 protocol_id       INTEGER,
                 created_at        TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
@@ -225,8 +221,7 @@ def init_db() -> None:
             -- Movimentações entre lotes
             CREATE TABLE IF NOT EXISTS animal_movements (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id     TEXT NOT NULL,
-                animal_uuid     TEXT,
+                animal_uuid     TEXT NOT NULL,
                 from_lote_id  TEXT,
                 to_lote_id    TEXT NOT NULL,
                 movement_date TEXT NOT NULL,
@@ -234,7 +229,6 @@ def init_db() -> None:
                 operator      TEXT,
                 notes         TEXT,
                 created_at    TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -245,8 +239,7 @@ def init_db() -> None:
                 type             TEXT NOT NULL,
                 quantity         REAL NOT NULL,
                 reason           TEXT,
-                animal_id        TEXT,
-                animal_uuid        TEXT,
+                animal_uuid        TEXT,   -- anulável: nem toda saída de estoque é de um animal
                 transaction_date TEXT NOT NULL,
                 operator         TEXT,
                 notes            TEXT,
@@ -259,15 +252,13 @@ def init_db() -> None:
             -- Custos por animal
             CREATE TABLE IF NOT EXISTS animal_costs (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id   TEXT NOT NULL,
-                animal_uuid   TEXT,
+                animal_uuid   TEXT NOT NULL,
                 cost_type   TEXT NOT NULL DEFAULT 'operacional',
                 description TEXT,
                 amount      REAL NOT NULL,
                 cost_date   TEXT NOT NULL,
                 notes       TEXT,
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -328,8 +319,7 @@ def init_db() -> None:
             -- Vendas (1 linha por animal; lote agrupado por lot_ref)
             CREATE TABLE IF NOT EXISTS sales (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id    TEXT NOT NULL,
-                animal_uuid    TEXT,
+                animal_uuid    TEXT NOT NULL,
                 sale_date    TEXT NOT NULL,
                 sale_type    TEXT NOT NULL DEFAULT 'abate',
                 pricing_mode TEXT NOT NULL DEFAULT 'kg',
@@ -343,15 +333,13 @@ def init_db() -> None:
                 operator     TEXT,
                 notes        TEXT,
                 created_at   TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
             -- Óbitos (mortalidade) com causa
             CREATE TABLE IF NOT EXISTS deaths (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id       TEXT NOT NULL,
-                animal_uuid       TEXT,
+                animal_uuid       TEXT NOT NULL,
                 death_date      TEXT NOT NULL,
                 cause           TEXT NOT NULL DEFAULT 'Desconhecida',
                 lote_id         TEXT,
@@ -360,7 +348,6 @@ def init_db() -> None:
                 operator        TEXT,
                 notes           TEXT,
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -384,14 +371,12 @@ def init_db() -> None:
             -- Fotos dos animais (imagem comprimida, com histórico)
             CREATE TABLE IF NOT EXISTS animal_photos (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                animal_id  TEXT NOT NULL,
-                animal_uuid  TEXT,
+                animal_uuid  TEXT NOT NULL,
                 image      BLOB NOT NULL,
                 mime       TEXT DEFAULT 'image/jpeg',
                 taken_date TEXT NOT NULL,
                 operator   TEXT,
                 created_at TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (animal_id) REFERENCES animals(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -415,13 +400,13 @@ def init_db() -> None:
             );
 
             -- Índices para performance (volume futuro)
-            CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings (animal_id, weigh_date DESC);
-            CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications (animal_id);
+            CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings (animal_uuid, weigh_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications (animal_uuid);
             CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications (protocol_id);
-            CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs (animal_id);
+            CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs (animal_uuid);
             CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions (lote_id);
             CREATE INDEX IF NOT EXISTS idx_animals_status ON animals (status);
-            CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos (animal_id);
+            CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos (animal_uuid);
 
             -- Sessões de login persistente (cookie). Definida aqui, e só aqui:
             -- antes era criada sob demanda dentro de create_session/get_session_user/
@@ -526,15 +511,19 @@ def _backfill_uuids(con) -> int:
 
 
 def _backfill_animal_uuid(con) -> int:
-    """Espelha `animals.uuid` nas 8 tabelas filhas (ADR 0004, etapa B1.2).
+    """Espelha `animals.uuid` nas filhas que AINDA tenham `animal_id` (etapa B1.2).
 
-    Idempotente: só preenche linhas com `animal_uuid` nulo. Enquanto as FKs
-    ainda apontam para `animal_id`, as duas colunas convivem — é o que torna
-    esta etapa reversível.
+    Só faz sentido em banco que ainda não passou pela etapa B1.6: a partir dela
+    `animal_id` não existe mais, e não há de onde derivar o uuid. Por isso o
+    `PRAGMA` antes — a função vira no-op num banco já migrado, em vez de
+    estourar. Mantida porque bancos antigos ainda chegam aqui pelo `_migrate`.
     """
     total = 0
     for t in ("weighings", "medications", "animal_costs", "animal_movements",
               "animal_photos", "deaths", "sales", "insumo_transactions"):
+        cols = {r["name"] for r in con.execute(f"PRAGMA table_info({t})").fetchall()}
+        if "animal_id" not in cols:
+            continue
         cur = con.execute(
             f"UPDATE {t} SET animal_uuid = ("
             f"  SELECT a.uuid FROM animals a WHERE a.id = {t}.animal_id"
@@ -1403,7 +1392,9 @@ def get_fornecedor_ranking() -> list[dict]:
     """
     animals = get_all_animals(status=None)  # todos os status
     with _conn() as con:
-        drows = con.execute("SELECT animal_id, weight_at_death FROM deaths").fetchall()
+        drows = con.execute(
+            "SELECT a.id AS animal_id, d.weight_at_death FROM deaths d "
+            "JOIN animals a ON a.uuid=d.animal_uuid").fetchall()
     death_w = {r["animal_id"]: r["weight_at_death"] for r in drows}
 
     agg: dict[str, dict] = {}
@@ -1725,10 +1716,13 @@ def add_photo(animal_id: str, image_bytes: bytes, mime: str = "image/jpeg",
               taken_date: Optional[str] = None, operator: str = "") -> None:
     taken_date = taken_date or date.today().isoformat()
     with _conn() as con:
+        _uuid_foto = uuid_de(con, animal_id)
+        if _uuid_foto is None:
+            raise ValueError(f"Animal {animal_id} não encontrado.")
         img = _conexao.psycopg2.Binary(image_bytes) if _conexao.USE_PG else image_bytes
         con.execute(
-            "INSERT INTO animal_photos (animal_id,animal_uuid,image,mime,taken_date,operator) VALUES(?,?,?,?,?,?)",
-            (animal_id, uuid_de(con, animal_id), img, mime, taken_date, operator),
+            "INSERT INTO animal_photos (animal_uuid,image,mime,taken_date,operator) VALUES(?,?,?,?,?)",
+            (_uuid_foto, img, mime, taken_date, operator),
         )
 
 
@@ -1736,8 +1730,9 @@ def get_photos(animal_id: str) -> list[dict]:
     """Metadados das fotos (sem os bytes da imagem)."""
     with _conn() as con:
         rows = con.execute(
-            "SELECT id,taken_date,operator,mime FROM animal_photos "
-            "WHERE animal_id=? ORDER BY taken_date DESC, id DESC",
+            "SELECT p.id,p.taken_date,p.operator,p.mime FROM animal_photos p "
+            "JOIN animals a ON a.uuid=p.animal_uuid "
+            "WHERE a.id=? ORDER BY p.taken_date DESC, p.id DESC",
             (animal_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -1755,8 +1750,9 @@ def get_photo_image(photo_id: int):
 def get_latest_photo(animal_id: str):
     with _conn() as con:
         row = con.execute(
-            "SELECT image, mime FROM animal_photos WHERE animal_id=? "
-            "ORDER BY taken_date DESC, id DESC LIMIT 1", (animal_id,)
+            "SELECT p.image, p.mime FROM animal_photos p "
+            "JOIN animals a ON a.uuid=p.animal_uuid WHERE a.id=? "
+            "ORDER BY p.taken_date DESC, p.id DESC LIMIT 1", (animal_id,)
         ).fetchone()
     if not row:
         return None
@@ -1765,7 +1761,8 @@ def get_latest_photo(animal_id: str):
 
 def count_photos(animal_id: str) -> int:
     with _conn() as con:
-        row = con.execute("SELECT COUNT(*) c FROM animal_photos WHERE animal_id=?",
+        row = con.execute("SELECT COUNT(*) c FROM animal_photos p "
+                          "JOIN animals a ON a.uuid=p.animal_uuid WHERE a.id=?",
                           (animal_id,)).fetchone()
     return int(row["c"])
 

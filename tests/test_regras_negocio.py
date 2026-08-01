@@ -71,24 +71,34 @@ class BaseRegras(unittest.TestCase):
 
     def animal(self, aid="A1", *, peso=400.0, entrada=None, peso_entrada=300.0,
                nascimento=None, sexo="M", alvo=None, lote=None, status="ativo"):
+        # O uuid é obrigatório desde a etapa B1.6: as filhas só se ligam por ele.
         self._sql(
-            "INSERT INTO animals (id,breed,sex,birth_date,entry_date,entry_weight,"
-            "current_weight,target_weight,status,lote_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            (aid, "Nelore", sexo, nascimento, entrada or _dias_atras(100),
+            "INSERT INTO animals (id,uuid,breed,sex,birth_date,entry_date,entry_weight,"
+            "current_weight,target_weight,status,lote_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (aid, f"uuid-{aid}", "Nelore", sexo, nascimento,
+             entrada or _dias_atras(100),
              peso_entrada, peso, alvo, status, lote))
         return aid
 
+    def _uuid(self, aid):
+        con = sqlite3.connect(db.DB_PATH)
+        try:
+            r = con.execute("SELECT uuid FROM animals WHERE id=?", (aid,)).fetchone()
+        finally:
+            con.close()
+        return r[0]
+
     def pesagem(self, aid, peso, data):
-        self._sql("INSERT INTO weighings (animal_id,weight,weigh_date) VALUES(?,?,?)",
-                  (aid, peso, data))
+        self._sql("INSERT INTO weighings (animal_uuid,weight,weigh_date) VALUES(?,?,?)",
+                  (self._uuid(aid), peso, data))
 
     def custo(self, aid, valor, tipo="operacional"):
-        self._sql("INSERT INTO animal_costs (animal_id,cost_type,amount,cost_date) "
-                  "VALUES(?,?,?,?)", (aid, tipo, valor, HOJE.isoformat()))
+        self._sql("INSERT INTO animal_costs (animal_uuid,cost_type,amount,cost_date) "
+                  "VALUES(?,?,?,?)", (self._uuid(aid), tipo, valor, HOJE.isoformat()))
 
     def medicacao(self, aid, med_date, carencia):
-        self._sql("INSERT INTO medications (animal_id,medication_name,med_date,"
-                  "withdrawal_days) VALUES(?,?,?,?)", (aid, "Ivermectina",
+        self._sql("INSERT INTO medications (animal_uuid,medication_name,med_date,"
+                  "withdrawal_days) VALUES(?,?,?,?)", (self._uuid(aid), "Ivermectina",
                                                        med_date, carencia))
 
 

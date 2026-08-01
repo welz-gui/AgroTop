@@ -87,21 +87,21 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
              purchase_mode, lote_id or None, fornecedor_id or None, notes),
         )
         con.execute(
-            "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?,?)",
-            (animal_id, _uuid_novo, entry_weight, entry_date, lote_id or None,
+            "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
+            (_uuid_novo, entry_weight, entry_date, lote_id or None,
              "Cadastro", weight_method),
         )
         # Registra custo de compra apenas para animais adquiridos
         if age_source != "propriedade" and purchase_price and purchase_price > 0:
             con.execute(
-                "INSERT INTO animal_costs (animal_id,animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?,?)",
-                (animal_id, _uuid_novo, "compra", "Valor de compra", purchase_price,
+                "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
+                (_uuid_novo, "compra", "Valor de compra", purchase_price,
                  entry_date),
             )
         if lote_id:
             con.execute(
-                "INSERT INTO animal_movements (animal_id,animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?,?)",
-                (animal_id, _uuid_novo, None, lote_id, entry_date, "entrada", "Cadastro"),
+                "INSERT INTO animal_movements (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?)",
+                (_uuid_novo, None, lote_id, entry_date, "entrada", "Cadastro"),
             )
 
 
@@ -109,16 +109,18 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
 def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator="", notes="") -> None:
     with _conn() as con:
         row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
-        from_lote = row["lote_id"] if row else None
+        if row is None:
+            raise ValueError(f"Animal {animal_id} não encontrado.")
+        from_lote = row["lote_id"]
         con.execute(
             "UPDATE animals SET lote_id=? WHERE id=?", (to_lote_id, animal_id)
         )
         con.execute(
             """INSERT INTO animal_movements
-               (animal_id,animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
+               (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
                 operator,notes)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (animal_id, row["uuid"] if row else None, from_lote, to_lote_id,
+               VALUES(?,?,?,?,?,?,?)""",
+            (row["uuid"], from_lote, to_lote_id,
              movement_date, reason, operator, notes),
         )
         con.execute(
@@ -137,7 +139,8 @@ def get_movements(animal_id: str) -> list[dict]:
                FROM animal_movements m
                LEFT JOIN lotes l1 ON l1.id=m.from_lote_id
                LEFT JOIN lotes l2 ON l2.id=m.to_lote_id
-               WHERE m.animal_id=? ORDER BY m.movement_date DESC""",
+               JOIN animals a ON a.uuid=m.animal_uuid
+               WHERE a.id=? ORDER BY m.movement_date DESC""",
             (animal_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -176,14 +179,18 @@ def _seed_animals(con):
         if i == 13: status = "vendido"
         if i == 14: status = "morto"
 
+        # O uuid é gerado AQUI, e não deixado para o backfill: depois da etapa
+        # B1.6 as filhas só têm `animal_uuid`, então uma linha semeada sem uuid
+        # ficaria órfã sem nada de onde reconstruí-la.
+        a_uuid = novo_uuid()
         con.execute(
             """INSERT INTO animals
-               (id,breed,sex,birth_date,birth_estimated,age_source,entry_date,
+               (id,uuid,breed,sex,birth_date,birth_estimated,age_source,entry_date,
                 entry_weight,current_weight,target_weight,status,lote_id,
                 fornecedor_id,purchase_price)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (aid, breed, sex, birth_date, est, src, entry_date, e_weight, c_weight,
-             target_w, status, lote_id, forn_id, price),
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
+             c_weight, target_w, status, lote_id, forn_id, price),
         )
 
         # Pesagens: entrada, meio, recente
@@ -191,8 +198,8 @@ def _seed_animals(con):
             w_date   = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
             w_weight = round(e_weight + (c_weight - e_weight) * step, 1)
             con.execute(
-                "INSERT INTO weighings (animal_id,weight,weigh_date,lote_id,operator) VALUES(?,?,?,?,?)",
-                (aid, w_weight, w_date, lote_id, "Sistema"),
+                "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator) VALUES(?,?,?,?,?)",
+                (a_uuid, w_weight, w_date, lote_id, "Sistema"),
             )
 
         # Medicamentos (1-2 por animal)
@@ -208,28 +215,28 @@ def _seed_animals(con):
             md = (today - timedelta(days=random.randint(0, 60))).isoformat()
             con.execute(
                 """INSERT INTO medications
-                   (animal_id,medication_name,dose,unit,application_route,
+                   (animal_uuid,medication_name,dose,unit,application_route,
                     withdrawal_days,med_date,applied_by)
                    VALUES(?,?,?,?,?,?,?,?)""",
-                (aid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"),
+                (a_uuid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"),
             )
 
         # Custo de compra
         con.execute(
-            "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-            (aid, "compra", "Valor de compra", price, entry_date),
+            "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
+            (a_uuid, "compra", "Valor de compra", price, entry_date),
         )
         # Custo operacional
         op_cost = round(days_in * 0.85, 2)
         con.execute(
-            "INSERT INTO animal_costs (animal_id,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-            (aid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()),
+            "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
+            (a_uuid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()),
         )
 
         # Movimentação inicial para o lote
         con.execute(
             """INSERT INTO animal_movements
-               (animal_id,from_lote_id,to_lote_id,movement_date,reason,operator)
+               (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator)
                VALUES(?,?,?,?,?,?)""",
-            (aid, None, lote_id, entry_date, "entrada", "Sistema"),
+            (a_uuid, None, lote_id, entry_date, "entrada", "Sistema"),
         )

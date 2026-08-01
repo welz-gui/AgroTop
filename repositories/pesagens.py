@@ -16,10 +16,17 @@ from .conexao import _cache, _conn, _writes
 
 @_cache
 def _weighings_by_animal() -> dict:
-    """Todas as pesagens agrupadas por animal (mais recente primeiro). 1 consulta."""
+    """Todas as pesagens agrupadas por animal (mais recente primeiro). 1 consulta.
+
+    A ligação é por `animal_uuid` (ADR 0004, etapa B1.6), mas o dicionário
+    continua indexado pelo **brinco**: é o que a interface usa e o que os
+    chamadores esperam. O `JOIN` faz essa tradução numa consulta só.
+    """
     with _conn() as con:
         rows = con.execute(
-            "SELECT * FROM weighings ORDER BY weigh_date DESC, id DESC"
+            """SELECT w.*, a.id AS animal_id
+               FROM weighings w JOIN animals a ON a.uuid=w.animal_uuid
+               ORDER BY w.weigh_date DESC, w.id DESC"""
         ).fetchall()
     out: dict = {}
     for r in rows:
@@ -39,11 +46,11 @@ def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
         a = con.execute(
             "SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)
         ).fetchone()
-        lote_id = a["lote_id"] if a else None
+        if a is None:
+            raise ValueError(f"Animal {animal_id} não encontrado.")
         con.execute(
-            "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?,?)",
-            (animal_id, a["uuid"] if a else None, weight, weigh_date, lote_id,
-             operator, method, notes),
+            "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?)",
+            (a["uuid"], weight, weigh_date, a["lote_id"], operator, method, notes),
         )
         con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
 
@@ -51,8 +58,8 @@ def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
 def get_all_weighings() -> list[dict]:
     with _conn() as con:
         rows = con.execute(
-            """SELECT w.*, a.breed
-               FROM weighings w JOIN animals a ON a.id=w.animal_id
+            """SELECT w.*, a.id AS animal_id, a.breed
+               FROM weighings w JOIN animals a ON a.uuid=w.animal_uuid
                WHERE a.status='ativo' ORDER BY w.weigh_date""",
         ).fetchall()
     return [dict(r) for r in rows]

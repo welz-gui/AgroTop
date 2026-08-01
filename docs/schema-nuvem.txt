@@ -8,7 +8,6 @@
 # formato: uma linha por coluna, "tabela.coluna", na ordem ordinal.
 
 animal_costs.id
-animal_costs.animal_id
 animal_costs.cost_type
 animal_costs.description
 animal_costs.amount
@@ -27,7 +26,6 @@ animal_identifiers.motivo_remocao
 animal_identifiers.aplicado_por
 animal_identifiers.created_at
 animal_movements.id
-animal_movements.animal_id
 animal_movements.from_lote_id
 animal_movements.to_lote_id
 animal_movements.movement_date
@@ -37,7 +35,6 @@ animal_movements.notes
 animal_movements.created_at
 animal_movements.animal_uuid
 animal_photos.id
-animal_photos.animal_id
 animal_photos.image
 animal_photos.mime
 animal_photos.taken_date
@@ -73,7 +70,6 @@ category_prices.price_per_kg
 category_prices.price_per_head
 category_prices.updated_at
 deaths.id
-deaths.animal_id
 deaths.death_date
 deaths.cause
 deaths.lote_id
@@ -137,7 +133,6 @@ insumo_transactions.insumo_id
 insumo_transactions.type
 insumo_transactions.quantity
 insumo_transactions.reason
-insumo_transactions.animal_id
 insumo_transactions.transaction_date
 insumo_transactions.operator
 insumo_transactions.notes
@@ -164,7 +159,6 @@ lotes.last_exit_date
 lotes.notes
 lotes.created_at
 medications.id
-medications.animal_id
 medications.medication_name
 medications.dose
 medications.unit
@@ -185,7 +179,6 @@ pluviometria.operator
 pluviometria.notes
 pluviometria.created_at
 sales.id
-sales.animal_id
 sales.sale_date
 sales.sale_type
 sales.pricing_mode
@@ -211,7 +204,6 @@ users.password_hash
 users.name
 users.role
 weighings.id
-weighings.animal_id
 weighings.weight
 weighings.weigh_date
 weighings.lote_id
