@@ -291,5 +291,65 @@ class TestEscritaPreencheUuid(BaseSurrogate):
         self.assertEqual(pendentes, {}, f"escritas deixaram espelho pendente: {pendentes}")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+class TestIntegridadeReferencial(BaseSurrogate):
+    """Etapa B1.5 — as FKs passam a apontar para `animals(uuid)`.
+
+    Primeira etapa que **restringe** em vez de acrescentar. Só foi possível
+    porque a etapa 4 garantiu que toda escrita preenche o espelho: a restrição
+    encontra dado consistente.
+    """
+
+    TABELAS = ["weighings", "medications", "animal_costs", "animal_movements",
+               "animal_photos", "deaths", "sales", "insumo_transactions"]
+
+    def test_fk_declarada_nas_oito_tabelas(self):
+        for t in self.TABELAS:
+            with self.subTest(tabela=t):
+                fks = self._linhas(f"PRAGMA foreign_key_list({t})")
+                alvos = {(f["from"], f["table"], f["to"]) for f in fks}
+                self.assertIn(("animal_uuid", "animals", "uuid"), alvos,
+                              f"{t} sem FK de animal_uuid para animals(uuid)")
+
+    def test_uuid_inexistente_e_recusado(self):
+        """A restrição precisa BLOQUEAR de verdade, não só existir."""
+        con = sqlite3.connect(db.DB_PATH)
+        con.execute("PRAGMA foreign_keys=ON")
+        aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                con.execute(
+                    "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date) "
+                    "VALUES(?,?,?,?)", (aid, "uuid-que-nao-existe", 400.0, "2026-07-31"))
+                con.commit()
+        finally:
+            con.close()
+
+    def test_uuid_valido_e_aceito(self):
+        """O contraponto: a FK não pode bloquear dado correto."""
+        con = sqlite3.connect(db.DB_PATH)
+        con.execute("PRAGMA foreign_keys=ON")
+        a = self._linhas("SELECT id, uuid FROM animals LIMIT 1")[0]
+        try:
+            con.execute(
+                "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date) "
+                "VALUES(?,?,?,?)", (a["id"], a["uuid"], 405.0, "2026-07-31"))
+            con.commit()
+        finally:
+            con.close()
+        self.assertTrue(self._linhas(
+            "SELECT id FROM weighings WHERE animal_uuid=? AND weight=405.0", (a["uuid"],)))
+
+    def test_animals_uuid_e_unico_no_schema(self):
+        """A FK só é possível porque `uuid` é UNIQUE — sem isso, não há alvo."""
+        idx = self._linhas("PRAGMA index_list(animals)")
+        unicos = [i for i in idx if i["unique"]]
+        colunas = set()
+        for i in unicos:
+            for c in self._linhas(f"PRAGMA index_info({i['name']})"):
+                colunas.add(c["name"])
+        self.assertIn("uuid", colunas, "animals.uuid não é único — a FK não se sustenta")
+
+
 if __name__ == "__main__":
     unittest.main()
