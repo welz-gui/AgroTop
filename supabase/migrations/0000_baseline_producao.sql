@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-01 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-02 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.
@@ -22,6 +22,31 @@ CREATE TABLE IF NOT EXISTS animal_costs (
     created_at timestamp with time zone DEFAULT now(),
     animal_uuid text NOT NULL,
     CONSTRAINT animal_costs_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS animal_events (
+    id bigserial,
+    animal_uuid text NOT NULL,
+    tipo text NOT NULL,
+    ocorrido_em timestamp with time zone NOT NULL,
+    registrado_em timestamp with time zone DEFAULT now() NOT NULL,
+    propriedade_id text,
+    local_interno text,
+    responsavel text,
+    usuario_registro text,
+    origem_informacao text DEFAULT 'web'::text NOT NULL,
+    latitude double precision,
+    longitude double precision,
+    observacoes text,
+    documento text,
+    anexos jsonb,
+    status_sincronizacao text DEFAULT 'pendente'::text NOT NULL,
+    identificador_oficial text,
+    versao integer DEFAULT 1 NOT NULL,
+    evento_anterior_id bigint,
+    justificativa text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT animal_events_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS animal_identifiers (
@@ -87,6 +112,25 @@ CREATE TABLE IF NOT EXISTS animals (
     uuid text NOT NULL,
     CONSTRAINT animals_pkey PRIMARY KEY (id),
     CONSTRAINT animals_uuid_key UNIQUE (uuid)
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id bigserial,
+    usuario text,
+    ocorrido_em timestamp with time zone NOT NULL,
+    dispositivo text,
+    ip text,
+    acao text NOT NULL,
+    entidade text,
+    entidade_id text,
+    registro_anterior jsonb,
+    registro_posterior jsonb,
+    motivo text,
+    autorizacao text,
+    origem text DEFAULT 'web'::text NOT NULL,
+    protocolo_externo text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS category_prices (
@@ -311,6 +355,8 @@ CREATE TABLE IF NOT EXISTS weighings (
 -- Chaves estrangeiras aplicadas ao final: assim a ordem de
 -- criação das tabelas acima não importa.
 ALTER TABLE animal_costs ADD CONSTRAINT fk_animal_costs_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE animal_events ADD CONSTRAINT animal_events_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE animal_events ADD CONSTRAINT animal_events_evento_anterior_id_fkey FOREIGN KEY (evento_anterior_id) REFERENCES animal_events(id);
 ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
@@ -329,11 +375,16 @@ ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (anima
 
 -- Índices (fora das constraints)
 CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_eventos_animal ON animal_events USING btree (animal_uuid, ocorrido_em DESC);
+CREATE INDEX IF NOT EXISTS idx_eventos_sincronizacao ON animal_events USING btree (status_sincronizacao) WHERE (status_sincronizacao <> 'sincronizado'::text);
+CREATE INDEX IF NOT EXISTS idx_eventos_tipo ON animal_events USING btree (tipo, ocorrido_em DESC);
 CREATE INDEX IF NOT EXISTS idx_ident_animal ON animal_identifiers USING btree (animal_uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers USING btree (tipo, valor) WHERE (status = 'ativo'::text);
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_audit_entidade ON audit_logs USING btree (entidade, entidade_id);
+CREATE INDEX IF NOT EXISTS idx_audit_ocorrido ON audit_logs USING btree (ocorrido_em DESC);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);

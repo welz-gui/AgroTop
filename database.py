@@ -45,6 +45,7 @@ from services.importacao import parse_pesagens  # noqa: F401
 # `app.py` e os testes seguirem funcionando durante a transição. Código novo deve
 # importar do repositório diretamente. **Não adicione consulta nova aqui.**
 from repositories import identificadores as identificadores  # noqa: F401
+from repositories import eventos as eventos  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -435,6 +436,104 @@ def init_db() -> None:
                 ON animal_identifiers (tipo, valor) WHERE status = 'ativo';
             CREATE INDEX IF NOT EXISTS idx_ident_animal
                 ON animal_identifiers (animal_uuid);
+
+            -- ADR 0004 · etapa B2 — §6: histórico de eventos do animal.
+            -- APPEND-ONLY. Evento confirmado nunca é apagado nem sobrescrito;
+            -- correção gera um NOVO evento apontando para o anterior (§6.3).
+            -- Os gatilhos abaixo impõem isso — comentário não impõe nada.
+            --
+            -- Adoção incremental (ADR 0004): por ora os eventos são REGISTRADOS
+            -- junto das operações atuais. Derivar o estado do animal a partir
+            -- deles é passo posterior; fazer as duas coisas de uma vez seria
+            -- reescrever o sistema num salto.
+            CREATE TABLE IF NOT EXISTS animal_events (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_uuid         TEXT NOT NULL,
+                tipo                TEXT NOT NULL,
+                -- §6.2 separa QUANDO ACONTECEU de QUANDO FOI REGISTRADO: em
+                -- evento regulatório a diferença entre os dois é auditável.
+                -- Emenda à R5: aqui vai data/hora COM fuso, não data de negócio.
+                ocorrido_em         TEXT NOT NULL,
+                registrado_em       TEXT NOT NULL,
+                propriedade_id      TEXT,     -- chega na etapa B4
+                local_interno       TEXT,
+                responsavel         TEXT,
+                usuario_registro    TEXT,
+                origem_informacao   TEXT,     -- web | app | integracao | importacao
+                latitude            REAL,
+                longitude           REAL,
+                observacoes         TEXT,
+                documento           TEXT,
+                anexos              TEXT,     -- JSON; jsonb no Postgres
+                status_sincronizacao TEXT NOT NULL DEFAULT 'pendente',
+                identificador_oficial TEXT,   -- devolvido pelo sistema oficial
+                versao              INTEGER NOT NULL DEFAULT 1,
+                evento_anterior_id  INTEGER,  -- correção/estorno aponta para o original
+                justificativa       TEXT,
+                created_at          TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (animal_uuid)        REFERENCES animals(uuid),
+                FOREIGN KEY (evento_anterior_id) REFERENCES animal_events(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_eventos_animal
+                ON animal_events (animal_uuid, ocorrido_em DESC);
+            CREATE INDEX IF NOT EXISTS idx_eventos_tipo
+                ON animal_events (tipo, ocorrido_em DESC);
+            CREATE INDEX IF NOT EXISTS idx_eventos_sincronizacao
+                ON animal_events (status_sincronizacao)
+                WHERE status_sincronizacao <> 'sincronizado';
+
+            -- §6.3 na marra. Sem estes gatilhos, "append-only" é só uma frase.
+            CREATE TRIGGER IF NOT EXISTS trg_eventos_sem_update
+            BEFORE UPDATE ON animal_events
+            BEGIN
+                SELECT RAISE(ABORT,
+                    'animal_events e append-only (PNIB 6.3): gere um evento de correcao');
+            END;
+            CREATE TRIGGER IF NOT EXISTS trg_eventos_sem_delete
+            BEFORE DELETE ON animal_events
+            BEGIN
+                SELECT RAISE(ABORT,
+                    'animal_events e append-only (PNIB 6.3): evento nao se apaga');
+            END;
+
+            -- ADR 0004 · etapa B2 — §14.1: trilha de auditoria.
+            -- Responde "quem mudou o quê, quando, de onde e com que autorização".
+            -- É o destino definitivo da justificativa que hoje vai para
+            -- `animals.notes` nas transições sensíveis de status.
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario            TEXT,
+                ocorrido_em        TEXT NOT NULL,
+                dispositivo        TEXT,
+                ip                 TEXT,
+                acao               TEXT NOT NULL,
+                entidade           TEXT,      -- tabela ou agregado afetado
+                entidade_id        TEXT,
+                registro_anterior  TEXT,      -- JSON; jsonb no Postgres
+                registro_posterior TEXT,
+                motivo             TEXT,
+                autorizacao        TEXT,      -- quem autorizou a ação sensível
+                origem             TEXT NOT NULL DEFAULT 'web',
+                protocolo_externo  TEXT,
+                created_at         TEXT DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_ocorrido
+                ON audit_logs (ocorrido_em DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_entidade
+                ON audit_logs (entidade, entidade_id);
+
+            -- Auditoria também não se reescreve: seria o primeiro alvo de quem
+            -- quisesse encobrir uma ação.
+            CREATE TRIGGER IF NOT EXISTS trg_audit_sem_update
+            BEFORE UPDATE ON audit_logs
+            BEGIN
+                SELECT RAISE(ABORT, 'audit_logs e append-only (PNIB 14.1)');
+            END;
+            CREATE TRIGGER IF NOT EXISTS trg_audit_sem_delete
+            BEFORE DELETE ON audit_logs
+            BEGIN
+                SELECT RAISE(ABORT, 'audit_logs e append-only (PNIB 14.1)');
+            END;
 
             CREATE TABLE IF NOT EXISTS sessions (
                 token      TEXT PRIMARY KEY,
@@ -849,6 +948,17 @@ def count_admins() -> int:
 
 
 
+# Um status do sistema vira um tipo de evento do §6.1. Onde não há correspondente
+# exato, `mudanca_categoria` é o genérico previsto pela portaria.
+_EVENTO_POR_STATUS = {
+    "vendido": "venda",
+    "morto": "morte",
+    "abatido": "abate",
+    "ativo": "mudanca_categoria",
+    "carencia": "manejo_sanitario",
+}
+
+
 @_writes
 def update_animal_status(animal_id: str, status: str, *,
                          tem_autorizacao: bool = False,
@@ -865,13 +975,14 @@ def update_animal_status(animal_id: str, status: str, *,
     mostrar ao usuário, e quem ignora o retorno mantém o comportamento anterior
     nas transições livres.
 
-    ⚠️ A justificativa é anexada a `animals.notes` porque **ainda não existe
-    tabela de auditoria** — ela chega na etapa B2 do ADR 0004. Quando chegar,
-    este trecho passa a gravar lá.
+    A justificativa vai para `audit_logs` (§14.1) e a mudança vira um evento em
+    `animal_events` (§6) — as duas append-only. Até a etapa B2 isso era anexado
+    a `animals.notes`, que funcionava mas não era consultável nem protegido
+    contra reescrita.
     """
     with _conn() as con:
         row = con.execute(
-            "SELECT status, notes FROM animals WHERE id=?", (animal_id,)
+            "SELECT status, uuid FROM animals WHERE id=?", (animal_id,)
         ).fetchone()
     if row is None:
         return {"ok": False, "motivo": f"Animal {animal_id} não encontrado."}
@@ -887,17 +998,25 @@ def update_animal_status(animal_id: str, status: str, *,
 
     with _conn() as con:
         con.execute("UPDATE animals SET status=? WHERE id=?", (status, animal_id))
-        if justificativa.strip():
-            # Montado em Python, e não em SQL: concatenar com quebra de linha
-            # exigiria `char(10)` no SQLite e `chr(10)` no Postgres, e o
-            # `_translate()` não cobre diferença de função — só de placeholder.
-            marca = (f"[{date.today().isoformat()}] {operador or 'sistema'}: "
-                     f"{atual} → {status} — {justificativa.strip()}")
-            anterior = (row["notes"] or "").rstrip()
-            con.execute(
-                "UPDATE animals SET notes=? WHERE id=?",
-                (f"{anterior}\n{marca}" if anterior else marca, animal_id),
-            )
+
+    # Auditoria e evento vêm DEPOIS de a escrita dar certo: registrar uma
+    # mudança que não aconteceu é pior do que não registrar nada.
+    eventos.auditar(
+        "mudanca_status_animal",
+        usuario=operador,
+        entidade="animals", entidade_id=animal_id,
+        registro_anterior={"status": atual},
+        registro_posterior={"status": status},
+        motivo=justificativa.strip(),
+        autorizacao=operador if veredito["exige_autorizacao"] else "",
+    )
+    if row["uuid"]:
+        eventos.registrar(
+            row["uuid"], _EVENTO_POR_STATUS.get(status, "mudanca_categoria"),
+            usuario_registro=operador,
+            observacoes=f"{atual} → {status}",
+            justificativa=justificativa.strip(),
+        )
     return {"ok": True, "de": atual, "para": status, **veredito}
 
 

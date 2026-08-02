@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-08-01 por tools/dump_schema_nuvem.py
+# Extraído em 2026-08-02 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -15,6 +15,27 @@ animal_costs.cost_date
 animal_costs.notes
 animal_costs.created_at
 animal_costs.animal_uuid
+animal_events.id
+animal_events.animal_uuid
+animal_events.tipo
+animal_events.ocorrido_em
+animal_events.registrado_em
+animal_events.propriedade_id
+animal_events.local_interno
+animal_events.responsavel
+animal_events.usuario_registro
+animal_events.origem_informacao
+animal_events.latitude
+animal_events.longitude
+animal_events.observacoes
+animal_events.documento
+animal_events.anexos
+animal_events.status_sincronizacao
+animal_events.identificador_oficial
+animal_events.versao
+animal_events.evento_anterior_id
+animal_events.justificativa
+animal_events.created_at
 animal_identifiers.id
 animal_identifiers.animal_uuid
 animal_identifiers.tipo
@@ -63,6 +84,21 @@ animals.created_at
 animals.purchase_mode
 animals.purchase_lot_ref
 animals.uuid
+audit_logs.id
+audit_logs.usuario
+audit_logs.ocorrido_em
+audit_logs.dispositivo
+audit_logs.ip
+audit_logs.acao
+audit_logs.entidade
+audit_logs.entidade_id
+audit_logs.registro_anterior
+audit_logs.registro_posterior
+audit_logs.motivo
+audit_logs.autorizacao
+audit_logs.origem
+audit_logs.protocolo_externo
+audit_logs.created_at
 category_prices.id
 category_prices.age_band
 category_prices.sex
