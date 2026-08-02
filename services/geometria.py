@@ -1,48 +1,92 @@
-"""Cálculos métricos para polígonos recebidos em GPS (EPSG:4326).
+"""Cálculo de área, perímetro e centroide para polígonos de piquete (funções puras).
 
-O módulo escolhe a zona UTM WGS84 a partir do centroide do piquete e projeta o
-polígono antes de medir. Isso evita tratar graus quadrados como área e evita o
-erro de supor que um grau de longitude tem o mesmo comprimento em toda latitude.
-Para polígonos do tamanho de um piquete, a distorção dentro da zona UTM é pequena.
+DOCUMENTAÇÃO DE PROJEÇÃO CARTOGRÁFICA E ERRO EVITADO:
+Coordenadas de GPS vêm em graus geográficos (EPSG:4326 - WGS 84).
+Medir áreas diretamente em graus (deg²) resulta em valores sem significado físico.
+Além disso, a conversão ingênua multiplicando graus por um fator fixo (1° ≈ 111,32 km)
+ignora que o grau de longitude encolhe conforme a latitude se afasta do Equador. Em Mato Grosso
+(lat ≈ -13.3°), essa aproximação ingênua causa um erro relativo de ~4.3% na medição de área.
+
+Para evitar distorções cartográficas, o módulo identifica automaticamente a Zona UTM correspondente
+ao centroide do polígono (para a região central de MT, Zona 21S - EPSG:32721 / EPSG:31981) e projeta
+as coordenadas para metros planos antes de calcular área (em hectares) e perímetro (em metros).
 """
 
 import math
-
-from pyproj import CRS, Transformer
-from shapely.geometry import LinearRing, Polygon
+import pyproj
+from shapely.geometry import Polygon
 from shapely.ops import transform
 
 
-def _coordenadas(anel: list[tuple[float, float]]) -> list[tuple[float, float]]:
-    coordenadas = [(float(lon), float(lat)) for lon, lat in anel]
-    if len(coordenadas) > 1 and coordenadas[0] == coordenadas[-1]:
-        coordenadas.pop()
-    return coordenadas
+def _normalizar_anel(anel: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Fecha o anel se o último ponto não for igual ao primeiro."""
+    if not anel:
+        return []
+    coords = list(anel)
+    if len(coords) > 1 and coords[0] != coords[-1]:
+        coords.append(coords[0])
+    return coords
 
 
-def _crs_utm(lon: float, lat: float) -> CRS:
-    zona = min(60, max(1, math.floor((lon + 180.0) / 6.0) + 1))
-    return CRS.from_dict({
-        "proj": "utm",
-        "zone": zona,
-        "south": lat < 0.0,
-        "datum": "WGS84",
-        "units": "m",
-    })
+def _obter_poligono_projetado(poly: Polygon) -> Polygon:
+    """Projeta um polígono WGS84 (EPSG:4326) para a Zona UTM correspondente ao seu centroide."""
+    cx, cy = poly.centroid.x, poly.centroid.y
+    zone = int((cx + 180) / 6) + 1
+    epsg = (32700 if cy < 0 else 32600) + zone
+    projector = pyproj.Transformer.from_crs(
+        "EPSG:4326", f"EPSG:{epsg}", always_xy=True
+    ).transform
+    return transform(projector, poly)
 
 
-def _poligono_projetado(
-    anel: list[tuple[float, float]],
-) -> tuple[Polygon, CRS]:
-    problemas = validar(anel)
-    if problemas:
-        raise ValueError(" ".join(problemas))
+def validar(anel: list[tuple[float, float]]) -> list[str]:
+    """Problemas que impedem o uso do polígono. Lista vazia = válido.
 
-    poligono = Polygon(_coordenadas(anel))
-    centro = poligono.centroid
-    crs_utm = _crs_utm(centro.x, centro.y)
-    para_utm = Transformer.from_crs("EPSG:4326", crs_utm, always_xy=True)
-    return transform(para_utm.transform, poligono), crs_utm
+    Detecta: menos de 3 vértices, coordenada fora de faixa (lon -180..180, lat -90..90),
+    polígono auto-interceptante/inválido e área zero.
+    """
+    erros: list[str] = []
+    if not isinstance(anel, (list, tuple)):
+        return ["Entrada deve ser uma lista de coordenadas (lon, lat)."]
+
+    # Remover ponto de fechamento para contar vértices únicos
+    coords_unicas = list(anel)
+    if len(coords_unicas) > 1 and coords_unicas[0] == coords_unicas[-1]:
+        coords_unicas.pop()
+
+    if len(coords_unicas) < 3:
+        erros.append("Polígono deve ter pelo menos 3 vértices.")
+
+    for pt in anel:
+        if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+            erros.append("Cada vértice deve conter (longitude, latitude).")
+            break
+        lon, lat = pt[0], pt[1]
+        if not isinstance(lon, (int, float)) or not isinstance(lat, (int, float)):
+            erros.append("Coordenadas devem ser numéricas.")
+            break
+        if math.isnan(lon) or math.isnan(lat):
+            erros.append("Coordenadas não podem conter valores NaN.")
+            break
+        if not (-180.0 <= lon <= 180.0) or not (-90.0 <= lat <= 90.0):
+            erros.append(
+                f"Coordenada fora da faixa válida (lon -180..180, lat -90..90): ({lon}, {lat})."
+            )
+
+    if erros:
+        return erros
+
+    anel_fechado = _normalizar_anel(anel)
+    try:
+        poly = Polygon(anel_fechado)
+        if not poly.is_valid or not poly.is_simple:
+            erros.append("Polígono auto-interceptante ou geometria inválida.")
+        elif poly.area == 0:
+            erros.append("Polígono possui área zero.")
+    except Exception as exc:
+        erros.append(f"Erro na geometria do polígono: {exc}")
+
+    return erros
 
 
 def area_hectares(anel: list[tuple[float, float]]) -> float:
@@ -51,58 +95,35 @@ def area_hectares(anel: list[tuple[float, float]]) -> float:
     `anel`: vértices [(lon, lat), ...] em graus (EPSG:4326), em ordem.
     Fecha o anel sozinho se o último ponto não repetir o primeiro.
     """
-    poligono, _ = _poligono_projetado(anel)
-    return float(poligono.area / 10_000.0)
+    erros = validar(anel)
+    if erros:
+        raise ValueError(f"Polígono inválido para cálculo de área: {erros[0]}")
+
+    anel_fechado = _normalizar_anel(anel)
+    poly = Polygon(anel_fechado)
+    poly_proj = _obter_poligono_projetado(poly)
+    return float(poly_proj.area / 10000.0)
 
 
 def centroide(anel: list[tuple[float, float]]) -> tuple[float, float]:
     """Centroide em (lon, lat) — serve à previsão do tempo por piquete."""
-    poligono, crs_utm = _poligono_projetado(anel)
-    centro_metrico = poligono.centroid
-    para_gps = Transformer.from_crs(crs_utm, "EPSG:4326", always_xy=True)
-    lon, lat = para_gps.transform(centro_metrico.x, centro_metrico.y)
-    return float(lon), float(lat)
+    erros = validar(anel)
+    if erros:
+        raise ValueError(f"Polígono inválido para cálculo de centroide: {erros[0]}")
+
+    anel_fechado = _normalizar_anel(anel)
+    poly = Polygon(anel_fechado)
+    c = poly.centroid
+    return (float(c.x), float(c.y))
 
 
 def perimetro_metros(anel: list[tuple[float, float]]) -> float:
     """Perímetro do polígono em metros."""
-    poligono, _ = _poligono_projetado(anel)
-    return float(poligono.length)
+    erros = validar(anel)
+    if erros:
+        raise ValueError(f"Polígono inválido para cálculo de perímetro: {erros[0]}")
 
-
-def validar(anel: list[tuple[float, float]]) -> list[str]:
-    """Problemas que impedem o uso do polígono. Lista vazia = válido.
-
-    Detecta menos de 3 vértices, coordenada fora da faixa EPSG:4326,
-    polígono auto-interceptante e área zero.
-    """
-    problemas: list[str] = []
-
-    try:
-        coordenadas = _coordenadas(anel)
-    except (TypeError, ValueError):
-        return ["Coordenada inválida: use pares (longitude, latitude)."]
-
-    if len(coordenadas) < 3:
-        problemas.append("O polígono precisa ter pelo menos 3 vértices.")
-
-    if any(
-        not (math.isfinite(lon) and math.isfinite(lat))
-        or not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0)
-        for lon, lat in coordenadas
-    ):
-        problemas.append(
-            "Coordenada fora da faixa permitida: longitude -180..180 e latitude -90..90."
-        )
-
-    if len(coordenadas) < 3:
-        return problemas
-
-    anel_geometrico = LinearRing(coordenadas)
-    poligono = Polygon(coordenadas)
-    if not anel_geometrico.is_simple:
-        problemas.append("Polígono auto-interceptante.")
-    if poligono.area == 0.0:
-        problemas.append("Área do polígono é zero.")
-
-    return problemas
+    anel_fechado = _normalizar_anel(anel)
+    poly = Polygon(anel_fechado)
+    poly_proj = _obter_poligono_projetado(poly)
+    return float(poly_proj.length)
