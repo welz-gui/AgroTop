@@ -18,7 +18,9 @@ def _medications_by_animal() -> dict:
     """Todos os medicamentos agrupados por animal (mais recente primeiro). 1 consulta."""
     with _conn() as con:
         rows = con.execute(
-            "SELECT * FROM medications ORDER BY med_date DESC, id DESC"
+            """SELECT m.*, a.id AS animal_id
+               FROM medications m JOIN animals a ON a.uuid=m.animal_uuid
+               ORDER BY m.med_date DESC, m.id DESC"""
         ).fetchall()
     out: dict = {}
     for r in rows:
@@ -35,12 +37,15 @@ def add_medication(animal_id, medication_name, dose, unit, application_route,
                    withdrawal_days, med_date, applied_by="",
                    insumo_id=None, notes="", protocol_id=None) -> None:
     with _conn() as con:
+        _uuid = uuid_de(con, animal_id)
+        if _uuid is None:
+            raise ValueError(f"Animal {animal_id} não encontrado.")
         con.execute(
             """INSERT INTO medications
-               (animal_id,animal_uuid,medication_name,dose,unit,application_route,
+               (animal_uuid,medication_name,dose,unit,application_route,
                 withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, uuid_de(con, animal_id), medication_name, dose, unit,
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (_uuid, medication_name, dose, unit,
              application_route,
              withdrawal_days, med_date, applied_by, insumo_id or None, notes,
              protocol_id or None),
@@ -53,9 +58,9 @@ def add_medication(animal_id, medication_name, dose, unit, application_route,
             )
             con.execute(
                 """INSERT INTO insumo_transactions
-                   (insumo_id,type,quantity,reason,animal_id,transaction_date,operator)
+                   (insumo_id,type,quantity,reason,animal_uuid,transaction_date,operator)
                    VALUES(?,?,?,?,?,?,?)""",
-                (insumo_id, "saida", dose, "uso_animal", animal_id, med_date, applied_by),
+                (insumo_id, "saida", dose, "uso_animal", _uuid, med_date, applied_by),
             )
         # Atualiza status do animal se há carência
         if withdrawal_days and withdrawal_days > 0:

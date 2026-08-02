@@ -23,7 +23,9 @@ def _costs_by_animal() -> dict:
     """Soma de custos por animal. 1 consulta."""
     with _conn() as con:
         rows = con.execute(
-            "SELECT animal_id, COALESCE(SUM(amount),0) AS total FROM animal_costs GROUP BY animal_id"
+            """SELECT a.id AS animal_id, COALESCE(SUM(c.amount),0) AS total
+               FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
+               GROUP BY a.id"""
         ).fetchall()
     return {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
 
@@ -35,7 +37,9 @@ def get_total_cost(animal_id: str) -> float:
 def get_animal_costs(animal_id: str) -> list[dict]:
     with _conn() as con:
         rows = con.execute(
-            "SELECT * FROM animal_costs WHERE animal_id=? ORDER BY cost_date DESC",
+            """SELECT c.*, a.id AS animal_id
+               FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
+               WHERE a.id=? ORDER BY c.cost_date DESC""",
             (animal_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -44,10 +48,12 @@ def get_animal_costs(animal_id: str) -> list[dict]:
 @_writes
 def add_animal_cost(animal_id, cost_type, description, amount, cost_date, notes="") -> None:
     with _conn() as con:
+        uuid = uuid_de(con, animal_id)
+        if uuid is None:
+            raise ValueError(f"Animal {animal_id} não encontrado.")
         con.execute(
-            "INSERT INTO animal_costs (animal_id,animal_uuid,cost_type,description,amount,cost_date,notes) VALUES(?,?,?,?,?,?,?)",
-            (animal_id, uuid_de(con, animal_id), cost_type, description, amount,
-             cost_date, notes),
+            "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date,notes) VALUES(?,?,?,?,?,?)",
+            (uuid, cost_type, description, amount, cost_date, notes),
         )
 
 
@@ -142,11 +148,11 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
 
             con.execute(
                 """INSERT INTO sales
-                   (animal_id,animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
+                   (animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
                     price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
                     operator,notes)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (a["id"], a.get("uuid"), sale_date, sale_type, pricing_mode,
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (a["uuid"], sale_date, sale_type, pricing_mode,
                  a["current_weight"], ppk,
                  val, buyer or None, lot_ref, custo, lucro, operator, notes),
             )
@@ -158,8 +164,8 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
 
 def get_sales(start_date: Optional[str] = None,
               end_date: Optional[str] = None) -> list[dict]:
-    sql = ("SELECT s.*, a.breed, a.sex FROM sales s "
-           "LEFT JOIN animals a ON a.id=s.animal_id WHERE 1=1")
+    sql = ("SELECT s.*, a.id AS animal_id, a.breed, a.sex FROM sales s "
+           "LEFT JOIN animals a ON a.uuid=s.animal_uuid WHERE 1=1")
     args: list = []
     if start_date:
         sql += " AND s.sale_date >= ?"; args.append(start_date)
@@ -237,10 +243,10 @@ def register_death(animal_id: str, death_date: str, cause: str,
     with _conn() as con:
         con.execute(
             """INSERT INTO deaths
-               (animal_id,animal_uuid,death_date,cause,lote_id,weight_at_death,
+               (animal_uuid,death_date,cause,lote_id,weight_at_death,
                 cost_at_death,operator,notes)
-               VALUES(?,?,?,?,?,?,?,?,?)""",
-            (animal_id, a.get("uuid"), death_date, cause, a.get("lote_id"),
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (a["uuid"], death_date, cause, a.get("lote_id"),
              a["current_weight"], custo, operator, notes),
         )
         con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
@@ -249,8 +255,8 @@ def register_death(animal_id: str, death_date: str, cause: str,
 
 def get_deaths(start_date: Optional[str] = None,
                end_date: Optional[str] = None) -> list[dict]:
-    sql = ("SELECT d.*, a.breed, a.sex, l.name AS lote_name "
-           "FROM deaths d LEFT JOIN animals a ON a.id=d.animal_id "
+    sql = ("SELECT d.*, a.id AS animal_id, a.breed, a.sex, l.name AS lote_name "
+           "FROM deaths d LEFT JOIN animals a ON a.uuid=d.animal_uuid "
            "LEFT JOIN lotes l ON l.id=d.lote_id WHERE 1=1")
     args: list = []
     if start_date:

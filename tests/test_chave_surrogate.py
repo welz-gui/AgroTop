@@ -91,10 +91,11 @@ class TestFormatoDoUuid(unittest.TestCase):
 
 # ══════════════════════════════════════════════════════════════════════════════
 class TestEspelhoNasFilhas(BaseSurrogate):
-    """Etapa B1.2 — `animal_uuid` espelhado nas 8 tabelas filhas.
+    """Etapa B1.6 — `animal_uuid` é a ÚNICA ligação com o animal.
 
-    Enquanto as FKs ainda apontam para `animal_id`, as duas colunas convivem.
-    É o que torna a etapa reversível: nada depende do espelho ainda.
+    Até a etapa 5 as duas colunas conviviam e o teste comparava uma com a outra.
+    A etapa 6 removeu `animal_id`, então não há mais espelho a conferir: a
+    garantia passou a ser mais forte — nenhuma linha órfã e nenhum uuid nulo.
     """
 
     TABELAS = ["weighings", "medications", "animal_costs", "animal_movements",
@@ -106,15 +107,26 @@ class TestEspelhoNasFilhas(BaseSurrogate):
                 cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({t})")}
                 self.assertIn("animal_uuid", cols)
 
-    def test_espelho_confere_com_o_animal(self):
-        """Toda linha com animal_id tem o uuid do animal correspondente."""
+    def test_animal_id_foi_removido(self):
+        """A coluna legada não pode voltar por descuido num CREATE TABLE."""
         for t in self.TABELAS:
             with self.subTest(tabela=t):
-                divergentes = self._linhas(
-                    f"SELECT t.animal_id FROM {t} t JOIN animals a ON a.id = t.animal_id "
-                    f"WHERE t.animal_uuid IS NULL OR t.animal_uuid <> a.uuid")
-                self.assertEqual(divergentes, [],
-                                 f"{t}: espelho divergente do animals.uuid")
+                cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({t})")}
+                self.assertNotIn("animal_id", cols,
+                                 f"{t}: coluna legada reapareceu (etapa B1.6)")
+
+    def test_nenhuma_linha_orfa(self):
+        """Todo `animal_uuid` preenchido aponta para um animal que existe.
+
+        Sem `animal_id`, esta é a única coisa que liga a linha ao animal — se
+        apontar para nada, o histórico do animal se perde em silêncio.
+        """
+        for t in self.TABELAS:
+            with self.subTest(tabela=t):
+                orfas = self._linhas(
+                    f"SELECT t.id FROM {t} t LEFT JOIN animals a ON a.uuid = t.animal_uuid "
+                    f"WHERE t.animal_uuid IS NOT NULL AND a.uuid IS NULL")
+                self.assertEqual(orfas, [], f"{t}: linhas órfãs")
 
     def test_backfill_das_filhas_e_idempotente(self):
         with db._conn() as con:
@@ -133,8 +145,7 @@ class TestEspelhoNasFilhas(BaseSurrogate):
         """
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
         db.add_weighing(aid, 400.0, "2026-07-31")
-        pendente = self._linhas(
-            "SELECT id FROM weighings WHERE animal_uuid IS NULL AND animal_id=?", (aid,))
+        pendente = self._linhas("SELECT id FROM weighings WHERE animal_uuid IS NULL")
         self.assertEqual(pendente, [], "escrita nova deixou o espelho vazio")
 
         # O backfill continua idempotente: não há o que preencher.
@@ -230,9 +241,13 @@ class TestEscritaPreencheUuid(BaseSurrogate):
     """
 
     def _sem_espelho(self, tabela, animal_id):
-        return self._linhas(
-            f"SELECT id FROM {tabela} WHERE animal_id=? AND animal_uuid IS NULL",
-            (animal_id,))
+        """Linhas sem `animal_uuid` na tabela.
+
+        Depois da etapa 6 uma linha assim é invisível: sem `animal_id`, ela não
+        pertence a animal nenhum e some do histórico sem erro nenhum.
+        O `animal_id` fica no parâmetro só para a mensagem de falha ser legível.
+        """
+        return self._linhas(f"SELECT id FROM {tabela} WHERE animal_uuid IS NULL")
 
     def test_cadastro_de_animal_preenche_tudo(self):
         db.add_animal("E4A", "Nelore", "M", None, "2026-01-01",
@@ -285,7 +300,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
         for t in ("weighings", "medications", "animal_costs", "animal_movements",
                   "animal_photos", "deaths", "sales", "insumo_transactions"):
             n = self._linhas(
-                f"SELECT id FROM {t} WHERE animal_id IS NOT NULL AND animal_uuid IS NULL")
+                f"SELECT id FROM {t} WHERE animal_uuid IS NULL")
             if n:
                 pendentes[t] = len(n)
         self.assertEqual(pendentes, {}, f"escritas deixaram espelho pendente: {pendentes}")
@@ -319,8 +334,8 @@ class TestIntegridadeReferencial(BaseSurrogate):
         try:
             with self.assertRaises(sqlite3.IntegrityError):
                 con.execute(
-                    "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date) "
-                    "VALUES(?,?,?,?)", (aid, "uuid-que-nao-existe", 400.0, "2026-07-31"))
+                    "INSERT INTO weighings (animal_uuid,weight,weigh_date) "
+                    "VALUES(?,?,?)", ("uuid-que-nao-existe", 400.0, "2026-07-31"))
                 con.commit()
         finally:
             con.close()
@@ -332,8 +347,8 @@ class TestIntegridadeReferencial(BaseSurrogate):
         a = self._linhas("SELECT id, uuid FROM animals LIMIT 1")[0]
         try:
             con.execute(
-                "INSERT INTO weighings (animal_id,animal_uuid,weight,weigh_date) "
-                "VALUES(?,?,?,?)", (a["id"], a["uuid"], 405.0, "2026-07-31"))
+                "INSERT INTO weighings (animal_uuid,weight,weigh_date) "
+                "VALUES(?,?,?)", (a["uuid"], 405.0, "2026-07-31"))
             con.commit()
         finally:
             con.close()

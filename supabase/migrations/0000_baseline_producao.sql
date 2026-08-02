@@ -14,14 +14,13 @@
 
 CREATE TABLE IF NOT EXISTS animal_costs (
     id bigserial,
-    animal_id text NOT NULL,
     cost_type text DEFAULT 'operacional'::text NOT NULL,
     description text,
     amount double precision NOT NULL,
     cost_date text NOT NULL,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT animal_costs_pkey PRIMARY KEY (id)
 );
 
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS animal_identifiers (
 
 CREATE TABLE IF NOT EXISTS animal_movements (
     id bigserial,
-    animal_id text NOT NULL,
     from_lote_id text,
     to_lote_id text NOT NULL,
     movement_date text NOT NULL,
@@ -49,19 +47,18 @@ CREATE TABLE IF NOT EXISTS animal_movements (
     operator text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT animal_movements_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS animal_photos (
     id bigserial,
-    animal_id text NOT NULL,
     image bytea NOT NULL,
     mime text DEFAULT 'image/jpeg'::text,
     taken_date text NOT NULL,
     operator text,
     created_at timestamp with time zone DEFAULT now(),
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT animal_photos_pkey PRIMARY KEY (id)
 );
 
@@ -105,7 +102,6 @@ CREATE TABLE IF NOT EXISTS category_prices (
 
 CREATE TABLE IF NOT EXISTS deaths (
     id bigserial,
-    animal_id text NOT NULL,
     death_date text NOT NULL,
     cause text DEFAULT 'Desconhecida'::text NOT NULL,
     lote_id text,
@@ -114,7 +110,7 @@ CREATE TABLE IF NOT EXISTS deaths (
     operator text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT deaths_pkey PRIMARY KEY (id)
 );
 
@@ -193,7 +189,6 @@ CREATE TABLE IF NOT EXISTS insumo_transactions (
     type text NOT NULL,
     quantity double precision NOT NULL,
     reason text,
-    animal_id text,
     transaction_date text NOT NULL,
     operator text,
     notes text,
@@ -232,7 +227,6 @@ CREATE TABLE IF NOT EXISTS lotes (
 
 CREATE TABLE IF NOT EXISTS medications (
     id bigserial,
-    animal_id text NOT NULL,
     medication_name text NOT NULL,
     dose double precision DEFAULT 0,
     unit text DEFAULT 'ml'::text,
@@ -244,7 +238,7 @@ CREATE TABLE IF NOT EXISTS medications (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     protocol_id bigint,
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT medications_pkey PRIMARY KEY (id)
 );
 
@@ -261,7 +255,6 @@ CREATE TABLE IF NOT EXISTS pluviometria (
 
 CREATE TABLE IF NOT EXISTS sales (
     id bigserial,
-    animal_id text NOT NULL,
     sale_date text NOT NULL,
     sale_type text DEFAULT 'abate'::text NOT NULL,
     pricing_mode text DEFAULT 'kg'::text NOT NULL,
@@ -275,7 +268,7 @@ CREATE TABLE IF NOT EXISTS sales (
     operator text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT sales_pkey PRIMARY KEY (id)
 );
 
@@ -304,7 +297,6 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS weighings (
     id bigserial,
-    animal_id text NOT NULL,
     weight double precision NOT NULL,
     weigh_date text NOT NULL,
     lote_id text,
@@ -312,21 +304,17 @@ CREATE TABLE IF NOT EXISTS weighings (
     method text DEFAULT 'pesado'::text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    animal_uuid text,
+    animal_uuid text NOT NULL,
     CONSTRAINT weighings_pkey PRIMARY KEY (id)
 );
 
 -- Chaves estrangeiras aplicadas ao final: assim a ordem de
 -- criação das tabelas acima não importa.
-ALTER TABLE animal_costs ADD CONSTRAINT animal_costs_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE animal_costs ADD CONSTRAINT fk_animal_costs_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
-ALTER TABLE animal_movements ADD CONSTRAINT animal_movements_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
-ALTER TABLE animal_photos ADD CONSTRAINT animal_photos_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
 ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
-ALTER TABLE deaths ADD CONSTRAINT deaths_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
@@ -335,28 +323,25 @@ ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FORE
 ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
-ALTER TABLE medications ADD CONSTRAINT medications_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE sales ADD CONSTRAINT fk_sales_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
-ALTER TABLE sales ADD CONSTRAINT sales_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
-ALTER TABLE weighings ADD CONSTRAINT weighings_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id);
 
 -- Índices (fora das constraints)
-CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_ident_animal ON animal_identifiers USING btree (animal_uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers USING btree (tipo, valor) WHERE (status = 'ativo'::text);
-CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
-CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_id);
+CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications USING btree (protocol_id);
 CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_date);
 CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales USING btree (sale_date);
-CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings USING btree (animal_id, weigh_date DESC);
+CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings USING btree (animal_uuid, weigh_date DESC);
 CREATE INDEX IF NOT EXISTS idx_weighings_date ON weighings USING btree (weigh_date DESC);
 
