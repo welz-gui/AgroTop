@@ -609,19 +609,37 @@ def _backfill_uuids(con) -> int:
     return len(sem)
 
 
+def _colunas(con, tabela: str) -> set:
+    """Nomes das colunas de uma tabela, **nos dois bancos**.
+
+    `PRAGMA table_info` é sintaxe exclusiva do SQLite: no Postgres o driver
+    devolve erro de sintaxe. Este auxiliar existe porque essa diferença já
+    derrubou a produção uma vez — a suíte roda inteira com `AGROTOP_FORCE_SQLITE`
+    e não enxerga o caminho Postgres.
+    """
+    if _conexao.USE_PG:
+        rows = con.execute(
+            "SELECT column_name AS name FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name=?", (tabela,)
+        ).fetchall()
+    else:
+        rows = con.execute(f"PRAGMA table_info({tabela})").fetchall()
+    return {r["name"] for r in rows}
+
+
 def _backfill_animal_uuid(con) -> int:
     """Espelha `animals.uuid` nas filhas que AINDA tenham `animal_id` (etapa B1.2).
 
     Só faz sentido em banco que ainda não passou pela etapa B1.6: a partir dela
-    `animal_id` não existe mais, e não há de onde derivar o uuid. Por isso o
-    `PRAGMA` antes — a função vira no-op num banco já migrado, em vez de
-    estourar. Mantida porque bancos antigos ainda chegam aqui pelo `_migrate`.
+    `animal_id` não existe mais, e não há de onde derivar o uuid. Por isso a
+    conferência de colunas antes — a função vira no-op num banco já migrado, em
+    vez de estourar. Mantida porque bancos antigos ainda chegam aqui pelo
+    `_migrate`.
     """
     total = 0
     for t in ("weighings", "medications", "animal_costs", "animal_movements",
               "animal_photos", "deaths", "sales", "insumo_transactions"):
-        cols = {r["name"] for r in con.execute(f"PRAGMA table_info({t})").fetchall()}
-        if "animal_id" not in cols:
+        if "animal_id" not in _colunas(con, t):
             continue
         cur = con.execute(
             f"UPDATE {t} SET animal_uuid = ("
