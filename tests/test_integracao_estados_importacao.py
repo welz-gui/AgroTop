@@ -123,31 +123,45 @@ class TestTransicaoSensivel(BaseIntegracao):
         self.assertTrue(r["ok"], r)
         self.assertEqual(self._animal(a)["status"], "ativo")
 
-    def test_justificativa_fica_registrada_nas_notas(self):
-        """Registro interino: a tabela de auditoria só chega na etapa B2."""
+    def test_justificativa_vai_para_a_trilha_de_auditoria(self):
+        """Etapa B2: o destino é `audit_logs` (§14.1), não mais `animals.notes`."""
         a = self._vender()
         db.update_animal_status(a, "ativo", tem_autorizacao=True,
                                 justificativa="venda cancelada pelo comprador",
                                 operador="admin")
-        notas = self._animal(a)["notes"] or ""
-        self.assertIn("venda cancelada pelo comprador", notas)
-        self.assertIn("vendido", notas)
-        self.assertIn("admin", notas)
 
-    def test_notas_anteriores_sao_preservadas(self):
+        trilha = db.eventos.trilha(entidade="animals", entidade_id=a)
+        self.assertTrue(trilha, "nada foi registrado na trilha de auditoria")
+        r = trilha[0]
+        self.assertEqual(r["acao"], "mudanca_status_animal")
+        self.assertEqual(r["usuario"], "admin")
+        self.assertIn("venda cancelada pelo comprador", r["motivo"])
+        self.assertEqual(r["registro_anterior"], {"status": "vendido"})
+        self.assertEqual(r["registro_posterior"], {"status": "ativo"})
+        self.assertEqual(r["autorizacao"], "admin",
+                         "transição sensível tem de registrar quem autorizou")
+
+    def test_mudanca_de_status_vira_evento_do_animal(self):
+        """A mesma mudança também entra na linha do tempo do animal (§6)."""
+        a = self._vender()
+        uuid = self._animal(a)["uuid"]
+        evs = db.eventos.do_animal(uuid)
+        self.assertTrue(any(e["tipo"] == "venda" for e in evs),
+                        f"nenhum evento de venda registrado: {[e['tipo'] for e in evs]}")
+
+    def test_notas_do_animal_nao_sao_mais_tocadas(self):
+        """A nota do usuário é dele. Depois do B2 o sistema não escreve mais lá."""
         a = self._vender()
         con = sqlite3.connect(db.DB_PATH)
-        con.execute("UPDATE animals SET notes=? WHERE id=?", ("observação antiga", a))
+        con.execute("UPDATE animals SET notes=? WHERE id=?", ("observação do dono", a))
         con.commit()
         con.close()
         db.clear_cache()
 
         db.update_animal_status(a, "ativo", tem_autorizacao=True,
                                 justificativa="motivo novo", operador="admin")
-        notas = self._animal(a)["notes"] or ""
-        self.assertIn("observação antiga", notas,
-                      "a nota anterior foi sobrescrita pelo registro da transição")
-        self.assertIn("motivo novo", notas)
+        self.assertEqual(self._animal(a)["notes"], "observação do dono",
+                         "o sistema voltou a escrever no campo de observações")
 
     def test_animal_inexistente_nao_estoura(self):
         r = db.update_animal_status("NAO_EXISTE", "ativo")
