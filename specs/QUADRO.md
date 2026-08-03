@@ -43,8 +43,13 @@ baixo** — a ordem é prioridade, não sugestão.
 
 ⚙️ = infraestrutura · 🇧🇷 = fundação regulatória PNIB · 🏗️ = avança trilha do roadmap
 
-> ## 🟡 A FILA ESTÁ VAZIA — não inicie agente sem escrever spec antes
->
+| 1 | [0029](0029-escore-de-conformidade.md) — escore de conformidade PNIB 🇧🇷 | `feat/escore-conformidade` | 🟢 livre | — | — |
+| 2 | [0028](0028-geometria-lotacao-e-sobreposicao.md) — lotação e sobreposição 🏗️ | `feat/geometria-lotacao` | 🟢 livre | — | — |
+| 3 | [0030](0030-importacao-de-lote-de-brincos.md) — leitura de arquivo de brincos 🇧🇷 | `feat/arquivo-lote-brincos` | 🟢 livre | — | — |
+| 4 | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | `feat/mapa-de-conformidade` | 🟢 livre | — | — |
+| 5 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
+| 6 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema (destravada) | `feat/hex-para-tokens` | 🟢 livre | — | — |
+
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
 > **Não confie neste quadro.** Ele é mantido à mão e já ficou desatualizado — em 2026-08-02
@@ -190,7 +195,7 @@ verificar que a sessão persiste. Um PWA instalado tem contexto de armazenamento
 
 | Spec | Motivo |
 |---|---|
-| 0007 — substituir os 198 hex por tokens de `ui/tema.py` | 🔴 **Continua bloqueada, mas o motivo mudou.** |
+| — | *(nenhuma)* |
 
 **Sobre a 0007:** o [#44](https://github.com/welz-gui/AgroTop/pull/44) introduziu
 `streamlit.testing.v1.AppTest` (ver `tests/ui_estados_prova.py`), então **já existe** como

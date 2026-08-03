@@ -41,9 +41,19 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0025](0025-postgres-no-ci.md) | Postgres no CI | infraestrutura | **médio** | ✅ concluída |
 | [0026](0026-controle-de-brincos.md) | 🇧🇷 Controle de estoque de brincos (§5) | implementação | baixo | ✅ concluída |
 | [0027](0027-projecao-de-abate.md) | Projeção de abate e chuva × GMD | implementação | baixo | ✅ concluída |
-| 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada pela 0024 |
+| [0007](0007-hex-para-tokens.md) | Substituir hex literais pelos tokens de `ui/tema.py` | manutenção | **médio** | 🟢 disponível |
+| [0028](0028-geometria-lotacao-e-sobreposicao.md) | Lotação e sobreposição de piquetes | implementação | baixo | 🟢 disponível |
+| [0029](0029-escore-de-conformidade.md) | 🇧🇷 Escore de conformidade PNIB | implementação | baixo | 🟢 disponível |
+| [0030](0030-importacao-de-lote-de-brincos.md) | 🇧🇷 Leitura de arquivo de lote de brincos | implementação | baixo | 🟢 disponível |
+| [0031](0031-testes-de-propriedade.md) | Testes de propriedade para os services | teste | baixo | 🟢 disponível |
+| [0032](0032-mapa-de-conformidade.md) | 🇧🇷 Mapa de conformidade §-por-§ | documentação | baixo | 🟢 disponível |
 
-**0007 continua bloqueada, mas agora tem caminho.** São ~198 substituições em `app.py` sem
+**0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
+ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
+mantenedor decidiu que essas ganham token novo aproximado ao mais próximo. Com isso a
+substituição passa a ser verificável valor por valor.
+
+*Registro do que a bloqueava:* São ~198 substituições em `app.py` sem
 como provar que a aparência não mudou. O `AppTest` (desde o PR #44) prova que um widget
 existe, **não qual cor ele tem**.
 
