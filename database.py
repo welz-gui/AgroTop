@@ -48,6 +48,7 @@ from repositories import identificadores as identificadores  # noqa: F401
 from repositories import eventos as eventos  # noqa: F401
 from repositories import propriedades as propriedades  # noqa: F401
 from repositories import nascimentos as nascimentos  # noqa: F401
+from repositories import movimentacoes as movimentacoes  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -199,6 +200,59 @@ def init_db() -> None:
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (property_id) REFERENCES properties(id)
             );
+
+            -- ADR 0004 · etapa B6 — §8: movimentação entre PROPRIEDADES.
+            -- Distinta de `animal_movements`, que é piquete→piquete e continua
+            -- valendo para manejo interno. Esta é a movimentação com valor
+            -- regulatório: tem GTA, titular, transportador e confirmação de
+            -- chegada — coisas que trocar de pasto não tem.
+            CREATE TABLE IF NOT EXISTS movimentacoes (
+                id                     TEXT PRIMARY KEY,   -- uuid
+                tipo                   TEXT NOT NULL,      -- §8.1
+                propriedade_origem_id  TEXT,
+                propriedade_destino_id TEXT,
+                titular_origem_id      TEXT,
+                titular_destino_id     TEXT,
+                finalidade             TEXT,
+                data_prevista          TEXT,
+                data_efetiva           TEXT,
+                transportador          TEXT,
+                veiculo                TEXT,
+                gta_numero             TEXT,
+                documento_comercial    TEXT,
+                protocolo_oficial      TEXT,
+                -- rascunho | liberada | em_transito | concluida | cancelada
+                status                 TEXT NOT NULL DEFAULT 'rascunho',
+                confirmacao_chegada    TEXT,
+                divergencias           TEXT,
+                anexos                 TEXT,   -- JSON
+                justificativa          TEXT,   -- §8.4: alerta exige confirmação
+                created_at             TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (propriedade_origem_id)  REFERENCES properties(id),
+                FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id),
+                FOREIGN KEY (titular_origem_id)      REFERENCES produtores(id),
+                FOREIGN KEY (titular_destino_id)     REFERENCES produtores(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_mov_status ON movimentacoes (status);
+            CREATE INDEX IF NOT EXISTS idx_mov_origem
+                ON movimentacoes (propriedade_origem_id, data_prevista DESC);
+
+            -- Quais animais em qual movimentação. Tabela própria porque um
+            -- animal pode aparecer em várias ao longo da vida, e uma
+            -- movimentação leva muitos animais.
+            CREATE TABLE IF NOT EXISTS movimentacao_animais (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                movimentacao_id TEXT NOT NULL,
+                animal_uuid     TEXT NOT NULL,
+                divergencia     TEXT,   -- §8.2: recusa ou falta na recepção
+                created_at      TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (movimentacao_id) REFERENCES movimentacoes(id),
+                FOREIGN KEY (animal_uuid)     REFERENCES animals(uuid)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_mov_animal_unico
+                ON movimentacao_animais (movimentacao_id, animal_uuid);
+            CREATE INDEX IF NOT EXISTS idx_mov_animal
+                ON movimentacao_animais (animal_uuid);
 
             -- ADR 0004 · etapa B3 — §7: nascimentos e vínculo materno.
             -- O parto é entidade própria, e não um campo do animal, porque o
