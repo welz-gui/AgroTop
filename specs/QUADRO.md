@@ -33,7 +33,7 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0024](0024-auditoria-de-cores.md) — auditoria de cores (destrava a 0007) | — | ✅ [#62](https://github.com/welz-gui/AgroTop/pull/62) | | 2026-08-03 |
 | — | [0018](0018-previsao-de-estoque.md) — previsão de ruptura de estoque 🏗️ | — | ✅ [#65](https://github.com/welz-gui/AgroTop/pull/65) | | 2026-08-03 |
 | — | [0019](0019-rateio-de-custo-de-lote.md) — rateio de custo de lote 🏗️ | — | ✅ [#63](https://github.com/welz-gui/AgroTop/pull/63) | | 2026-08-03 |
-| — | [0027](0027-projecao-de-abate.md) — projeção de abate e chuva × GMD 🏗️ | `feat/projecao-abate` | 🟡 em andamento ([#68](https://github.com/welz-gui/AgroTop/pull/68)) | agente | 2026-08-03 |
+| — | [0027](0027-projecao-de-abate.md) — projeção de abate e chuva × GMD 🏗️ | — | ✅ [#68](https://github.com/welz-gui/AgroTop/pull/68) | | 2026-08-03 |
 | — | [0020](0020-custo-de-dieta.md) — custo de dieta multi-ingrediente 🏗️ | — | ✅ [#66](https://github.com/welz-gui/AgroTop/pull/66) | | 2026-08-03 |
 | — | [0022](0022-validacao-de-genealogia.md) — validação de genealogia 🇧🇷 | — | ✅ [#67](https://github.com/welz-gui/AgroTop/pull/67) | | 2026-08-03 |
 | 1 | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | `feat/validacao-gta` | 🟢 livre | — | — |
