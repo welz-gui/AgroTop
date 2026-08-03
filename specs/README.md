@@ -38,7 +38,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0022](0022-validacao-de-genealogia.md) | 🇧🇷 Validação de vínculo materno (§7) | implementação | baixo | ✅ concluída |
 | [0023](0023-validacao-de-gta.md) | 🇧🇷 Validação de GTA e trânsito (§8) | implementação | baixo | ✅ concluída |
 | [0024](0024-auditoria-de-cores.md) | Auditoria de cores — destrava a 0007 | ferramenta | baixo | ✅ concluída |
-| [0025](0025-postgres-no-ci.md) | Postgres no CI | infraestrutura | **médio** | 🟢 disponível |
+| [0025](0025-postgres-no-ci.md) | Postgres no CI | infraestrutura | **médio** | ✅ concluída |
 | [0026](0026-controle-de-brincos.md) | 🇧🇷 Controle de estoque de brincos (§5) | implementação | baixo | ✅ concluída |
 | [0027](0027-projecao-de-abate.md) | Projeção de abate e chuva × GMD | implementação | baixo | ✅ concluída |
 | 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada pela 0024 |

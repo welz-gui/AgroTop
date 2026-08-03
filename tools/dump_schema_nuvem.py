@@ -29,8 +29,14 @@ COMO USAR
 
 AVISO SOBRE FIDELIDADE
     O baseline é reconstruído do catálogo, não é um `pg_dump`. Cobre tabelas,
-    colunas, constraints e índices — mas NÃO triggers, funções, políticas de RLS,
-    grants, sequences órfãs ou extensões. Quando houver `pg_dump` ou o Supabase
+    colunas, constraints, índices, **funções e triggers** — mas NÃO políticas de
+    RLS, grants, sequences órfãs ou extensões.
+
+    ⚠️ Funções e triggers passaram a ser capturados em 2026-08-03. Antes disso o
+    baseline recriava `animal_events` e `audit_logs` **sem os gatilhos
+    append-only** — quem restaurasse a partir dele teria as duas graváveis e
+    apagáveis, perdendo a garantia que a etapa B2 existe para dar. O
+    `testar_baseline.py` dizia "OK" porque comparava apenas colunas. Quando houver `pg_dump` ou o Supabase
     CLI disponível, prefira:
         supabase db dump -f supabase/migrations/0000_baseline_producao.sql
     Este script é o caminho alternativo para quando nenhum dos dois existe.
@@ -80,6 +86,26 @@ SELECT tablename AS tabela, indexname AS nome, indexdef AS definicao
 """
 
 
+Q_FUNCOES = """
+SELECT p.proname AS nome,
+       pg_get_functiondef(p.oid) AS definicao
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname = 'public' AND p.prokind = 'f'
+ ORDER BY p.proname;
+"""
+
+Q_TRIGGERS = """
+SELECT c.relname AS tabela, t.tgname AS nome,
+       pg_get_triggerdef(t.oid) AS definicao
+  FROM pg_trigger t
+  JOIN pg_class c ON c.oid = t.tgrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public' AND NOT t.tgisinternal
+ ORDER BY c.relname, t.tgname;
+"""
+
+
 def _linhas(con, sql):
     cur = con.cursor()
     cur.execute(sql)
@@ -103,7 +129,8 @@ def escrever_snapshot(colunas, data):
     return len(colunas)
 
 
-def escrever_baseline(colunas, constraints, indices, data):
+def escrever_baseline(colunas, constraints, indices, data,
+                      funcoes=None, triggers=None):
     por_tabela = {}
     for c in colunas:
         por_tabela.setdefault(c["tabela"], []).append(c)
@@ -117,7 +144,7 @@ def escrever_baseline(colunas, constraints, indices, data):
         fh.write("-- Baseline do schema de produção do AgroTop\n")
         fh.write(f"-- Gerado em {data} por tools/dump_schema_nuvem.py\n")
         fh.write("--\n-- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.\n")
-        fh.write("-- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.\n")
+        fh.write("-- NÃO cobre: políticas de RLS, grants, extensões.\n")
         fh.write("-- Para um dump completo, prefira `supabase db dump` ou `pg_dump`.\n")
         fh.write("--\n-- SEM QUALIFICAÇÃO DE SCHEMA de propósito: os nomes são resolvidos\n")
         fh.write("-- pelo search_path, para que o mesmo arquivo sirva a qualquer tenant\n")
@@ -173,6 +200,29 @@ def escrever_baseline(colunas, constraints, indices, data):
                 definicao = definicao.replace(" ON public.", " ON ")
                 fh.write(f"{definicao};\n")
             fh.write("\n")
+
+        # Funções antes dos triggers: o trigger referencia a função.
+        #
+        # A qualificação `public.` é removida das duas, pelo mesmo motivo dos
+        # índices: quem resolve o nome é o search_path. Sem isso, aplicar o
+        # baseline num schema novo criaria a função dentro de `public` — efeito
+        # colateral no schema de produção — e o trigger não a encontraria no
+        # schema onde está sendo criado.
+        if funcoes:
+            fh.write("-- Funções\n")
+            for f in funcoes:
+                definicao = f["definicao"].replace("FUNCTION public.", "FUNCTION ", 1)
+                fh.write(f"{definicao};\n\n")
+
+        if triggers:
+            fh.write("-- Triggers\n")
+            fh.write("-- Sem eles, `animal_events` e `audit_logs` deixam de ser\n")
+            fh.write("-- append-only (PNIB §6.3 e §14.1).\n")
+            for t in triggers:
+                definicao = t["definicao"].replace(" ON public.", " ON ")
+                fh.write(f"DROP TRIGGER IF EXISTS {t['nome']} ON {t['tabela']};\n")
+                fh.write(f"{definicao};\n")
+            fh.write("\n")
     return len(por_tabela)
 
 
@@ -199,6 +249,8 @@ def main() -> int:
         colunas = _linhas(con, Q_COLUNAS)
         constraints = _linhas(con, Q_CONSTRAINTS)
         indices = _linhas(con, Q_INDICES)
+        funcoes = _linhas(con, Q_FUNCOES)
+        triggers = _linhas(con, Q_TRIGGERS)
     finally:
         con.close()
 
@@ -207,9 +259,11 @@ def main() -> int:
     print(f"[ok] {os.path.relpath(SNAPSHOT, RAIZ)}: {n} colunas / {tabelas} tabelas")
 
     if args.baseline:
-        t = escrever_baseline(colunas, constraints, indices, hoje)
+        t = escrever_baseline(colunas, constraints, indices, hoje,
+                              funcoes, triggers)
         print(f"[ok] {os.path.relpath(BASELINE, RAIZ)}: {t} tabelas, "
-              f"{len(constraints)} constraints, {len(indices)} índices")
+              f"{len(constraints)} constraints, {len(indices)} índices, "
+              f"{len(funcoes)} funções, {len(triggers)} triggers")
 
     print("\nConfira o diff antes de commitar: git diff docs/ supabase/")
     return 0
