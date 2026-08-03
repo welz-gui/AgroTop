@@ -47,6 +47,7 @@ from services.importacao import parse_pesagens  # noqa: F401
 from repositories import identificadores as identificadores  # noqa: F401
 from repositories import eventos as eventos  # noqa: F401
 from repositories import propriedades as propriedades  # noqa: F401
+from repositories import nascimentos as nascimentos  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -199,6 +200,27 @@ def init_db() -> None:
                 FOREIGN KEY (property_id) REFERENCES properties(id)
             );
 
+            -- ADR 0004 · etapa B3 — §7: nascimentos e vínculo materno.
+            -- O parto é entidade própria, e não um campo do animal, porque o
+            -- §7.2 exige que gêmeos gerem "animais distintos ligados ao MESMO
+            -- parto". Com o parto no animal, dois gêmeos teriam dois partos.
+            CREATE TABLE IF NOT EXISTS partos (
+                id             TEXT PRIMARY KEY,     -- uuid
+                mae_uuid       TEXT NOT NULL,
+                data           TEXT NOT NULL,        -- data de negócio (R5)
+                hora           TEXT,
+                tipo_parto     TEXT,                 -- normal | assistido | cesarea
+                condicao       TEXT,                 -- nascido_vivo | natimorto
+                propriedade_id TEXT,
+                responsavel    TEXT,
+                data_estimada  INTEGER NOT NULL DEFAULT 0,
+                observacoes    TEXT,
+                created_at     TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (mae_uuid)       REFERENCES animals(uuid),
+                FOREIGN KEY (propriedade_id) REFERENCES properties(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_partos_mae ON partos (mae_uuid, data DESC);
+
             -- Animais
             CREATE TABLE IF NOT EXISTS animals (
                 -- `id` é o número do brinco e HOJE ainda é a PK. Ver ADR 0004:
@@ -222,6 +244,15 @@ def init_db() -> None:
                 lote_id          TEXT,
                 -- §3.4 · etapa B4. Anulável nesta etapa; obrigatório na B4.3.
                 property_id      TEXT,
+                -- §4.3 · etapa B3. A propriedade de NASCIMENTO é diferente da
+                -- atual: o animal se move, o lugar onde nasceu não muda.
+                propriedade_nascimento_id TEXT,
+                mae_uuid         TEXT,
+                pai_uuid         TEXT,   -- "quando conhecido" (§4.3)
+                parto_id         TEXT,   -- gêmeos compartilham (§7.2)
+                peso_nascimento  REAL,
+                -- nascido | comprado | transferido | importado (§4.3)
+                origem           TEXT NOT NULL DEFAULT 'comprado',
                 fornecedor_id    INTEGER,
                 purchase_price   REAL DEFAULT 0,
                 purchase_mode    TEXT DEFAULT 'cabeca',
@@ -231,6 +262,10 @@ def init_db() -> None:
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (lote_id)       REFERENCES lotes(id),
                 FOREIGN KEY (property_id)   REFERENCES properties(id),
+                FOREIGN KEY (propriedade_nascimento_id) REFERENCES properties(id),
+                FOREIGN KEY (mae_uuid)      REFERENCES animals(uuid),
+                FOREIGN KEY (pai_uuid)      REFERENCES animals(uuid),
+                FOREIGN KEY (parto_id)      REFERENCES partos(id),
                 FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id)
             );
 

@@ -111,6 +111,12 @@ CREATE TABLE IF NOT EXISTS animals (
     purchase_lot_ref text,
     uuid text NOT NULL,
     property_id text,
+    propriedade_nascimento_id text,
+    mae_uuid text,
+    pai_uuid text,
+    parto_id text,
+    peso_nascimento double precision,
+    origem text DEFAULT 'comprado'::text NOT NULL,
     CONSTRAINT animals_pkey PRIMARY KEY (id),
     CONSTRAINT animals_uuid_key UNIQUE (uuid)
 );
@@ -299,6 +305,21 @@ CREATE TABLE IF NOT EXISTS organizacoes (
     CONSTRAINT organizacoes_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS partos (
+    id text NOT NULL,
+    mae_uuid text NOT NULL,
+    data text NOT NULL,
+    hora text,
+    tipo_parto text,
+    condicao text,
+    propriedade_id text,
+    responsavel text,
+    data_estimada integer DEFAULT 0 NOT NULL,
+    observacoes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT partos_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS pluviometria (
     id bigserial,
     read_date text NOT NULL,
@@ -405,6 +426,10 @@ ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FORE
 ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
 ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_mae FOREIGN KEY (mae_uuid) REFERENCES animals(uuid);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_pai FOREIGN KEY (pai_uuid) REFERENCES animals(uuid);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_parto FOREIGN KEY (parto_id) REFERENCES partos(id);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_prop_nascimento FOREIGN KEY (propriedade_nascimento_id) REFERENCES properties(id);
 ALTER TABLE animals ADD CONSTRAINT fk_animals_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
@@ -416,6 +441,8 @@ ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fke
 ALTER TABLE lotes ADD CONSTRAINT fk_lotes_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE partos ADD CONSTRAINT partos_mae_uuid_fkey FOREIGN KEY (mae_uuid) REFERENCES animals(uuid);
+ALTER TABLE partos ADD CONSTRAINT partos_propriedade_id_fkey FOREIGN KEY (propriedade_id) REFERENCES properties(id);
 ALTER TABLE produtores ADD CONSTRAINT produtores_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id);
 ALTER TABLE properties ADD CONSTRAINT properties_produtor_id_fkey FOREIGN KEY (produtor_id) REFERENCES produtores(id);
 ALTER TABLE sales ADD CONSTRAINT fk_sales_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
@@ -430,6 +457,8 @@ CREATE INDEX IF NOT EXISTS idx_ident_animal ON animal_identifiers USING btree (a
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers USING btree (tipo, valor) WHERE (status = 'ativo'::text);
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_animals_mae ON animals USING btree (mae_uuid);
+CREATE INDEX IF NOT EXISTS idx_animals_parto ON animals USING btree (parto_id);
 CREATE INDEX IF NOT EXISTS idx_animals_property ON animals USING btree (property_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_audit_entidade ON audit_logs USING btree (entidade, entidade_id);
@@ -439,6 +468,7 @@ CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING bt
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
 CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications USING btree (protocol_id);
+CREATE INDEX IF NOT EXISTS idx_partos_mae ON partos USING btree (mae_uuid, data DESC);
 CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_date);
 CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_codigo_oficial ON properties USING btree (codigo_oficial) WHERE (codigo_oficial IS NOT NULL);
