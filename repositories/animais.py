@@ -72,20 +72,33 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                lote_id, fornecedor_id, notes="",
                birth_estimated=0, age_source="propriedade",
                nf_number="", gta_number="", weight_method="pesado",
-               purchase_mode="cabeca") -> None:
+               purchase_mode="cabeca", property_id=None) -> None:
     _uuid_novo = novo_uuid()
     with _conn() as con:
+        # ADR 0004 · B4: o animal nasce numa propriedade (§3.4). Sem escolha
+        # explícita, herda a do piquete; sem piquete, a propriedade padrão.
+        # É o que permite a B4.3 exigir a coluna depois.
+        if property_id is None and lote_id:
+            r = con.execute(
+                "SELECT property_id FROM lotes WHERE id=?", (lote_id,)).fetchone()
+            property_id = r["property_id"] if r else None
+        if property_id is None:
+            r = con.execute(
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
+            property_id = r["id"] if r else None
+
         con.execute(
             """INSERT INTO animals
                (id,uuid,breed,sex,birth_date,birth_estimated,age_source,nf_number,
                 gta_number,entry_date,entry_weight,current_weight,target_weight,
-                purchase_price,purchase_mode,lote_id,fornecedor_id,notes)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                purchase_price,purchase_mode,lote_id,property_id,fornecedor_id,notes)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (animal_id, _uuid_novo, breed, sex, birth_date or None,
              int(birth_estimated), age_source,
              nf_number or None, gta_number or None, entry_date,
              entry_weight, entry_weight, target_weight, purchase_price,
-             purchase_mode, lote_id or None, fornecedor_id or None, notes),
+             purchase_mode, lote_id or None, property_id,
+             fornecedor_id or None, notes),
         )
         con.execute(
             "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
@@ -119,8 +132,14 @@ def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator=
         if row is None:
             raise ValueError(f"Animal {animal_id} não encontrado.")
         from_lote = row["lote_id"]
+        # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
+        # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
+        destino = con.execute(
+            "SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
         con.execute(
-            "UPDATE animals SET lote_id=? WHERE id=?", (to_lote_id, animal_id)
+            "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) "
+            "WHERE id=?",
+            (to_lote_id, destino["property_id"] if destino else None, animal_id)
         )
         con.execute(
             """INSERT INTO animal_movements

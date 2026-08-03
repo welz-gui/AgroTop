@@ -46,6 +46,7 @@ from services.importacao import parse_pesagens  # noqa: F401
 # importar do repositório diretamente. **Não adicione consulta nova aqui.**
 from repositories import identificadores as identificadores  # noqa: F401
 from repositories import eventos as eventos  # noqa: F401
+from repositories import propriedades as propriedades  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -127,17 +128,75 @@ def init_db() -> None:
                 created_at TEXT DEFAULT (datetime('now','localtime'))
             );
 
+            -- ADR 0004 · etapa B4 — §3.1: Organização → Produtor → Propriedade.
+            -- O PNIB exige a hierarquia mesmo com uma fazenda só, porque o
+            -- titular pode ter várias propriedades e movimentar animais entre
+            -- elas (§8.1). Sem isso, `lote_id` (piquete) seria a única noção de
+            -- lugar — e piquete não é estabelecimento perante o órgão.
+            CREATE TABLE IF NOT EXISTS organizacoes (
+                id                TEXT PRIMARY KEY,   -- uuid
+                nome              TEXT NOT NULL,
+                documento         TEXT,               -- CPF ou CNPJ
+                responsavel_legal TEXT,
+                contato           TEXT,
+                status            TEXT NOT NULL DEFAULT 'ativa',
+                created_at        TEXT DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS produtores (
+                id                 TEXT PRIMARY KEY,  -- uuid
+                organizacao_id     TEXT NOT NULL,
+                nome               TEXT NOT NULL,
+                documento          TEXT,
+                inscricao_estadual TEXT,
+                contato            TEXT,
+                status             TEXT NOT NULL DEFAULT 'ativo',
+                created_at         TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id)
+            );
+
+            -- §3.4: o identificador da propriedade é INTERNO E IMUTÁVEL. O
+            -- `codigo_oficial` do estabelecimento pode mudar ou nem existir
+            -- ainda — mesma razão de o animal ter uuid separado do brinco.
+            CREATE TABLE IF NOT EXISTS properties (
+                id             TEXT PRIMARY KEY,      -- uuid
+                produtor_id    TEXT NOT NULL,
+                nome           TEXT NOT NULL,
+                codigo_oficial TEXT,
+                municipio      TEXT,
+                uf             TEXT,
+                endereco       TEXT,
+                latitude       REAL,
+                longitude      REAL,
+                poligono       TEXT,   -- GeoJSON; alimentado pela spec 0015
+                atividade      TEXT,
+                situacao       TEXT NOT NULL DEFAULT 'ativa',
+                inicio         TEXT,
+                encerramento   TEXT,
+                created_at     TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (produtor_id) REFERENCES produtores(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_properties_produtor
+                ON properties (produtor_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_codigo_oficial
+                ON properties (codigo_oficial) WHERE codigo_oficial IS NOT NULL;
+
             -- Lotes / Piquetes
             CREATE TABLE IF NOT EXISTS lotes (
                 id              TEXT PRIMARY KEY,
                 name            TEXT NOT NULL,
+                -- §3.4: piquete pertence a uma propriedade. Anulável nesta
+                -- etapa; vira obrigatório na B4.3, depois de as escritas
+                -- preencherem — mesma ordem que funcionou no B1.
+                property_id     TEXT,
                 area_ha         REAL DEFAULT 0,
                 capacity_ua     REAL DEFAULT 0,
                 status          TEXT DEFAULT 'ativo',
                 last_entry_date TEXT,
                 last_exit_date  TEXT,
                 notes           TEXT,
-                created_at      TEXT DEFAULT (datetime('now','localtime'))
+                created_at      TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (property_id) REFERENCES properties(id)
             );
 
             -- Animais
@@ -161,6 +220,8 @@ def init_db() -> None:
                 target_weight    REAL DEFAULT 500,
                 status           TEXT NOT NULL DEFAULT 'ativo',
                 lote_id          TEXT,
+                -- §3.4 · etapa B4. Anulável nesta etapa; obrigatório na B4.3.
+                property_id      TEXT,
                 fornecedor_id    INTEGER,
                 purchase_price   REAL DEFAULT 0,
                 purchase_mode    TEXT DEFAULT 'cabeca',
@@ -169,6 +230,7 @@ def init_db() -> None:
                 notes            TEXT,
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (lote_id)       REFERENCES lotes(id),
+                FOREIGN KEY (property_id)   REFERENCES properties(id),
                 FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id)
             );
 
@@ -551,6 +613,10 @@ def init_db() -> None:
         _backfill_uuids(con)
         _backfill_animal_uuid(con)
         _backfill_identificadores(con)
+        # ADR 0004 etapa B4 — hierarquia §3. Vem DEPOIS do seed de animais e
+        # lotes, porque o backfill precisa deles já existindo para apontar.
+        propriedades._seed_hierarquia(con)
+        propriedades._backfill_property_id(con)
 
 
 def _migrate(con) -> None:
@@ -1102,11 +1168,24 @@ def get_lote(lote_id: str) -> Optional[dict]:
 
 
 @_writes
-def add_lote(lote_id, name, area_ha, capacity_ua, notes="") -> None:
+def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
+             property_id=None) -> None:
+    """Cria um piquete. Sem `property_id`, assume a propriedade padrão (§3.4).
+
+    Assumir é aceitável enquanto existe uma propriedade só. Com várias, a
+    interface tem de perguntar — piquete atribuído à propriedade errada é erro
+    de localização, e localização errada num sistema de rastreabilidade é pior
+    que localização ausente.
+    """
     with _conn() as con:
+        if property_id is None:
+            row = con.execute(
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
+            property_id = row["id"] if row else None
         con.execute(
-            "INSERT INTO lotes (id,name,area_ha,capacity_ua,notes) VALUES(?,?,?,?,?)",
-            (lote_id, name, area_ha, capacity_ua, notes),
+            "INSERT INTO lotes (id,name,property_id,area_ha,capacity_ua,notes) "
+            "VALUES(?,?,?,?,?,?)",
+            (lote_id, name, property_id, area_ha, capacity_ua, notes),
         )
 
 

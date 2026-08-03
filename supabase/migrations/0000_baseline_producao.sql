@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-02 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-03 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: triggers, funções, políticas de RLS, grants, extensões.
@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS animals (
     purchase_mode text DEFAULT 'cabeca'::text,
     purchase_lot_ref text,
     uuid text NOT NULL,
+    property_id text,
     CONSTRAINT animals_pkey PRIMARY KEY (id),
     CONSTRAINT animals_uuid_key UNIQUE (uuid)
 );
@@ -266,6 +267,7 @@ CREATE TABLE IF NOT EXISTS lotes (
     last_exit_date text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    property_id text,
     CONSTRAINT lotes_pkey PRIMARY KEY (id)
 );
 
@@ -286,6 +288,17 @@ CREATE TABLE IF NOT EXISTS medications (
     CONSTRAINT medications_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS organizacoes (
+    id text NOT NULL,
+    nome text NOT NULL,
+    documento text,
+    responsavel_legal text,
+    contato text,
+    status text DEFAULT 'ativa'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organizacoes_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS pluviometria (
     id bigserial,
     read_date text NOT NULL,
@@ -295,6 +308,37 @@ CREATE TABLE IF NOT EXISTS pluviometria (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT pluviometria_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS produtores (
+    id text NOT NULL,
+    organizacao_id text NOT NULL,
+    nome text NOT NULL,
+    documento text,
+    inscricao_estadual text,
+    contato text,
+    status text DEFAULT 'ativo'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT produtores_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS properties (
+    id text NOT NULL,
+    produtor_id text NOT NULL,
+    nome text NOT NULL,
+    codigo_oficial text,
+    municipio text,
+    uf text,
+    endereco text,
+    latitude double precision,
+    longitude double precision,
+    poligono text,
+    atividade text,
+    situacao text DEFAULT 'ativa'::text NOT NULL,
+    inicio text,
+    encerramento text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT properties_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS sales (
@@ -361,6 +405,7 @@ ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FORE
 ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
 ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
@@ -368,8 +413,11 @@ ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY 
 ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE lotes ADD CONSTRAINT fk_lotes_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE produtores ADD CONSTRAINT produtores_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id);
+ALTER TABLE properties ADD CONSTRAINT properties_produtor_id_fkey FOREIGN KEY (produtor_id) REFERENCES produtores(id);
 ALTER TABLE sales ADD CONSTRAINT fk_sales_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 
@@ -382,6 +430,7 @@ CREATE INDEX IF NOT EXISTS idx_ident_animal ON animal_identifiers USING btree (a
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers USING btree (tipo, valor) WHERE (status = 'ativo'::text);
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_animals_property ON animals USING btree (property_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_audit_entidade ON audit_logs USING btree (entidade, entidade_id);
 CREATE INDEX IF NOT EXISTS idx_audit_ocorrido ON audit_logs USING btree (ocorrido_em DESC);
@@ -392,6 +441,8 @@ CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (an
 CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications USING btree (protocol_id);
 CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_date);
 CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_codigo_oficial ON properties USING btree (codigo_oficial) WHERE (codigo_oficial IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_properties_produtor ON properties USING btree (produtor_id);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales USING btree (sale_date);
 CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings USING btree (animal_uuid, weigh_date DESC);
 CREATE INDEX IF NOT EXISTS idx_weighings_date ON weighings USING btree (weigh_date DESC);
