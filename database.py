@@ -50,6 +50,7 @@ from repositories import propriedades as propriedades  # noqa: F401
 from repositories import nascimentos as nascimentos  # noqa: F401
 from repositories import movimentacoes as movimentacoes  # noqa: F401
 from repositories import dispositivos as dispositivos  # noqa: F401
+from repositories import regras as regras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -201,6 +202,48 @@ def init_db() -> None:
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (property_id) REFERENCES properties(id)
             );
+
+            -- ADR 0004 · etapa B5 — §11: motor de regras regulatórias.
+            -- O §11 abre dizendo que "as regras não devem ficar fixadas no
+            -- código-fonte". A portaria muda, cada UF acrescenta a sua, e um
+            -- frigorífico impõe protocolo próprio — codificar isso em `if`
+            -- significaria alterar o sistema a cada mudança normativa.
+            CREATE TABLE IF NOT EXISTS regras_regulatorias (
+                id                   TEXT PRIMARY KEY,   -- uuid
+                nome                 TEXT NOT NULL,
+                descricao            TEXT,
+                fundamento           TEXT,   -- portaria, IN, protocolo
+                -- federal | estadual | protocolo | interna
+                esfera               TEXT NOT NULL DEFAULT 'federal',
+                uf                   TEXT,   -- NULL = vale para todas
+                especie              TEXT,
+                categoria            TEXT,
+                sexo                 TEXT,
+                idade_min_meses      INTEGER,
+                idade_max_meses      INTEGER,
+                finalidade           TEXT,
+                evento_aplicacao     TEXT,   -- movimentacao | abate | nascimento…
+                -- VIGÊNCIA: a regra que vale em 2027 não é a que vale em 2030.
+                -- O próprio PNIB tem prazo escalonado (identificação obrigatória
+                -- para trânsito só a partir de 01/01/2033).
+                data_inicial         TEXT,
+                data_final           TEXT,
+                -- informativo | alerta | bloqueio
+                nivel                TEXT NOT NULL DEFAULT 'informativo',
+                condicao             TEXT,   -- JSON: campo/operador/valor
+                mensagem             TEXT,
+                excecoes             TEXT,
+                documentacao_exigida TEXT,
+                versao               INTEGER NOT NULL DEFAULT 1,
+                aprovado_por         TEXT,
+                ultima_revisao       TEXT,
+                ativa                INTEGER NOT NULL DEFAULT 1,
+                created_at           TEXT DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_regras_vigencia
+                ON regras_regulatorias (ativa, data_inicial, data_final);
+            CREATE INDEX IF NOT EXISTS idx_regras_evento
+                ON regras_regulatorias (evento_aplicacao, uf);
 
             -- ADR 0004 · etapa B7 — §5: estoque de dispositivos de identificação.
             -- O brinco é um BEM antes de ser identidade: é comprado em lote,

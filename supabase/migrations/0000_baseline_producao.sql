@@ -421,6 +421,35 @@ CREATE TABLE IF NOT EXISTS properties (
     CONSTRAINT properties_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS regras_regulatorias (
+    id text NOT NULL,
+    nome text NOT NULL,
+    descricao text,
+    fundamento text,
+    esfera text DEFAULT 'federal'::text NOT NULL,
+    uf text,
+    especie text,
+    categoria text,
+    sexo text,
+    idade_min_meses integer,
+    idade_max_meses integer,
+    finalidade text,
+    evento_aplicacao text,
+    data_inicial text,
+    data_final text,
+    nivel text DEFAULT 'informativo'::text NOT NULL,
+    condicao jsonb,
+    mensagem text,
+    excecoes text,
+    documentacao_exigida text,
+    versao integer DEFAULT 1 NOT NULL,
+    aprovado_por text,
+    ultima_revisao text,
+    ativa integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT regras_regulatorias_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS sales (
     id bigserial,
     sale_date text NOT NULL,
@@ -549,6 +578,8 @@ CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_dat
 CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_codigo_oficial ON properties USING btree (codigo_oficial) WHERE (codigo_oficial IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_properties_produtor ON properties USING btree (produtor_id);
+CREATE INDEX IF NOT EXISTS idx_regras_evento ON regras_regulatorias USING btree (evento_aplicacao, uf);
+CREATE INDEX IF NOT EXISTS idx_regras_vigencia ON regras_regulatorias USING btree (ativa, data_inicial, data_final);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales USING btree (sale_date);
 CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings USING btree (animal_uuid, weigh_date DESC);
 CREATE INDEX IF NOT EXISTS idx_weighings_date ON weighings USING btree (weigh_date DESC);

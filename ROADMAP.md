@@ -273,10 +273,22 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 | B2 | ✅ **`animal_events` + auditoria** | concluída em 2026-08-02, append-only por gatilho |
 | B3 | ✅ **Genealogia e nascimentos** | concluída em 2026-08-03 — `partos`, vínculo materno auditado, pendências do §7.3 |
 | B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; falta só a B4.3 (NOT NULL) |
-| B5 | **Motor de regras regulatórias** | Estende a spec 0011 com vigência, UF e nível (§11) |
+| B5 | ✅ **Motor de regras regulatórias** | concluída em 2026-08-03 — regras como dado, com vigência, versionamento e simulação |
 | B6 | ✅ **Movimentações entre propriedades + GTA** | concluída em 2026-08-03 — três níveis do §8.4, divergência de recepção |
 | B7 | ✅ **Módulo de dispositivos (brincos)** | concluída em 2026-08-03 — 12 estados, conferência visual×eletrônico, inventário |
 | — | **Integrações oficiais** | ⛔ **Bloqueado**: as APIs não existem, e o §23 lista 19 pontos não confirmados |
+
+### ✅ Fase B CONCLUÍDA em 2026-08-03
+
+Todas as sete etapas (B1 a B7) estão em produção. O AgroTop tem agora a fundação
+regulatória que o PNIB exige: identidade imutável separada do brinco, eventos e
+auditoria append-only, genealogia, hierarquia de propriedades, movimentação com
+GTA, estoque de dispositivos e motor de regras configurável com vigência.
+
+**O que a Fase B NÃO fez, e é proposital:** nada disso está ligado à interface
+ainda, salvo o que já foi integrado antes. As tabelas existem, as regras existem,
+os repositórios existem — falta a tela. É o trabalho que vem a seguir, e é o que
+transforma conformidade de arquitetura em conformidade de uso.
 
 ### ⚠️ Revisão de 2026-08-01 — o gate é B1+B2, não B1–B7
 
