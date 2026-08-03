@@ -819,10 +819,7 @@ def _colunas(con, tabela: str) -> set:
     e não enxerga o caminho Postgres.
     """
     if _conexao.USE_PG:
-        rows = con.execute(
-            "SELECT column_name AS name FROM information_schema.columns "
-            "WHERE table_schema='public' AND table_name=?", (tabela,)
-        ).fetchall()
+        rows = con.execute(f"PRAGMA table_info({tabela})").fetchall()
     else:
         rows = con.execute(f"PRAGMA table_info({tabela})").fetchall()
     return {r["name"] for r in rows}
