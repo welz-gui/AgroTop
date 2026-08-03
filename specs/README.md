@@ -140,14 +140,14 @@ deploy do Streamlit Cloud.
 A primeira frase precisa conter a palavra **worktree** — é o que autoriza o agente a se
 isolar. Escolha a variante conforme **quantos agentes você vai iniciar**.
 
-#### Variante A — o agente pega a próxima livre ⚠️ **desaconselhada**
+#### Variante A — o agente pega a próxima livre (autoatendimento)
 
-> 🛑 **Não use, salvo motivo forte.** Ela depende de o agente ler o quadro e o quadro estar
-> correto — e o quadro **atrasa**, porque é mantido à mão. Foi assim que a spec 0015 foi
-> implementada duas vezes em 2026-08-02.
->
-> **Prefira a Variante B**, que atribui a spec no prompt: zero corrida, zero dependência de
-> o quadro estar em dia. O custo é você escolher a spec, o que leva dez segundos.
+Viável **desde que a verificação venha antes do trabalho**. A versão antiga desta variante
+falhou porque o agente descobria a colisão só ao publicar; a de agora **reivindica primeiro
+e trabalha depois**, e pular de tarefa durante a seleção não custa nada (R34).
+
+Continua valendo: **um agente por vez**. A reivindicação atômica protege contra dois pushes
+simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
