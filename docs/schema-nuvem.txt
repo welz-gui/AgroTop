@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-08-02 por tools/dump_schema_nuvem.py
+# Extraído em 2026-08-03 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -84,6 +84,7 @@ animals.created_at
 animals.purchase_mode
 animals.purchase_lot_ref
 animals.uuid
+animals.property_id
 audit_logs.id
 audit_logs.usuario
 audit_logs.ocorrido_em
@@ -194,6 +195,7 @@ lotes.last_entry_date
 lotes.last_exit_date
 lotes.notes
 lotes.created_at
+lotes.property_id
 medications.id
 medications.medication_name
 medications.dose
@@ -207,6 +209,13 @@ medications.notes
 medications.created_at
 medications.protocol_id
 medications.animal_uuid
+organizacoes.id
+organizacoes.nome
+organizacoes.documento
+organizacoes.responsavel_legal
+organizacoes.contato
+organizacoes.status
+organizacoes.created_at
 pluviometria.id
 pluviometria.read_date
 pluviometria.rain_mm
@@ -214,6 +223,29 @@ pluviometria.lote_id
 pluviometria.operator
 pluviometria.notes
 pluviometria.created_at
+produtores.id
+produtores.organizacao_id
+produtores.nome
+produtores.documento
+produtores.inscricao_estadual
+produtores.contato
+produtores.status
+produtores.created_at
+properties.id
+properties.produtor_id
+properties.nome
+properties.codigo_oficial
+properties.municipio
+properties.uf
+properties.endereco
+properties.latitude
+properties.longitude
+properties.poligono
+properties.atividade
+properties.situacao
+properties.inicio
+properties.encerramento
+properties.created_at
 sales.id
 sales.sale_date
 sales.sale_type
