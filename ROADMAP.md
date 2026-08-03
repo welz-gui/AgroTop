@@ -725,6 +725,20 @@ A regra de o agente remover o próprio worktree existe desde a primeira rodada e
 valendo. Mas sete falhas mostram que **regra que depende de o agente lembrar não é
 suficiente**: a limpeza precisa de um dono, e o dono é quem faz o merge.
 
+### R34. Colisão de tarefa: o agente PARA, não pega outra
+
+Se a reivindicação falhar porque outro agente já tomou a tarefa, o agente **para e avisa**.
+Nunca escolhe a próxima sozinho.
+
+*Histórico: até 2026-08-03 o `specs/QUADRO.md` mandava o contrário — "pegue a próxima e não
+insista". O efeito era o oposto do pretendido: o agente executava a tarefa inteira, descobria
+a colisão só ao publicar, e então fazia **outra tarefa completa** na mesma sessão. Duas
+entregas, uma jogada fora, dois PRs para revisar — e a colisão nunca chegava a quem coordena.*
+
+Corolário que vale mais que a regra: **reivindicar tem de ser o primeiro comando**, antes de
+ler a spec e antes de qualquer trabalho. Reivindicação feita no fim não protege nada — só
+descobre o desperdício depois de pagá-lo.
+
 ⚠️ Antes de remover um worktree, veja se há arquivo não commitado dentro dele e **compare
 com a `main`**. No caso do 0017 havia dois arquivos que pareciam trabalho perdido e eram
 rascunho anterior ao que já fora mesclado — só a comparação revelou isso.

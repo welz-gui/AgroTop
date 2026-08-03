@@ -159,8 +159,10 @@ isolar. Escolha a variante conforme **quantos agentes você vai iniciar**.
 >    git ls-remote --heads origin                        # ver o que já está tomado
 >    git push origin HEAD:refs/heads/<branch-da-spec>    # reivindicar — ATÔMICO
 >    ```
->    Se o push falhar dizendo que a referência já existe, a tarefa está tomada: **pegue a
->    próxima e não insista**. Não edite o quadro — quem atualiza é o mantenedor.
+>    Se o push falhar dizendo que a referência já existe, a tarefa está tomada:
+>    **PARE e avise quem te instruiu. NÃO pegue outra tarefa** — pegar outra faz você
+>    executar duas numa sessão, uma delas jogada fora, e esconde a colisão de quem coordena.
+>    Não edite o quadro — quem atualiza é o mantenedor.
 > 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
 > 5. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.

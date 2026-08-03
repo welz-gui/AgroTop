@@ -247,11 +247,30 @@ git ls-remote --heads origin        # ver o que já está tomado
 git push origin HEAD:refs/heads/<branch-da-spec>   # reivindicar — ATÔMICO
 ```
 
-Se o push falhar com referência já existente, a tarefa está tomada: **pegue a próxima e não
-insista**. A operação é atômica, então dois agentes simultâneos não vencem os dois.
+Se o push falhar com referência já existente, a tarefa está tomada. **PARE e avise quem te
+instruiu. NÃO pegue outra tarefa.**
 
-Mas note: isso protege contra colisão **no push**, não contra dois agentes trabalharem em
-paralelo antes de empurrar. Só use com um agente ativo por vez.
+> ### 🛑 Por que "pegue a próxima" era a instrução errada
+>
+> Este documento mandava, até 2026-08-03, *"pegue a próxima e não insista"* — e isso
+> **causava** o desperdício que pretendia evitar.
+>
+> O que acontecia: o agente lia o quadro, escolhia uma tarefa, **executava o trabalho
+> inteiro** e só ao tentar publicar descobria que outro agente já a tinha. Obedecendo à
+> instrução, pegava outra e fazia tudo de novo — **duas tarefas numa sessão, uma jogada
+> fora**, dois PRs para revisar, e a colisão invisível para quem coordena.
+>
+> Parar é melhor por quatro razões:
+>
+> 1. o contexto do agente já está contaminado pela tarefa abandonada;
+> 2. duas entregas numa sessão são mais difíceis de revisar que duas sessões;
+> 3. quem coordena pode **não querer** a próxima tarefa feita agora;
+> 4. se o agente segue sozinho, a colisão nunca chega ao humano — e o processo não aprende.
+
+A reivindicação é atômica, então dois agentes simultâneos não vencem os dois. Mas ela
+protege contra colisão **no push**, não contra dois agentes trabalharem em paralelo antes de
+empurrar — e é por isso que **reivindicar tem de ser o PRIMEIRO comando**, antes de ler a
+spec, antes de qualquer trabalho. Reivindicar no fim não protege nada.
 
 ## Reivindicações paradas
 
