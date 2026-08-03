@@ -15,30 +15,51 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
 | # | Tarefa | Tipo | Risco | Estado |
 |---|---|---|---|---|
-| [0001](0001-ci-actions-node24.md) | Atualizar actions do CI (Node 20 → 24) | manutenção | baixo | 🟢 disponível |
-| [0002](0002-pwa-instalavel.md) | PWA: AgroTop instalável no celular | funcionalidade | baixo | 🟢 disponível |
-| [0003](0003-poc-mapa-piquetes.md) | PoC: biblioteca de mapa para desenhar piquete | pesquisa | baixo | 🟢 disponível |
-| [0004](0004-poc-ndvi-viabilidade.md) | PoC: NDVI é viável? (nuvem em MT) | pesquisa | baixo | 🟢 disponível |
-| [0005](0005-poc-flutter-api.md) | PoC: esqueleto Flutter + API autenticada | pesquisa | médio | 🟢 disponível |
-| [0006](0006-poc-dados-modelos-preditivos.md) | PoC: quanto histórico os modelos exigem | pesquisa | baixo | 🟢 disponível |
-| [0008](0008-importacao-pesagens-csv.md) | Importação de pesagens por CSV (parser puro) | implementação | baixo | 🟢 disponível |
-| [0009](0009-deteccao-peso-suspeito.md) | Detecção de pesagem suspeita | implementação | baixo | 🟢 disponível |
-| [0010](0010-custo-medio-ponderado.md) | Custo médio ponderado + ADR | implementação | baixo | 🟢 disponível |
-| [0011](0011-motor-de-regras.md) | Motor de regras de recomendação | implementação | baixo | 🟢 disponível |
-| [0012](0012-maquina-estados-animal.md) | 🇧🇷 Máquina de estados do animal (PNIB §4.4) | implementação | baixo | 🟢 disponível |
-| [0013](0013-validacoes-consistencia-regulatoria.md) | 🇧🇷 Validações de consistência (PNIB §17.3) | implementação | baixo | 🟢 disponível |
-| [0014](0014-validador-identificadores.md) | 🇧🇷 Validador de identificadores (PNIB §4.2) | implementação | baixo | 🟢 disponível |
-| [0015](0015-geometria-piquetes.md) | Área e centroide do piquete pelo polígono | implementação | baixo | 🟢 disponível |
-| [0016](0016-indicador-completude-dados.md) | Indicador de completude de dados | implementação | baixo | 🟢 disponível |
-| [0017](0017-lucro-por-raca.md) | Lucro por raça e cruzamento | implementação | baixo | 🟢 disponível |
-| 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada |
+| [0001](0001-ci-actions-node24.md) | Atualizar actions do CI (Node 20 → 24) | manutenção | baixo | ✅ concluída |
+| [0002](0002-pwa-instalavel.md) | PWA: AgroTop instalável no celular | funcionalidade | baixo | ✅ concluída |
+| [0003](0003-poc-mapa-piquetes.md) | PoC: biblioteca de mapa para desenhar piquete | pesquisa | baixo | ✅ concluída |
+| [0004](0004-poc-ndvi-viabilidade.md) | PoC: NDVI é viável? (nuvem em MT) | pesquisa | baixo | ✅ concluída |
+| [0005](0005-poc-flutter-api.md) | PoC: esqueleto Flutter + API autenticada | pesquisa | médio | ✅ concluída |
+| [0006](0006-poc-dados-modelos-preditivos.md) | PoC: quanto histórico os modelos exigem | pesquisa | baixo | ✅ concluída |
+| [0008](0008-importacao-pesagens-csv.md) | Importação de pesagens por CSV (parser puro) | implementação | baixo | ✅ concluída |
+| [0009](0009-deteccao-peso-suspeito.md) | Detecção de pesagem suspeita | implementação | baixo | ✅ concluída |
+| [0010](0010-custo-medio-ponderado.md) | Custo médio ponderado + ADR | implementação | baixo | ✅ concluída |
+| [0011](0011-motor-de-regras.md) | Motor de regras de recomendação | implementação | baixo | ✅ concluída |
+| [0012](0012-maquina-estados-animal.md) | 🇧🇷 Máquina de estados do animal (PNIB §4.4) | implementação | baixo | ✅ concluída |
+| [0013](0013-validacoes-consistencia-regulatoria.md) | 🇧🇷 Validações de consistência (PNIB §17.3) | implementação | baixo | ✅ concluída |
+| [0014](0014-validador-identificadores.md) | 🇧🇷 Validador de identificadores (PNIB §4.2) | implementação | baixo | ✅ concluída |
+| [0015](0015-geometria-piquetes.md) | Área e centroide do piquete pelo polígono | implementação | baixo | ✅ concluída |
+| [0016](0016-indicador-completude-dados.md) | Indicador de completude de dados | implementação | baixo | ✅ concluída |
+| [0017](0017-lucro-por-raca.md) | Lucro por raça e cruzamento | implementação | baixo | ✅ concluída |
+| [0018](0018-previsao-de-estoque.md) | Previsão de ruptura de estoque | implementação | baixo | 🟢 disponível |
+| [0019](0019-rateio-de-custo-de-lote.md) | Rateio de custo de lote entre animais | implementação | baixo | 🟢 disponível |
+| [0020](0020-custo-de-dieta.md) | Custo de dieta multi-ingrediente | implementação | baixo | 🟢 disponível |
+| [0021](0021-competencia-e-caixa.md) | Competência × caixa e fluxo projetado | implementação | baixo | 🟢 disponível |
+| [0022](0022-validacao-de-genealogia.md) | 🇧🇷 Validação de vínculo materno (§7) | implementação | baixo | 🟢 disponível |
+| [0023](0023-validacao-de-gta.md) | 🇧🇷 Validação de GTA e trânsito (§8) | implementação | baixo | 🟢 disponível |
+| [0024](0024-auditoria-de-cores.md) | Auditoria de cores — destrava a 0007 | ferramenta | baixo | 🟢 disponível |
+| [0025](0025-postgres-no-ci.md) | Postgres no CI | infraestrutura | **médio** | 🟢 disponível |
+| [0026](0026-controle-de-brincos.md) | 🇧🇷 Controle de estoque de brincos (§5) | implementação | baixo | 🟢 disponível |
+| [0027](0027-projecao-de-abate.md) | Projeção de abate e chuva × GMD | implementação | baixo | 🟢 disponível |
+| 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada pela 0024 |
 
-**0007 está bloqueada de propósito:** são 198 substituições em `app.py` (3.280 linhas) sem
-nenhum teste de UI, e a verificação é visual, tela por tela. Não delegue enquanto não houver
-como provar que nada mudou de aparência.
+**0007 continua bloqueada, mas agora tem caminho.** São ~198 substituições em `app.py` sem
+como provar que a aparência não mudou. O `AppTest` (desde o PR #44) prova que um widget
+existe, **não qual cor ele tem**.
 
-**Estados:** 🟢 disponível · 🟡 em andamento (anote quem pegou) · ✅ concluída (link do PR) ·
-⚪ arquivada.
+A saída é comparar **valor por valor**: se `#4ade80` vira `cores["sucesso"]` e
+`cores["sucesso"] == "#4ade80"`, a aparência não pode ter mudado — é identidade, não
+semelhança. A **spec 0024** entrega o mapa que isso exige. O mantenedor já decidiu o que
+fazer com hex sem token correspondente: **criar token novo, aproximado ao existente mais
+próximo**. Depois da 0024, a 0007 pode ser escrita com critério verificável.
+
+**Estados:** 🟢 disponível · 🟡 em andamento (anote quem pegou) · ✅ concluída ·
+🔴 bloqueada · ⚪ arquivada.
+
+> ⚠️ **Esta tabela também é mantida à mão e também atrasa.** Em 2026-08-03 ela ainda listava
+> quinze specs concluídas como "disponível". **Não decida se uma tarefa está feita por aqui**
+> — confira se o arquivo que a spec manda criar já existe na `origin/main`. O código não
+> atrasa.
 
 > **Atribua a spec no prompt.** Deixar o agente escolher foi tentado e falhou: dois agentes
 > começaram a mesma spec 0001 sem marcar o quadro. Ver [QUADRO.md](QUADRO.md).
@@ -154,6 +175,18 @@ projeto. Você não precisa escolher a spec.
 
 #### Continuação, igual nas duas variantes
 
+> **Confirme que a tarefa ainda não foi feita.** A spec diz qual arquivo criar; se ele já
+> existe na `origin/main`, ela já foi entregue:
+> ```
+> git fetch origin
+> git cat-file -e origin/main:services/<modulo-da-spec>.py 2>/dev/null \
+>   && echo "JA EXISTE - pare e avise quem te instruiu" \
+>   || echo "nao existe - pode seguir"
+> ```
+> Em 2026-08-02 a spec 0015 foi implementada **duas vezes**, porque o quadro continuava
+> marcando como livre uma tarefa já entregue. **O código é a fonte da verdade; o quadro é só
+> a fila de prioridade** — e ele é mantido à mão, então atrasa.
+>
 > **Antes de escrever qualquer arquivo, prove que está dentro do worktree** — não na pasta
 > principal do mantenedor:
 > ```
@@ -328,9 +361,30 @@ checkout do mantenedor.
 Depois que o PR for aberto, saia do worktree — `ExitWorktree` (ação `keep`) ou
 `git worktree remove <caminho>`.
 
-*Por quê:* três worktrees ficaram órfãos na primeira rodada, dois deles em `C:/tmp`. Eles
-**seguram o branch** e impedem o mantenedor de trabalhar nele: um `git checkout` falhou com
-`branch is already used by worktree`.
+*Por quê:* **já aconteceu sete vezes.** Três na primeira rodada, dois deles em `C:/tmp`; o
+mais recente em 2026-08-03, quando `AgroTop-0017` sobreviveu ao merge do PR #55 e segurou o
+branch `feat/lucro-por-raca` mesmo depois de o remoto ter sido apagado.
+
+Worktree abandonado **segura o branch**: `git branch -D` falha com
+`cannot delete branch used by worktree`, e o mantenedor descobre isso semanas depois, ao
+tentar limpar. Também deixa arquivos soltos que ninguém sabe se são trabalho perdido ou
+rascunho — no caso do 0017, eram um rascunho anterior ao que foi mesclado, e alguém teve de
+comparar arquivo por arquivo antes de apagar.
+
+> ### 🧹 Limpeza — responsabilidade do MANTENEDOR, não do agente
+>
+> A regra acima depende de o agente lembrar, e sete ocorrências mostram que isso não basta.
+> **Rode isto depois de cada rodada de merges:**
+>
+> ```bash
+> git fetch --prune
+> git worktree list            # algum worktree além do principal?
+> git worktree prune           # remove os que já não têm pasta
+> git branch -vv | grep gone   # branches locais cujo remoto sumiu
+> ```
+>
+> Um worktree listado que você não está usando é resíduo. Antes de remover, olhe se há
+> arquivo não commitado lá dentro — e compare com a `main` antes de descartar.
 
 ### 3. Abra o PR pronto para revisão, nunca como rascunho
 

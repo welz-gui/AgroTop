@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-07-30 · Estado: **Fase A em execução**
+Última atualização: 2026-08-03 · Estado: **Fase A concluída · B1 e B2 concluídos**
 
 ---
 
@@ -17,10 +17,14 @@ SQLite para desenvolvimento e teste.
 |---|---|
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
-| Schema | **194 colunas / 21 tabelas**, paridade total entre DDL local e produção |
-| Testes | 21, verdes no CI |
-| Código | `app.py` (~3.280 linhas) + `database.py` (~2.430 linhas) — monolítico |
-| Rebanho real | ~150–200 animais ativos + histórico (os 12 do banco atual são **dados fictícios de seed**) |
+| Schema | **241 colunas / 24 tabelas**, paridade total entre DDL local e produção |
+| Testes | **260**, verdes no CI |
+| Código | `app.py` (~3.700) · `database.py` (~1.800, fachada) · `repositories/` (7) · `services/` (13) · `ui/` |
+| Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
+
+> ⚠️ **Esta tabela envelhece rápido.** Em 2026-08-03 ela ainda dizia "21 testes" e "Fase A em
+> execução", meses depois de as duas coisas terem mudado. Se os números aqui não baterem com
+> o que você vê, **confie no código** e corrija esta tabela (R32).
 
 ### Funcionalidades em produção
 Cadastro (animais, lotes/piquetes, fornecedores, insumos) · pesagens, curva de peso,
@@ -684,6 +688,46 @@ colidir com a Fase A.
 O padrão: a spec fixa a **assinatura exata** da função; o agente entrega o módulo novo mais
 os testes; o mantenedor liga à interface e ao banco depois. Assim a trilha avança em
 paralelo ao refactor, e a integração fica barata — é ligar função pronta e testada.
+
+### R32. O código é a fonte da verdade sobre o que já foi feito — nunca o quadro
+
+Antes de começar qualquer spec, confira se o arquivo que ela manda criar **já existe na
+`origin/main`**:
+
+```bash
+git fetch origin
+git cat-file -e origin/main:services/<modulo>.py 2>/dev/null && echo "JA EXISTE"
+```
+
+*Histórico: em 2026-08-02 a spec 0015 foi implementada **duas vezes** — PR #46 e PR #50 —
+porque `specs/QUADRO.md` continuava marcando como livre uma tarefa entregue no dia anterior.
+Os dois módulos eram funcionalmente idênticos, com erro de 0,045 % contra o padrão
+geodésico nos dois casos. Um agente trabalhou para nada.*
+
+Quadro e índice são mantidos à mão e **sempre atrasam**. Marcar a conclusão no mesmo dia
+ajuda, mas depende de alguém lembrar; a conferência no código não depende de ninguém.
+
+### R33. Worktree abandonado é resíduo do mantenedor, não do agente
+
+Depois de cada rodada de merges:
+
+```bash
+git fetch --prune
+git worktree list && git worktree prune
+git branch -vv | grep gone
+```
+
+*Histórico: **sete ocorrências**. A mais recente em 2026-08-03, quando `AgroTop-0017`
+sobreviveu ao merge do PR #55 e segurou `feat/lucro-por-raca` mesmo com o branch remoto já
+apagado — `git branch -D` falhava com `cannot delete branch used by worktree`.*
+
+A regra de o agente remover o próprio worktree existe desde a primeira rodada e continua
+valendo. Mas sete falhas mostram que **regra que depende de o agente lembrar não é
+suficiente**: a limpeza precisa de um dono, e o dono é quem faz o merge.
+
+⚠️ Antes de remover um worktree, veja se há arquivo não commitado dentro dele e **compare
+com a `main`**. No caso do 0017 havia dois arquivos que pareciam trabalho perdido e eram
+rascunho anterior ao que já fora mesclado — só a comparação revelou isso.
 
 Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 
