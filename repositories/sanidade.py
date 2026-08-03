@@ -10,6 +10,7 @@ from typing import Optional
 
 from .animais import get_all_animals
 from .animais import uuid_de
+from . import eventos
 from .conexao import _cache, _conn, _writes
 
 
@@ -62,6 +63,14 @@ def add_medication(animal_id, medication_name, dose, unit, application_route,
                    VALUES(?,?,?,?,?,?,?)""",
                 (insumo_id, "saida", dose, "uso_animal", _uuid, med_date, applied_by),
             )
+        # `vacinacao` e `tratamento` sao tipos proprios no §6.1; sem campo que
+        # distinga um do outro, `manejo_sanitario` e o termo honesto.
+        eventos.registrar_em(
+            con, _uuid, "manejo_sanitario", ocorrido_em=med_date,
+            usuario_registro=applied_by,
+            observacoes=f"{medication_name} {dose}{unit}"
+                        + (f", carencia {withdrawal_days}d" if withdrawal_days else ""))
+
         # Atualiza status do animal se há carência
         if withdrawal_days and withdrawal_days > 0:
             con.execute(

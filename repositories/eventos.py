@@ -78,23 +78,48 @@ def _normalizar(linha) -> dict:
     return d
 
 
+def registrar_em(con, animal_uuid: str, tipo: str, **campos) -> dict:
+    """Grava o evento **na conexão do chamador**, dentro da transação dele.
+
+    É a forma que os repositórios usam. Duas razões:
+
+    1. `_conn()` abre conexão NOVA a cada chamada. Registrar de dentro de um
+       bloco aberto daria `database is locked` no SQLite e leitura suja no
+       Postgres — o `SELECT` de validação não enxergaria o animal recém-inserido.
+    2. **Atomicidade.** Operação e evento entram juntos ou não entram. Numa base
+       de rastreabilidade, pesagem gravada sem evento correspondente é
+       exatamente o buraco que o §6 existe para fechar.
+    """
+    return _gravar(con, animal_uuid, tipo, **campos)
+
+
 @_writes
-def registrar(animal_uuid: str, tipo: str, *,
-              ocorrido_em: Optional[str] = None,
-              usuario_registro: str = "",
-              responsavel: str = "",
-              origem_informacao: str = "web",
-              propriedade_id: Optional[str] = None,
-              local_interno: Optional[str] = None,
-              latitude: Optional[float] = None,
-              longitude: Optional[float] = None,
-              observacoes: str = "",
-              documento: Optional[str] = None,
-              anexos=None,
-              justificativa: str = "",
-              evento_anterior_id: Optional[int] = None,
-              versao: int = 1) -> dict:
-    """Grava um evento. Nunca sobrescreve nada.
+def registrar(animal_uuid: str, tipo: str, **campos) -> dict:
+    """Grava um evento abrindo a própria conexão.
+
+    Use quando não houver transação em curso. De dentro de um repositório,
+    prefira `registrar_em(con, ...)`.
+    """
+    with _conn() as con:
+        return _gravar(con, animal_uuid, tipo, **campos)
+
+
+def _gravar(con, animal_uuid: str, tipo: str, *,
+            ocorrido_em: Optional[str] = None,
+            usuario_registro: str = "",
+            responsavel: str = "",
+            origem_informacao: str = "web",
+            propriedade_id: Optional[str] = None,
+            local_interno: Optional[str] = None,
+            latitude: Optional[float] = None,
+            longitude: Optional[float] = None,
+            observacoes: str = "",
+            documento: Optional[str] = None,
+            anexos=None,
+            justificativa: str = "",
+            evento_anterior_id: Optional[int] = None,
+            versao: int = 1) -> dict:
+    """Grava um evento na conexão recebida. Nunca sobrescreve nada.
 
     `ocorrido_em` é quando o fato aconteceu; se omitido, assume agora. O
     `registrado_em` é sempre agora — os dois são gravados separados de propósito
@@ -104,25 +129,24 @@ def registrar(animal_uuid: str, tipo: str, *,
         return {"ok": False, "erro": f"Tipo de evento desconhecido: '{tipo}'."}
 
     agora = _agora()
-    with _conn() as con:
-        existe = con.execute(
-            "SELECT 1 FROM animals WHERE uuid=?", (animal_uuid,)).fetchone()
-        if existe is None:
-            return {"ok": False, "erro": f"Animal {animal_uuid} não encontrado."}
+    existe = con.execute(
+        "SELECT 1 FROM animals WHERE uuid=?", (animal_uuid,)).fetchone()
+    if existe is None:
+        return {"ok": False, "erro": f"Animal {animal_uuid} não encontrado."}
 
-        con.execute(
-            """INSERT INTO animal_events
-               (animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
-                local_interno,responsavel,usuario_registro,origem_informacao,
-                latitude,longitude,observacoes,documento,anexos,
-                justificativa,evento_anterior_id,versao)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_uuid, tipo, ocorrido_em or agora, agora, propriedade_id,
-             local_interno, responsavel or None, usuario_registro or None,
-             origem_informacao, latitude, longitude, observacoes or None,
-             documento, _json(anexos), justificativa or None,
-             evento_anterior_id, versao),
-        )
+    con.execute(
+        """INSERT INTO animal_events
+           (animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
+            local_interno,responsavel,usuario_registro,origem_informacao,
+            latitude,longitude,observacoes,documento,anexos,
+            justificativa,evento_anterior_id,versao)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (animal_uuid, tipo, ocorrido_em or agora, agora, propriedade_id,
+         local_interno, responsavel or None, usuario_registro or None,
+         origem_informacao, latitude, longitude, observacoes or None,
+         documento, _json(anexos), justificativa or None,
+         evento_anterior_id, versao),
+    )
     return {"ok": True}
 
 

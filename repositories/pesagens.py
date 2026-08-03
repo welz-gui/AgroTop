@@ -11,6 +11,7 @@ Sem Streamlit no topo do módulo.
 from datetime import datetime
 from typing import Optional
 
+from . import eventos
 from .conexao import _cache, _conn, _writes
 
 
@@ -53,6 +54,10 @@ def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
             (a["uuid"], weight, weigh_date, a["lote_id"], operator, method, notes),
         )
         con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
+        # Evento na MESMA transação da pesagem (§6): ou entram os dois, ou nenhum.
+        eventos.registrar_em(
+            con, a["uuid"], "pesagem", ocorrido_em=weigh_date,
+            usuario_registro=operator, observacoes=f"{weight} kg ({method})")
 
 
 def get_all_weighings() -> list[dict]:
