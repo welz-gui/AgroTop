@@ -10,6 +10,7 @@ import uuid as _uuid
 from datetime import date, timedelta
 from typing import Optional
 
+from . import eventos
 from .conexao import _cache, _conn, _writes
 
 
@@ -103,6 +104,12 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                 "INSERT INTO animal_movements (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?)",
                 (_uuid_novo, None, lote_id, entry_date, "entrada", "Cadastro"),
             )
+        eventos.registrar_em(con, _uuid_novo, "cadastro_inicial",
+                             ocorrido_em=entry_date,
+                             observacoes=f"{breed}, {entry_weight} kg")
+        eventos.registrar_em(con, _uuid_novo, "identificacao_interna",
+                             ocorrido_em=entry_date,
+                             observacoes=f"brinco {animal_id}")
 
 
 @_writes
@@ -123,6 +130,10 @@ def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator=
             (row["uuid"], from_lote, to_lote_id,
              movement_date, reason, operator, notes),
         )
+        eventos.registrar_em(
+            con, row["uuid"], "mudanca_lote", ocorrido_em=movement_date,
+            usuario_registro=operator, local_interno=to_lote_id,
+            observacoes=f"{from_lote or '—'} → {to_lote_id} ({reason})")
         con.execute(
             "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)
         )

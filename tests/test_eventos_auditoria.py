@@ -189,3 +189,65 @@ class TestTrilhaDeAuditoria(BaseEventos):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOperacoesGeramEvento(BaseEventos):
+    """Cada operação do dia a dia entra na linha do tempo do animal (§6.1).
+
+    Até 2026-08-02 só a mudança de status gerava evento, e `animal_events` ficava
+    praticamente vazia — a rastreabilidade era promessa, não fato. Estes testes
+    travam cada ponto de escrita.
+    """
+
+    def _tipos(self, uuid):
+        return [e["tipo"] for e in eventos.do_animal(uuid)]
+
+    def test_pesagem(self):
+        db.add_weighing(self.animal["id"], 430.0, "2026-07-20", operator="op1")
+        self.assertIn("pesagem", self._tipos(self.uuid))
+
+    def test_medicacao(self):
+        db.add_medication(self.animal["id"], "Ivermectina", 10, "ml",
+                          "Subcutânea", 21, "2026-07-20", "op1")
+        self.assertIn("manejo_sanitario", self._tipos(self.uuid))
+
+    def test_movimentacao_de_lote(self):
+        db.move_animal(self.animal["id"], "P02", "2026-07-20", operator="op1")
+        self.assertIn("mudanca_lote", self._tipos(self.uuid))
+
+    def test_cadastro_gera_dois_eventos(self):
+        """Cadastro e identificação interna são eventos distintos no §6.1."""
+        db.add_animal("EV1", "Nelore", "M", None, "2026-07-01",
+                      300.0, 500.0, 1000.0, None, None)
+        novo = [a for a in db.get_all_animals(status=None) if a["id"] == "EV1"][0]
+        tipos = self._tipos(novo["uuid"])
+        self.assertIn("cadastro_inicial", tipos)
+        self.assertIn("identificacao_interna", tipos)
+
+    def test_venda(self):
+        db.register_sale([self.animal["id"]], "2026-07-20", "abate", "cabeca",
+                         5000.0, buyer="Frigorífico X", operator="op1")
+        self.assertIn("venda", self._tipos(self.uuid))
+
+    def test_obito(self):
+        db.register_death(self.animal["id"], "2026-07-20", "Timpanismo",
+                          operator="op1")
+        self.assertIn("morte", self._tipos(self.uuid))
+
+    def test_evento_e_atomico_com_a_operacao(self):
+        """Se a operação falha, não pode sobrar evento órfão dizendo que houve.
+
+        `add_weighing` recusa animal inexistente; o evento não pode ter entrado.
+        """
+        antes = len(eventos.do_animal(self.uuid))
+        with self.assertRaises(ValueError):
+            db.add_weighing("NAO_EXISTE", 400.0, "2026-07-20")
+        self.assertEqual(len(eventos.do_animal(self.uuid)), antes)
+
+    def test_ocorrido_em_usa_a_data_do_fato_nao_a_de_hoje(self):
+        """§6.2: pesagem lançada com atraso guarda a data em que ocorreu."""
+        db.add_weighing(self.animal["id"], 430.0, "2026-01-15", operator="op1")
+        ev = [e for e in eventos.do_animal(self.uuid) if e["tipo"] == "pesagem"][0]
+        self.assertTrue(ev["ocorrido_em"].startswith("2026-01-15"),
+                        f"ocorrido_em não é a data da pesagem: {ev['ocorrido_em']}")
+        self.assertNotEqual(ev["ocorrido_em"], ev["registrado_em"])
