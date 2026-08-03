@@ -275,7 +275,7 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 | B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; falta só a B4.3 (NOT NULL) |
 | B5 | **Motor de regras regulatórias** | Estende a spec 0011 com vigência, UF e nível (§11) |
 | B6 | ✅ **Movimentações entre propriedades + GTA** | concluída em 2026-08-03 — três níveis do §8.4, divergência de recepção |
-| B7 | **Módulo de dispositivos (brincos)** | Estoque, lotes, conferência visual×RFID (§5) |
+| B7 | ✅ **Módulo de dispositivos (brincos)** | concluída em 2026-08-03 — 12 estados, conferência visual×eletrônico, inventário |
 | — | **Integrações oficiais** | ⛔ **Bloqueado**: as APIs não existem, e o §23 lista 19 pontos não confirmados |
 
 ### ⚠️ Revisão de 2026-08-01 — o gate é B1+B2, não B1–B7
@@ -749,8 +749,13 @@ descobre o desperdício depois de pagá-lo.
 
 ### R35. Marcar o quadro é parte do merge, não tarefa separada
 
-Ao mesclar um PR que veio de spec, **atualize `specs/QUADRO.md` no mesmo movimento** —
-marque ✅ com o link do PR e a data. Não deixe para depois.
+Ao mesclar um PR que veio de spec, **atualize `specs/QUADRO.md` E o índice de
+`specs/README.md` no mesmo movimento** — marque ✅ com o link do PR e a data. Não deixe
+para depois.
+
+⚠️ **São dois arquivos.** A primeira versão desta regra citava só o quadro, e o índice
+ficou de fora: em 2026-08-03, nove specs mescladas continuaram listadas como "disponível"
+lá. Corrigir um e esquecer o outro é o mesmo defeito com outro nome.
 
 *Histórico: a R32 mandava o agente conferir no código porque o quadro atrasa. Isso resolve o
 sintoma; a causa é o merge não atualizar o quadro. Em 2026-08-03, cinco specs foram mescladas

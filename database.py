@@ -49,6 +49,7 @@ from repositories import eventos as eventos  # noqa: F401
 from repositories import propriedades as propriedades  # noqa: F401
 from repositories import nascimentos as nascimentos  # noqa: F401
 from repositories import movimentacoes as movimentacoes  # noqa: F401
+from repositories import dispositivos as dispositivos  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -200,6 +201,51 @@ def init_db() -> None:
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (property_id) REFERENCES properties(id)
             );
+
+            -- ADR 0004 · etapa B7 — §5: estoque de dispositivos de identificação.
+            -- O brinco é um BEM antes de ser identidade: é comprado em lote,
+            -- fica em estoque, pode ser perdido ou inutilizado. Nada disso cabia
+            -- em `animal_identifiers`, que registra o vínculo já feito.
+            CREATE TABLE IF NOT EXISTS dispositivos (
+                id                  TEXT PRIMARY KEY,   -- uuid interno
+                codigo_visual       TEXT,
+                codigo_eletronico   TEXT,
+                -- brinco_visual | boton | conjunto | outro
+                tipo                TEXT NOT NULL DEFAULT 'brinco_visual',
+                tecnologia          TEXT,
+                fabricante          TEXT,
+                fornecedor          TEXT,
+                modelo              TEXT,
+                lote                TEXT,
+                data_fabricacao     TEXT,
+                data_aquisicao      TEXT,
+                proprietario_id     TEXT,   -- produtor dono do estoque
+                propriedade_destino_id TEXT,
+                padrao_tecnico      TEXT,
+                -- §5.2, doze estados. A máquina vive em
+                -- services/estados_dispositivo.py.
+                status              TEXT NOT NULL DEFAULT 'disponivel',
+                data_aplicacao      TEXT,
+                animal_uuid         TEXT,
+                aplicador           TEXT,
+                motivo_inutilizacao TEXT,
+                data_baixa          TEXT,   -- devolução ou descarte
+                divergencia         TEXT,   -- §5.3: visual × eletrônico
+                created_at          TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (proprietario_id)        REFERENCES produtores(id),
+                FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id),
+                FOREIGN KEY (animal_uuid)            REFERENCES animals(uuid)
+            );
+            -- §4.2.1: um código não pode estar ATIVO em dois dispositivos. O
+            -- índice parcial permite reaproveitar o número depois da baixa,
+            -- mesma lógica de `animal_identifiers`.
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_disp_visual_ativo
+                ON dispositivos (codigo_visual)
+                WHERE codigo_visual IS NOT NULL
+                  AND status NOT IN ('inutilizado','devolvido','cancelado');
+            CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos (status);
+            CREATE INDEX IF NOT EXISTS idx_disp_lote   ON dispositivos (lote);
+            CREATE INDEX IF NOT EXISTS idx_disp_animal ON dispositivos (animal_uuid);
 
             -- ADR 0004 · etapa B6 — §8: movimentação entre PROPRIEDADES.
             -- Distinta de `animal_movements`, que é piquete→piquete e continua
