@@ -1,61 +1,167 @@
 # AgroTop — Sistema de Gestão de Gado de Corte
 
-O **AgroTop** é um sistema completo em formato PWA (Progressive Web App) focado no acompanhamento, gestão e análise de rebanhos de gado de corte. Desenvolvido para funcionar tanto no escritório quanto no campo, o sistema oferece controle total sobre produção, pesagem, custos, nutrição, estoque e parte sanitária de sua fazenda.
+Sistema em formato PWA para acompanhamento, gestão e análise de rebanhos de corte —
+escritório e campo. Controla produção, pesagem, custos, nutrição, estoque e sanidade.
 
-## 🚀 Funcionalidades Principais
+Desde julho de 2026 o projeto tem um segundo objetivo, que reordenou tudo: **conformidade
+com o PNIB** (Programa Nacional de Identificação Individual de Bovinos e Bubalinos,
+Portaria SDA/MAPA 1.331/2025). Isso muda a natureza do produto — de software de gestão para
+sistema de rastreabilidade com valor regulatório. Ver
+[ADR 0004](docs/adr/0004-conformidade-pnib.md).
 
-- **📊 Dashboard:** Visão geral da fazenda com KPIs, evolução de peso do rebanho, gráficos por raça e distribuição de GMD (Ganho Médio Diário).
-- **📱 Modo Campo:** Interface otimizada (mobile-first) para manejo rápido: pesagens, medicamentos, movimentação, fotos e registro de óbitos com menos cliques, projetada para funcionar com luvas e ao sol.
-- **📋 Rebanho (Inventário e Fichas):** Consulta fácil a todo o rebanho, detalhamento por animal, histórico de peso com gráfico de tendência, histórico sanitário e financeiro individual.
-- **🌿 Lotes / Pastagem:** Controle de lotação (UA/ha), capacidade de pasto, histórico de ocupação e visualização de todos os animais no piquete.
-- **📈 Desempenho:** Metas de ganho de peso, simulações de terminação (pasto, semiconfinamento, confinamento), comparativo entre piquetes e projeção de abate.
-- **💰 Financeiro & Mercado:** Previsão de lucro e breakeven, lançamento de vendas (por kg, lote ou cabeça), gestão de custos operacionais/fixos e análise de mortalidade e ranking de fornecedores.
-- **📦 Estoque de Insumos:** Registro de medicamentos, vacinas e rações, com alertas visuais para níveis críticos e mínimo.
-- **🌾 Nutrição:** Cadastro de planos de trato para os piquetes, confirmações de fornecimento de silo/sal, e descontos de estoque automáticos.
-- **💉 Calendário Sanitário:** Controle e aplicação em lote de protocolos e esquemas vacinais (aftosa, brucelose, vermifugação).
-- **🌧️ Clima & Chuva:** Previsão do tempo atualizada (via Open-Meteo) e pluviometria por piquete, com gráficos históricos da chuva.
-- **🔔 Alertas Automáticos:** Notificações sobre animais sumidos (sem pesar há dias), períodos de carência em medicamentos, lotes de gado prontos para abate, falta de estoque e baixo GMD.
-- **📄 Relatórios:** Geração rápida de CSV, planilhas em Excel e arquivos PDF de toda a sua operação (pesagens, inventário, etc.).
+**Última revisão desta página:** 2026-08-03.
 
-## 💻 Tecnologias Utilizadas
+---
 
-- **Framework Web:** [Streamlit](https://streamlit.io/)
-- **Visualizações (Gráficos):** [Plotly](https://plotly.com/python/)
-- **Processamento de Dados:** [Pandas](https://pandas.pydata.org/), Numpy
-- **Banco de Dados:** SQLite (padrão local offline) / PostgreSQL (via Supabase na nuvem)
-- **Geração de Documentos:** `openpyxl` (Excel), `fpdf2` (PDF)
-- **Extra:** OCR e QR Code parsing com `Pillow`, `opencv-python-headless` e `pytesseract`.
+## Estado real do projeto
 
-## 🛠️ Como Executar o Projeto
+| | |
+|---|---|
+| Produção | Streamlit Community Cloud, deploy a cada push na `main` |
+| Banco | Supabase/PostgreSQL · **32 tabelas, 362 colunas** |
+| Testes | **430**, verdes em SQLite **e** PostgreSQL no CI |
+| Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
+| Migrations | 13, versionadas, com rollback documentado |
+| Fase A | ✅ concluída — refatoração em camadas |
+| Fase B | ✅ concluída — B1 a B7, fundação regulatória |
 
-1. Clone o repositório ou faça o download dos arquivos.
-2. É recomendado criar um ambiente virtual em Python.
-3. Instale as dependências:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Execute o aplicativo localmente:
-   ```bash
-   streamlit run app.py
-   ```
-   *Alternativa Windows:* Você também pode rodar através do arquivo `Iniciar_AgroTop.bat`.
+### ⚠️ O que a Fase B fez e o que ela não fez
 
-O sistema vai inicializar um banco SQLite local (`agrotop.db`) e popular algumas tabelas iniciais se estiverem vazias, abrindo o navegador com a aplicação.
+A fundação regulatória está **em produção e testada**: identidade imutável separada do
+brinco, eventos e auditoria append-only, genealogia, hierarquia de propriedades,
+movimentação com GTA, estoque de dispositivos e motor de regras configurável.
 
-## 🔐 Credenciais Padrão (Seed Inicial)
+**Quase nada disso tem interface.** Seis repositórios da Fase B — `eventos`,
+`nascimentos`, `movimentacoes`, `propriedades`, `regras`, `dispositivos` — têm **zero uso
+em `app.py`**. Um pecuarista que abrir o sistema hoje não vê nascimento, não vê GTA, não vê
+estoque de brincos.
 
-O banco é criado com 2 usuários padrão na primeira inicialização, com senhas configuráveis via variáveis de ambiente.
-*   **Administrador:**
-    *   Usuário: `admin`
-    *   Senha: Definida pela variável de ambiente `AGROTOP_ADMIN_PASSWORD`
-*   **Operador de Campo:** (Não vê abas financeiras, apenas leitura e operação rápida)
-    *   Usuário: `op1`
-    *   Senha: Definida pela variável de ambiente `AGROTOP_OP_PASSWORD`
+Isso é conformidade de **arquitetura**, não de **uso**. É a maior pendência do projeto, e
+está registrada como tal no [ROADMAP](ROADMAP.md).
 
-Se as variáveis de ambiente não estiverem definidas, senhas seguras e aleatórias serão geradas e exibidas no log (stdout) durante a inicialização.
+---
 
-## 🗄️ Banco de Dados
+## Funcionalidades em produção (visíveis ao usuário)
 
-O AgroTop usa a seguinte lógica para o Banco de Dados:
-- **Local (SQLite):** É o modo padrão caso não haja varíaveis de ambiente. Ideal para operação 100% offline. Todo o armazenamento é feito num arquivo único (`agrotop.db`).
-- **Nuvem (PostgreSQL):** Caso você queira sincronizar múltiplos dispositivos ou instalar em um servidor remoto, basta fornecer a variável de ambiente `DATABASE_URL` contendo a sua string de conexão para uma instância do PostgreSQL (como Supabase, Railway ou RDS). O sistema traduz automaticamente as chamadas necessárias de SQL.
+- **📊 Dashboard** — KPIs, evolução de peso, distribuição por raça e GMD.
+- **📱 Modo Campo** — pesagem, medicamento, movimentação entre piquetes, foto, óbito e
+  **importação de pesagens por CSV** do indicador de balança. Mobile-first, pensado para
+  uso com luva e ao sol.
+- **📋 Rebanho** — inventário, ficha individual com curva de peso, histórico sanitário e
+  financeiro, e **gestão de identificadores com histórico**: trocar brinco encerra o
+  anterior sem apagá-lo (§4.2.3 do PNIB).
+- **🌿 Lotes / Pastagem** — lotação UA/ha, capacidade, ocupação.
+- **📈 Desempenho** — metas, simulação de terminação, projeção de abate.
+- **💰 Financeiro** — venda por kg/lote/cabeça, custo médio ponderado, breakeven,
+  mortalidade, ranking de fornecedor.
+- **📦 Estoque · 🌾 Nutrição · 💉 Sanitário · 🌧️ Clima** — insumos com alerta de mínimo,
+  planos de trato com baixa automática, protocolos vacinais, chuva e previsão.
+- **🔔 Alertas** — animais sumidos, carência, prontos para abate, estoque baixo, e o
+  **motor de recomendações**, que mostra o motivo e os números de cada sugestão.
+- **⚙️ Admin** — usuários, edição direta de dados, e **mudança de status com máquina de
+  estados**: sair de um estado final exige autorização e justificativa, que vão para a
+  trilha de auditoria.
+- **📄 Relatórios** — CSV, Excel e PDF.
+
+## Fundação regulatória (sem interface ainda)
+
+| Módulo | O que faz | §PNIB |
+|---|---|---|
+| `animal_events` | linha do tempo do animal, **append-only por gatilho** | §6 |
+| `audit_logs` | quem mudou o quê, quando, com que autorização | §14 |
+| `partos` | nascimento com vínculo materno; gêmeos no mesmo parto | §7 |
+| `properties` | Organização → Produtor → Propriedade | §3 |
+| `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
+| `dispositivos` | estoque de brincos, 12 estados, conferência visual×eletrônico | §5 |
+| `regras_regulatorias` | regras como **dado**, com vigência e versionamento | §11 |
+
+---
+
+## Arquitetura
+
+```
+app.py           interface Streamlit (ainda monolítica)
+database.py      FACHADA — reexporta; não adicione consulta nova aqui
+repositories/    SQL, e só SQL. Um módulo por agregado
+services/        regra de negócio pura — sem banco, sem Streamlit
+ui/tema.py       tokens de cor semânticos (escuro e claro)
+tools/           backup, restauração, dump de schema, auditoria de cores
+```
+
+Duas regras sustentam isso, detalhadas no [ROADMAP](ROADMAP.md):
+
+- **`_conn()` é o único ponto de acesso ao banco** (R1) — é o que torna viável trocar de
+  provedor e rotear por tenant.
+- **`services/` não importa Streamlit** (R9) — é o que permite a mesma regra servir à API,
+  ao mobile e a jobs agendados.
+
+---
+
+## Como executar
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+No Windows há também o `Iniciar_AgroTop.bat`. O sistema cria um SQLite local
+(`agrotop.db`) e popula dados de demonstração se as tabelas estiverem vazias.
+
+### Rodando os testes
+
+```bash
+AGROTOP_FORCE_SQLITE=1 python -m unittest discover -s tests -t .
+```
+
+⚠️ **O `-t .` não é opcional e o `AGROTOP_FORCE_SQLITE=1` é a segunda trava.** Sem os dois,
+os testes podem conectar no banco de **produção** se houver `.streamlit/secrets.toml`
+presente. `tests/test_isolamento.py` falha de propósito nesse caso.
+
+---
+
+## Banco de dados
+
+- **SQLite** — padrão local, operação offline, arquivo único.
+- **PostgreSQL** — defina `DATABASE_URL`. O sistema traduz placeholders automaticamente.
+
+⚠️ **A tradução cobre pouco.** `_translate()` converte `?` → `%s` e `MAX(0,` →
+`GREATEST(0,` — **nada além**. Sintaxe específica de dialeto (`PRAGMA`,
+`information_schema`, `chr` vs `char`) precisa de ramo explícito por `USE_PG`. Supor o
+contrário derrubou a produção em 2026-08-02; `tests/test_dialeto_duplo.py` existe por causa
+disso.
+
+Ao alterar schema, siga [supabase/README.md](supabase/README.md): migration na nuvem → DDL
+local → `dump_schema_nuvem.py --baseline` → `testar_baseline.py` → testes.
+
+---
+
+## Credenciais
+
+O banco nasce com `admin` e `op1`, com senhas de `AGROTOP_ADMIN_PASSWORD` e
+`AGROTOP_OP_PASSWORD`. Sem as variáveis, senhas aleatórias são geradas e impressas no log.
+
+⚠️ As variáveis valem apenas para **instalações novas** — `_seed_users` só roda com a
+tabela `users` vazia. Para trocar a senha de uma conta existente:
+
+```bash
+python tools/gerar_hash_senha.py --usuario admin
+```
+
+---
+
+## Documentação
+
+| Arquivo | Para quê |
+|---|---|
+| [ROADMAP.md](ROADMAP.md) | **leia antes de codar** — regras invioláveis, fases, dívidas |
+| [DESIGN.md](DESIGN.md) | tokens de cor e convenções de interface |
+| [docs/adr/](docs/adr/) | decisões de arquitetura, com o porquê e o que substituem |
+| [docs/regulatorio/](docs/regulatorio/) | requisitos do PNIB |
+| [specs/](specs/) | tarefas fechadas para delegar a agentes de IA |
+| [supabase/README.md](supabase/README.md) | fluxo de alteração de schema |
+
+## Tecnologias
+
+Streamlit · Plotly · Pandas/Numpy · SQLite/PostgreSQL · `openpyxl` e `fpdf2` ·
+`shapely`/`pyproj` (geometria de piquetes) · `Pillow`, `opencv-python-headless`,
+`pytesseract` (QR e OCR de brinco).
