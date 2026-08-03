@@ -39,10 +39,12 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | — | ✅ [#71](https://github.com/welz-gui/AgroTop/pull/71) | | 2026-08-03 |
 | — | [0026](0026-controle-de-brincos.md) — controle de estoque de brincos 🇧🇷 | — | ✅ [#70](https://github.com/welz-gui/AgroTop/pull/70) | | 2026-08-03 |
 | — | [0021](0021-competencia-e-caixa.md) — competência × caixa 🏗️ | — | ✅ [#73](https://github.com/welz-gui/AgroTop/pull/73) | | 2026-08-03 |
-| 1 | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | `feat/postgres-no-ci` | 🟢 livre | — | — |
+| — | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | — | ✅ [#76](https://github.com/welz-gui/AgroTop/pull/76) | | 2026-08-03 |
 
 ⚙️ = infraestrutura · 🇧🇷 = fundação regulatória PNIB · 🏗️ = avança trilha do roadmap
 
+> ## 🟡 A FILA ESTÁ VAZIA — não inicie agente sem escrever spec antes
+>
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
 > **Não confie neste quadro.** Ele é mantido à mão e já ficou desatualizado — em 2026-08-02
