@@ -274,7 +274,7 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 | B3 | ✅ **Genealogia e nascimentos** | concluída em 2026-08-03 — `partos`, vínculo materno auditado, pendências do §7.3 |
 | B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; falta só a B4.3 (NOT NULL) |
 | B5 | **Motor de regras regulatórias** | Estende a spec 0011 com vigência, UF e nível (§11) |
-| B6 | **Movimentações entre propriedades + GTA** | Hoje só piquete→piquete (§8) |
+| B6 | ✅ **Movimentações entre propriedades + GTA** | concluída em 2026-08-03 — três níveis do §8.4, divergência de recepção |
 | B7 | **Módulo de dispositivos (brincos)** | Estoque, lotes, conferência visual×RFID (§5) |
 | — | **Integrações oficiais** | ⛔ **Bloqueado**: as APIs não existem, e o §23 lista 19 pontos não confirmados |
 

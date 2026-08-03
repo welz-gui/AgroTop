@@ -36,10 +36,10 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0027](0027-projecao-de-abate.md) — projeção de abate e chuva × GMD 🏗️ | — | ✅ [#68](https://github.com/welz-gui/AgroTop/pull/68) | | 2026-08-03 |
 | — | [0020](0020-custo-de-dieta.md) — custo de dieta multi-ingrediente 🏗️ | — | ✅ [#66](https://github.com/welz-gui/AgroTop/pull/66) | | 2026-08-03 |
 | — | [0022](0022-validacao-de-genealogia.md) — validação de genealogia 🇧🇷 | — | ✅ [#67](https://github.com/welz-gui/AgroTop/pull/67) | | 2026-08-03 |
-| 1 | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | `feat/validacao-gta` | 🟢 livre | — | — |
-| 2 | [0026](0026-controle-de-brincos.md) — controle de estoque de brincos 🇧🇷 | `feat/controle-de-brincos` | 🟢 livre | — | — |
-| 3 | [0021](0021-competencia-e-caixa.md) — competência × caixa 🏗️ | `feat/competencia-caixa` | 🟢 livre | — | — |
-| 4 | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | `feat/postgres-no-ci` | 🟢 livre | — | — |
+| — | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | — | ✅ [#71](https://github.com/welz-gui/AgroTop/pull/71) | | 2026-08-03 |
+| — | [0026](0026-controle-de-brincos.md) — controle de estoque de brincos 🇧🇷 | — | ✅ [#70](https://github.com/welz-gui/AgroTop/pull/70) | | 2026-08-03 |
+| — | [0021](0021-competencia-e-caixa.md) — competência × caixa 🏗️ | — | ✅ [#73](https://github.com/welz-gui/AgroTop/pull/73) | | 2026-08-03 |
+| 1 | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | `feat/postgres-no-ci` | 🟢 livre | — | — |
 
 ⚙️ = infraestrutura · 🇧🇷 = fundação regulatória PNIB · 🏗️ = avança trilha do roadmap
 

@@ -294,6 +294,39 @@ CREATE TABLE IF NOT EXISTS medications (
     CONSTRAINT medications_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS movimentacao_animais (
+    id bigserial,
+    movimentacao_id text NOT NULL,
+    animal_uuid text NOT NULL,
+    divergencia text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT movimentacao_animais_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS movimentacoes (
+    id text NOT NULL,
+    tipo text NOT NULL,
+    propriedade_origem_id text,
+    propriedade_destino_id text,
+    titular_origem_id text,
+    titular_destino_id text,
+    finalidade text,
+    data_prevista text,
+    data_efetiva text,
+    transportador text,
+    veiculo text,
+    gta_numero text,
+    documento_comercial text,
+    protocolo_oficial text,
+    status text DEFAULT 'rascunho'::text NOT NULL,
+    confirmacao_chegada text,
+    divergencias text,
+    anexos jsonb,
+    justificativa text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT movimentacoes_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS organizacoes (
     id text NOT NULL,
     nome text NOT NULL,
@@ -441,6 +474,12 @@ ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fke
 ALTER TABLE lotes ADD CONSTRAINT fk_lotes_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE movimentacao_animais ADD CONSTRAINT movimentacao_animais_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE movimentacao_animais ADD CONSTRAINT movimentacao_animais_movimentacao_id_fkey FOREIGN KEY (movimentacao_id) REFERENCES movimentacoes(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_propriedade_origem_id_fkey FOREIGN KEY (propriedade_origem_id) REFERENCES properties(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_titular_destino_id_fkey FOREIGN KEY (titular_destino_id) REFERENCES produtores(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_titular_origem_id_fkey FOREIGN KEY (titular_origem_id) REFERENCES produtores(id);
 ALTER TABLE partos ADD CONSTRAINT partos_mae_uuid_fkey FOREIGN KEY (mae_uuid) REFERENCES animals(uuid);
 ALTER TABLE partos ADD CONSTRAINT partos_propriedade_id_fkey FOREIGN KEY (propriedade_id) REFERENCES properties(id);
 ALTER TABLE produtores ADD CONSTRAINT produtores_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id);
@@ -468,6 +507,10 @@ CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING bt
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
 CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications USING btree (protocol_id);
+CREATE INDEX IF NOT EXISTS idx_mov_animal ON movimentacao_animais USING btree (animal_uuid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mov_animal_unico ON movimentacao_animais USING btree (movimentacao_id, animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_mov_origem ON movimentacoes USING btree (propriedade_origem_id, data_prevista DESC);
+CREATE INDEX IF NOT EXISTS idx_mov_status ON movimentacoes USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_partos_mae ON partos USING btree (mae_uuid, data DESC);
 CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_date);
 CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);

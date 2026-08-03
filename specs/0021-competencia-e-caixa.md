@@ -64,8 +64,14 @@ def em_aberto(lancamentos: list[dict], hoje: str) -> list[dict]:
 ## Critério de aceite
 
 1. **O teste central desta spec:** um lançamento com competência em março, vencimento em
-   abril e pagamento em maio aparece no resultado de **março**, no projetado de **abril** e
-   no realizado de **maio**. Se esse teste passa, a separação está correta.
+   abril e pagamento em maio aparece no resultado de **março** e no realizado de **maio**.
+   O **mesmo lançamento ainda em aberto** (sem `pagamento`) aparece no projetado de
+   **abril**. Se esses dois testes passam, a separação está correta.
+
+   ⚠️ **Correção de 2026-08-03:** a versão anterior deste critério dizia que o lançamento
+   *já pago* deveria aparecer no projetado de abril — o que contradizia o próprio contrato,
+   que define projetado como "vencimento **em aberto**". Não se projeta pagamento que já
+   aconteceu. O contrato estava certo; o critério é que estava mal escrito.
 2. Lançamento sem `pagamento` **nunca** entra no realizado.
 3. `em_aberto` calcula o atraso corretamente e **não** conta como atrasado o que vence hoje.
 4. Mês sem lançamento devolve zeros, não erro.
