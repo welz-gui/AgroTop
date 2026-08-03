@@ -30,10 +30,34 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0016](0016-indicador-completude-dados.md) — indicador de completude 🏗️ | — | ✅ [#52](https://github.com/welz-gui/AgroTop/pull/52) | | 2026-08-02 |
 | — | [0017](0017-lucro-por-raca.md) — lucro por raça e cruzamento 🏗️ | — | ✅ [#55](https://github.com/welz-gui/AgroTop/pull/55) | | 2026-08-03 |
 
-> ⚠️ **A fila está VAZIA.** Não há spec livre — não inicie agente sem escrever uma antes.
-> Em 2026-08-02 a 0015 foi implementada **duas vezes** ([#46](https://github.com/welz-gui/AgroTop/pull/46) e [#50](https://github.com/welz-gui/AgroTop/pull/50)) porque o quadro
-> continuava marcando como livre uma tarefa já entregue. Marcar a conclusão **no mesmo dia**
-> é o que evita o retrabalho.
+| 1 | [0024](0024-auditoria-de-cores.md) — auditoria de cores (destrava a 0007) | `feat/auditoria-de-cores` | 🟢 livre | — | — |
+| 2 | [0018](0018-previsao-de-estoque.md) — previsão de ruptura de estoque 🏗️ | `feat/previsao-estoque` | 🟢 livre | — | — |
+| 3 | [0019](0019-rateio-de-custo-de-lote.md) — rateio de custo de lote 🏗️ | `feat/rateio-custo-lote` | 🟢 livre | — | — |
+| 4 | [0027](0027-projecao-de-abate.md) — projeção de abate e chuva × GMD 🏗️ | `feat/projecao-abate` | 🟢 livre | — | — |
+| 5 | [0020](0020-custo-de-dieta.md) — custo de dieta multi-ingrediente 🏗️ | `feat/custo-dieta` | 🟢 livre | — | — |
+| 6 | [0022](0022-validacao-de-genealogia.md) — validação de genealogia 🇧🇷 | `feat/validacao-genealogia` | 🟢 livre | — | — |
+| 7 | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | `feat/validacao-gta` | 🟢 livre | — | — |
+| 8 | [0026](0026-controle-de-brincos.md) — controle de estoque de brincos 🇧🇷 | `feat/controle-de-brincos` | 🟢 livre | — | — |
+| 9 | [0021](0021-competencia-e-caixa.md) — competência × caixa 🏗️ | `feat/competencia-caixa` | 🟢 livre | — | — |
+| 10 | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | `feat/postgres-no-ci` | 🟢 livre | — | — |
+
+⚙️ = infraestrutura · 🇧🇷 = fundação regulatória PNIB · 🏗️ = avança trilha do roadmap
+
+> ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
+>
+> **Não confie neste quadro.** Ele é mantido à mão e já ficou desatualizado — em 2026-08-02
+> a spec 0015 foi implementada **duas vezes** ([#46](https://github.com/welz-gui/AgroTop/pull/46) e [#50](https://github.com/welz-gui/AgroTop/pull/50)) porque continuava marcada
+> como livre depois de entregue. O segundo agente trabalhou dois dias para nada.
+>
+> A spec diz qual arquivo criar. **Se ele já existe na `origin/main`, a tarefa está feita:**
+>
+> ```bash
+> git fetch origin
+> git cat-file -e origin/main:services/<modulo>.py 2>/dev/null >   && echo "JA EXISTE — pare e avise" >   || echo "nao existe — pode seguir"
+> ```
+>
+> Isso não depende de ninguém lembrar de atualizar nada. **O código é a fonte da verdade;
+> o quadro é só a fila de prioridade.**
 
 ⚠️ **A 0004 foi entregue, mas o PR #43 foi fechado sem merge** — o conteúdo já estava na
 `main`, carregado por engano dentro do [#44](https://github.com/welz-gui/AgroTop/pull/44).
