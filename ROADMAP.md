@@ -747,6 +747,19 @@ Corolário que vale mais que a regra: **reivindicar tem de ser o primeiro comand
 ler a spec e antes de qualquer trabalho. Reivindicação feita no fim não protege nada — só
 descobre o desperdício depois de pagá-lo.
 
+### R35. Marcar o quadro é parte do merge, não tarefa separada
+
+Ao mesclar um PR que veio de spec, **atualize `specs/QUADRO.md` no mesmo movimento** —
+marque ✅ com o link do PR e a data. Não deixe para depois.
+
+*Histórico: a R32 mandava o agente conferir no código porque o quadro atrasa. Isso resolve o
+sintoma; a causa é o merge não atualizar o quadro. Em 2026-08-03, cinco specs foram mescladas
+e o quadro continuou marcando todas como livres — um agente iniciado naquele intervalo teria
+pegado tarefa já feita, exatamente como aconteceu com a 0015 no dia anterior.*
+
+As duas regras se somam: **R35 impede o quadro de mentir; R32 protege quando ele mentir
+mesmo assim.** Nenhuma substitui a outra.
+
 ⚠️ Antes de remover um worktree, veja se há arquivo não commitado dentro dele e **compare
 com a `main`**. No caso do 0017 havia dois arquivos que pareciam trabalho perdido e eram
 rascunho anterior ao que já fora mesclado — só a comparação revelou isso.
