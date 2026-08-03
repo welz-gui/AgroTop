@@ -269,10 +269,10 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 
 | # | Etapa | Por que aqui |
 |---|---|---|
-| B1 | **Chave surrogate + `animal_identifiers`** | Pré-requisito de tudo. Toca 8 tabelas com FK |
-| B2 | **`animal_events` + auditoria** | A3 já estava planejado; vira obrigatório (§6, §14) |
-| B3 | **Genealogia e nascimentos** | Mãe/pai não existem hoje (§4.3, §7) |
-| B4 | **Hierarquia de propriedades** | `properties` + `property_id` (§3) |
+| B1 | ✅ **Chave surrogate + `animal_identifiers`** | concluída em 2026-08-02, seis etapas |
+| B2 | ✅ **`animal_events` + auditoria** | concluída em 2026-08-02, append-only por gatilho |
+| B3 | ✅ **Genealogia e nascimentos** | concluída em 2026-08-03 — `partos`, vínculo materno auditado, pendências do §7.3 |
+| B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; falta só a B4.3 (NOT NULL) |
 | B5 | **Motor de regras regulatórias** | Estende a spec 0011 com vigência, UF e nível (§11) |
 | B6 | **Movimentações entre propriedades + GTA** | Hoje só piquete→piquete (§8) |
 | B7 | **Módulo de dispositivos (brincos)** | Estoque, lotes, conferência visual×RFID (§5) |
