@@ -698,21 +698,62 @@ Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 
 ## 11. Dívidas conhecidas
 
-1. **Rotacionar a senha do Postgres** — ela já apareceu em texto claro duas vezes.
-   Supabase → Settings → Database → reset, e atualizar `secrets.toml` + Secrets do
-   Streamlit Cloud. *(Adiada por decisão do usuário.)*
-2. **Trocar as senhas dos usuários que JÁ existem em produção.**
-   ⚠️ **O contexto mudou (2026-08-01):** com a decisão de conformidade PNIB, o sistema passa
-   a ter valor legal e trilha de auditoria. Um sistema de rastreabilidade oficial rodando com
-   `admin/admin123` num app público é contradição — e a auditoria da Fase B registra *quem*
-   fez cada operação, o que perde sentido se a conta for compartilhada por senha padrão. O PR #12 fez as
-   instalações **novas** usarem `AGROTOP_ADMIN_PASSWORD`/`AGROTOP_OP_PASSWORD` (ou senha
-   aleatória), mas **não altera contas existentes** — e `_seed_users` só roda com a tabela
-   `users` vazia. Ou seja: no app público, `admin` e `op1` continuam com as senhas antigas.
-   Trocar com `python tools/gerar_hash_senha.py --usuario admin`.
-   *(Adiada por decisão do usuário — mas segue aberta.)*
-3. **Actions do CI em Node 20** (deprecado) — bump de `actions/checkout` e `setup-python`.
-4. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
-   servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
-5. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar
-   manualmente. Um leitor nativo (Trilha 1) resolve isso de verdade.
+Revisada em **2026-08-02**. Fechada só sai daqui pela mão do mantenedor (R28).
+
+### 🔴 Segurança
+
+1. **Rotacionar a senha do Postgres** — apareceu em texto claro duas vezes, uma delas numa
+   mensagem de teste. Supabase → Settings → Database → reset, e atualizar `secrets.toml` +
+   Secrets do Streamlit Cloud. *(Adiada por decisão do usuário. **Segue aberta.**)*
+
+   ⚠️ **É a única dívida de segurança que resta**, e ficou mais exposta agora: a trilha de
+   auditoria da etapa B2 grava quem fez cada operação, mas nada disso protege o banco se a
+   credencial dele estiver comprometida — quem tem a senha escreve direto, sem passar pelo app.
+
+2. ✅ **Senhas dos usuários de produção — RESOLVIDA em 2026-08-02.** O usuário trocou login e
+   senha das contas existentes. O `_seed_users` só roda com a tabela `users` vazia, e as
+   instalações novas já usam `AGROTOP_ADMIN_PASSWORD`/`AGROTOP_OP_PASSWORD` (PR #12).
+
+### 🟠 Técnicas
+
+3. ✅ **Actions do CI — RESOLVIDA** (PR #15): `checkout@v6` e `setup-python@v6`, Node 24.
+
+4. **A suíte é cega para o caminho Postgres.** Todos os testes rodam com
+   `AGROTOP_FORCE_SQLITE=1` — o que está certo e evita tocar produção (R16/R18), mas em
+   2026-08-02 deixou passar um `PRAGMA table_info` que derrubou o app. `tests/test_dialeto_duplo.py`
+   inspeciona o código à procura de sintaxe de um dialeto só, o que teria pego aquele caso,
+   mas **não substitui rodar contra um Postgres de verdade**. Um serviço `postgres` no CI
+   fecharia isso.
+
+5. **`expected_sale_value` é regra de negócio morando em `repositories/financeiro.py`**
+   (peso × preço da categoria). Anotada no próprio arquivo; mover para `services/` é
+   trabalho posterior e sem urgência.
+
+6. **PWA: validar no aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
+   deploy fica atrás do portão de autenticação do Streamlit Cloud, e o PWA instalado precisa
+   passar por ele antes do login do AgroTop, com cofre de cookies próprio. **Só um celular
+   responde** — não dá para verificar por navegador comum nem por script.
+
+7. **`animals.id` ainda é a PK.** A etapa B1.6 removeu a coluna legada das 8 filhas, mas a
+   chave primária de `animals` continua sendo o brinco. Trocá-la é trabalho à parte e **não é
+   urgente**: o vínculo já é o uuid em todo lugar, que é o que o §4.1 do PNIB exige.
+
+8. **B2 está parcial de propósito.** Só a mudança de status gera evento. Pesagem, medicação,
+   movimentação, venda e óbito ainda não — cada uma é uma chamada no ponto de escrita que já
+   existe. Enquanto não forem feitas, `animal_events` fica quase vazia e a rastreabilidade
+   prometida não se realiza.
+
+9. **Bancos SQLite antigos não recebem as FKs** — o `ALTER TABLE` do SQLite não adiciona
+   constraint; só bancos criados do zero as têm. Aceitável, porque SQLite é dev/teste.
+
+10. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
+    servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
+
+11. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar
+    manualmente. Um leitor nativo (Trilha 1) resolve de verdade.
+
+### 🔵 Processo
+
+12. **Spec 0007 bloqueada** — 198 hex em `app.py` sem teste que prove que a aparência não
+    mudou. O `AppTest` (desde o PR #44) prova que um widget existe, **não qual cor ele tem**.
+    O caminho barato é extrair os hex e comparar token a token com `ui/tema.py`.
