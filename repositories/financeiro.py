@@ -10,6 +10,7 @@ from typing import Optional
 
 from . import conexao as _conexao
 from .animais import get_animal, uuid_de
+from . import eventos
 from .conexao import _cache, _conn, _writes
 
 # `expected_sale_value` é regra de negócio (peso × preço da categoria) que ficou
@@ -157,6 +158,12 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
                  val, buyer or None, lot_ref, custo, lucro, operator, notes),
             )
             con.execute("UPDATE animals SET status='vendido' WHERE id=?", (a["id"],))
+            # Venda e obito mudam status por SQL direto, sem passar por
+            # update_animal_status -- entao o evento precisa ser registrado aqui.
+            eventos.registrar_em(
+                con, a["uuid"], "venda", ocorrido_em=sale_date,
+                usuario_registro=operator, documento=lot_ref,
+                observacoes=f"R$ {val:.2f} para {buyer or 'comprador nao informado'}")
     return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
             "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
             "lot_ref": lot_ref}
@@ -250,6 +257,10 @@ def register_death(animal_id: str, death_date: str, cause: str,
              a["current_weight"], custo, operator, notes),
         )
         con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
+        eventos.registrar_em(
+            con, a["uuid"], "morte", ocorrido_em=death_date,
+            usuario_registro=operator,
+            observacoes=f"causa: {cause}; perda de R$ {custo:.2f}")
     return {"ok": True, "perda": round(custo, 2)}
 
 
