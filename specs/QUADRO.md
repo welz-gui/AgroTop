@@ -30,16 +30,16 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0016](0016-indicador-completude-dados.md) — indicador de completude 🏗️ | — | ✅ [#52](https://github.com/welz-gui/AgroTop/pull/52) | | 2026-08-02 |
 | — | [0017](0017-lucro-por-raca.md) — lucro por raça e cruzamento 🏗️ | — | ✅ [#55](https://github.com/welz-gui/AgroTop/pull/55) | | 2026-08-03 |
 
-| 1 | [0024](0024-auditoria-de-cores.md) — auditoria de cores (destrava a 0007) | `feat/auditoria-de-cores` | 🟢 livre | — | — |
-| 2 | [0018](0018-previsao-de-estoque.md) — previsão de ruptura de estoque 🏗️ | `feat/previsao-estoque` | 🟢 livre | — | — |
-| 3 | [0019](0019-rateio-de-custo-de-lote.md) — rateio de custo de lote 🏗️ | `feat/rateio-custo-lote` | 🟢 livre | — | — |
-| 4 | [0027](0027-projecao-de-abate.md) — projeção de abate e chuva × GMD 🏗️ | `feat/projecao-abate` | 🟢 livre | — | — |
-| 5 | [0020](0020-custo-de-dieta.md) — custo de dieta multi-ingrediente 🏗️ | `feat/custo-dieta` | 🟢 livre | — | — |
-| 6 | [0022](0022-validacao-de-genealogia.md) — validação de genealogia 🇧🇷 | `feat/validacao-genealogia` | 🟢 livre | — | — |
-| 7 | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | `feat/validacao-gta` | 🟢 livre | — | — |
-| 8 | [0026](0026-controle-de-brincos.md) — controle de estoque de brincos 🇧🇷 | `feat/controle-de-brincos` | 🟢 livre | — | — |
-| 9 | [0021](0021-competencia-e-caixa.md) — competência × caixa 🏗️ | `feat/competencia-caixa` | 🟢 livre | — | — |
-| 10 | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | `feat/postgres-no-ci` | 🟢 livre | — | — |
+| — | [0024](0024-auditoria-de-cores.md) — auditoria de cores (destrava a 0007) | — | ✅ [#62](https://github.com/welz-gui/AgroTop/pull/62) | | 2026-08-03 |
+| — | [0018](0018-previsao-de-estoque.md) — previsão de ruptura de estoque 🏗️ | — | ✅ [#65](https://github.com/welz-gui/AgroTop/pull/65) | | 2026-08-03 |
+| — | [0019](0019-rateio-de-custo-de-lote.md) — rateio de custo de lote 🏗️ | — | ✅ [#63](https://github.com/welz-gui/AgroTop/pull/63) | | 2026-08-03 |
+| — | [0027](0027-projecao-de-abate.md) — projeção de abate e chuva × GMD 🏗️ | `feat/projecao-abate` | 🟡 em andamento ([#68](https://github.com/welz-gui/AgroTop/pull/68)) | agente | 2026-08-03 |
+| — | [0020](0020-custo-de-dieta.md) — custo de dieta multi-ingrediente 🏗️ | — | ✅ [#66](https://github.com/welz-gui/AgroTop/pull/66) | | 2026-08-03 |
+| — | [0022](0022-validacao-de-genealogia.md) — validação de genealogia 🇧🇷 | — | ✅ [#67](https://github.com/welz-gui/AgroTop/pull/67) | | 2026-08-03 |
+| 1 | [0023](0023-validacao-de-gta.md) — validação de GTA e trânsito 🇧🇷 | `feat/validacao-gta` | 🟢 livre | — | — |
+| 2 | [0026](0026-controle-de-brincos.md) — controle de estoque de brincos 🇧🇷 | `feat/controle-de-brincos` | 🟢 livre | — | — |
+| 3 | [0021](0021-competencia-e-caixa.md) — competência × caixa 🏗️ | `feat/competencia-caixa` | 🟢 livre | — | — |
+| 4 | [0025](0025-postgres-no-ci.md) — Postgres no CI ⚙️ | `feat/postgres-no-ci` | 🟢 livre | — | — |
 
 ⚙️ = infraestrutura · 🇧🇷 = fundação regulatória PNIB · 🏗️ = avança trilha do roadmap
 
