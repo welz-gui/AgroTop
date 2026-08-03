@@ -65,6 +65,9 @@ def ranking_por_raca(ciclos: list[dict]) -> list[dict]:
         receita_total = grupo["receita_total"]
         gmds = grupo["gmds"]
 
+        # A margem NÃO é limitada a 0..1: raça que deu prejuízo tem margem
+        # negativa, e travá-la em zero faria prejuízo parecer empate. A spec
+        # dizia "0..1" — o texto estava errado e foi corrigido junto com isto.
         margem = lucro_total / receita_total if receita_total > 0 else 0.0
         resultado.append({
             "raca": raca,
@@ -74,7 +77,7 @@ def ranking_por_raca(ciclos: list[dict]) -> list[dict]:
                 round(lucro_total / arrobas, 2) if arrobas > 0 else 0.0
             ),
             "gmd_medio": round(sum(gmds) / len(gmds), 3) if gmds else 0.0,
-            "margem": round(min(1.0, max(0.0, margem)), 4),
+            "margem": round(margem, 4),
         })
 
     return sorted(

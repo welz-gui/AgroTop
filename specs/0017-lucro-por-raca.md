@@ -42,7 +42,9 @@ def ranking_por_raca(ciclos: list[dict]) -> list[dict]:
           "lucro_por_cabeca": float,
           "lucro_por_arroba_produzida": float,
           "gmd_medio": float,
-          "margem": float,          # lucro / receita, 0..1
+          "margem": float,          # lucro / receita. PODE SER NEGATIVA:
+                                    # raça que deu prejuízo tem margem < 0, e
+                                    # travar em zero faria prejuízo parecer empate
         }, ...]
     """
 ```

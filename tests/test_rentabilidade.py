@@ -109,3 +109,34 @@ class TestRankingPorRaca(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMargemNegativa(unittest.TestCase):
+    """Raça que dá prejuízo precisa APARECER como prejuízo.
+
+    A spec 0017 dizia `margem: 0..1` e a primeira versão travava o valor em zero,
+    o que fazia prejuízo parecer empate. O texto da spec estava errado; foi
+    corrigido junto com o código.
+    """
+
+    def _ciclo(self, raca, custo, receita):
+        return {"raca": raca, "peso_entrada": 300.0, "peso_saida": 450.0,
+                "dias": 200, "custo_total": custo, "receita": receita}
+
+    def test_prejuizo_produz_margem_negativa(self):
+        r = ranking_por_raca([self._ciclo("Angus", 8000.0, 6000.0)])
+        self.assertAlmostEqual(r[0]["margem"], -0.3333, places=4)
+
+    def test_prejuizo_nao_se_confunde_com_empate(self):
+        """O caso que motivou a correção: os dois davam 0.0 antes."""
+        r = {x["raca"]: x for x in ranking_por_raca([
+            self._ciclo("Empate", 6000.0, 6000.0),
+            self._ciclo("Prejuizo", 8000.0, 6000.0),
+        ])}
+        self.assertEqual(r["Empate"]["margem"], 0.0)
+        self.assertLess(r["Prejuizo"]["margem"], 0.0,
+                        "prejuízo travado em zero: indistinguível de empatar")
+
+    def test_lucro_por_arroba_tambem_pode_ser_negativo(self):
+        r = ranking_por_raca([self._ciclo("Angus", 8000.0, 6000.0)])
+        self.assertLess(r[0]["lucro_por_arroba_produzida"], 0.0)
