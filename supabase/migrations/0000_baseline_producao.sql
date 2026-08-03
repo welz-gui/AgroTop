@@ -165,6 +165,32 @@ CREATE TABLE IF NOT EXISTS deaths (
     CONSTRAINT deaths_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS dispositivos (
+    id text NOT NULL,
+    codigo_visual text,
+    codigo_eletronico text,
+    tipo text DEFAULT 'brinco_visual'::text NOT NULL,
+    tecnologia text,
+    fabricante text,
+    fornecedor text,
+    modelo text,
+    lote text,
+    data_fabricacao text,
+    data_aquisicao text,
+    proprietario_id text,
+    propriedade_destino_id text,
+    padrao_tecnico text,
+    status text DEFAULT 'disponivel'::text NOT NULL,
+    data_aplicacao text,
+    animal_uuid text,
+    aplicador text,
+    motivo_inutilizacao text,
+    data_baixa text,
+    divergencia text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT dispositivos_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS feeding_checks (
     id bigserial,
     plan_id bigint,
@@ -465,6 +491,9 @@ ALTER TABLE animals ADD CONSTRAINT fk_animals_parto FOREIGN KEY (parto_id) REFER
 ALTER TABLE animals ADD CONSTRAINT fk_animals_prop_nascimento FOREIGN KEY (propriedade_nascimento_id) REFERENCES properties(id);
 ALTER TABLE animals ADD CONSTRAINT fk_animals_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id);
+ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_proprietario_id_fkey FOREIGN KEY (proprietario_id) REFERENCES produtores(id);
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
@@ -503,6 +532,10 @@ CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_audit_entidade ON audit_logs USING btree (entidade, entidade_id);
 CREATE INDEX IF NOT EXISTS idx_audit_ocorrido ON audit_logs USING btree (ocorrido_em DESC);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
+CREATE INDEX IF NOT EXISTS idx_disp_animal ON dispositivos USING btree (animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_disp_lote ON dispositivos USING btree (lote);
+CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos USING btree (status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_disp_visual_ativo ON dispositivos USING btree (codigo_visual) WHERE ((codigo_visual IS NOT NULL) AND (status <> ALL (ARRAY['inutilizado'::text, 'devolvido'::text, 'cancelado'::text])));
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
 CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);

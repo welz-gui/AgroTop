@@ -31,16 +31,16 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0015](0015-geometria-piquetes.md) | Área e centroide do piquete pelo polígono | implementação | baixo | ✅ concluída |
 | [0016](0016-indicador-completude-dados.md) | Indicador de completude de dados | implementação | baixo | ✅ concluída |
 | [0017](0017-lucro-por-raca.md) | Lucro por raça e cruzamento | implementação | baixo | ✅ concluída |
-| [0018](0018-previsao-de-estoque.md) | Previsão de ruptura de estoque | implementação | baixo | 🟢 disponível |
-| [0019](0019-rateio-de-custo-de-lote.md) | Rateio de custo de lote entre animais | implementação | baixo | 🟢 disponível |
-| [0020](0020-custo-de-dieta.md) | Custo de dieta multi-ingrediente | implementação | baixo | 🟢 disponível |
-| [0021](0021-competencia-e-caixa.md) | Competência × caixa e fluxo projetado | implementação | baixo | 🟢 disponível |
-| [0022](0022-validacao-de-genealogia.md) | 🇧🇷 Validação de vínculo materno (§7) | implementação | baixo | 🟢 disponível |
-| [0023](0023-validacao-de-gta.md) | 🇧🇷 Validação de GTA e trânsito (§8) | implementação | baixo | 🟢 disponível |
-| [0024](0024-auditoria-de-cores.md) | Auditoria de cores — destrava a 0007 | ferramenta | baixo | 🟢 disponível |
+| [0018](0018-previsao-de-estoque.md) | Previsão de ruptura de estoque | implementação | baixo | ✅ concluída |
+| [0019](0019-rateio-de-custo-de-lote.md) | Rateio de custo de lote entre animais | implementação | baixo | ✅ concluída |
+| [0020](0020-custo-de-dieta.md) | Custo de dieta multi-ingrediente | implementação | baixo | ✅ concluída |
+| [0021](0021-competencia-e-caixa.md) | Competência × caixa e fluxo projetado | implementação | baixo | ✅ concluída |
+| [0022](0022-validacao-de-genealogia.md) | 🇧🇷 Validação de vínculo materno (§7) | implementação | baixo | ✅ concluída |
+| [0023](0023-validacao-de-gta.md) | 🇧🇷 Validação de GTA e trânsito (§8) | implementação | baixo | ✅ concluída |
+| [0024](0024-auditoria-de-cores.md) | Auditoria de cores — destrava a 0007 | ferramenta | baixo | ✅ concluída |
 | [0025](0025-postgres-no-ci.md) | Postgres no CI | infraestrutura | **médio** | 🟢 disponível |
-| [0026](0026-controle-de-brincos.md) | 🇧🇷 Controle de estoque de brincos (§5) | implementação | baixo | 🟢 disponível |
-| [0027](0027-projecao-de-abate.md) | Projeção de abate e chuva × GMD | implementação | baixo | 🟢 disponível |
+| [0026](0026-controle-de-brincos.md) | 🇧🇷 Controle de estoque de brincos (§5) | implementação | baixo | ✅ concluída |
+| [0027](0027-projecao-de-abate.md) | Projeção de abate e chuva × GMD | implementação | baixo | ✅ concluída |
 | 0007 | Substituir hex literais pelos tokens de `ui/tema.py` (A2b) | manutenção | **médio** | 🔴 bloqueada pela 0024 |
 
 **0007 continua bloqueada, mas agora tem caminho.** São ~198 substituições em `app.py` sem
@@ -56,8 +56,10 @@ próximo**. Depois da 0024, a 0007 pode ser escrita com critério verificável.
 **Estados:** 🟢 disponível · 🟡 em andamento (anote quem pegou) · ✅ concluída ·
 🔴 bloqueada · ⚪ arquivada.
 
-> ⚠️ **Esta tabela também é mantida à mão e também atrasa.** Em 2026-08-03 ela ainda listava
-> quinze specs concluídas como "disponível". **Não decida se uma tarefa está feita por aqui**
+> ⚠️ **Esta tabela também é mantida à mão e também atrasa.** Aconteceu **duas vezes** em
+> 2026-08-03: de manhã listava quinze specs concluídas como "disponível", e à tarde
+> outras nove — porque a R35 falava só do `QUADRO.md` e esta tabela ficou de fora.
+> **Ao mesclar uma spec, marque nos DOIS arquivos.** **Não decida se uma tarefa está feita por aqui**
 > — confira se o arquivo que a spec manda criar já existe na `origin/main`. O código não
 > atrasa.
 
