@@ -725,10 +725,18 @@ A regra de o agente remover o próprio worktree existe desde a primeira rodada e
 valendo. Mas sete falhas mostram que **regra que depende de o agente lembrar não é
 suficiente**: a limpeza precisa de um dono, e o dono é quem faz o merge.
 
-### R34. Colisão de tarefa: o agente PARA, não pega outra
+### R34. Colisão de tarefa: o que importa é QUANDO ela é descoberta
 
-Se a reivindicação falhar porque outro agente já tomou a tarefa, o agente **para e avisa**.
-Nunca escolhe a próxima sozinho.
+| Momento da descoberta | O que fazer |
+|---|---|
+| **Antes de qualquer trabalho** (na seleção) | pular para a próxima da fila — é grátis |
+| **Depois de já ter trabalhado** | **PARAR e avisar.** Nunca pegar outra |
+
+A diferença é o custo já pago. Pular durante a seleção não desperdiça nada e é o que torna
+o autoatendimento viável. Pular depois de trabalhar significa **fazer duas tarefas numa
+sessão, uma delas jogada fora**.
+
+Por isso a verificação tem de vir **antes**: reivindicar é o primeiro comando, não o último.
 
 *Histórico: até 2026-08-03 o `specs/QUADRO.md` mandava o contrário — "pegue a próxima e não
 insista". O efeito era o oposto do pretendido: o agente executava a tarefa inteira, descobria

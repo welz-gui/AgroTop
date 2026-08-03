@@ -247,8 +247,9 @@ git ls-remote --heads origin        # ver o que já está tomado
 git push origin HEAD:refs/heads/<branch-da-spec>   # reivindicar — ATÔMICO
 ```
 
-Se o push falhar com referência já existente, a tarefa está tomada. **PARE e avise quem te
-instruiu. NÃO pegue outra tarefa.**
+Se o push falhar com referência já existente, a tarefa está tomada. **Se você ainda não
+trabalhou, pule para a próxima da fila** — é grátis. **Se já trabalhou, PARE e avise**;
+nunca comece uma segunda tarefa na mesma sessão.
 
 > ### 🛑 Por que "pegue a próxima" era a instrução errada
 >
