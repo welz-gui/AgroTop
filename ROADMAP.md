@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-03 · Estado: **Fase A concluída · B1 e B2 concluídos**
+Última atualização: 2026-08-03 · Estado: **Fases A e B CONCLUÍDAS · próximo passo é ligar as telas**
 
 ---
 
@@ -17,9 +17,10 @@ SQLite para desenvolvimento e teste.
 |---|---|
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
-| Schema | **241 colunas / 24 tabelas**, paridade total entre DDL local e produção |
-| Testes | **260**, verdes no CI |
-| Código | `app.py` (~3.700) · `database.py` (~1.800, fachada) · `repositories/` (7) · `services/` (13) · `ui/` |
+| Schema | **362 colunas / 32 tabelas**, paridade total entre DDL local e produção |
+| Testes | **430**, verdes no CI em SQLite **e** PostgreSQL |
+| Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
+| Integração | ⚠️ **11 de 25 services ligados ao app** · 6 repositórios da Fase B com ZERO uso em `app.py` |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
 > ⚠️ **Esta tabela envelhece rápido.** Em 2026-08-03 ela ainda dizia "21 testes" e "Fase A em
@@ -206,7 +207,7 @@ commit.
 
 ---
 
-## 4. Fase A — fundação (em execução, sequencial, um agente)
+## 4. Fase A — fundação ✅ CONCLUÍDA
 
 **Por que sequencial:** as etapas A1 e A2 reescrevem os mesmos dois arquivos de 5.700
 linhas. Paralelizar aqui gera conflito de merge que custa mais do que economiza.
@@ -334,7 +335,11 @@ por todo o `database.py`.
 
 As trilhas 1–4 abaixo continuam válidas, mas **depois** de B1–B4.
 
-## 5. Trilhas paralelas (abrem só depois da Fase A)
+## 5. Trilhas paralelas — **abertas** (Fase A e B concluídas)
+
+> ⚠️ **Antes de abrir trilha nova, leia a dívida nº 1 da seção 11.** Sete módulos da Fase B
+> existem e não têm tela. Começar trilha antes de ligá-los aumenta a distância entre o que o
+> sistema faz e o que ele mostra — que já é a maior da história do projeto.
 
 Regras gerais para trabalho paralelo:
 
@@ -794,62 +799,86 @@ Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 
 ## 11. Dívidas conhecidas
 
-Revisada em **2026-08-02**. Fechada só sai daqui pela mão do mantenedor (R28).
+Revisada em **2026-08-03**, com a Fase B concluída. Fechada só sai daqui pela mão do
+mantenedor, na revisão.
+
+### 🔴 A dívida nº 1 — a Fase B não tem interface
+
+**Sete módulos regulatórios existem, estão testados, estão em produção — e nenhum tem
+tela.** Seis repositórios com **zero uso em `app.py`**:
+
+| Repositório | O que ficou invisível | §PNIB |
+|---|---|---|
+| `nascimentos` | cadastro de nascimento, vínculo materno, gêmeos, pendências | §7 |
+| `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
+| `dispositivos` | estoque de brincos, aplicação, inventário | §5 |
+| `propriedades` | hierarquia Organização → Produtor → Propriedade | §3 |
+| `eventos` | linha do tempo do animal e trilha de auditoria | §6, §14 |
+| `regras` | regras configuráveis com vigência e simulação | §11 |
+
+E **nove services órfãos**, entregues por agentes e sem nenhum consumidor: `caixa`,
+`completude`, `dieta`, `geometria`, `gta`, `previsao_estoque`, `projecao`, `rateio`,
+`rentabilidade`.
+
+**Por que isto é a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
+Fiscalização não aceita "o repositório tem o método". E o próprio ROADMAP nomeia o risco
+desde 2026-08-01 — *modo fundação permanente* —, só que agora a distância entre o que o
+sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
+
+**Ordem sugerida de integração**, por valor sobre esforço: nascimento → estoque de brincos
+→ movimentação com GTA → painel de pendências (§7.3) → geometria dos piquetes → regras
+configuráveis (tela de administrador, por último).
 
 ### 🔴 Segurança
 
-1. **Rotacionar a senha do Postgres** — apareceu em texto claro duas vezes, uma delas numa
-   mensagem de teste. Supabase → Settings → Database → reset, e atualizar `secrets.toml` +
-   Secrets do Streamlit Cloud. *(Adiada por decisão do usuário. **Segue aberta.**)*
-
-   ⚠️ **É a única dívida de segurança que resta**, e ficou mais exposta agora: a trilha de
-   auditoria da etapa B2 grava quem fez cada operação, mas nada disso protege o banco se a
-   credencial dele estiver comprometida — quem tem a senha escreve direto, sem passar pelo app.
-
-2. ✅ **Senhas dos usuários de produção — RESOLVIDA em 2026-08-02.** O usuário trocou login e
-   senha das contas existentes. O `_seed_users` só roda com a tabela `users` vazia, e as
-   instalações novas já usam `AGROTOP_ADMIN_PASSWORD`/`AGROTOP_OP_PASSWORD` (PR #12).
+Nenhuma dívida aberta. As duas anteriores foram fechadas em 2026-08-03: as senhas dos
+usuários de produção e a rotação da senha do Postgres.
 
 ### 🟠 Técnicas
 
-3. ✅ **Actions do CI — RESOLVIDA** (PR #15): `checkout@v6` e `setup-python@v6`, Node 24.
+2. **`animals.id` ainda é a PK.** A etapa B1.6 removeu a coluna legada das oito filhas, mas
+   a chave primária de `animals` continua sendo o brinco. **Não é urgente:** o vínculo já é
+   o `uuid` em todo lugar, que é o que o §4.1 exige. Trocar a PK é trabalho à parte.
 
-4. **A suíte é cega para o caminho Postgres.** Todos os testes rodam com
-   `AGROTOP_FORCE_SQLITE=1` — o que está certo e evita tocar produção (R16/R18), mas em
-   2026-08-02 deixou passar um `PRAGMA table_info` que derrubou o app. `tests/test_dialeto_duplo.py`
-   inspeciona o código à procura de sintaxe de um dialeto só, o que teria pego aquele caso,
-   mas **não substitui rodar contra um Postgres de verdade**. Um serviço `postgres` no CI
-   fecharia isso.
+3. **B4.3 pendente** — `property_id` continua **anulável** em `animals` e `lotes`. As
+   escritas já preenchem; falta o `NOT NULL`. Mesma ordem que funcionou no B1: escrita
+   primeiro, restrição depois.
 
-5. **`expected_sale_value` é regra de negócio morando em `repositories/financeiro.py`**
-   (peso × preço da categoria). Anotada no próprio arquivo; mover para `services/` é
-   trabalho posterior e sem urgência.
+4. **A adoção de eventos é incremental, por decisão do ADR 0004.** Os eventos são
+   *registrados* junto das operações, mas o estado do animal **não é derivado deles**.
+   Fazer as duas coisas de uma vez seria reescrever o sistema num salto.
 
-6. **PWA: validar no aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
+5. **`expected_sale_value` é regra de negócio em `repositories/financeiro.py`.** Anotada no
+   próprio arquivo; mover para `services/` é trabalho posterior e sem urgência.
+
+6. **PWA: validar num aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
    deploy fica atrás do portão de autenticação do Streamlit Cloud, e o PWA instalado precisa
    passar por ele antes do login do AgroTop, com cofre de cookies próprio. **Só um celular
    responde** — não dá para verificar por navegador comum nem por script.
 
-7. **`animals.id` ainda é a PK.** A etapa B1.6 removeu a coluna legada das 8 filhas, mas a
-   chave primária de `animals` continua sendo o brinco. Trocá-la é trabalho à parte e **não é
-   urgente**: o vínculo já é o uuid em todo lugar, que é o que o §4.1 do PNIB exige.
-
-8. **B2 está parcial de propósito.** Só a mudança de status gera evento. Pesagem, medicação,
-   movimentação, venda e óbito ainda não — cada uma é uma chamada no ponto de escrita que já
-   existe. Enquanto não forem feitas, `animal_events` fica quase vazia e a rastreabilidade
-   prometida não se realiza.
-
-9. **Bancos SQLite antigos não recebem as FKs** — o `ALTER TABLE` do SQLite não adiciona
+7. **Bancos SQLite antigos não recebem as FKs** — o `ALTER TABLE` do SQLite não adiciona
    constraint; só bancos criados do zero as têm. Aceitável, porque SQLite é dev/teste.
 
-10. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
-    servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
+8. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
+   servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
 
-11. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar
-    manualmente. Um leitor nativo (Trilha 1) resolve de verdade.
+9. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar
+   manualmente. Um leitor nativo (Trilha 1) resolve de verdade.
+
+### 🔵 Cobertura e ferramentas
+
+10. **O baseline não cobre RLS, grants nem extensões.** Funções e triggers **passaram a ser
+    cobertos** em 2026-08-03 — antes disso o baseline recriava `animal_events` e
+    `audit_logs` **sem os gatilhos append-only**, e o `testar_baseline` dizia "OK" porque
+    comparava só colunas. *A limitação estava documentada e ninguém reviu o aviso quando os
+    gatilhos entraram: documentar um risco não o elimina.*
+
+11. **A suíte roda Postgres no CI desde 2026-08-03** (spec 0025), o que fecha a dívida
+    aberta pela queda do `PRAGMA table_info`. `tests/test_dialeto_duplo.py` continua
+    valendo como guarda de leitura de código.
 
 ### 🔵 Processo
 
-12. **Spec 0007 bloqueada** — 198 hex em `app.py` sem teste que prove que a aparência não
-    mudou. O `AppTest` (desde o PR #44) prova que um widget existe, **não qual cor ele tem**.
-    O caminho barato é extrair os hex e comparar token a token com `ui/tema.py`.
+12. **Fila de specs com seis tarefas** (`specs/QUADRO.md`). O que resta de delegável é mais
+    escasso que antes: o trabalho principal virou integração, e integração é do mantenedor
+    pela R31.

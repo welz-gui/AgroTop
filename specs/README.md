@@ -3,6 +3,10 @@
 Cada arquivo `NNNN-<slug>.md` aqui é uma **tarefa fechada**, escrita para ser entregue a
 um agente que **não conhece o projeto**. Ele lê a spec, executa e abre um PR.
 
+**Estado em 2026-08-03:** 32 specs escritas, 26 concluídas, **6 na fila**. Fases A e B do
+[ROADMAP](../ROADMAP.md) concluídas — o que resta de delegável é mais escasso, porque o
+trabalho principal virou integração. Ver *"O que não delegar"*, no fim desta página.
+
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
 ---
@@ -441,10 +445,21 @@ tinham valor. Os problemas não foram de capacidade do agente, e sim de **contex
 
 ## O que **não** delegar
 
-- Alterar **arquivo existente** em `database.py`, `services/` ou `repositories/` enquanto a
-  Fase A estiver em andamento — é onde o refactor trabalha, e conflito ali custa caro.
-  **Criar módulo novo em `services/` é permitido** e é como as tarefas de implementação
-  avançam trilha sem colidir (ROADMAP R31).
+> ⚠️ **Isto mudou com o fim da Fase B (2026-08-03).** Antes, quase tudo que restava era
+> função pura em módulo novo — ideal para delegar. Agora o trabalho principal é
+> **integração**: ligar à interface os sete módulos regulatórios que já existem. Integração
+> toca `app.py`, mistura camadas e exige contexto do sistema inteiro. **É do mantenedor,
+> pela R31.**
+>
+> A consequência prática: a fila de specs encolheu e vai continuar encolhendo. Escrever
+> spec por escrever, para manter agentes ocupados, produz módulo órfão — e o projeto já tem
+> **nove** deles esperando consumidor.
+
+- **Ligar módulo à interface.** É o trabalho do mantenedor pela R31, e é onde a decisão de
+  produto acontece.
+- Alterar **arquivo existente** em `database.py`, `services/` ou `repositories/`.
+  **Criar módulo novo em `services/` continua permitido** e é como as tarefas de
+  implementação avançam sem colidir (ROADMAP R31).
 - Mudança de schema (R4) — passa pelo dono do schema, sempre serializada.
 - Alteração de regra de negócio com efeito numérico (GMD, custo, carência, venda).
 - Qualquer coisa que exija credencial de produção.

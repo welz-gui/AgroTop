@@ -3,6 +3,18 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
+**Estado em 2026-08-03:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 430 testes ·
+32 tabelas em produção · **6 tarefas na fila**.
+
+> ### ⚠️ O que estas seis specs NÃO cobrem
+>
+> A maior pendência do projeto não está nesta fila e não pode estar: **sete módulos
+> regulatórios da Fase B existem e não têm interface**. Ligar tela é do mantenedor pela R31.
+>
+> Estas seis existem para avançar em frentes que **não colidem** com essa integração. Se
+> você é um agente lendo isto: a fila é o seu escopo, e é legítimo — mas não confunda "a
+> fila está curta" com "falta pouco para o projeto".
+
 > ⚠️ **Este arquivo é visibilidade, não autoridade.** Um arquivo em git **não é um lock**:
 > dois agentes podem lê-lo ao mesmo tempo, ambos verem a mesma tarefa livre e ambos
 > reivindicá-la. Quem manda é o **branch no remoto** — ver o protocolo abaixo.
@@ -94,25 +106,28 @@ paralelo à migração:
 Assim o agente entrega a regra testada enquanto o mantenedor faz a migração — e a
 integração depois é ligar função pronta.
 
-**Concluídas:** 0001 a 0006 e 0008 a 0014 — **198 testes** na suíte. Só a 0007 segue de
-fora, bloqueada.
+**Concluídas:** 26 das 32 specs — **430 testes** na suíte. A 0007, bloqueada desde o início
+do projeto, foi **destravada** em 2026-08-03 pelo mapa de cores da spec 0024.
 
 **Fase A concluída** (PR #24): `database.py` 2.224 → 1.604 linhas, com `repositories/`
 (5 módulos), `services/` (11) e `ui/`.
 
-### Integração das funções entregues — situação em 2026-08-01
+### Integração das funções entregues — situação em 2026-08-03
 
 Ligar à interface é do mantenedor (R31). Estado atual:
 
-| Função | Situação |
+**11 de 25 services chegam ao app.** Cinco alimentam repositórios que também não têm tela.
+E **nove estão órfãos** — entregues, testados, sem nenhum consumidor:
+
+| Situação | Módulos |
 |---|---|
-| `services/qualidade.py` | ✅ ligada (pesagem no campo e prévia da importação) |
-| `services/estoque.py` | ✅ ligada |
-| `services/estados_animal.py` | ✅ ligada em `update_animal_status` ([#44](https://github.com/welz-gui/AgroTop/pull/44)) |
-| `services/importacao.py` | ✅ ligada (aba "Importar CSV" no Modo Campo) |
-| `services/identificadores.py` | ⏳ **não ligada** — depende da interface de troca de brinco |
-| `services/validacao_regulatoria.py` | ⏳ **não ligada** |
-| `services/recomendacoes.py` | ⏳ **não ligada** — motor de regras sem tela |
+| ✅ **na interface** (11) | `constantes` · `estados_animal` · `estoque` · `identificadores` · `importacao` · `qualidade` · `recomendacoes` · `seguranca` · `terminacao` · `validacao_regulatoria` · `zootecnia` |
+| 🟡 **usados por repositório sem tela** (5) | `dispositivos` · `estados_dispositivo` · `genealogia` · `movimentacao` · `regras_regulatorias` |
+| 🔴 **órfãos — sem nenhum consumidor** (9) | `caixa` · `completude` · `dieta` · `geometria` · `gta` · `previsao_estoque` · `projecao` · `rateio` · `rentabilidade` |
+
+Os nove órfãos são o custo real de delegar mais rápido do que se integra. Cada um custou
+dias de trabalho de agente e ainda não entregou nada ao usuário. **É o motivo de a fila ter
+encolhido de propósito.**
 
 A PoC 0003 recomendou **`streamlit-folium` + `shapely` + `pyproj`**, com ressalva de
 usabilidade de toque no celular — é o que a **spec 0015** começa a destravar.
