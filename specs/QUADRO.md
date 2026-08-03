@@ -26,9 +26,14 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0004](0004-poc-ndvi-viabilidade.md) — PoC NDVI em MT (2ª tentativa) | — | ✅ [#43](https://github.com/welz-gui/AgroTop/pull/43) ⚠️ | | 2026-08-01 |
 | — | [0006](0006-poc-dados-modelos-preditivos.md) — PoC histórico p/ modelos | — | ✅ [#35](https://github.com/welz-gui/AgroTop/pull/35) | | 2026-08-01 |
 | — | [0005](0005-poc-flutter-api.md) — PoC Flutter + API | — | ✅ [#40](https://github.com/welz-gui/AgroTop/pull/40) | | 2026-08-01 |
-| 1 | [0015](0015-geometria-piquetes.md) — área do piquete pelo polígono 🏗️ | `feat/geometria-piquetes` | 🟢 livre | — | — |
-| 2 | [0016](0016-indicador-completude-dados.md) — indicador de completude 🏗️ | `feat/completude-dados` | 🟢 livre | — | — |
-| 3 | [0017](0017-lucro-por-raca.md) — lucro por raça e cruzamento 🏗️ | `feat/lucro-por-raca` | 🟢 livre | — | — |
+| — | [0015](0015-geometria-piquetes.md) — área do piquete pelo polígono 🏗️ | — | ✅ [#46](https://github.com/welz-gui/AgroTop/pull/46) | | 2026-08-01 |
+| — | [0016](0016-indicador-completude-dados.md) — indicador de completude 🏗️ | — | ✅ [#52](https://github.com/welz-gui/AgroTop/pull/52) | | 2026-08-02 |
+| — | [0017](0017-lucro-por-raca.md) — lucro por raça e cruzamento 🏗️ | — | ✅ [#55](https://github.com/welz-gui/AgroTop/pull/55) | | 2026-08-03 |
+
+> ⚠️ **A fila está VAZIA.** Não há spec livre — não inicie agente sem escrever uma antes.
+> Em 2026-08-02 a 0015 foi implementada **duas vezes** ([#46](https://github.com/welz-gui/AgroTop/pull/46) e [#50](https://github.com/welz-gui/AgroTop/pull/50)) porque o quadro
+> continuava marcando como livre uma tarefa já entregue. Marcar a conclusão **no mesmo dia**
+> é o que evita o retrabalho.
 
 ⚠️ **A 0004 foi entregue, mas o PR #43 foi fechado sem merge** — o conteúdo já estava na
 `main`, carregado por engano dentro do [#44](https://github.com/welz-gui/AgroTop/pull/44).
