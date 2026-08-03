@@ -140,10 +140,14 @@ deploy do Streamlit Cloud.
 A primeira frase precisa conter a palavra **worktree** — é o que autoriza o agente a se
 isolar. Escolha a variante conforme **quantos agentes você vai iniciar**.
 
-#### Variante A — padrão: o agente pega a próxima livre ⭐
+#### Variante A — o agente pega a próxima livre ⚠️ **desaconselhada**
 
-**Use esta.** Vale quando há **um agente por vez** — que é o modo de trabalho normal deste
-projeto. Você não precisa escolher a spec.
+> 🛑 **Não use, salvo motivo forte.** Ela depende de o agente ler o quadro e o quadro estar
+> correto — e o quadro **atrasa**, porque é mantido à mão. Foi assim que a spec 0015 foi
+> implementada duas vezes em 2026-08-02.
+>
+> **Prefira a Variante B**, que atribui a spec no prompt: zero corrida, zero dependência de
+> o quadro estar em dia. O custo é você escolher a spec, o que leva dez segundos.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
@@ -161,10 +165,11 @@ projeto. Você não precisa escolher a spec.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
 > 5. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
-#### Variante B — vários agentes em paralelo (você atribui)
+#### Variante B — você atribui a spec ⭐ **use esta**
 
-**Obrigatória** quando houver mais de um agente ativo ao mesmo tempo. A colisão de
-2026-07-31 aconteceu com dois iniciados em paralelo lendo a fila juntos.
+**Obrigatória** com mais de um agente ativo, e **recomendada mesmo com um só**. A colisão de
+2026-07-31 aconteceu com dois agentes iniciados em paralelo lendo a fila juntos; a de
+2026-08-02 aconteceu com o quadro desatualizado. Atribuir no prompt elimina as duas.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
@@ -175,18 +180,6 @@ projeto. Você não precisa escolher a spec.
 
 #### Continuação, igual nas duas variantes
 
-> **Confirme que a tarefa ainda não foi feita.** A spec diz qual arquivo criar; se ele já
-> existe na `origin/main`, ela já foi entregue:
-> ```
-> git fetch origin
-> git cat-file -e origin/main:services/<modulo-da-spec>.py 2>/dev/null \
->   && echo "JA EXISTE - pare e avise quem te instruiu" \
->   || echo "nao existe - pode seguir"
-> ```
-> Em 2026-08-02 a spec 0015 foi implementada **duas vezes**, porque o quadro continuava
-> marcando como livre uma tarefa já entregue. **O código é a fonte da verdade; o quadro é só
-> a fila de prioridade** — e ele é mantido à mão, então atrasa.
->
 > **Antes de escrever qualquer arquivo, prove que está dentro do worktree** — não na pasta
 > principal do mantenedor:
 > ```
@@ -203,8 +196,18 @@ projeto. Você não precisa escolher a spec.
 > git fetch origin                     # NÃO é opcional
 > git log --oneline -1 origin/main     # deve ser o mesmo ponto de partida do seu branch
 > ```
-> Se não for, refaça o worktree a partir de `origin/main`. Sem o `fetch` você pode estar
-> lendo um quadro desatualizado e concluir que sua tarefa já foi feita — já aconteceu.
+> Se não for, refaça o worktree a partir de `origin/main`.
+>
+> **Agora confirme que a tarefa ainda NÃO foi feita.** A spec diz qual arquivo criar; se ele
+> já existe na `origin/main`, ela já foi entregue:
+> ```
+> git cat-file -e origin/main:<arquivo-que-a-spec-manda-criar> 2>/dev/null \
+>   && echo "JA EXISTE - PARE e avise quem te instruiu" \
+>   || echo "nao existe - pode seguir"
+> ```
+> Em 2026-08-02 a spec 0015 foi implementada **duas vezes** porque o quadro continuava
+> marcando como livre uma tarefa entregue no dia anterior — o segundo agente trabalhou para
+> nada. **O código é a fonte da verdade; o quadro é só a fila de prioridade** (R32).
 >
 > Faça **apenas** o que a spec pede. Se identificar outro problema, **anote no PR em vez de
 > corrigir** — mudança fora de escopo é rejeitada.
