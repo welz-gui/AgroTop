@@ -4,6 +4,24 @@ from datetime import date, timedelta
 import math
 
 
+def _safe_float(val, default: float = 0.0) -> float:
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(val, default: int = 0) -> int:
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def prever(insumos: list[dict], hoje: str) -> list[dict]:
     """Dias restantes e data de ruptura por insumo.
 
@@ -41,10 +59,10 @@ def prever(insumos: list[dict], hoje: str) -> list[dict]:
 
         insumo_id = insumo.get("id")
         nome = str(insumo.get("nome", ""))
-        saldo = float(insumo.get("saldo", 0.0) or 0.0)
-        consumo_diario = float(insumo.get("consumo_diario", 0.0) or 0.0)
-        estoque_minimo = float(insumo.get("estoque_minimo", 0.0) or 0.0)
-        prazo_reposicao_dias = int(insumo.get("prazo_reposicao_dias", 0) or 0)
+        saldo = _safe_float(insumo.get("saldo"), 0.0)
+        consumo_diario = _safe_float(insumo.get("consumo_diario"), 0.0)
+        estoque_minimo = _safe_float(insumo.get("estoque_minimo"), 0.0)
+        prazo_reposicao_dias = _safe_int(insumo.get("prazo_reposicao_dias"), 0)
 
         if consumo_diario <= 0:
             dias_restantes = None
