@@ -8,6 +8,20 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: agrotop_test
+          POSTGRES_PASSWORD: agrotop_test
+          POSTGRES_DB: agrotop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agrotop_test -d agrotop_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v6
 
@@ -27,5 +41,25 @@ jobs:
       # `-t .` é obrigatório: faz `tests` ser importado como pacote, o que executa
       # tests/__init__.py e isola a suíte do banco de produção. Sem isso, o teste
       # tests/test_isolamento.py falha de propósito.
-      - name: Testes unitários
+      - name: Testes — SQLite
+        env:
+          AGROTOP_FORCE_SQLITE: "1"
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Preparar schema PostgreSQL efêmero
+        env:
+          PGPASSWORD: agrotop_test
+        run: |
+          psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/0000_baseline_producao.sql
+          psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/0007_eventos_e_auditoria.sql
+
+      # tests/__init__.py continua forçando SQLite no processo principal. Os
+      # testes de integração abrem subprocessos e removem essa trava somente
+      # para este Postgres efêmero, sem expor nem alcançar credencial real.
+      - name: Testes — PostgreSQL
+        env:
+          AGROTOP_TEST_POSTGRES: "1"
+          DATABASE_URL: postgresql://agrotop_test:agrotop_test@localhost:5432/agrotop_test
         run: python -m unittest discover -s tests -t . -v
