@@ -16,6 +16,10 @@ from services.qualidade import avaliar_pesagem
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
 from services.recomendacoes import avaliar as avaliar_recomendacoes
+from services.estados_dispositivo import (
+    ESTADOS as ESTADOS_DISPOSITIVO,
+    transicao_permitida as _transicao_dispositivo,
+)
 from ui.tema import cores
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -490,6 +494,7 @@ def _sidebar():
                 ("📈","Desempenho","desempenho",""),
                 ("💰","Financeiro","financeiro",""),
                 ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
+                ("🏷️","Brincos","brincos",""),
                 ("🌾","Nutrição","nutricao",""),
                 ("💉","Sanitário","sanitario",""),
                 ("🌧️","Clima & Chuva","clima",""),
@@ -504,6 +509,7 @@ def _sidebar():
                 ("📱","Modo Campo","campo",""),
                 ("➕","Cadastrar Animal","cadastrar",""),
                 ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
+                ("🏷️","Brincos","brincos",""),
             ]
 
         for icon, label, key, badge in pages:
@@ -3600,6 +3606,254 @@ def page_nutricao():
             st.info("Nenhuma checagem registrada no período.")
 
 
+# Rótulos dos doze estados do §5.2. O código é o que vai ao banco; o rótulo é o
+# que o operador entende no curral.
+_ESTADO_BRINCO = {
+    "solicitado": "Solicitado ao fornecedor", "recebido": "Recebido, a conferir",
+    "disponivel": "Disponível", "reservado": "Reservado",
+    "aplicado": "Aplicado em animal", "perdido": "Perdido",
+    "danificado": "Danificado", "substituido": "Substituído",
+    "inutilizado": "Inutilizado (definitivo)", "devolvido": "Devolvido (definitivo)",
+    "cancelado": "Cancelado (definitivo)", "bloqueado_orgao": "Bloqueado pelo órgão",
+}
+_TIPO_BRINCO = {"brinco_visual": "Brinco visual", "boton": "Botton",
+                "conjunto": "Conjunto (visual + eletrônico)", "outro": "Outro"}
+
+
+def page_brincos():
+    """Estoque de dispositivos de identificação (PNIB §5).
+
+    Página própria, e não uma aba do Estoque de Insumos, porque as duas coisas
+    só se parecem no nome: insumo acaba e se repõe; brinco é um número
+    controlado, com doze estados e ato definitivo no fim. Um alerta de estoque
+    mínimo não diz nada sobre um brinco inutilizado.
+    """
+    st.markdown('<div class="page-title">🏷️ Brincos e Dispositivos</div>',
+                unsafe_allow_html=True)
+
+    inv = db.dispositivos.inventario()
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Em estoque", inv["em_estoque"])
+    c2.metric("Aplicados", inv["aplicados"])
+    c3.metric("Perdidos / danificados", inv["perdidos_ou_danificados"])
+    c4.metric("Divergências", len(inv["divergencias"]))
+
+    if inv["divergencias"]:
+        st.warning(
+            f"⚠️ {_plural(len(inv['divergencias']), 'dispositivo aplicado', 'dispositivos aplicados')} "
+            "com divergência entre o código visual e o eletrônico. "
+            "Foi registrado na aplicação e **não bloqueou** o trabalho (§5.3) — "
+            "mas precisa de conferência no campo.")
+
+    t_inv, t_aplicar, t_import = st.tabs(
+        ["📋 Inventário", "🏷️ Aplicar em animal", "📥 Importar lote"])
+
+    with t_inv:
+        _brincos_inventario(inv)
+    with t_aplicar:
+        _brincos_aplicar()
+    with t_import:
+        _brincos_importar()
+
+
+def _brincos_inventario(inv):
+    if not inv["por_status"]:
+        st.info("Nenhum dispositivo cadastrado. Comece pela aba **Importar lote**.")
+        return
+
+    st.markdown("**Por situação**")
+    st.dataframe(
+        pd.DataFrame([{"Situação": _ESTADO_BRINCO.get(k, k), "Quantidade": v}
+                      for k, v in sorted(inv["por_status"].items(),
+                                         key=lambda kv: -kv[1])]),
+        use_container_width=True, hide_index=True)
+
+    if inv["por_lote"]:
+        st.markdown("**Por lote de compra**")
+        st.dataframe(
+            pd.DataFrame([{"Lote": l["lote"], "Total": l["total"],
+                           "Ainda em estoque": l["em_estoque"]}
+                          for l in inv["por_lote"]]),
+            use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown("**Mudar a situação de um dispositivo**")
+    st.caption("Busque pelo número gravado no brinco — é como ele aparece na mão "
+               "do operador.")
+
+    codigo = st.text_input("🔎 Código do brinco", key="brc_busca").strip().upper()
+    if not codigo:
+        return
+
+    d = db.dispositivos.por_codigo(codigo)
+    if d is None:
+        st.info(f"Nenhum dispositivo ativo com o código **{codigo}**. "
+                "Inutilizado, devolvido ou cancelado não aparece nesta busca — "
+                "o número deles não volta ao estoque.")
+        return
+
+    atual = d["status"]
+    st.markdown(f"**{d['codigo_visual']}** · {_TIPO_BRINCO.get(d['tipo'], d['tipo'])} · "
+                f"situação atual: **{_ESTADO_BRINCO.get(atual, atual)}**"
+                + (f" · lote {d['lote']}" if d.get("lote") else ""))
+
+    destinos = [e for e in ESTADOS_DISPOSITIVO
+                if e != atual and _transicao_dispositivo(atual, e)["permitida"]]
+    if not destinos:
+        # Nada permitido tem duas causas muito diferentes, e confundi-las seria
+        # dizer ao operador que o sistema quebrou quando na verdade a norma
+        # está sendo cumprida.
+        if _transicao_dispositivo(atual, "disponivel").get("exige_autorizacao"):
+            st.error("🔒 Dispositivo bloqueado pelo órgão oficial. "
+                     "Só o órgão libera — o sistema não desfaz isso sozinho (§5.2).")
+        else:
+            st.info(f"**{_ESTADO_BRINCO.get(atual, atual)}** é situação definitiva: "
+                    "não admite mudança. É o que garante que este número não será "
+                    "reaplicado.")
+        return
+
+    novo = st.selectbox("Nova situação", destinos,
+                        format_func=lambda e: _ESTADO_BRINCO.get(e, e),
+                        key="brc_novo")
+    regra = _transicao_dispositivo(atual, novo)
+    motivo = ""
+    if regra["exige_motivo"]:
+        motivo = st.text_input(
+            "Motivo *", key="brc_motivo",
+            help="Sem o motivo ninguém reconstrói depois por que um brinco pago "
+                 "virou refugo.").strip()
+
+    pode = not regra["exige_motivo"] or bool(motivo)
+    if st.button("💾 Registrar mudança", type="primary", disabled=not pode,
+                 key="brc_salvar"):
+        r = db.dispositivos.mudar_status(
+            d["id"], novo, motivo=motivo, usuario=st.session_state.user["name"])
+        if r.get("ok"):
+            db.clear_cache()
+            st.success(f"✅ {d['codigo_visual']}: {_ESTADO_BRINCO.get(atual, atual)}"
+                       f" → {_ESTADO_BRINCO.get(novo, novo)}")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('erro') or r.get('motivo', 'Não foi possível mudar.')}")
+
+
+def _brincos_aplicar():
+    disp = db.dispositivos.disponiveis(limite=200)
+    if not disp:
+        st.info("Nenhum dispositivo disponível para aplicar. "
+                "Importe um lote ou libere os que estão reservados.")
+        return
+
+    animais = db.get_all_animals(status="ativo")
+    if not animais:
+        st.info("Nenhum animal ativo para receber o dispositivo.")
+        return
+
+    c1, c2 = st.columns(2)
+    with c1:
+        rot_d = {f"{d['codigo_visual']} — {_TIPO_BRINCO.get(d['tipo'], d['tipo'])}": d
+                 for d in disp}
+        dispositivo = rot_d[st.selectbox("🏷️ Dispositivo *", list(rot_d),
+                                         key="brap_disp")]
+    with c2:
+        rot_a = {f"{a['id']} — {a['breed']}": a for a in animais}
+        animal = rot_a[st.selectbox("🐄 Animal *", list(rot_a), key="brap_animal")]
+
+    c3, c4 = st.columns(2)
+    with c3:
+        tipo_id = st.selectbox(
+            "Função do identificador", ["manejo", "oficial", "eletronico"],
+            key="brap_tipo",
+            format_func=lambda t: {"manejo": "Manejo (uso diário)",
+                                   "oficial": "Oficial (§4.1)",
+                                   "eletronico": "Eletrônico"}[t])
+    with c4:
+        lido = st.text_input(
+            "Código lido no leitor", key="brap_lido",
+            help="Opcional. Confere visual × eletrônico na hora (§5.3). "
+                 "Divergência é registrada, não impede — pode ser erro de "
+                 "leitura, e recusar travaria o trabalho no curral.").strip().upper()
+
+    if lido and lido != dispositivo["codigo_visual"]:
+        st.warning(f"⚠️ O leitor devolveu **{lido}**, e o brinco é "
+                   f"**{dispositivo['codigo_visual']}**. A aplicação segue, e a "
+                   "divergência fica registrada para conferência.")
+
+    # Já existe identificador vigente desta função? Então isto é TROCA, e o
+    # §4.2.3 exige motivo. Perguntar aqui evita o erro voltar depois de o
+    # operador achar que gravou.
+    vigente = db.identificadores.get_ativo(animal["uuid"], tipo_id)
+    troca = bool(vigente and vigente["valor"] != dispositivo["codigo_visual"])
+    motivo_sub = ""
+    if troca:
+        st.info(f"O animal já tem {tipo_id} **{vigente['valor']}**. Aplicar outro "
+                "é **substituição**: o anterior é encerrado, não apagado (§4.2.3).")
+        motivo_sub = st.text_input("Motivo da substituição *",
+                                   key="brap_motivo").strip()
+
+    pode = not troca or bool(motivo_sub)
+    if st.button("✅ Aplicar dispositivo", type="primary", disabled=not pode,
+                 key="brap_salvar"):
+        r = db.dispositivos.aplicar(
+            dispositivo["id"], animal["uuid"],
+            aplicador=st.session_state.user["name"],
+            tipo_identificador=tipo_id, eletronico_lido=lido,
+            motivo_substituicao=motivo_sub)
+        if r.get("ok"):
+            db.clear_cache()
+            if r.get("divergencia"):
+                st.warning(f"✅ Aplicado com divergência registrada: {r['divergencia']}")
+            else:
+                st.success(f"✅ {dispositivo['codigo_visual']} aplicado em "
+                           f"{animal['id']}.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('erro', 'Não foi possível aplicar.')}")
+
+
+def _brincos_importar():
+    st.caption("§5.3: brincos chegam em faixa numérica contínua. Reimportar a "
+               "mesma faixa **pula** os números já cadastrados — não duplica nem "
+               "apaga histórico de aplicação.")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        inicio = st.text_input("Do número *", placeholder="BR0001",
+                               key="brimp_ini").strip().upper()
+    with c2:
+        fim = st.text_input("Até o número *", placeholder="BR0500",
+                            key="brimp_fim").strip().upper()
+    with c3:
+        lote = st.text_input("Lote de compra *", placeholder="NF 1234",
+                             key="brimp_lote").strip()
+
+    c4, c5, c6 = st.columns(3)
+    with c4:
+        tipo = st.selectbox("Tipo", list(_TIPO_BRINCO),
+                            format_func=lambda t: _TIPO_BRINCO[t], key="brimp_tipo")
+    with c5:
+        fabricante = st.text_input("Fabricante", key="brimp_fab").strip()
+    with c6:
+        aquisicao = st.date_input("Data de aquisição", value=date.today(),
+                                  key="brimp_data")
+
+    pode = bool(inicio and fim and lote)
+    if st.button("📥 Importar faixa", type="primary", disabled=not pode,
+                 key="brimp_salvar"):
+        r = db.dispositivos.importar_lote(
+            inicio, fim, lote=lote, tipo=tipo, fabricante=fabricante,
+            data_aquisicao=aquisicao.isoformat(),
+            usuario=st.session_state.user["name"])
+        if r.get("ok"):
+            db.clear_cache()
+            msg = f"✅ {r['criados']} de {r['total_na_faixa']} importados."
+            if r["pulados"]:
+                msg += f" {r['pulados']} já existiam e foram mantidos como estão."
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(f"🚫 {r['erro']}")
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -3757,7 +4011,9 @@ def page_admin():
 # ROTEADOR
 # ══════════════════════════════════════════════════════════════════════════════
 # Páginas que o operador pode acessar (as demais são exclusivas do admin)
-OPERATOR_PAGES = {"campo", "cadastrar", "estoque"}
+# Aplicar brinco é trabalho de curral, não de escritório — por isso o
+# operador entra em "brincos".
+OPERATOR_PAGES = {"campo", "cadastrar", "estoque", "brincos"}
 
 _COOKIE_NAME = "agrotop_sid"
 
@@ -3822,6 +4078,7 @@ def main():
         "desempenho":page_desempenho,
         "financeiro":page_financeiro,
         "estoque":   page_estoque,
+        "brincos":   page_brincos,
         "nutricao":  page_nutricao,
         "sanitario": page_sanitario,
         "clima":     page_clima,
