@@ -2680,8 +2680,152 @@ def _age_inputs(entry_date, key_prefix=""):
     return bd_str, estimated, metodo, err
 
 
+_GRAVIDADE_ICONE = {"bloqueio": "🔴", "alerta": "🟡", "informativo": "🔵"}
+
+
+def _cadastro_nascimento():
+    """Registro de nascimento (PNIB §7).
+
+    A regra é `services/genealogia.py`, via `repositories/nascimentos.py`. Aqui
+    só a tela — e a decisão de interface que o §7.2 impõe: **bloqueio impede,
+    alerta pede confirmação.** O texto do §7.2 é explícito: o sistema deve
+    "emitir alerta, sem substituir a avaliação técnica". Quem avalia é o
+    técnico; o software mostra o que sabe.
+    """
+    st.caption("Nascimento na propriedade. A mãe precisa estar cadastrada e ativa — "
+               "o vínculo materno é exigência do §7 do PNIB e não pode ser preenchido depois "
+               "sem deixar rastro.")
+
+    femeas = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "F"]
+    if not femeas:
+        st.warning("Nenhuma fêmea ativa no rebanho. Cadastre a mãe antes de registrar a cria.")
+        return
+
+    c1, c2, c3 = st.columns([2, 1, 1])
+    with c1:
+        rotulos = {f"{a['id']} — {a['breed']}": a for a in femeas}
+        mae = rotulos[st.selectbox("🐄 Mãe *", list(rotulos), key="nasc_mae")]
+    with c2:
+        data_parto = st.date_input("📅 Data do parto *", value=date.today(),
+                                   max_value=date.today(), key="nasc_data")
+    with c3:
+        hora = st.text_input("Hora", placeholder="14:30", key="nasc_hora").strip()
+
+    c4, c5, c6 = st.columns(3)
+    with c4:
+        tipo_parto = st.selectbox("Tipo de parto", ["normal", "assistido", "cesarea"],
+                                  key="nasc_tipo")
+    with c5:
+        condicao = st.selectbox("Condição", ["nascido_vivo", "natimorto"],
+                                format_func=lambda v: "Nascido vivo" if v == "nascido_vivo"
+                                else "Natimorto", key="nasc_cond")
+    with c6:
+        n_crias = st.number_input("Nº de crias", min_value=1, max_value=4, value=1,
+                                  key="nasc_n",
+                                  help="Duas ou mais geram animais distintos ligados ao "
+                                       "MESMO parto — é o que o §7.2 exige para gêmeos.")
+
+    data_estimada = st.checkbox(
+        "Data estimada (parto não acompanhado)", key="nasc_est",
+        help="§7.1: marcar quando ninguém presenciou. Fica registrado como estimado "
+             "e aparece nas pendências.")
+
+    # ── Prévia da validação, ANTES de o usuário preencher as crias ───────────
+    problemas = db.nascimentos.avaliar(mae["uuid"], data_parto.isoformat(),
+                                       mae.get("property_id"))
+    bloqueios = [p for p in problemas if p["gravidade"] == "bloqueio"]
+    alertas = [p for p in problemas if p["gravidade"] == "alerta"]
+
+    if problemas:
+        st.markdown("**Verificação do vínculo materno (§7.2)**")
+        for p in problemas:
+            icone = _GRAVIDADE_ICONE.get(p["gravidade"], "•")
+            texto = f"{icone} {p['mensagem']}"
+            if p["gravidade"] == "bloqueio":
+                st.error(texto)
+            elif p["gravidade"] == "alerta":
+                st.warning(texto)
+            else:
+                st.info(texto)
+
+    if bloqueios:
+        st.error("🚫 Não é possível registrar enquanto houver bloqueio. "
+                 "Corrija o cadastro da mãe ou a data do parto.")
+        return
+
+    confirmado = False
+    if alertas:
+        confirmado = st.checkbox(
+            "Avaliei os alertas acima e confirmo o registro", key="nasc_conf",
+            help="§7.2: o sistema alerta, sem substituir a avaliação técnica. "
+                 "A confirmação fica registrada.")
+
+    st.markdown("---")
+    st.markdown(f"**{'Crias' if n_crias > 1 else 'Cria'}**")
+
+    crias = []
+    for i in range(int(n_crias)):
+        k1, k2, k3, k4 = st.columns([2, 1, 1, 1])
+        with k1:
+            brinco = st.text_input(f"🏷️ Brinco {i+1} *", key=f"nasc_id_{i}").strip().upper()
+        with k2:
+            sexo = st.selectbox("Sexo", ["M", "F"], key=f"nasc_sexo_{i}",
+                                format_func=lambda v: "♂" if v == "M" else "♀")
+        with k3:
+            raca = st.selectbox("Raça", BREEDS, key=f"nasc_raca_{i}",
+                                index=BREEDS.index(mae["breed"]) if mae["breed"] in BREEDS else 0)
+        with k4:
+            peso = st.number_input("Peso (kg)", min_value=0.0, max_value=100.0,
+                                   step=0.5, value=0.0, key=f"nasc_peso_{i}")
+        crias.append({"id": brinco, "sexo": sexo, "raca": raca,
+                      "peso": peso or None})
+
+    obs = st.text_area("Observações", key="nasc_obs").strip()
+
+    brincos = [c["id"] for c in crias if c["id"]]
+    faltando = len(brincos) < int(n_crias)
+    repetidos = len(brincos) != len(set(brincos))
+    if repetidos:
+        st.error("🚫 Dois brincos iguais na mesma ninhada.")
+
+    pode = (not faltando and not repetidos
+            and (not alertas or confirmado))
+    if faltando:
+        st.caption("Informe o brinco de cada cria para habilitar o registro.")
+
+    if st.button("✅ Registrar nascimento", type="primary", disabled=not pode,
+                 key="nasc_salvar"):
+        r = db.nascimentos.registrar(
+            mae["uuid"], data_parto.isoformat(), crias,
+            hora=hora, tipo_parto=tipo_parto, condicao=condicao,
+            propriedade_id=mae.get("property_id"),
+            responsavel=st.session_state.user["name"],
+            data_estimada=data_estimada, observacoes=obs,
+            ignorar_alertas=confirmado)
+
+        if r.get("ok"):
+            nomes = ", ".join(brincos)
+            st.success(f"✅ Nascimento registrado: {nomes}"
+                       + (" — gêmeos no mesmo parto" if len(brincos) > 1 else ""))
+            st.rerun()
+        elif r.get("exige_confirmacao"):
+            st.warning("Há alertas: marque a confirmação acima para prosseguir.")
+        else:
+            st.error(f"🚫 {r.get('erro', 'Não foi possível registrar.')}")
+
+
 def page_cadastrar():
     st.markdown('<div class="page-title">➕ Cadastrar Novo Animal</div>', unsafe_allow_html=True)
+    # Duas formas de um animal entrar no rebanho, e elas são diferentes: comprado
+    # tem fornecedor e preço; nascido tem mãe, parto e validação do §7 do PNIB.
+    tab_compra, tab_nasc = st.tabs(["🛒 Comprado / Recebido", "🐮 Nascimento na fazenda"])
+    with tab_nasc:
+        _cadastro_nascimento()
+    with tab_compra:
+        _cadastro_compra()
+
+
+def _cadastro_compra():
     fornecedores=db.get_all_fornecedores()
     lotes=[l for l in db.get_all_lotes() if l["status"]=="ativo"]
 
