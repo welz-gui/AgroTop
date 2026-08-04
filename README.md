@@ -24,7 +24,7 @@ sistema de rastreabilidade com valor regulatório. Ver
 | Migrations | 13, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |
 | Fase B | ✅ concluída — B1 a B7, fundação regulatória |
-| Fase B na tela | 🟡 4 de 6 — nascimento, brincos, GTA e pendências; ver [dívida nº 1](ROADMAP.md) |
+| Fase B na tela | 🟡 5 de 6 — falta só o motor de regras; ver [dívida nº 1](ROADMAP.md) |
 
 ### ⚠️ O que a Fase B fez e o que ela não fez
 
@@ -33,10 +33,10 @@ brinco, eventos e auditoria append-only, genealogia, hierarquia de propriedades,
 movimentação com GTA, estoque de dispositivos e motor de regras configurável.
 
 **A interface está sendo ligada.** A integração começou em 2026-08-04 e já cobre
-**nascimento** (§7), **estoque de brincos** (§5) e **movimentação com GTA** (§8). Três
-repositórios da Fase B — `eventos`, `propriedades`, `regras` — seguem com **zero uso em
-`app.py`**: quem abrir o sistema hoje ainda não vê a linha do tempo do animal nem
-administra a hierarquia de propriedades.
+**nascimento** (§7), **estoque de brincos** (§5), **movimentação com GTA** (§8),
+**pendências de conformidade** (§7.3) e **propriedades com perímetro** (§3). Dois
+repositórios da Fase B seguem com **zero uso em `app.py`**: `regras` (§11) e `eventos`
+(§6) — a linha do tempo do animal ainda não tem tela.
 
 Isso é conformidade de **arquitetura**, não de **uso**. É a maior pendência do projeto, e
 está registrada como tal no [ROADMAP](ROADMAP.md).
@@ -55,6 +55,9 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
 - **🏷️ Brincos** — estoque de dispositivos do §5: importação por faixa numérica,
   aplicação em animal com conferência visual × eletrônico, e as doze situações do §5.2.
   Situação definitiva não oferece saída; `bloqueado_orgao` diz quem libera.
+- **🏞️ Propriedades** — hierarquia Organização → Produtor → Propriedade do §3, com o
+  **perímetro em GeoJSON**: área, perímetro e centro são **calculados** do desenho, nunca
+  digitados. O titular é definido na criação e só muda por transferência (§8).
 - **🚚 Movimentação** — trânsito entre propriedades do §8, distinto do piquete→piquete
   do Modo Campo: rascunho, pré-validação da saída, liberação com justificativa escrita
   quando há alerta, e confirmação de chegada que registra quem não chegou.

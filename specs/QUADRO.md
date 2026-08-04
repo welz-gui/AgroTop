@@ -5,14 +5,15 @@ baixo** — a ordem é prioridade, não sugestão.
 
 **Estado em 2026-08-04:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 430 testes ·
 32 tabelas em produção · **6 tarefas na fila** · integração das telas da Fase B em curso
-pelo mantenedor (nascimento ✅, brincos ✅, GTA ✅ e pendências §7.3 ✅ em 2026-08-04).
+pelo mantenedor — 5 de 6 telas em 2026-08-04: nascimento, brincos, GTA, pendências
+§7.3 e propriedades com geometria.
 
 > ### ⚠️ O que estas seis specs NÃO cobrem
 >
 > A maior pendência do projeto não está nesta fila e não pode estar: **os módulos
 > regulatórios da Fase B existem e quase não têm interface**. Ligar tela é do mantenedor
-> pela R31 — nascimento (§7), brincos (§5) e movimentação com GTA (§8) saíram em
-> 2026-08-04; faltam três.
+> pela R31 — em 2026-08-04 saíram nascimento (§7), brincos (§5), GTA (§8), pendências
+> (§7.3) e propriedades com geometria (§3); falta o motor de regras (§11).
 >
 > ⚠️ **`app.py` está em mudança ativa por causa disso.** Se a sua spec toca `app.py`,
 > conte com rebase — e não reorganize a página `Cadastrar`, que acabou de virar abas.

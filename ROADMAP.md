@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · telas da Fase B sendo ligadas (4 de 6)**
+Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · telas da Fase B sendo ligadas (5 de 6)**
 
 ---
 
@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **362 colunas / 32 tabelas**, paridade total entre DDL local e produção |
 | Testes | **430**, verdes no CI em SQLite **e** PostgreSQL |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
-| Integração | ⚠️ **11 de 25 services ligados ao app** · 3 repositórios da Fase B ainda com ZERO uso em `app.py` |
+| Integração | ⚠️ **13 de 25 services ligados ao app** · 2 repositórios da Fase B ainda com ZERO uso em `app.py` |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
 > ⚠️ **Esta tabela envelhece rápido.** Em 2026-08-03 ela ainda dizia "21 testes" e "Fase A em
@@ -828,8 +828,12 @@ desde 2026-08-01 — *modo fundação permanente* —, só que agora a distânci
 sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
 
 **Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ →
-~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅ → geometria dos piquetes →
+~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅ → ~~geometria~~ ✅ (na propriedade, §3) →
 regras configuráveis (tela de administrador, por último).
+
+⚠️ **A geometria saiu na propriedade, não no piquete.** `properties.poligono` já existia
+e estava vazia; `lotes` **não tem coluna de polígono**, então piquete exigiria migration.
+Fica como trabalho à parte, com o fluxo do [supabase/README.md](supabase/README.md).
 
 **O que a primeira tela ensinou** (`_cadastro_nascimento`, 2026-08-04): o trabalho não é
 "chamar o repositório na tela". É decidir o que a norma exige da **interface** —
