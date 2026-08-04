@@ -9,7 +9,7 @@ Portaria SDA/MAPA 1.331/2025). Isso muda a natureza do produto — de software d
 sistema de rastreabilidade com valor regulatório. Ver
 [ADR 0004](docs/adr/0004-conformidade-pnib.md).
 
-**Última revisão desta página:** 2026-08-03.
+**Última revisão desta página:** 2026-08-04.
 
 ---
 
@@ -24,6 +24,7 @@ sistema de rastreabilidade com valor regulatório. Ver
 | Migrations | 13, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |
 | Fase B | ✅ concluída — B1 a B7, fundação regulatória |
+| Fase B na tela | 🟡 1 de 6 — nascimento integrado; ver [dívida nº 1](ROADMAP.md) |
 
 ### ⚠️ O que a Fase B fez e o que ela não fez
 
@@ -31,10 +32,10 @@ A fundação regulatória está **em produção e testada**: identidade imutáve
 brinco, eventos e auditoria append-only, genealogia, hierarquia de propriedades,
 movimentação com GTA, estoque de dispositivos e motor de regras configurável.
 
-**Quase nada disso tem interface.** Seis repositórios da Fase B — `eventos`,
-`nascimentos`, `movimentacoes`, `propriedades`, `regras`, `dispositivos` — têm **zero uso
-em `app.py`**. Um pecuarista que abrir o sistema hoje não vê nascimento, não vê GTA, não vê
-estoque de brincos.
+**Quase nada disso tem interface ainda.** A integração começou em 2026-08-04 pelo
+**nascimento** (§7). Cinco repositórios da Fase B — `eventos`, `movimentacoes`,
+`propriedades`, `regras`, `dispositivos` — seguem com **zero uso em `app.py`**: quem abrir
+o sistema hoje ainda não vê GTA nem estoque de brincos.
 
 Isso é conformidade de **arquitetura**, não de **uso**. É a maior pendência do projeto, e
 está registrada como tal no [ROADMAP](ROADMAP.md).
@@ -47,6 +48,9 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
 - **📱 Modo Campo** — pesagem, medicamento, movimentação entre piquetes, foto, óbito e
   **importação de pesagens por CSV** do indicador de balança. Mobile-first, pensado para
   uso com luva e ao sol.
+- **➕ Cadastrar** — duas abas, porque são dois fatos: **comprado** (fornecedor, preço) e
+  **nascido na fazenda**, com vínculo materno, gêmeos no mesmo parto e a validação do §7.
+  Bloqueio para o fluxo; alerta pede confirmação, sem substituir a avaliação técnica.
 - **📋 Rebanho** — inventário, ficha individual com curva de peso, histórico sanitário e
   financeiro, e **gestão de identificadores com histórico**: trocar brinco encerra o
   anterior sem apagá-lo (§4.2.3 do PNIB).
@@ -63,13 +67,12 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
   trilha de auditoria.
 - **📄 Relatórios** — CSV, Excel e PDF.
 
-## Fundação regulatória (sem interface ainda)
+## Fundação regulatória ainda sem interface
 
 | Módulo | O que faz | §PNIB |
 |---|---|---|
 | `animal_events` | linha do tempo do animal, **append-only por gatilho** | §6 |
 | `audit_logs` | quem mudou o quê, quando, com que autorização | §14 |
-| `partos` | nascimento com vínculo materno; gêmeos no mesmo parto | §7 |
 | `properties` | Organização → Produtor → Propriedade | §3 |
 | `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
 | `dispositivos` | estoque de brincos, 12 estados, conferência visual×eletrônico | §5 |

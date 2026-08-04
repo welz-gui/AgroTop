@@ -286,10 +286,11 @@ regulatória que o PNIB exige: identidade imutável separada do brinco, eventos 
 auditoria append-only, genealogia, hierarquia de propriedades, movimentação com
 GTA, estoque de dispositivos e motor de regras configurável com vigência.
 
-**O que a Fase B NÃO fez, e é proposital:** nada disso está ligado à interface
-ainda, salvo o que já foi integrado antes. As tabelas existem, as regras existem,
-os repositórios existem — falta a tela. É o trabalho que vem a seguir, e é o que
-transforma conformidade de arquitetura em conformidade de uso.
+**O que a Fase B NÃO fez, e é proposital:** nada disso estava ligado à interface
+quando ela terminou. As tabelas existem, as regras existem, os repositórios
+existem — faltava a tela. É o trabalho que veio a seguir, e é o que transforma
+conformidade de arquitetura em conformidade de uso. **A integração começou em
+2026-08-04 pelo nascimento** (§7); ver a dívida nº 1 na seção 11 para o que falta.
 
 ### ⚠️ Revisão de 2026-08-01 — o gate é B1+B2, não B1–B7
 
@@ -802,14 +803,14 @@ Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 Revisada em **2026-08-03**, com a Fase B concluída. Fechada só sai daqui pela mão do
 mantenedor, na revisão.
 
-### 🔴 A dívida nº 1 — a Fase B não tem interface
+### 🔴 A dívida nº 1 — a Fase B quase não tem interface
 
-**Sete módulos regulatórios existem, estão testados, estão em produção — e nenhum tem
-tela.** Seis repositórios com **zero uso em `app.py`**:
+**Sete módulos regulatórios existem, estão testados, estão em produção — e a integração
+com a tela começou em 2026-08-04, pelo nascimento.** Cinco repositórios ainda com **zero
+uso em `app.py`**:
 
 | Repositório | O que ficou invisível | §PNIB |
 |---|---|---|
-| `nascimentos` | cadastro de nascimento, vínculo materno, gêmeos, pendências | §7 |
 | `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
 | `dispositivos` | estoque de brincos, aplicação, inventário | §5 |
 | `propriedades` | hierarquia Organização → Produtor → Propriedade | §3 |
@@ -825,9 +826,15 @@ Fiscalização não aceita "o repositório tem o método". E o próprio ROADMAP 
 desde 2026-08-01 — *modo fundação permanente* —, só que agora a distância entre o que o
 sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
 
-**Ordem sugerida de integração**, por valor sobre esforço: nascimento → estoque de brincos
-→ movimentação com GTA → painel de pendências (§7.3) → geometria dos piquetes → regras
-configuráveis (tela de administrador, por último).
+**Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ → estoque de
+brincos → movimentação com GTA → painel de pendências (§7.3) → geometria dos piquetes →
+regras configuráveis (tela de administrador, por último).
+
+**O que a primeira tela ensinou** (`_cadastro_nascimento`, 2026-08-04): o trabalho não é
+"chamar o repositório na tela". É decidir o que a norma exige da **interface** —
+no §7.2, que **bloqueio para o fluxo antes do preenchimento e alerta pede confirmação
+explícita**. Essa distinção não estava no repositório e não caberia lá. Cada tela restante
+tem uma decisão equivalente escondida, e é ela que custa, não o `st.button`.
 
 ### 🔴 Segurança
 
