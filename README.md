@@ -19,24 +19,25 @@ sistema de rastreabilidade com valor regulatório. Ver
 |---|---|
 | Produção | Streamlit Community Cloud, deploy a cada push na `main` |
 | Banco | Supabase/PostgreSQL · **32 tabelas, 362 colunas** |
-| Testes | **430**, verdes em SQLite **e** PostgreSQL no CI |
+| Testes | **430**, verdes em SQLite **e** PostgreSQL no CI (~9 min: 6 provas de interface) |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
 | Migrations | 13, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |
 | Fase B | ✅ concluída — B1 a B7, fundação regulatória |
-| Fase B na tela | 🟡 5 de 6 — falta só o motor de regras; ver [dívida nº 1](ROADMAP.md) |
+| Fase B na tela | ✅ 6 de 7 — falta a linha do tempo do animal (§6) |
 
-### ⚠️ O que a Fase B fez e o que ela não fez
+### O que a Fase B fez, e o que ainda falta
 
 A fundação regulatória está **em produção e testada**: identidade imutável separada do
 brinco, eventos e auditoria append-only, genealogia, hierarquia de propriedades,
 movimentação com GTA, estoque de dispositivos e motor de regras configurável.
 
-**A interface está sendo ligada.** A integração começou em 2026-08-04 e já cobre
-**nascimento** (§7), **estoque de brincos** (§5), **movimentação com GTA** (§8),
-**pendências de conformidade** (§7.3) e **propriedades com perímetro** (§3). Dois
-repositórios da Fase B seguem com **zero uso em `app.py`**: `regras` (§11) e `eventos`
-(§6) — a linha do tempo do animal ainda não tem tela.
+**A interface foi ligada em 2026-08-04**, em seis telas: **nascimento** (§7),
+**estoque de brincos** (§5), **movimentação com GTA** (§8), **pendências de
+conformidade** (§7.3), **propriedades com perímetro** (§3) e **motor de regras** (§11).
+
+Falta uma: a **linha do tempo do animal** (§6). Os eventos são gravados em toda operação
+desde o B2 — só não há tela que os mostre.
 
 Isso é conformidade de **arquitetura**, não de **uso**. É a maior pendência do projeto, e
 está registrada como tal no [ROADMAP](ROADMAP.md).
@@ -58,6 +59,9 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
 - **🏞️ Propriedades** — hierarquia Organização → Produtor → Propriedade do §3, com o
   **perímetro em GeoJSON**: área, perímetro e centro são **calculados** do desenho, nunca
   digitados. O titular é definido na criação e só muda por transferência (§8).
+- **📜 Regras** — motor do §11: regra é **dado**, com vigência e versão. Não existe
+  editar — só nova versão, porque o que já foi julgado precisa continuar explicado pelo
+  texto que valia então. A simulação mostra o alcance no rebanho **antes** de salvar.
 - **🚚 Movimentação** — trânsito entre propriedades do §8, distinto do piquete→piquete
   do Modo Campo: rascunho, pré-validação da saída, liberação com justificativa escrita
   quando há alerta, e confirmação de chegada que registra quem não chegou.
@@ -80,7 +84,7 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
   trilha de auditoria.
 - **📄 Relatórios** — CSV, Excel e PDF.
 
-## Fundação regulatória ainda sem interface
+## Fundação regulatória
 
 | Módulo | O que faz | §PNIB |
 |---|---|---|

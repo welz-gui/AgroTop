@@ -17,6 +17,7 @@ from services.identificadores import REGRAS_PADRAO, validar as validar_formato_i
 from services.validacao_regulatoria import validar_animal
 from services.recomendacoes import avaliar as avaliar_recomendacoes
 import json
+from services.regras_regulatorias import simular as simular_regra_pura
 from services.geometria import (
     area_hectares as geometria_area_ha,
     centroide as geometria_centroide,
@@ -504,6 +505,7 @@ def _sidebar():
                 ("🏷️","Brincos","brincos",""),
                 ("🚚","Movimentação","movimentacao",""),
                 ("🏞️","Propriedades","propriedades",""),
+                ("📜","Regras","regras",""),
                 ("🌾","Nutrição","nutricao",""),
                 ("💉","Sanitário","sanitario",""),
                 ("🌧️","Clima & Chuva","clima",""),
@@ -4356,6 +4358,235 @@ def _propriedade_nova():
                    "O perímetro pode ser desenhado na aba **Cadastradas**.")
         st.rerun()
 
+_NIVEL_REGRA = {"informativo": "🔵 Informativo", "alerta": "🟡 Alerta",
+                "bloqueio": "🔴 Bloqueio"}
+_ESFERA_REGRA = {"federal": "Federal", "estadual": "Estadual",
+                 "protocolo": "Protocolo (frigorífico, certificadora)",
+                 "interna": "Interna da fazenda"}
+
+
+def _casos_do_rebanho():
+    """O rebanho atual no formato que `simular` espera.
+
+    Simular contra o rebanho real, e não contra exemplos inventados, é o que
+    torna o número da §11.3 uma resposta em vez de um exercício.
+    """
+    casos = []
+    for a in db.get_all_animals(status="ativo"):
+        casos.append({
+            "id": a["id"],
+            "especie": "bovino",
+            "categoria": db.get_age_category(a.get("birth_date"), a.get("sex")),
+            "sexo": a.get("sex"),
+            "idade_meses": db.get_age_months(a.get("birth_date")),
+            "peso": a.get("last_weight"),
+            "raca": a.get("breed"),
+        })
+    return casos
+
+
+def _mostrar_simulacao(regra_dict, casos):
+    """§11.3: quantos animais esta regra atinge, hoje."""
+    s = simular_regra_pura(regra_dict, casos)
+    if not s["vigente_na_data"]:
+        st.info("A regra não está vigente na data de hoje — a simulação mede o "
+                "alcance dela quando entrar em vigor.")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Rebanho avaliado", s["total_avaliado"])
+    c2.metric("Animais atingidos", s["atingidos"])
+    c3.metric("Alcance", f"{_num_br(s['percentual'], 1)}%")
+    if s["ids"]:
+        with st.expander(f"Ver os {len(s['ids'])} atingidos"):
+            st.dataframe(pd.DataFrame({"Brinco": s["ids"]}),
+                         use_container_width=True, hide_index=True)
+    return s
+
+
+def page_regras():
+    """Motor de regras regulatórias (PNIB §11).
+
+    O §11 abre dizendo que as regras "não devem ficar fixadas no código-fonte".
+    A tabela existe desde o B5 e nunca teve tela — o que significa que, na
+    prática, elas continuavam fixadas: mudá-las exigia SQL.
+    """
+    if st.session_state.user["role"] != "admin":
+        st.error("🔒 Acesso restrito ao Administrador."); return
+    st.markdown('<div class="page-title">📜 Regras Regulatórias</div>',
+                unsafe_allow_html=True)
+    st.caption("§11: a portaria muda, cada UF acrescenta a sua e um frigorífico "
+               "impõe protocolo próprio. Regra é **dado**, com vigência e "
+               "versão — não `if` no código.")
+
+    regras = db.regras.listar(apenas_ativas=False)
+    t_lista, t_nova = st.tabs([f"📋 Cadastradas ({len(regras)})", "➕ Nova regra"])
+    with t_lista:
+        _regras_lista(regras)
+    with t_nova:
+        _regra_nova()
+
+
+def _regras_lista(regras):
+    if not regras:
+        st.info("Nenhuma regra cadastrada.")
+        return
+
+    st.dataframe(
+        pd.DataFrame([{
+            "Nome": r["nome"], "Nível": _NIVEL_REGRA.get(r["nivel"], r["nivel"]),
+            "Esfera": r["esfera"], "UF": r.get("uf") or "todas",
+            "Versão": r.get("versao"),
+            "Vigência": f"{r.get('data_inicial') or '—'} → "
+                        f"{r.get('data_final') or 'em aberto'}",
+            "Aprovada por": r.get("aprovado_por") or "— rascunho —",
+        } for r in regras]),
+        use_container_width=True, hide_index=True)
+
+    rot = {f"{r['nome']} · v{r.get('versao')} · "
+           f"{_NIVEL_REGRA.get(r['nivel'], r['nivel'])}": r for r in regras}
+    r = rot[st.selectbox("Regra", list(rot), key="reg_sel")]
+
+    if not r.get("aprovado_por"):
+        st.warning("📝 **Rascunho.** Nasceu inativa porque não tem responsável "
+                   "pela aprovação — o §11.1 pede o responsável justamente para "
+                   "que exista a quem perguntar depois. Publique com uma nova "
+                   "versão aprovada.")
+
+    if r.get("descricao"):
+        st.markdown(r["descricao"])
+    if r.get("fundamento"):
+        st.caption(f"Fundamento: {r['fundamento']}")
+
+    st.markdown("**Alcance no rebanho de hoje (§11.3)**")
+    _mostrar_simulacao(r, _casos_do_rebanho())
+
+    st.markdown("---")
+    # Não existe "editar". O §11.2 quer o histórico: uma movimentação julgada em
+    # 2027 precisa continuar explicada pelo texto que valia então. Editar no
+    # lugar reescreveria o passado.
+    st.markdown("**Nova versão**")
+    st.caption("Regra não se edita: cria-se outra versão. A anterior é encerrada "
+               "com `data_final` de ontem e continua explicando o que foi julgado "
+               "sob ela.")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        nivel = st.selectbox("Nível", list(_NIVEL_REGRA),
+                             index=list(_NIVEL_REGRA).index(r["nivel"]),
+                             format_func=lambda n: _NIVEL_REGRA[n],
+                             key="reg_nivel")
+    with c2:
+        aprovador = st.text_input(
+            "Responsável pela aprovação *", key="reg_aprovador",
+            help="§11.1. Sem ele não há nova versão — decisão regulatória sem "
+                 "responsável é decisão de ninguém.").strip()
+
+    mensagem = st.text_input("Mensagem ao usuário",
+                             value=r.get("mensagem") or "", key="reg_msg").strip()
+
+    if st.button("📄 Publicar nova versão", type="primary",
+                 disabled=not aprovador, key="reg_versao"):
+        res = db.regras.nova_versao(
+            r["id"], aprovado_por=aprovador,
+            usuario=st.session_state.user["name"],
+            nivel=nivel, mensagem=mensagem)
+        if res.get("ok"):
+            db.clear_cache()
+            st.success(f"✅ Versão {res.get('versao', '')} publicada. "
+                       "A anterior continua no histórico.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {res.get('erro', 'Não foi possível versionar.')}")
+
+
+def _regra_nova():
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        nome = st.text_input("Nome *", key="regn_nome").strip()
+    with c2:
+        nivel = st.selectbox("Nível *", list(_NIVEL_REGRA),
+                             format_func=lambda n: _NIVEL_REGRA[n], key="regn_nivel")
+    with c3:
+        esfera = st.selectbox("Esfera *", list(_ESFERA_REGRA),
+                              format_func=lambda e: _ESFERA_REGRA[e],
+                              key="regn_esfera")
+
+    descricao = st.text_input("Descrição", key="regn_desc").strip()
+    c4, c5 = st.columns(2)
+    with c4:
+        fundamento = st.text_input("Fundamento", key="regn_fund",
+                                   placeholder="Portaria SDA/MAPA 1.331/2025, §7").strip()
+    with c5:
+        mensagem = st.text_input("Mensagem ao usuário", key="regn_msg").strip()
+
+    st.markdown("**Escopo** — campo em branco significa *qualquer*, e é o que "
+                "permite escrever uma regra federal sem enumerar as 27 UFs.")
+    c6, c7, c8 = st.columns(3)
+    with c6:
+        uf = st.text_input("UF", max_chars=2, key="regn_uf").strip().upper()
+    with c7:
+        sexo = st.selectbox("Sexo", ["", "M", "F"], key="regn_sexo",
+                            format_func=lambda s: "qualquer" if not s else s)
+    with c8:
+        finalidade = st.text_input("Finalidade", key="regn_fin").strip()
+
+    c9, c10 = st.columns(2)
+    with c9:
+        idade_min = st.number_input("Idade mínima (meses)", min_value=0, max_value=300,
+                                    value=0, key="regn_idade_min")
+    with c10:
+        idade_max = st.number_input("Idade máxima (meses)", min_value=0, max_value=300,
+                                    value=0, key="regn_idade_max",
+                                    help="0 = sem limite.")
+
+    c11, c12 = st.columns(2)
+    with c11:
+        inicio = st.text_input("Vigência a partir de (AAAA-MM-DD)",
+                               value=date.today().isoformat(), key="regn_inicio").strip()
+    with c12:
+        aprovador = st.text_input(
+            "Responsável pela aprovação", key="regn_aprovador",
+            help="§11.1. **Em branco, a regra nasce como rascunho inativo** — "
+                 "não é recusa, é o estado correto de uma decisão sem "
+                 "responsável.").strip()
+
+    regra = {"nome": nome or "(sem nome)", "nivel": nivel, "esfera": esfera,
+             "uf": uf or None, "sexo": sexo or None,
+             "finalidade": finalidade or None,
+             "idade_min_meses": int(idade_min) or None,
+             "idade_max_meses": int(idade_max) or None,
+             "data_inicial": inicio or None, "data_final": None,
+             "condicao": None}
+
+    # A simulação vem ANTES do botão, e não depois de salvar. Ativar bloqueio
+    # sem saber o alcance é descobri-lo no dia em que o caminhão está no curral.
+    st.markdown("---")
+    st.markdown("**Alcance desta regra no rebanho de hoje (§11.3)**")
+    s = _mostrar_simulacao(regra, _casos_do_rebanho())
+    if nivel == "bloqueio" and s["atingidos"]:
+        st.warning(f"⚠️ Como **bloqueio**, esta regra impediria a operação de "
+                   f"{s['atingidos']} de {s['total_avaliado']} animais ativos.")
+
+    if st.button("➕ Cadastrar regra", type="primary", disabled=not nome,
+                 key="regn_salvar"):
+        res = db.regras.criar(
+            nome, nivel=nivel, esfera=esfera, descricao=descricao,
+            fundamento=fundamento, mensagem=mensagem, uf=uf or None,
+            sexo=sexo or None, finalidade=finalidade or None,
+            idade_min_meses=int(idade_min) or None,
+            idade_max_meses=int(idade_max) or None,
+            data_inicial=inicio or None, aprovado_por=aprovador,
+            usuario=st.session_state.user["name"])
+        if res.get("ok"):
+            db.clear_cache()
+            if res.get("ativa"):
+                st.success("✅ Regra cadastrada e **ativa**.")
+            else:
+                st.info("📝 Regra cadastrada como **rascunho inativo**: sem "
+                        "responsável pela aprovação ela não vale (§11.1).")
+            st.rerun()
+        else:
+            st.error(f"🚫 {res['erro']}")
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -4583,6 +4814,7 @@ def main():
         "brincos":   page_brincos,
         "movimentacao": page_movimentacao,
         "propriedades": page_propriedades,
+        "regras":    page_regras,
         "nutricao":  page_nutricao,
         "sanitario": page_sanitario,
         "clima":     page_clima,

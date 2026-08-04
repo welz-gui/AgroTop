@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · telas da Fase B sendo ligadas (5 de 6)**
+Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · Fase B ligada à interface (6 de 7)**
 
 ---
 
@@ -18,9 +18,9 @@ SQLite para desenvolvimento e teste.
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
 | Schema | **362 colunas / 32 tabelas**, paridade total entre DDL local e produção |
-| Testes | **430**, verdes no CI em SQLite **e** PostgreSQL |
+| Testes | **430**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface) |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
-| Integração | ⚠️ **13 de 25 services ligados ao app** · 2 repositórios da Fase B ainda com ZERO uso em `app.py` |
+| Integração | **14 de 25 services ligados ao app** · só `eventos` (§6) sem tela |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
 > ⚠️ **Esta tabela envelhece rápido.** Em 2026-08-03 ela ainda dizia "21 testes" e "Fase A em
@@ -806,40 +806,56 @@ Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 Revisada em **2026-08-03**, com a Fase B concluída. Fechada só sai daqui pela mão do
 mantenedor, na revisão.
 
-### 🔴 A dívida nº 1 — a Fase B quase não tem interface
+### 🟠 A dívida nº 1 — a Fase B na interface (6 de 7 ligados)
 
-**Sete módulos regulatórios existem, estão testados, estão em produção — e a integração
-com a tela começou em 2026-08-04 e já cobre nascimento, brincos e GTA.** Três
-repositórios ainda com **zero uso em `app.py`**:
+**Era a maior pendência do projeto e deixou de ser em 2026-08-04**, quando seis telas
+foram ligadas em sequência. Um repositório ainda com **zero uso em `app.py`**:
 
-| Repositório | O que ficou invisível | §PNIB |
+| Repositório | O que ainda está invisível | §PNIB |
 |---|---|---|
-| `propriedades` | hierarquia Organização → Produtor → Propriedade | §3 |
 | `eventos` | linha do tempo do animal e trilha de auditoria | §6, §14 |
-| `regras` | regras configuráveis com vigência e simulação | §11 |
 
-E **nove services órfãos**, entregues por agentes e sem nenhum consumidor: `caixa`,
-`completude`, `dieta`, `geometria`, `gta`, `previsao_estoque`, `projecao`, `rateio`,
-`rentabilidade`.
+`eventos` é caso diferente dos outros: ele **é** usado — toda operação grava evento desde
+o B2. O que falta é **mostrá-los**: uma tela que responda "o que aconteceu com este
+animal", e que hoje só existe consultando o banco.
 
-**Por que isto é a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
-Fiscalização não aceita "o repositório tem o método". E o próprio ROADMAP nomeia o risco
-desde 2026-08-01 — *modo fundação permanente* —, só que agora a distância entre o que o
-sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
+E **sete services órfãos**, entregues por agentes e sem nenhum consumidor: `caixa`,
+`completude`, `dieta`, `gta`, `previsao_estoque`, `projecao`, `rateio`, `rentabilidade`.
+`geometria` saiu da lista em 2026-08-04, ligado pela tela de propriedades.
 
-**Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ →
-~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅ → ~~geometria~~ ✅ (na propriedade, §3) →
-regras configuráveis (tela de administrador, por último).
+**Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
+Fiscalização não aceita "o repositório tem o método".
+
+**Ordem de integração, executada em 2026-08-04:** ~~nascimento~~ ✅ →
+~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅
+→ ~~geometria~~ ✅ (na propriedade, §3) → ~~regras configuráveis~~ ✅.
 
 ⚠️ **A geometria saiu na propriedade, não no piquete.** `properties.poligono` já existia
 e estava vazia; `lotes` **não tem coluna de polígono**, então piquete exigiria migration.
 Fica como trabalho à parte, com o fluxo do [supabase/README.md](supabase/README.md).
 
-**O que a primeira tela ensinou** (`_cadastro_nascimento`, 2026-08-04): o trabalho não é
-"chamar o repositório na tela". É decidir o que a norma exige da **interface** —
-no §7.2, que **bloqueio para o fluxo antes do preenchimento e alerta pede confirmação
-explícita**. Essa distinção não estava no repositório e não caberia lá. Cada tela restante
-tem uma decisão equivalente escondida, e é ela que custa, não o `st.button`.
+#### O que as seis telas ensinaram
+
+**O trabalho não é "chamar o repositório na tela".** É decidir o que a norma exige da
+**interface** — e essa decisão nunca estava no repositório, nem caberia lá:
+
+| Tela | A decisão que a norma impôs |
+|---|---|
+| nascimento (§7.2) | bloqueio para o fluxo **antes** do preenchimento; alerta pede confirmação |
+| brincos (§5.2) | situação definitiva não oferece saída; `bloqueado_orgao` diz **quem** libera |
+| GTA (§8.3–8.4) | bloqueio não ganha botão cinza, ganha **ausência** de botão; alerta pede justificativa **escrita** |
+| pendências (§7.3) | prazo futuro (2033) não pode parecer irregularidade, e fica **fora** do contador |
+| propriedades (§3) | titular não é editável — mudá-lo é transferência (§8); área é **calculada**, nunca digitada |
+| regras (§11) | não existe "editar": só nova versão; simulação **antes** do botão de salvar |
+
+**Um padrão apareceu três vezes e virou regra prática:** *contador que nunca zera é
+contador que ninguém lê.* Apareceu como acidente na fila de sincronização (dívida nº 4),
+e como escolha evitada nas pendências de 2033 e no alerta de GTA.
+
+⚠️ **Custo medido:** a suíte foi de **193 s para 518 s**. As seis provas de interface
+rodam em subprocesso, cada uma levantando o `AppTest` — é o preço de ter prova
+automatizada de que a regra chegou à tela, e nenhum teste de unidade substitui isso.
+Se passar de ~10 min, o caminho é paralelizar os subprocessos, não apagar provas.
 
 ### 🔴 Segurança
 
