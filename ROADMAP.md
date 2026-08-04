@@ -290,7 +290,8 @@ GTA, estoque de dispositivos e motor de regras configurável com vigência.
 quando ela terminou. As tabelas existem, as regras existem, os repositórios
 existem — faltava a tela. É o trabalho que veio a seguir, e é o que transforma
 conformidade de arquitetura em conformidade de uso. **A integração começou em
-2026-08-04 pelo nascimento** (§7); ver a dívida nº 1 na seção 11 para o que falta.
+2026-08-04, pelo nascimento (§7) e pelos brincos (§5)**; ver a dívida nº 1 na seção 11
+para o que falta.
 
 ### ⚠️ Revisão de 2026-08-01 — o gate é B1+B2, não B1–B7
 
@@ -806,13 +807,12 @@ mantenedor, na revisão.
 ### 🔴 A dívida nº 1 — a Fase B quase não tem interface
 
 **Sete módulos regulatórios existem, estão testados, estão em produção — e a integração
-com a tela começou em 2026-08-04, pelo nascimento.** Cinco repositórios ainda com **zero
-uso em `app.py`**:
+com a tela começou em 2026-08-04, pelo nascimento e pelos brincos.** Quatro repositórios
+ainda com **zero uso em `app.py`**:
 
 | Repositório | O que ficou invisível | §PNIB |
 |---|---|---|
 | `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
-| `dispositivos` | estoque de brincos, aplicação, inventário | §5 |
 | `propriedades` | hierarquia Organização → Produtor → Propriedade | §3 |
 | `eventos` | linha do tempo do animal e trilha de auditoria | §6, §14 |
 | `regras` | regras configuráveis com vigência e simulação | §11 |
@@ -826,8 +826,8 @@ Fiscalização não aceita "o repositório tem o método". E o próprio ROADMAP 
 desde 2026-08-01 — *modo fundação permanente* —, só que agora a distância entre o que o
 sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
 
-**Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ → estoque de
-brincos → movimentação com GTA → painel de pendências (§7.3) → geometria dos piquetes →
+**Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ →
+~~estoque de brincos~~ ✅ → movimentação com GTA → painel de pendências (§7.3) → geometria dos piquetes →
 regras configuráveis (tela de administrador, por último).
 
 **O que a primeira tela ensinou** (`_cadastro_nascimento`, 2026-08-04): o trabalho não é

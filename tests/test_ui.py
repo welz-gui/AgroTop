@@ -23,6 +23,7 @@ PROVAS = [
     "tests.ui_estados_prova",       # máquina de estados na tela de admin
     "tests.ui_integracoes_prova",   # identificadores, consistência e recomendações
     "tests.ui_nascimento_prova",    # §7.2: bloqueio impede, alerta pede confirmação
+    "tests.ui_brincos_prova",       # §5: estado definitivo, divergência, troca
 ]
 
 
