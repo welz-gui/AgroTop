@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-03 · Estado: **Fases A e B CONCLUÍDAS · próximo passo é ligar as telas**
+Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · telas da Fase B sendo ligadas (3 de 6)**
 
 ---
 
@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **362 colunas / 32 tabelas**, paridade total entre DDL local e produção |
 | Testes | **430**, verdes no CI em SQLite **e** PostgreSQL |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
-| Integração | ⚠️ **11 de 25 services ligados ao app** · 6 repositórios da Fase B com ZERO uso em `app.py` |
+| Integração | ⚠️ **11 de 25 services ligados ao app** · 3 repositórios da Fase B ainda com ZERO uso em `app.py` |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
 > ⚠️ **Esta tabela envelhece rápido.** Em 2026-08-03 ela ainda dizia "21 testes" e "Fase A em
@@ -123,8 +123,10 @@ passar pelo `main()`** — furando o guard de perfil de [app.py:3251](app.py:325
 um operador acesso ao Financeiro. Use **`views/`**. Se um dia quiser multipage nativo, use
 `st.navigation`/`st.Page` com a lista filtrada por perfil.
 
-**R13. Preservar o guard de perfil.** `OPERATOR_PAGES = {"campo","cadastrar","estoque"}` e
-a checagem em `main()`. Qualquer nova página restrita precisa passar por ali.
+**R13. Preservar o guard de perfil.** `OPERATOR_PAGES` e a checagem em `main()`. Qualquer
+página nova precisa passar por ali, e a decisão de incluir ou não é de conteúdo, não de
+conveniência: `brincos` entrou em 2026-08-04 porque aplicar brinco é trabalho de curral;
+`movimentacao` ficou de fora porque liberar GTA é ato administrativo.
 
 **R14. Escapar `R\$` em markdown.** Dois `$` na mesma string viram fórmula LaTeX e o
 Streamlit engole os cifrões. Em f-string: `R\\$`. `column_config` com
@@ -290,8 +292,8 @@ GTA, estoque de dispositivos e motor de regras configurável com vigência.
 quando ela terminou. As tabelas existem, as regras existem, os repositórios
 existem — faltava a tela. É o trabalho que veio a seguir, e é o que transforma
 conformidade de arquitetura em conformidade de uso. **A integração começou em
-2026-08-04, pelo nascimento (§7) e pelos brincos (§5)**; ver a dívida nº 1 na seção 11
-para o que falta.
+2026-08-04, pelo nascimento (§7), pelos brincos (§5) e pela movimentação com GTA
+(§8)**; ver a dívida nº 1 na seção 11 para o que falta.
 
 ### ⚠️ Revisão de 2026-08-01 — o gate é B1+B2, não B1–B7
 
@@ -807,12 +809,11 @@ mantenedor, na revisão.
 ### 🔴 A dívida nº 1 — a Fase B quase não tem interface
 
 **Sete módulos regulatórios existem, estão testados, estão em produção — e a integração
-com a tela começou em 2026-08-04, pelo nascimento e pelos brincos.** Quatro repositórios
-ainda com **zero uso em `app.py`**:
+com a tela começou em 2026-08-04 e já cobre nascimento, brincos e GTA.** Três
+repositórios ainda com **zero uso em `app.py`**:
 
 | Repositório | O que ficou invisível | §PNIB |
 |---|---|---|
-| `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
 | `propriedades` | hierarquia Organização → Produtor → Propriedade | §3 |
 | `eventos` | linha do tempo do animal e trilha de auditoria | §6, §14 |
 | `regras` | regras configuráveis com vigência e simulação | §11 |
@@ -827,7 +828,7 @@ desde 2026-08-01 — *modo fundação permanente* —, só que agora a distânci
 sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
 
 **Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ →
-~~estoque de brincos~~ ✅ → movimentação com GTA → painel de pendências (§7.3) → geometria dos piquetes →
+~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → painel de pendências (§7.3) → geometria dos piquetes →
 regras configuráveis (tela de administrador, por último).
 
 **O que a primeira tela ensinou** (`_cadastro_nascimento`, 2026-08-04): o trabalho não é
@@ -851,22 +852,33 @@ usuários de produção e a rotação da senha do Postgres.
    escritas já preenchem; falta o `NOT NULL`. Mesma ordem que funcionou no B1: escrita
    primeiro, restrição depois.
 
-4. **A adoção de eventos é incremental, por decisão do ADR 0004.** Os eventos são
+4. **A fila de sincronização não drena** — descoberto em 2026-08-04, ao ligar a tela do
+   §8. `animal_events.status_sincronizacao` nasce `pendente` e **não há como marcá-la
+   como enviada**: `repositories/eventos.py` só oferece leitura, e o gatilho append-only
+   do §6.3 aborta qualquer `UPDATE`. O mesmo vale para `identificador_oficial`, que o
+   §6 descreve como *devolvido pelo sistema oficial* e portanto precisa ser gravável
+   depois. O efeito prático já aparece: o contador nunca zera, então **toda** liberação
+   de saída passa a exigir justificativa (§8.4) por um alerta que não informa nada — e
+   alerta que sempre aparece deixa de ser lido. Duas saídas, e a escolha não é óbvia:
+   tabela de controle à parte (mantém `animal_events` estritamente imutável) ou exceção
+   no gatilho para essas duas colunas. Enquanto não se decide, o alerta é ruído.
+
+5. **A adoção de eventos é incremental, por decisão do ADR 0004.** Os eventos são
    *registrados* junto das operações, mas o estado do animal **não é derivado deles**.
    Fazer as duas coisas de uma vez seria reescrever o sistema num salto.
 
-5. **`expected_sale_value` é regra de negócio em `repositories/financeiro.py`.** Anotada no
+6. **`expected_sale_value` é regra de negócio em `repositories/financeiro.py`.** Anotada no
    próprio arquivo; mover para `services/` é trabalho posterior e sem urgência.
 
-6. **PWA: validar num aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
+7. **PWA: validar num aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
    deploy fica atrás do portão de autenticação do Streamlit Cloud, e o PWA instalado precisa
    passar por ele antes do login do AgroTop, com cofre de cookies próprio. **Só um celular
    responde** — não dá para verificar por navegador comum nem por script.
 
-7. **Bancos SQLite antigos não recebem as FKs** — o `ALTER TABLE` do SQLite não adiciona
+8. **Bancos SQLite antigos não recebem as FKs** — o `ALTER TABLE` do SQLite não adiciona
    constraint; só bancos criados do zero as têm. Aceitável, porque SQLite é dev/teste.
 
-8. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
+9. **Reboot no deploy:** ao adicionar função nova em `database.py`, o Streamlit Cloud pode
    servir o módulo antigo em cache → `AttributeError`. Solução: Manage app → Reboot app.
 
 9. **OCR do brinco** é *best-effort* e impreciso no campo; QR é confiável. Sempre confirmar

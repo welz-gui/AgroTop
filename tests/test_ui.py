@@ -24,6 +24,7 @@ PROVAS = [
     "tests.ui_integracoes_prova",   # identificadores, consistência e recomendações
     "tests.ui_nascimento_prova",    # §7.2: bloqueio impede, alerta pede confirmação
     "tests.ui_brincos_prova",       # §5: estado definitivo, divergência, troca
+    "tests.ui_movimentacao_prova",  # §8: bloqueio, justificativa escrita, divergência
 ]
 
 
