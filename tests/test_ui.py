@@ -26,6 +26,7 @@ PROVAS = [
     "tests.ui_brincos_prova",       # §5: estado definitivo, divergência, troca
     "tests.ui_movimentacao_prova",  # §8: bloqueio, justificativa escrita, divergência
     "tests.ui_pendencias_prova",    # §7.3: prazo futuro não é irregularidade
+    "tests.ui_propriedades_prova",  # §3: titular imutável, área calculada
 ]
 
 

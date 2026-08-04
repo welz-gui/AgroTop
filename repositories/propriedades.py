@@ -43,6 +43,20 @@ def listar(*, apenas_ativas: bool = True) -> list[dict]:
         return [dict(r) for r in con.execute(sql).fetchall()]
 
 
+def listar_produtores() -> list[dict]:
+    """Produtores com a organização a que pertencem.
+
+    A tela de cadastro precisa saber sob qual titular a propriedade nasce: o
+    `produtor_id` é escolhido **na criação e nunca mais** — trocá-lo depois é
+    transferência de titularidade, que é evento do §8, não edição de cadastro.
+    """
+    with _conn() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT pr.*, o.nome AS organizacao_nome FROM produtores pr "
+            "JOIN organizacoes o ON o.id = pr.organizacao_id "
+            "ORDER BY o.nome, pr.nome").fetchall()]
+
+
 def get(property_id: str) -> Optional[dict]:
     with _conn() as con:
         row = con.execute(

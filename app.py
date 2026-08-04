@@ -16,6 +16,13 @@ from services.qualidade import avaliar_pesagem
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
 from services.recomendacoes import avaliar as avaliar_recomendacoes
+import json
+from services.geometria import (
+    area_hectares as geometria_area_ha,
+    centroide as geometria_centroide,
+    perimetro_metros as geometria_perimetro_m,
+    validar as geometria_validar,
+)
 from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
@@ -496,6 +503,7 @@ def _sidebar():
                 ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
                 ("🏷️","Brincos","brincos",""),
                 ("🚚","Movimentação","movimentacao",""),
+                ("🏞️","Propriedades","propriedades",""),
                 ("🌾","Nutrição","nutricao",""),
                 ("💉","Sanitário","sanitario",""),
                 ("🌧️","Clima & Chuva","clima",""),
@@ -4158,6 +4166,196 @@ def _mov_nova(props):
         else:
             st.error(f"🚫 {r['erro']}")
 
+def _ler_poligono(texto):
+    """Lê o perímetro digitado como `lon,lat` por linha.
+
+    Aceita também `lat,lon`? **Não.** O GeoJSON e o EPSG:4326 usam
+    (longitude, latitude), e aceitar as duas ordens obrigaria a adivinhar qual
+    é qual — no Brasil ambos são negativos e a troca passa despercebida até a
+    área sair errada.
+    """
+    anel = []
+    for linha in (texto or "").strip().splitlines():
+        linha = linha.strip().replace(";", ",")
+        if not linha:
+            continue
+        partes = [p.strip() for p in linha.split(",")]
+        if len(partes) != 2:
+            raise ValueError(f"Linha inválida: {linha!r}. Use `longitude, latitude`.")
+        anel.append((float(partes[0]), float(partes[1])))
+    return anel
+
+
+def _poligono_para_texto(geojson_txt):
+    if not geojson_txt:
+        return ""
+    try:
+        g = json.loads(geojson_txt)
+        anel = g["coordinates"][0]
+    except Exception:
+        return ""
+    return "\n".join(f"{lon}, {lat}" for lon, lat in anel)
+
+
+def page_propriedades():
+    """Hierarquia Organização → Produtor → Propriedade (PNIB §3).
+
+    A hierarquia existe desde o B4 e nunca teve tela. É ela que responde "de
+    quem é este animal e onde ele está" — a pergunta que a rastreabilidade
+    persegue.
+    """
+    if st.session_state.user["role"] != "admin":
+        st.error("🔒 Acesso restrito ao Administrador."); return
+    st.markdown('<div class="page-title">🏞️ Propriedades</div>',
+                unsafe_allow_html=True)
+
+    props = db.propriedades.listar(apenas_ativas=False)
+    t_lista, t_nova = st.tabs([f"📋 Cadastradas ({len(props)})", "➕ Nova propriedade"])
+    with t_lista:
+        _propriedades_editar(props)
+    with t_nova:
+        _propriedade_nova()
+
+
+def _propriedades_editar(props):
+    if not props:
+        st.info("Nenhuma propriedade cadastrada.")
+        return
+
+    rot = {f"{p['nome']} — {p['produtor_nome']} "
+           f"({'ativa' if p['situacao'] == 'ativa' else p['situacao']})": p
+           for p in props}
+    p = rot[st.selectbox("Propriedade", list(rot), key="prop_sel")]
+
+    # O titular NÃO é editável: trocá-lo é transferência de titularidade, que é
+    # evento do §8, com GTA e data. Oferecer aqui como campo de cadastro faria
+    # uma mudança regulatória parecer correção de digitação.
+    st.caption(f"Titular: **{p['produtor_nome']}** · Organização: "
+               f"**{p['organizacao_nome']}**. O titular é definido na criação e "
+               "só muda por transferência (§8), não por edição.")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        nome = st.text_input("Nome *", value=p["nome"], key="prop_nome").strip()
+    with c2:
+        codigo = st.text_input("Código oficial", value=p.get("codigo_oficial") or "",
+                               key="prop_codigo",
+                               help="Cadastro da propriedade no órgão estadual (§3.2).").strip()
+    with c3:
+        situacao = st.selectbox(
+            "Situação", ["ativa", "inativa", "encerrada"],
+            index=["ativa", "inativa", "encerrada"].index(
+                p["situacao"] if p["situacao"] in ("ativa", "inativa", "encerrada")
+                else "ativa"),
+            key="prop_situacao")
+
+    c4, c5 = st.columns([2, 1])
+    with c4:
+        municipio = st.text_input("Município", value=p.get("municipio") or "",
+                                  key="prop_municipio").strip()
+    with c5:
+        uf = st.text_input("UF", value=p.get("uf") or "", max_chars=2,
+                           key="prop_uf").strip().upper()
+
+    encerramento = ""
+    if situacao == "encerrada":
+        # Propriedade encerrada sem data não conta história nenhuma: o §3 pede
+        # saber quando o vínculo terminou, não só que terminou.
+        encerramento = st.text_input(
+            "Data de encerramento * (AAAA-MM-DD)",
+            value=p.get("encerramento") or "", key="prop_encerramento").strip()
+
+    st.markdown("---")
+    st.markdown("**Perímetro da propriedade**")
+    st.caption("Um vértice por linha, no formato `longitude, latitude` — a ordem "
+               "do GeoJSON. A área é **calculada**, não digitada: área digitada "
+               "e perímetro desenhado divergem com o tempo, e aí ninguém sabe "
+               "qual dos dois vale.")
+
+    texto = st.text_area("Vértices", value=_poligono_para_texto(p.get("poligono")),
+                         height=140, key="prop_poligono",
+                         placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
+                                     "-51.2280, -30.0320")
+
+    anel, erro_leitura, problemas = [], "", []
+    if texto.strip():
+        try:
+            anel = _ler_poligono(texto)
+        except ValueError as e:
+            erro_leitura = str(e)
+        else:
+            problemas = geometria_validar(anel)
+
+    if erro_leitura:
+        st.error(f"🚫 {erro_leitura}")
+    for prob in problemas:
+        st.error(f"🚫 {prob}")
+
+    if anel and not problemas:
+        lon, lat = geometria_centroide(anel)
+        g1, g2, g3 = st.columns(3)
+        g1.metric("Área", f"{_num_br(geometria_area_ha(anel), 2)} ha")
+        g2.metric("Perímetro", f"{_num_br(geometria_perimetro_m(anel), 0)} m")
+        g3.metric("Centro", f"{lat:.4f}, {lon:.4f}")
+
+    pode = (bool(nome) and not erro_leitura and not problemas
+            and (situacao != "encerrada" or bool(encerramento)))
+    if st.button("💾 Salvar propriedade", type="primary", disabled=not pode,
+                 key="prop_salvar"):
+        campos = {"nome": nome, "codigo_oficial": codigo or None,
+                  "municipio": municipio or None, "uf": uf or None,
+                  "situacao": situacao,
+                  "encerramento": encerramento or None}
+        if anel:
+            campos["poligono"] = json.dumps(
+                {"type": "Polygon", "coordinates": [[list(v) for v in anel]]})
+            lon, lat = geometria_centroide(anel)
+            campos["longitude"], campos["latitude"] = lon, lat
+        elif not texto.strip():
+            campos["poligono"] = None
+
+        if db.propriedades.atualizar(p["id"], **campos):
+            db.clear_cache()
+            st.success("✅ Propriedade atualizada.")
+            st.rerun()
+        else:
+            st.error("🚫 Nada foi alterado.")
+
+
+def _propriedade_nova():
+    produtores = db.propriedades.listar_produtores()
+    if not produtores:
+        st.warning("Nenhum produtor cadastrado. A hierarquia do §3 é "
+                   "Organização → Produtor → Propriedade, nessa ordem.")
+        return
+
+    rot = {f"{p['nome']} — {p['organizacao_nome']}": p["id"] for p in produtores}
+    c1, c2 = st.columns(2)
+    with c1:
+        produtor = rot[st.selectbox("Titular (produtor) *", list(rot),
+                                    key="propn_produtor",
+                                    help="Escolhido agora e **imutável**: mudar "
+                                         "depois é transferência (§8).")]
+    with c2:
+        nome = st.text_input("Nome da propriedade *", key="propn_nome").strip()
+
+    c3, c4, c5 = st.columns(3)
+    with c3:
+        codigo = st.text_input("Código oficial", key="propn_codigo").strip()
+    with c4:
+        municipio = st.text_input("Município", key="propn_municipio").strip()
+    with c5:
+        uf = st.text_input("UF", max_chars=2, key="propn_uf").strip().upper()
+
+    if st.button("➕ Cadastrar propriedade", type="primary", disabled=not nome,
+                 key="propn_salvar"):
+        db.propriedades.criar_propriedade(
+            produtor, nome, codigo_oficial=codigo, municipio=municipio, uf=uf)
+        db.clear_cache()
+        st.success(f"✅ Propriedade **{nome}** cadastrada. "
+                   "O perímetro pode ser desenhado na aba **Cadastradas**.")
+        st.rerun()
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -4384,6 +4582,7 @@ def main():
         "estoque":   page_estoque,
         "brincos":   page_brincos,
         "movimentacao": page_movimentacao,
+        "propriedades": page_propriedades,
         "nutricao":  page_nutricao,
         "sanitario": page_sanitario,
         "clima":     page_clima,
