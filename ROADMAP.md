@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · telas da Fase B sendo ligadas (3 de 6)**
+Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · telas da Fase B sendo ligadas (4 de 6)**
 
 ---
 
@@ -828,7 +828,7 @@ desde 2026-08-01 — *modo fundação permanente* —, só que agora a distânci
 sistema pode fazer e o que ele mostra é a maior de toda a história do projeto.
 
 **Ordem sugerida de integração**, por valor sobre esforço: ~~nascimento~~ ✅ →
-~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → painel de pendências (§7.3) → geometria dos piquetes →
+~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅ → geometria dos piquetes →
 regras configuráveis (tela de administrador, por último).
 
 **O que a primeira tela ensinou** (`_cadastro_nascimento`, 2026-08-04): o trabalho não é
