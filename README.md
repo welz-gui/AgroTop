@@ -24,7 +24,7 @@ sistema de rastreabilidade com valor regulatório. Ver
 | Migrations | 13, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |
 | Fase B | ✅ concluída — B1 a B7, fundação regulatória |
-| Fase B na tela | 🟡 2 de 6 — nascimento e brincos; ver [dívida nº 1](ROADMAP.md) |
+| Fase B na tela | 🟡 3 de 6 — nascimento, brincos e GTA; ver [dívida nº 1](ROADMAP.md) |
 
 ### ⚠️ O que a Fase B fez e o que ela não fez
 
@@ -32,10 +32,11 @@ A fundação regulatória está **em produção e testada**: identidade imutáve
 brinco, eventos e auditoria append-only, genealogia, hierarquia de propriedades,
 movimentação com GTA, estoque de dispositivos e motor de regras configurável.
 
-**Quase nada disso tem interface ainda.** A integração começou em 2026-08-04, pelo
-**nascimento** (§7) e pelo **estoque de brincos** (§5). Quatro repositórios da Fase B —
-`eventos`, `movimentacoes`, `propriedades`, `regras` — seguem com **zero uso em `app.py`**:
-quem abrir o sistema hoje ainda não vê GTA nem a linha do tempo do animal.
+**A interface está sendo ligada.** A integração começou em 2026-08-04 e já cobre
+**nascimento** (§7), **estoque de brincos** (§5) e **movimentação com GTA** (§8). Três
+repositórios da Fase B — `eventos`, `propriedades`, `regras` — seguem com **zero uso em
+`app.py`**: quem abrir o sistema hoje ainda não vê a linha do tempo do animal nem
+administra a hierarquia de propriedades.
 
 Isso é conformidade de **arquitetura**, não de **uso**. É a maior pendência do projeto, e
 está registrada como tal no [ROADMAP](ROADMAP.md).
@@ -54,6 +55,9 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
 - **🏷️ Brincos** — estoque de dispositivos do §5: importação por faixa numérica,
   aplicação em animal com conferência visual × eletrônico, e as doze situações do §5.2.
   Situação definitiva não oferece saída; `bloqueado_orgao` diz quem libera.
+- **🚚 Movimentação** — trânsito entre propriedades do §8, distinto do piquete→piquete
+  do Modo Campo: rascunho, pré-validação da saída, liberação com justificativa escrita
+  quando há alerta, e confirmação de chegada que registra quem não chegou.
 - **📋 Rebanho** — inventário, ficha individual com curva de peso, histórico sanitário e
   financeiro, e **gestão de identificadores com histórico**: trocar brinco encerra o
   anterior sem apagá-lo (§4.2.3 do PNIB).

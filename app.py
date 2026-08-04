@@ -495,6 +495,7 @@ def _sidebar():
                 ("💰","Financeiro","financeiro",""),
                 ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
                 ("🏷️","Brincos","brincos",""),
+                ("🚚","Movimentação","movimentacao",""),
                 ("🌾","Nutrição","nutricao",""),
                 ("💉","Sanitário","sanitario",""),
                 ("🌧️","Clima & Chuva","clima",""),
@@ -3854,6 +3855,233 @@ def _brincos_importar():
         else:
             st.error(f"🚫 {r['erro']}")
 
+_TIPO_MOV = {
+    "entre_propriedades_mesmo_titular": "Entre propriedades (mesmo titular)",
+    "entre_titulares_diferentes": "Entre titulares diferentes",
+    "venda": "Venda", "compra": "Compra", "remate": "Remate",
+    "emprestimo": "Empréstimo", "parceria": "Parceria", "exposicao": "Exposição",
+    "evento_agropecuario": "Evento agropecuário", "retorno": "Retorno",
+    "frigorifico": "Frigorífico (abate)", "confinamento": "Confinamento",
+    "temporaria": "Temporária", "sanitaria": "Sanitária", "outra": "Outra",
+}
+_STATUS_MOV = {"rascunho": "📝 Rascunho", "liberada": "🚚 Liberada",
+               "em_transito": "🛣️ Em trânsito", "concluida": "✅ Concluída",
+               "divergente": "⚠️ Concluída com divergência",
+               "cancelada": "🚫 Cancelada"}
+
+
+def page_movimentacao():
+    """Movimentação entre propriedades, com GTA (PNIB §8).
+
+    Não se confunde com o trânsito piquete→piquete do Modo Campo, que continua
+    sendo manejo interno. Esta tem GTA, titular, transportador e confirmação de
+    chegada — e é a que o órgão enxerga.
+    """
+    st.markdown('<div class="page-title">🚚 Movimentação entre Propriedades</div>',
+                unsafe_allow_html=True)
+
+    props = db.propriedades.listar()
+    if len(props) < 2:
+        st.info("É preciso ter **duas ou mais propriedades cadastradas** para "
+                "movimentar entre elas. Cadastre em ⚙️ Admin → Propriedades. "
+                "Para trocar de piquete dentro da mesma fazenda, use o 📱 Modo Campo.")
+        return
+
+    abertas = db.movimentacoes.abertas()
+    t_fila, t_nova = st.tabs(
+        [f"📋 Em andamento ({len(abertas)})", "➕ Nova movimentação"])
+
+    with t_fila:
+        _mov_fila(abertas, props)
+    with t_nova:
+        _mov_nova(props)
+
+
+def _rotulo_prop(props, pid):
+    for p in props:
+        if p["id"] == pid:
+            return p["nome"]
+    return "—"
+
+
+def _mov_fila(abertas, props):
+    if not abertas:
+        st.info("Nenhuma movimentação em andamento. As concluídas saem desta fila.")
+        return
+
+    rotulos = {}
+    for m in abertas:
+        rotulos[f"{_STATUS_MOV.get(m['status'], m['status'])} · "
+                f"{_TIPO_MOV.get(m['tipo'], m['tipo'])} · "
+                f"{_rotulo_prop(props, m['propriedade_origem_id'])} → "
+                f"{_rotulo_prop(props, m['propriedade_destino_id'])} · "
+                f"{m.get('data_prevista') or 'sem data'}"] = m
+
+    escolha = st.selectbox("Movimentação", list(rotulos), key="mov_sel")
+    mov = db.movimentacoes.get(rotulos[escolha]["id"])
+    if mov is None:
+        st.error("Movimentação não encontrada."); return
+
+    st.markdown(f"**GTA:** {mov.get('gta_numero') or '— não informada —'} · "
+                f"**Transportador:** {mov.get('transportador') or '—'} · "
+                f"**Animais:** {len(mov['animais'])}")
+
+    if mov["status"] == "rascunho":
+        _mov_liberar(mov)
+    else:
+        _mov_confirmar_chegada(mov)
+
+
+def _mov_liberar(mov):
+    v = db.movimentacoes.pre_validar(mov["id"])
+    if not v.get("ok"):
+        st.error(f"🚫 {v['erro']}"); return
+
+    problemas = v["problemas"]
+    if problemas:
+        st.markdown("**Pré-validação da saída (§8.3)**")
+        for p in problemas:
+            texto = f"{_GRAVIDADE_ICONE.get(p['gravidade'], '•')} {p['mensagem']}"
+            if p["gravidade"] == "bloqueio":
+                st.error(texto)
+            elif p["gravidade"] == "alerta":
+                st.warning(texto)
+            else:
+                st.info(texto)
+    else:
+        st.success("✅ Nenhum problema na pré-validação.")
+
+    if not v["pode_liberar"]:
+        st.error("🚫 Há bloqueio. Corrija a movimentação — não existe liberar "
+                 "assim mesmo, e é isso que separa bloqueio de alerta.")
+        return
+
+    justificativa = ""
+    if v["exige_confirmacao"]:
+        # §8.4 pede "confirmação e justificativa". Uma caixa de seleção não
+        # serve aqui: o que fica no registro é o texto de quem avaliou.
+        justificativa = st.text_input(
+            "Justificativa dos alertas *", key="mov_just",
+            help="§8.4: a justificativa fica no evento e na auditoria. É o que "
+                 "distingue quem avaliou de quem apenas clicou.").strip()
+
+    pode = not v["exige_confirmacao"] or bool(justificativa)
+    if st.button("🚚 Liberar saída", type="primary", disabled=not pode,
+                 key="mov_liberar"):
+        r = db.movimentacoes.liberar(mov["id"],
+                                     usuario=st.session_state.user["name"],
+                                     justificativa=justificativa)
+        if r.get("ok"):
+            db.clear_cache()
+            st.success("✅ Saída liberada. Os animais receberam evento de saída.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('erro', 'Não foi possível liberar.')}")
+
+
+def _mov_confirmar_chegada(mov):
+    st.markdown("**Confirmação de chegada (§8.2)**")
+    st.caption("Desmarque quem **não** chegou. Animal declarado e não recebido "
+               "fica registrado como divergência, em vez de a movimentação "
+               "inteira ser dada como concluída sem ressalva.")
+
+    data = st.date_input("Data da chegada", value=date.today(), key="mov_chegada")
+
+    recebidos = []
+    for a in mov["animais"]:
+        if st.checkbox(f"{a['brinco']}", value=True, key=f"mov_rec_{a['animal_uuid']}"):
+            recebidos.append(a["animal_uuid"])
+
+    faltantes = len(mov["animais"]) - len(recebidos)
+    obs = ""
+    if faltantes:
+        st.warning(f"⚠️ {_plural(faltantes, 'animal', 'animais')} não recebido(s). "
+                   "A movimentação será concluída **com divergência**.")
+        obs = st.text_input("Observação da divergência", key="mov_div").strip()
+
+    if st.button("✅ Confirmar chegada", type="primary", key="mov_confirmar"):
+        r = db.movimentacoes.confirmar_chegada(
+            mov["id"], data=data.isoformat(),
+            usuario=st.session_state.user["name"],
+            recebidos=recebidos, divergencias=obs)
+        if r.get("ok"):
+            db.clear_cache()
+            if r["status"] == "divergente":
+                st.warning(f"⚠️ Concluída com {len(r['nao_recebidos'])} "
+                           "não recebido(s), registrado.")
+            else:
+                st.success("✅ Chegada confirmada. Os animais mudaram de propriedade.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('erro', 'Não foi possível confirmar.')}")
+
+
+def _mov_nova(props):
+    st.caption("A movimentação nasce em **rascunho** e não é validada agora — "
+               "rascunho é onde se monta. A conferência do §8.3 acontece na aba "
+               "**Em andamento**, antes de liberar a saída.")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        tipo = st.selectbox("Tipo *", list(_TIPO_MOV),
+                            format_func=lambda t: _TIPO_MOV[t], key="movn_tipo")
+    with c2:
+        finalidade = st.text_input(
+            "Finalidade", key="movn_fin",
+            help="Escreva 'abate' ou 'frigorifico' quando for o caso: é o que "
+                 "faz a carência virar bloqueio em vez de aviso.").strip()
+
+    rot_p = {f"{p['nome']} — {p['produtor_nome']}": p["id"] for p in props}
+    c3, c4 = st.columns(2)
+    with c3:
+        origem = rot_p[st.selectbox("Propriedade de origem *", list(rot_p),
+                                    key="movn_origem")]
+    with c4:
+        destinos = [k for k, v in rot_p.items() if v != origem]
+        destino = rot_p[st.selectbox("Propriedade de destino *", destinos,
+                                     key="movn_destino")]
+
+    c5, c6, c7 = st.columns(3)
+    with c5:
+        prevista = st.date_input("Data prevista", value=date.today(),
+                                 key="movn_data")
+    with c6:
+        gta = st.text_input("Nº da GTA", key="movn_gta",
+                            help="Pode ficar em branco no rascunho: sem GTA é "
+                                 "alerta na liberação, não impedimento — a guia "
+                                 "costuma sair depois de o lote estar montado."
+                            ).strip()
+    with c7:
+        transportador = st.text_input("Transportador", key="movn_transp").strip()
+
+    # Só animais da origem: levar um animal de outra propriedade é BLOQUEIO na
+    # pré-validação, e oferecer o que a regra vai recusar é armadilha.
+    candidatos = [a for a in db.get_all_animals(status="ativo")
+                  if a.get("property_id") == origem]
+    if not candidatos:
+        st.warning("Nenhum animal ativo nesta propriedade de origem.")
+        return
+
+    rot_a = {f"{a['id']} — {a['breed']}": a["uuid"] for a in candidatos}
+    escolhidos = st.multiselect(f"Animais * ({len(candidatos)} disponíveis)",
+                                list(rot_a), key="movn_animais")
+
+    if st.button("📝 Criar rascunho", type="primary",
+                 disabled=not escolhidos, key="movn_salvar"):
+        r = db.movimentacoes.criar(
+            tipo, propriedade_origem_id=origem, propriedade_destino_id=destino,
+            finalidade=finalidade, data_prevista=prevista.isoformat(),
+            transportador=transportador, gta_numero=gta,
+            animais=[rot_a[e] for e in escolhidos],
+            usuario=st.session_state.user["name"])
+        if r.get("ok"):
+            db.clear_cache()
+            st.success(f"✅ Rascunho criado com {len(escolhidos)} animal(is). "
+                       "Vá em **Em andamento** para conferir e liberar.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r['erro']}")
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -4079,6 +4307,7 @@ def main():
         "financeiro":page_financeiro,
         "estoque":   page_estoque,
         "brincos":   page_brincos,
+        "movimentacao": page_movimentacao,
         "nutricao":  page_nutricao,
         "sanitario": page_sanitario,
         "clima":     page_clima,
