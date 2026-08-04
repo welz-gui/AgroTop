@@ -5,7 +5,7 @@ baixo** — a ordem é prioridade, não sugestão.
 
 **Estado em 2026-08-04:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 430 testes ·
 32 tabelas em produção · **6 tarefas na fila** · integração das telas da Fase B em curso
-pelo mantenedor (nascimento ✅, brincos ✅ e GTA ✅ em 2026-08-04).
+pelo mantenedor (nascimento ✅, brincos ✅, GTA ✅ e pendências §7.3 ✅ em 2026-08-04).
 
 > ### ⚠️ O que estas seis specs NÃO cobrem
 >

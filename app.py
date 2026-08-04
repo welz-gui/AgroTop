@@ -2403,9 +2403,85 @@ def _custo_medio_por_arroba():
 _GRAVIDADE_CARD = {"alta": "card-red", "media": "card-yellow", "baixa": "card-green"}
 
 
+# §7.3 — cada pendência com o que é, e o prazo em que passa a valer. O prazo é
+# metade da informação: sem ele, "12 animais sem identificação oficial" parece
+# irregularidade quando ainda faltam anos para ser exigível.
+_PENDENCIAS_7_3 = {
+    "sem_mae_vinculada": (
+        "Nascidos sem mãe vinculada",
+        "§7.1 exige vínculo materno para animal nascido na propriedade. "
+        "Vincule pela ficha do animal.", True),
+    "nascimento_estimado": (
+        "Nascimento com data estimada",
+        "§7.1: parto não acompanhado entra como estimado. Não é erro — é um "
+        "dado a confirmar quando houver como.", False),
+    "sem_raca": (
+        "Sem raça informada",
+        "Dado de cadastro básico, e a raça entra em quase todo relatório "
+        "zootécnico.", True),
+    "sem_propriedade_de_nascimento": (
+        "Sem propriedade de nascimento",
+        "§3: o nascimento acontece em algum lugar, e é esse lugar que a "
+        "rastreabilidade persegue.", True),
+    "sem_identificacao_oficial": (
+        "Sem identificação oficial",
+        "§4.1 — exigível para trânsito a partir de **01/01/2033**, e o formato "
+        "oficial ainda não foi publicado (§23). Está aqui para dimensionar o "
+        "esforço, não para ser resolvido hoje.", False),
+}
+
+
+def _painel_pendencias_7_3():
+    """Pendências de conformidade (PNIB §7.3).
+
+    Fica numa aba própria, e **fora do contador da barra lateral**, de
+    propósito. `sem_identificacao_oficial` lista o rebanho inteiro e só vira
+    exigência em 2033: somá-lo ao badge deixaria o número permanentemente alto,
+    e contador que nunca zera é contador que ninguém lê. O mesmo raciocínio já
+    valeu para o alerta de sincronização do §8.
+    """
+    st.caption("O que falta para os dados estarem completos. Conformidade não é "
+               "só registrar certo — é **saber o que falta** antes de a "
+               "fiscalização perguntar (§7.3).")
+
+    pend = db.nascimentos.pendencias()
+    exigiveis = {k: v for k, v in pend.items()
+                 if v and _PENDENCIAS_7_3.get(k, ("", "", True))[2]}
+
+    if not any(pend.values()):
+        st.success("✅ Nenhuma pendência de conformidade.")
+        return
+
+    if exigiveis:
+        st.warning(f"⚠️ {_plural(len(exigiveis), 'tipo', 'tipos')} de pendência "
+                   "com exigência já vigente.")
+    else:
+        st.success("✅ Nenhuma pendência de exigência vigente. O que resta abaixo "
+                   "tem prazo futuro ou é informativo.")
+
+    for chave, ids in pend.items():
+        if not ids:
+            continue
+        titulo, explicacao, vigente = _PENDENCIAS_7_3.get(
+            chave, (chave, "", True))
+        icone = "🔴" if vigente else "⏳"
+        with st.expander(f"{icone} {titulo} — {len(ids)}"):
+            st.markdown(explicacao)
+            st.dataframe(pd.DataFrame({"Brinco": ids}),
+                         use_container_width=True, hide_index=True)
+
 def page_alertas():
     st.markdown('<div class="page-title">🔔 Alertas Ativos</div>', unsafe_allow_html=True)
+    # Duas perguntas diferentes: "o que faço hoje" e "o que falta nos dados".
+    # Misturá-las faria a segunda, que é lenta e cumulativa, abafar a primeira.
+    tab_op, tab_conf = st.tabs(["🔔 Operacionais", "📋 Conformidade (§7.3)"])
+    with tab_conf:
+        _painel_pendencias_7_3()
+    with tab_op:
+        _alertas_operacionais()
 
+
+def _alertas_operacionais():
     # ── Recomendações do motor de regras (services/recomendacoes.py) ──────────
     st.subheader("🧭 Recomendações")
     st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "

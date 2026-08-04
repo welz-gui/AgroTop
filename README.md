@@ -24,7 +24,7 @@ sistema de rastreabilidade com valor regulatório. Ver
 | Migrations | 13, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |
 | Fase B | ✅ concluída — B1 a B7, fundação regulatória |
-| Fase B na tela | 🟡 3 de 6 — nascimento, brincos e GTA; ver [dívida nº 1](ROADMAP.md) |
+| Fase B na tela | 🟡 4 de 6 — nascimento, brincos, GTA e pendências; ver [dívida nº 1](ROADMAP.md) |
 
 ### ⚠️ O que a Fase B fez e o que ela não fez
 
@@ -67,8 +67,11 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
   mortalidade, ranking de fornecedor.
 - **📦 Estoque · 🌾 Nutrição · 💉 Sanitário · 🌧️ Clima** — insumos com alerta de mínimo,
   planos de trato com baixa automática, protocolos vacinais, chuva e previsão.
-- **🔔 Alertas** — animais sumidos, carência, prontos para abate, estoque baixo, e o
-  **motor de recomendações**, que mostra o motivo e os números de cada sugestão.
+- **🔔 Alertas** — duas abas, porque são duas perguntas: **operacionais** (animais
+  sumidos, carência, prontos para abate, estoque baixo, e o **motor de recomendações**, que
+  mostra o motivo e os números de cada sugestão) e **conformidade §7.3** — o que falta nos
+  dados, com o prazo de cada exigência. Pendência que só vale a partir de 2033 aparece
+  como ⏳ e **fica fora do contador**: número que nunca zera ninguém lê.
 - **⚙️ Admin** — usuários, edição direta de dados, e **mudança de status com máquina de
   estados**: sair de um estado final exige autorização e justificativa, que vão para a
   trilha de auditoria.
