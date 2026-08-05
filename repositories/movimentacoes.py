@@ -111,9 +111,11 @@ def pre_validar(movimentacao_id: str, *,
             "hoje": date.today().isoformat(),
             "animais_em_outra_movimentacao": _em_outra_movimentacao(
                 con, uuids, excluindo=movimentacao_id),
-            "eventos_pendentes_de_sincronizacao": con.execute(
-                "SELECT count(*) c FROM animal_events "
-                "WHERE status_sincronizacao <> 'sincronizado'").fetchone()["c"],
+            # ADR 0005: quem responde isto é `evento_sincronizacao`, não a
+            # coluna legada de `animal_events` — que, sendo a linha imutável,
+            # jamais deixava de dizer 'pendente' e fazia o alerta do §8.4
+            # aparecer em TODA liberação.
+            "eventos_pendentes_de_sincronizacao": eventos.contar_pendentes_em(con),
             "identificacao_obrigatoria": identificacao_obrigatoria,
         }
 

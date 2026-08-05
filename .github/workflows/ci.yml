@@ -54,6 +54,11 @@ jobs:
             -f supabase/migrations/0000_baseline_producao.sql
           psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/0007_eventos_e_auditoria.sql
+          # A 0013 é aplicada à parte enquanto o baseline não for regenerado a
+          # partir da nuvem. Depois disso vira redundante — e inofensiva, porque
+          # é toda `IF NOT EXISTS`.
+          psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/0013_fila_de_sincronizacao.sql
 
       # tests/__init__.py continua forçando SQLite no processo principal. Os
       # testes de integração abrem subprocessos e removem essa trava somente

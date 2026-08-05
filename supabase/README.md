@@ -97,6 +97,20 @@ Não inclua `DATABASE_URL` em mensagens de teste ou log: ela contém a senha do 
 
 ## Histórico de decisões aplicadas
 
+- **`evento_sincronizacao` criada** (`migrations/0013_fila_de_sincronizacao.sql`,
+  [ADR 0005](../docs/adr/0005-fila-de-sincronizacao.md)). Aditiva: uma tabela nova,
+  nenhuma linha existente tocada. Tira a fila de sincronização (§10.3) de dentro de
+  `animal_events`, que continua **estritamente** append-only —
+  `status_sincronizacao` e `identificador_oficial` viram colunas legadas, congeladas
+  no nascimento do evento.
+  ⚠️ **Pendente de aplicação na nuvem no momento do commit.** O worktree do agente
+  não alcança produção (R29), então o passo 1 deste README não foi executado e o
+  baseline e o retrato foram escritos à mão, no formato que o gerador produz. Antes
+  de mesclar: aplicar a 0013 no Supabase, rodar
+  `python tools/dump_schema_nuvem.py --baseline` e conferir que
+  `git diff docs/ supabase/migrations/0000_baseline_producao.sql` sai **vazio** — se
+  não sair, a verdade é o que a nuvem devolveu.
+
 - **`profiles` removida** de produção em 2026-07-30
   (`migrations/0001_drop_profiles.sql`). Era resíduo do app mobile obsoleto, com PK
   referenciando `auth.users` — o padrão do Supabase Auth que o

@@ -17,8 +17,8 @@ SQLite para desenvolvimento e teste.
 |---|---|
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
-| Schema | **362 colunas / 32 tabelas**, paridade total entre DDL local e produção |
-| Testes | **430**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface) |
+| Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
+| Testes | **CONTAGEM**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface) |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
 | Integração | **14 de 25 services ligados ao app** · só `eventos` (§6) sem tela |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
@@ -44,6 +44,9 @@ login por cookie · câmera (QR + OCR de brinco + foto).
   e o cancelamento de `roles`/`permissions` fica revogado.
 - **[ADR 0002](docs/adr/0002-fronteira-de-portabilidade.md)** — Postgres é permanente,
   o provedor é substituível; **Supabase Auth vetado**.
+- **[ADR 0005](docs/adr/0005-fila-de-sincronizacao.md)** — a fila de sincronização (§10.3)
+  fica **fora** de `animal_events`, em `evento_sincronizacao`. Nenhuma exceção ao gatilho
+  append-only: nada em `animal_events` muda, nunca.
 - **[supabase/README.md](supabase/README.md)** — fluxo de alteração de schema.
 
 ---
@@ -882,6 +885,14 @@ usuários de produção e a rotação da senha do Postgres.
    alerta que sempre aparece deixa de ser lido. Duas saídas, e a escolha não é óbvia:
    tabela de controle à parte (mantém `animal_events` estritamente imutável) ou exceção
    no gatilho para essas duas colunas. Enquanto não se decide, o alerta é ruído.
+
+   ➡️ **Decidido em 2026-08-04 pelo [ADR 0005](docs/adr/0005-fila-de-sincronizacao.md):**
+   tabela de controle à parte (`evento_sincronizacao`), sem exceção nenhuma no gatilho.
+   O mecanismo existe e a fila fecha — mas **a dívida continua aberta**, porque nada a
+   drena sozinha: as APIs do §10.1 não existem e a marcação manual do §10.4
+   (`eventos.marcar_sincronizado`) **ainda não tem tela**. Fechar de verdade é a tela do
+   §10.4, com protocolo, comprovante e dupla conferência. Quem fecha a dívida é o
+   mantenedor, na revisão.
 
 5. **A adoção de eventos é incremental, por decisão do ADR 0004.** Os eventos são
    *registrados* junto das operações, mas o estado do animal **não é derivado deles**.
