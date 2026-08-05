@@ -3,8 +3,8 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-04:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 430 testes ·
-32 tabelas em produção · **6 tarefas na fila** · integração das telas da Fase B em curso
+**Estado em 2026-08-05:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 512 testes ·
+33 tabelas em produção, todas com RLS · integração das telas da Fase B concluída
 pelo mantenedor — **6 telas em 2026-08-04**: nascimento, brincos, GTA, pendências
 §7.3, propriedades com geometria e motor de regras.
 
@@ -62,12 +62,12 @@ pelo mantenedor — **6 telas em 2026-08-04**: nascimento, brincos, GTA, pendên
 
 ⚙️ = infraestrutura · 🇧🇷 = fundação regulatória PNIB · 🏗️ = avança trilha do roadmap
 
-| 1 | [0029](0029-escore-de-conformidade.md) — escore de conformidade PNIB 🇧🇷 | `feat/escore-conformidade-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
-| 2 | [0028](0028-geometria-lotacao-e-sobreposicao.md) — lotação e sobreposição 🏗️ | `feat/geometria-lotacao-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
+| — | [0029](0029-escore-de-conformidade.md) — escore de conformidade PNIB 🇧🇷 | — | ✅ [#95](https://github.com/welz-gui/AgroTop/pull/95) | | 2026-08-05 |
+| — | [0028](0028-geometria-lotacao-e-sobreposicao.md) — lotação e sobreposição 🏗️ | — | ✅ [#94](https://github.com/welz-gui/AgroTop/pull/94) | | 2026-08-05 |
 | — | [0030](0030-importacao-de-lote-de-brincos.md) — leitura de arquivo de brincos 🇧🇷 | — | ✅ [#90](https://github.com/welz-gui/AgroTop/pull/90) | | 2026-08-05 |
-| 4 | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | `feat/mapa-de-conformidade-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
-| 5 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
-| 6 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema (destravada) | `feat/hex-para-tokens` | 🟢 livre | — | — |
+| 1 | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | `feat/mapa-de-conformidade-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
+| 2 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
+| 3 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema (destravada) | `feat/hex-para-tokens` | 🟢 livre | — | — |
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
@@ -254,6 +254,27 @@ o caso que a spec **não** menciona — e se achar, escreva o teste antes de abr
 A 0032 é a mais desconfortável das três: o defeito era **exatamente o que a spec avisava
 em letras garrafais** que não podia acontecer. Ler a proibição não basta; é preciso
 conferir a própria entrega contra ela antes de abrir o PR.
+
+**Duas das três já voltaram a fechar** — 0028 em [#94](https://github.com/welz-gui/AgroTop/pull/94),
+0029 em [#95](https://github.com/welz-gui/AgroTop/pull/95), as duas corrigindo exatamente o
+defeito registrado, verificado contra o caso de reprodução antes do merge.
+
+### ⚠️ A 0032-v2 travou sem produzir nada, e foi liberada de novo em 2026-08-05
+
+Um agente reivindicou `feat/mapa-de-conformidade-v2`, abriu o worktree e parou — **zero
+commits, zero diff**, sem PR. O worktree ficou parado num commit antigo (`fbf3a0a`) e a
+branch remota continuou existindo, o que — pelo protocolo desta seção — faria qualquer
+outro agente que checasse o GitHub achar a tarefa ocupada e desistir dela para sempre.
+
+O mantenedor removeu o worktree órfão e a branch remota; **não havia código para
+reverter**, porque nada tinha sido escrito. A tarefa está livre outra vez, com o mesmo
+defeito registrado que motivou o retrabalho — leia a seção do defeito antes de começar,
+como qualquer outro agente pegando esta spec.
+
+**Se você é um agente e travar de verdade** (erro que não consegue contornar, ambiente
+quebrado, o que for): não deixe o worktree parado. Avise no PR, se conseguir abrir um
+rascunho, ou simplesmente pare — um worktree sem commit é inofensivo para o código, mas
+o nome da branch some da vista de quem decide se a tarefa está livre.
 
 ---
 

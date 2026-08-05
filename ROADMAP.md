@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-05 · Estado: **Fases A e B CONCLUÍDAS · Fase B ligada à interface (6 de 7)**
+Última atualização: 2026-08-05 · Estado: **Fases A e B CONCLUÍDAS · Fase B ligada à interface (6 de 7)** · fila de specs em 3
 
 ---
 
@@ -18,7 +18,7 @@ SQLite para desenvolvimento e teste.
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
-| Testes | **492**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface + testes de propriedade) |
+| Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
 | Integração | **14 de 25 services ligados ao app** · só `eventos` (§6) sem tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
@@ -970,6 +970,8 @@ usuários de produção e a rotação da senha do Postgres.
 
 ### 🔵 Processo
 
-12. **Fila de specs com seis tarefas** (`specs/QUADRO.md`). O que resta de delegável é mais
+12. **Fila de specs com três tarefas** (`specs/QUADRO.md`). O que resta de delegável é mais
     escasso que antes: o trabalho principal virou integração, e integração é do mantenedor
-    pela R31.
+    pela R31. Das seis que estavam na fila em 2026-08-04, três fecharam em 2026-08-05
+    (0030, 0028-v2, 0029-v2); a 0032-v2 ficou livre de novo depois de um agente travar
+    sem produzir nada — ver a nota no quadro.
