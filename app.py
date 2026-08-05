@@ -28,7 +28,7 @@ from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
 )
-from ui.tema import cores
+from ui.tema import cores, css_variaveis, plotly_layout, SERIES
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -41,65 +41,67 @@ st.set_page_config(
 
 db.init_db()
 db.refresh_carencia_status()
+c = cores()
 
 # ─── CSS ──────────────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(f"""
+{css_variaveis()}
 <style>
-.main .block-container{padding-top:.8rem;padding-bottom:2rem}
-section[data-testid="stSidebar"]{background:#0a1628!important}
+.main .block-container{{padding-top:.8rem;padding-bottom:2rem}}
+section[data-testid="stSidebar"]{{background:var(--fundo_alt)!important}}
 
 /* Botões grandes — uso ao sol */
-.stButton>button{min-height:2.75rem;font-size:1rem;font-weight:600;border-radius:10px;transition:all .15s}
-.stButton>button:hover{transform:translateY(-1px)}
+.stButton>button{{min-height:2.75rem;font-size:1rem;font-weight:600;border-radius:10px;transition:all .15s}}
+.stButton>button:hover{{transform:translateY(-1px)}}
 
 /* Métricas */
-div[data-testid="stMetric"]{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:1rem 1.2rem}
-div[data-testid="stMetricValue"]{font-size:1.55rem!important}
+div[data-testid="stMetric"]{{background:var(--superficie);border:1px solid var(--borda);border-radius:14px;padding:1rem 1.2rem}}
+div[data-testid="stMetricValue"]{{font-size:1.55rem!important}}
 
 /* Título de página */
-.page-title{font-size:1.55rem;font-weight:800;color:#4ade80;border-left:4px solid #4ade80;padding-left:.75rem;margin-bottom:1.4rem}
+.page-title{{font-size:1.55rem;font-weight:800;color:var(--primaria);border-left:4px solid var(--primaria);padding-left:.75rem;margin-bottom:1.4rem}}
 
 /* Cards */
-.card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-green{background:linear-gradient(135deg,#14532d,#0f172a);border:1px solid #166534;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-yellow{background:linear-gradient(135deg,#422006,#0f172a);border:1px solid #854d0e;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-red{background:linear-gradient(135deg,#450a0a,#0f172a);border:1px solid #7f1d1d;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.card{{background:var(--superficie);border:1px solid var(--borda);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}}
+.card-green{{background:linear-gradient(135deg,var(--sucesso_fundo),var(--fundo));border:1px solid var(--sucesso_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}}
+.card-yellow{{background:linear-gradient(135deg,var(--atencao_fundo),var(--fundo));border:1px solid var(--atencao_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}}
+.card-red{{background:linear-gradient(135deg,var(--perigo_fundo),var(--fundo));border:1px solid var(--perigo_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}}
 
 /* Badges */
-.badge-green {background:#166534;color:#4ade80;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-yellow{background:#713f12;color:#fbbf24;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-red   {background:#7f1d1d;color:#f87171;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-blue  {background:#1e3a5f;color:#60a5fa;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-gray  {background:#1e293b;color:#94a3b8;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-green {{background:var(--sucesso_escuro);color:var(--sucesso);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}}
+.badge-yellow{{background:var(--atencao_fundo_alt);color:var(--atencao);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}}
+.badge-red   {{background:var(--perigo_escuro);color:var(--perigo);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}}
+.badge-blue  {{background:var(--info_fundo);color:var(--info_texto);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}}
+.badge-gray  {{background:var(--superficie);color:var(--texto_secundario);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}}
 
 /* Linha de histórico */
-.hist-item{background:#0f172a;border-left:3px solid #4ade80;border-radius:8px;padding:.45rem .9rem;margin-bottom:.35rem}
+.hist-item{{background:var(--fundo);border-left:3px solid var(--sucesso);border-radius:8px;padding:.45rem .9rem;margin-bottom:.35rem}}
 
 /* Teclado numérico */
-.keypad-display{font-size:3rem;font-weight:900;color:#4ade80;text-align:center;background:#0f172a;border:2px solid #334155;border-radius:14px;padding:1rem;margin-bottom:.5rem;letter-spacing:.1em}
+.keypad-display{{font-size:3rem;font-weight:900;color:var(--primaria);text-align:center;background:var(--fundo);border:2px solid var(--borda);border-radius:14px;padding:1rem;margin-bottom:.5rem;letter-spacing:.1em}}
 
 /* Ocultar elementos padrão (mantendo o botão de abrir o menu lateral) */
-#MainMenu,footer{visibility:hidden}
-header[data-testid="stHeader"]{background:transparent}
+#MainMenu,footer{{visibility:hidden}}
+header[data-testid="stHeader"]{{background:transparent}}
 /* Botão para reabrir o menu lateral — sempre visível e destacado */
-[data-testid="collapsedControl"]{
+[data-testid="collapsedControl"]{{
     visibility:visible!important;
     display:flex!important;
     opacity:1!important;
     z-index:999999;
-}
-[data-testid="collapsedControl"] button{
-    background:#4ade80!important;
-    color:#0f172a!important;
+}}
+[data-testid="collapsedControl"] button{{
+    background:var(--primaria)!important;
+    color:var(--fundo)!important;
     border-radius:8px;
-}
+}}
 
 /* Mobile */
-@media(max-width:640px){
-  .main .block-container{padding-left:.4rem;padding-right:.4rem}
-  .stButton>button{min-height:3.2rem;font-size:1.1rem}
-  div[data-testid="stMetricValue"]{font-size:1.3rem!important}
-}
+@media(max-width:640px){{
+  .main .block-container{{padding-left:.4rem;padding-right:.4rem}}
+  .stButton>button{{min-height:3.2rem;font-size:1.1rem}}
+  div[data-testid="stMetricValue"]{{font-size:1.3rem!important}}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -111,13 +113,7 @@ COST_TYPES = ["compra","insumo","operacional","veterinário","outro"]
 # Cotação padrão centralizada (usada no Simulador e no Relatório Financeiro)
 DEFAULT_PRICE_ARROBA = 320.0   # R$ por arroba (boi gordo)
 DEFAULT_PRICE_KG     = 10.0    # R$ por kg de boi vivo
-PLOTLY = dict(
-    template="plotly_dark",
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#f1f5f9",size=12),
-    margin=dict(l=10,r=10,t=30,b=10),
-)
+PLOTLY = plotly_layout()
 
 def _layout(**overrides):
     """Mescla o layout padrão PLOTLY com overrides (evita conflito de kwargs)."""
@@ -438,8 +434,8 @@ def page_login():
         st.markdown("""
         <div style="text-align:center;padding:2rem 0 1.5rem">
             <div style="font-size:4.5rem;line-height:1">🐄</div>
-            <h1 style="color:#4ade80;margin:.4rem 0 0">AgroTop</h1>
-            <p style="color:#64748b;margin:0;font-size:.95rem">Sistema de Gestão de Gado de Corte</p>
+            f'<h1 style="color:{c["primaria"]};margin:.4rem 0 0">AgroTop</h1>'
+            f'<p style="color:{c["texto_terciario"]};margin:0;font-size:.95rem">Sistema de Gestão de Gado de Corte</p>'
         </div>""", unsafe_allow_html=True)
         with st.form("login"):
             user = st.text_input("👤 Usuário", placeholder="seu.usuario")
@@ -484,8 +480,8 @@ def _sidebar():
         st.markdown(f"""
         <div style="text-align:center;padding:.8rem 0 .5rem">
             <div style="font-size:2.5rem">🐄</div>
-            <h2 style="color:#4ade80;margin:0">AgroTop</h2>
-            <div style="color:#94a3b8;font-size:.8rem;margin-top:.25rem">
+            f'<h2 style="color:{c["primaria"]};margin:0">AgroTop</h2>'
+            f'<div style="color:{c["texto_secundario"]};font-size:.8rem;margin-top:.25rem">'
                 {user['name']}<br>
                 <span style="color:#4ade80">●</span>&nbsp;
                 {"Administrador" if user['role']=='admin' else "Operador"}
@@ -663,7 +659,7 @@ def page_dashboard():
         df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
         df_br.columns=["Raça","Qtd"]
         fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
-            color_discrete_sequence=["#4ade80","#22d3ee","#a78bfa","#f472b6","#fb923c","#facc15","#34d399"])
+            color_discrete_sequence=SERIES)
         fig_p.update_layout(**_layout(height=240,margin=dict(l=0,r=0,t=10,b=10),
             legend=dict(orientation="h",yanchor="bottom",y=-0.2)))
         fig_p.update_traces(textposition="inside",textinfo="percent+label")
@@ -1875,7 +1871,7 @@ def _fin_mortalidade():
         st.markdown("**Por causa**")
         dfc = pd.DataFrame([{"Causa":k2,"Mortes":v} for k2,v in m["por_causa"].items()]).sort_values("Mortes",ascending=False)
         figc = px.pie(dfc, names="Causa", values="Mortes", hole=0.45,
-            color_discrete_sequence=["#f87171","#fb923c","#facc15","#a78bfa","#22d3ee","#4ade80","#f472b6"])
+            color_discrete_sequence=[c["perigo"], c["atencao_secundario"], c["atencao_brilhante"], c["destaque"], c["info"], c["sucesso"], c["destaque_secundario"]])
         figc.update_layout(**_layout(height=260, margin=dict(l=0,r=0,t=10,b=10),
             legend=dict(orientation="h",yanchor="bottom",y=-0.35)))
         st.plotly_chart(figc, use_container_width=True)
@@ -2017,7 +2013,7 @@ def page_financeiro():
                 df_cat=pd.DataFrame(by_cat)
                 df_cat.columns=["Categoria","Total"]
                 fig_fx=px.pie(df_cat,names="Categoria",values="Total",hole=0.45,
-                    color_discrete_sequence=["#4ade80","#22d3ee","#a78bfa","#f472b6","#fb923c","#facc15","#34d399","#f87171"])
+                    color_discrete_sequence=SERIES + [c["perigo"]])
                 fig_fx.update_layout(**_layout(height=260,margin=dict(l=0,r=0,t=10,b=10),
                     legend=dict(orientation="h",yanchor="bottom",y=-0.25)))
                 fig_fx.update_traces(textposition="inside",textinfo="percent")
@@ -3188,7 +3184,7 @@ def page_clima():
                 mk[3].metric("Chuva prevista (7 dias)", f"{sum(d['precipitation_sum']):.0f} mm")
 
                 fig = px.bar(df, x="Data", y="Chuva (mm)", color="Prob. chuva (%)",
-                    color_continuous_scale=["#94a3b8","#22d3ee","#3b82f6"],
+                    color_continuous_scale=[c["texto_secundario"], c["info"], c["info_secundario"]],
                     labels={"Chuva (mm)":"Chuva prevista (mm)"})
                 fig.update_layout(**_layout(height=280, xaxis=dict(gridcolor="#1e293b"),
                     yaxis=dict(gridcolor="#1e293b")))
@@ -3240,7 +3236,7 @@ def page_clima():
                        .sum().reset_index())
                 dfm.columns = ["Mês","Chuva (mm)"]
                 figm = px.bar(dfm, x="Mês", y="Chuva (mm)",
-                    color_discrete_sequence=["#3b82f6"])
+                    color_discrete_sequence=[c["info_secundario"]])
                 figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor="#1e293b"),
                     yaxis=dict(gridcolor="#1e293b")))
                 st.plotly_chart(figm, use_container_width=True)
@@ -3248,7 +3244,7 @@ def page_clima():
                 st.markdown("**Por piquete**")
                 dfl = df.groupby("piquete")["rain_mm"].sum().reset_index().sort_values("rain_mm")
                 figl = px.bar(dfl, x="rain_mm", y="piquete", orientation="h",
-                    color="rain_mm", color_continuous_scale=["#94a3b8","#3b82f6"],
+                    color="rain_mm", color_continuous_scale=[c["texto_secundario"], c["info_secundario"]],
                     labels={"rain_mm":"Chuva (mm)","piquete":""})
                 figl.update_layout(**_layout(height=250, coloraxis_showscale=False,
                     xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b")))
