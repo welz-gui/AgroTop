@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-04 · Estado: **Fases A e B CONCLUÍDAS · Fase B ligada à interface (6 de 7)**
+Última atualização: 2026-08-05 · Estado: **Fases A e B CONCLUÍDAS · Fase B ligada à interface (6 de 7)**
 
 ---
 
@@ -18,9 +18,10 @@ SQLite para desenvolvimento e teste.
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
-| Testes | **474**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface) |
+| Testes | **492**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
 | Integração | **14 de 25 services ligados ao app** · só `eventos` (§6) sem tela |
+| Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
 > ⚠️ **Esta tabela envelhece rápido.** Em 2026-08-03 ela ainda dizia "21 testes" e "Fase A em
@@ -917,11 +918,12 @@ usuários de produção e a rotação da senha do Postgres.
 
 ### 🔵 Cobertura e ferramentas
 
-10. **O baseline não cobre RLS, grants nem extensões.** Funções e triggers **passaram a ser
-    cobertos** em 2026-08-03 — antes disso o baseline recriava `animal_events` e
-    `audit_logs` **sem os gatilhos append-only**, e o `testar_baseline` dizia "OK" porque
-    comparava só colunas. *A limitação estava documentada e ninguém reviu o aviso quando os
-    gatilhos entraram: documentar um risco não o elimina.*
+10. ~~**O baseline não cobre RLS, grants nem extensões.**~~ 🟢 **Fechada em 2026-08-05.**
+    Funções e triggers **passaram a ser cobertos** em 2026-08-03 — antes disso o baseline
+    recriava `animal_events` e `audit_logs` **sem os gatilhos append-only**, e o
+    `testar_baseline` dizia "OK" porque comparava só colunas. *A limitação estava
+    documentada e ninguém reviu o aviso quando os gatilhos entraram: documentar um risco
+    não o elimina.*
 
     🔴 **E o risco se realizou em 2026-08-05.** O linter do Supabase acusou
     `rls_disabled_in_public` em **onze tabelas** — exatamente as criadas pelas migrations
@@ -933,14 +935,34 @@ usuários de produção e a rotação da senha do Postgres.
     **projetada para ser pública**. A chave não vazou — verificado —, mas essa é a forma
     errada de defesa.
 
-    **O que já foi feito:** o checklist ganhou a seção *"Tabela nova nasce com RLS
-    ligado"*, e `tests/test_rls_nas_migrations.py` passou a **quebrar o CI** quando uma
-    migration cria tabela sem RLS e sem revogar os grants. Foi assim que a 0013 não virou
-    a décima segunda. As onze históricas estão numa lista de exceção **dentro do teste**,
-    que ele mesmo cobra que encolha — dívida em código executável, não em prosa.
+    **O que foi feito, no mesmo dia:**
+    - O checklist ganhou *"Tabela nova nasce com RLS ligado"*, e
+      `tests/test_rls_nas_migrations.py` passou a **quebrar o CI**. Foi assim que a 0013
+      (fila de sincronização) não virou a décima segunda tabela exposta — pega antes do
+      merge.
+    - A migration **0014** ligou RLS nas onze e revogou os grants de `anon`/`authenticated`
+      em bloco, com `ALTER DEFAULT PRIVILEGES` para o que vier depois.
+    - Ao tentar dropar `get_current_user_role()` (item seguinte), o Postgres recusou por
+      dependência: duas políticas em `storage.objects`, do bucket `animal-photos`,
+      **nunca usadas** — as fotos vão para a coluna `image` da própria tabela
+      `animal_photos`, e o projeto não tem `supabase-py` nas dependências. Removidas
+      também.
+    - `is_admin_or_gestor()` e `get_current_user_role()` — heranças do Supabase Auth que o
+      ADR 0002 vetou — foram **removidas**, não só desligadas. Verificado antes: a segunda
+      consultava `public.profiles`, tabela que a migration 0001 já tinha apagado. Não eram
+      "nunca exercidas": chamá-las devolvia erro. Estavam expostas a `anon` via
+      `/rest/v1/rpc/`.
+    - `fn_recusa_alteracao()` ganhou `search_path` fixo — sem ele, quem controla o
+      search_path da sessão pode influenciar que objeto o corpo da função resolve, e é a
+      garantia do §6.3 que está em jogo.
+    - Baseline regenerado, `testar_baseline.py` confirma paridade (375 colunas / 33
+      tabelas), suíte com 492 testes.
 
-    **O que falta:** aplicar a migration que liga RLS nas onze e remover a lista. Enquanto
-    isso não acontece, as onze seguem expostas.
+    O teste guarda dois níveis de rigor, e a diferença é deliberada: para migration nova
+    (a partir da 0013), RLS e REVOKE são exigidos **na mesma migration** que cria a
+    tabela — foi a falta disso ali que originou o teste. Para as 11 legadas, exigir isso
+    retroativamente reescreveria migration já aplicada em produção; o que se cobra delas é
+    terem sido protegidas **em algum lugar do histórico**, o que a 0014 fez.
 
 11. **A suíte roda Postgres no CI desde 2026-08-03** (spec 0025), o que fecha a dívida
     aberta pela queda do `PRAGMA table_info`. `tests/test_dialeto_duplo.py` continua

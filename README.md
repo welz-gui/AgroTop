@@ -9,7 +9,7 @@ Portaria SDA/MAPA 1.331/2025). Isso muda a natureza do produto — de software d
 sistema de rastreabilidade com valor regulatório. Ver
 [ADR 0004](docs/adr/0004-conformidade-pnib.md).
 
-**Última revisão desta página:** 2026-08-04.
+**Última revisão desta página:** 2026-08-05.
 
 ---
 
@@ -19,7 +19,7 @@ sistema de rastreabilidade com valor regulatório. Ver
 |---|---|
 | Produção | Streamlit Community Cloud, deploy a cada push na `main` |
 | Banco | Supabase/PostgreSQL · **32 tabelas, 362 colunas** |
-| Testes | **430**, verdes em SQLite **e** PostgreSQL no CI (~9 min: 6 provas de interface) |
+| Testes | **492**, verdes em SQLite **e** PostgreSQL no CI (~9 min: 6 provas de interface) |
 | Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
 | Migrations | 13, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |

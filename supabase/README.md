@@ -127,19 +127,27 @@ Não inclua `DATABASE_URL` em mensagens de teste ou log: ela contém a senha do 
 
 ## Histórico de decisões aplicadas
 
+- **RLS nas 11 tabelas da Fase B + limpeza de heranças do Supabase Auth**
+  (`migrations/0014_rls_nas_tabelas_da_fase_b.sql`, aplicada em 2026-08-05). O linter
+  do Supabase acusou `rls_disabled_in_public` em `animal_identifiers`, `animal_events`,
+  `audit_logs`, `organizacoes`, `produtores`, `properties`, `partos`, `movimentacoes`,
+  `movimentacao_animais`, `dispositivos` e `regras_regulatorias` — as 11 tabelas das
+  migrations 0002 a 0012, todas sem o passo que este README não pedia até então. Ver
+  a dívida nº 10 do [ROADMAP](../ROADMAP.md) para o incidente completo.
+  Na mesma migration: duas políticas mortas em `storage.objects` (bucket
+  `animal-photos`, nunca usado — as fotos vão para `animal_photos.image`) e as
+  funções `is_admin_or_gestor()`/`get_current_user_role()` foram **removidas**, não
+  só desligadas — a segunda consultava `public.profiles`, já apagada pela 0001, e
+  as duas eram `SECURITY DEFINER` executáveis por `anon` via RPC.
+  `fn_recusa_alteracao()` ganhou `search_path` fixo.
+
 - **`evento_sincronizacao` criada** (`migrations/0013_fila_de_sincronizacao.sql`,
-  [ADR 0005](../docs/adr/0005-fila-de-sincronizacao.md)). Aditiva: uma tabela nova,
-  nenhuma linha existente tocada. Tira a fila de sincronização (§10.3) de dentro de
-  `animal_events`, que continua **estritamente** append-only —
+  [ADR 0005](../docs/adr/0005-fila-de-sincronizacao.md), aplicada em 2026-08-05). Aditiva:
+  uma tabela nova, nenhuma linha existente tocada. Tira a fila de sincronização (§10.3) de
+  dentro de `animal_events`, que continua **estritamente** append-only —
   `status_sincronizacao` e `identificador_oficial` viram colunas legadas, congeladas
-  no nascimento do evento.
-  ⚠️ **Pendente de aplicação na nuvem no momento do commit.** O worktree do agente
-  não alcança produção (R29), então o passo 1 deste README não foi executado e o
-  baseline e o retrato foram escritos à mão, no formato que o gerador produz. Antes
-  de mesclar: aplicar a 0013 no Supabase, rodar
-  `python tools/dump_schema_nuvem.py --baseline` e conferir que
-  `git diff docs/ supabase/migrations/0000_baseline_producao.sql` sai **vazio** — se
-  não sair, a verdade é o que a nuvem devolveu.
+  no nascimento do evento. Nasce com RLS e grants revogados na própria migration —
+  ver a nota de rigor em `tests/test_rls_nas_migrations.py`.
 
 - **`profiles` removida** de produção em 2026-07-30
   (`migrations/0001_drop_profiles.sql`). Era resíduo do app mobile obsoleto, com PK

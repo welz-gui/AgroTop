@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-03 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-05 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -524,44 +524,44 @@ CREATE TABLE IF NOT EXISTS weighings (
 
 -- Chaves estrangeiras aplicadas ao final: assim a ordem de
 -- criação das tabelas acima não importa.
-ALTER TABLE animal_costs ADD CONSTRAINT fk_animal_costs_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE animal_events ADD CONSTRAINT animal_events_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE animal_events ADD CONSTRAINT animal_events_evento_anterior_id_fkey FOREIGN KEY (evento_anterior_id) REFERENCES public.animal_events(id);
-ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES public.fornecedores(id);
-ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES public.lotes(id);
-ALTER TABLE animals ADD CONSTRAINT fk_animals_mae FOREIGN KEY (mae_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE animals ADD CONSTRAINT fk_animals_pai FOREIGN KEY (pai_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE animals ADD CONSTRAINT fk_animals_parto FOREIGN KEY (parto_id) REFERENCES public.partos(id);
-ALTER TABLE animals ADD CONSTRAINT fk_animals_prop_nascimento FOREIGN KEY (propriedade_nascimento_id) REFERENCES public.properties(id);
-ALTER TABLE animals ADD CONSTRAINT fk_animals_property FOREIGN KEY (property_id) REFERENCES public.properties(id);
-ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES public.properties(id);
-ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_proprietario_id_fkey FOREIGN KEY (proprietario_id) REFERENCES public.produtores(id);
-ALTER TABLE evento_sincronizacao ADD CONSTRAINT evento_sincronizacao_evento_id_fkey FOREIGN KEY (evento_id) REFERENCES public.animal_events(id);
-ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.feeding_plans(id);
-ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES public.insumos(id);
-ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES public.lotes(id);
-ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES public.insumos(id);
-ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES public.insumos(id);
-ALTER TABLE lotes ADD CONSTRAINT fk_lotes_property FOREIGN KEY (property_id) REFERENCES public.properties(id);
-ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES public.insumos(id);
-ALTER TABLE movimentacao_animais ADD CONSTRAINT movimentacao_animais_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE movimentacao_animais ADD CONSTRAINT movimentacao_animais_movimentacao_id_fkey FOREIGN KEY (movimentacao_id) REFERENCES public.movimentacoes(id);
-ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES public.properties(id);
-ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_propriedade_origem_id_fkey FOREIGN KEY (propriedade_origem_id) REFERENCES public.properties(id);
-ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_titular_destino_id_fkey FOREIGN KEY (titular_destino_id) REFERENCES public.produtores(id);
-ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_titular_origem_id_fkey FOREIGN KEY (titular_origem_id) REFERENCES public.produtores(id);
-ALTER TABLE partos ADD CONSTRAINT partos_mae_uuid_fkey FOREIGN KEY (mae_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE partos ADD CONSTRAINT partos_propriedade_id_fkey FOREIGN KEY (propriedade_id) REFERENCES public.properties(id);
-ALTER TABLE produtores ADD CONSTRAINT produtores_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES public.organizacoes(id);
-ALTER TABLE properties ADD CONSTRAINT properties_produtor_id_fkey FOREIGN KEY (produtor_id) REFERENCES public.produtores(id);
-ALTER TABLE sales ADD CONSTRAINT fk_sales_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
-ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
+ALTER TABLE animal_costs ADD CONSTRAINT fk_animal_costs_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE animal_events ADD CONSTRAINT animal_events_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE animal_events ADD CONSTRAINT animal_events_evento_anterior_id_fkey FOREIGN KEY (evento_anterior_id) REFERENCES animal_events(id);
+ALTER TABLE animal_movements ADD CONSTRAINT fk_animal_movements_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE animal_photos ADD CONSTRAINT fk_animal_photos_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE animals ADD CONSTRAINT animals_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
+ALTER TABLE animals ADD CONSTRAINT animals_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_mae FOREIGN KEY (mae_uuid) REFERENCES animals(uuid);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_pai FOREIGN KEY (pai_uuid) REFERENCES animals(uuid);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_parto FOREIGN KEY (parto_id) REFERENCES partos(id);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_prop_nascimento FOREIGN KEY (propriedade_nascimento_id) REFERENCES properties(id);
+ALTER TABLE animals ADD CONSTRAINT fk_animals_property FOREIGN KEY (property_id) REFERENCES properties(id);
+ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id);
+ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_proprietario_id_fkey FOREIGN KEY (proprietario_id) REFERENCES produtores(id);
+ALTER TABLE evento_sincronizacao ADD CONSTRAINT evento_sincronizacao_evento_id_fkey FOREIGN KEY (evento_id) REFERENCES animal_events(id);
+ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
+ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE lotes ADD CONSTRAINT fk_lotes_property FOREIGN KEY (property_id) REFERENCES properties(id);
+ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE medications ADD CONSTRAINT medications_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE movimentacao_animais ADD CONSTRAINT movimentacao_animais_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE movimentacao_animais ADD CONSTRAINT movimentacao_animais_movimentacao_id_fkey FOREIGN KEY (movimentacao_id) REFERENCES movimentacoes(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_propriedade_origem_id_fkey FOREIGN KEY (propriedade_origem_id) REFERENCES properties(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_titular_destino_id_fkey FOREIGN KEY (titular_destino_id) REFERENCES produtores(id);
+ALTER TABLE movimentacoes ADD CONSTRAINT movimentacoes_titular_origem_id_fkey FOREIGN KEY (titular_origem_id) REFERENCES produtores(id);
+ALTER TABLE partos ADD CONSTRAINT partos_mae_uuid_fkey FOREIGN KEY (mae_uuid) REFERENCES animals(uuid);
+ALTER TABLE partos ADD CONSTRAINT partos_propriedade_id_fkey FOREIGN KEY (propriedade_id) REFERENCES properties(id);
+ALTER TABLE produtores ADD CONSTRAINT produtores_organizacao_id_fkey FOREIGN KEY (organizacao_id) REFERENCES organizacoes(id);
+ALTER TABLE properties ADD CONSTRAINT properties_produtor_id_fkey FOREIGN KEY (produtor_id) REFERENCES produtores(id);
+ALTER TABLE sales ADD CONSTRAINT fk_sales_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 
 -- Índices (fora das constraints)
 CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_uuid);
@@ -608,6 +608,7 @@ CREATE INDEX IF NOT EXISTS idx_weighings_date ON weighings USING btree (weigh_da
 CREATE OR REPLACE FUNCTION fn_recusa_alteracao()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'pg_catalog', 'public'
 AS $function$
 BEGIN
     RAISE EXCEPTION
@@ -617,41 +618,13 @@ END;
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION get_current_user_role()
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-    user_role TEXT;
-BEGIN
-    SELECT role INTO user_role
-    FROM public.profiles
-    WHERE id = auth.uid();
-    
-    RETURN COALESCE(user_role, 'usuario');
-END;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION is_admin_or_gestor()
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-BEGIN
-    RETURN public.get_current_user_role() IN ('admin', 'gestor');
-END;
-$function$
-;
-
 -- Triggers
 -- Sem eles, `animal_events` e `audit_logs` deixam de ser
 -- append-only (PNIB §6.3 e §14.1).
 DROP TRIGGER IF EXISTS trg_eventos_imutavel ON animal_events;
-CREATE TRIGGER trg_eventos_imutavel BEFORE DELETE OR UPDATE ON animal_events FOR EACH ROW EXECUTE FUNCTION public.fn_recusa_alteracao();
+CREATE TRIGGER trg_eventos_imutavel BEFORE DELETE OR UPDATE ON animal_events FOR EACH ROW EXECUTE FUNCTION fn_recusa_alteracao();
 DROP TRIGGER IF EXISTS trg_audit_imutavel ON audit_logs;
-CREATE TRIGGER trg_audit_imutavel BEFORE DELETE OR UPDATE ON audit_logs FOR EACH ROW EXECUTE FUNCTION public.fn_recusa_alteracao();
+CREATE TRIGGER trg_audit_imutavel BEFORE DELETE OR UPDATE ON audit_logs FOR EACH ROW EXECUTE FUNCTION fn_recusa_alteracao();
 DROP TRIGGER IF EXISTS trg_evsinc_imutavel ON evento_sincronizacao;
-CREATE TRIGGER trg_evsinc_imutavel BEFORE DELETE OR UPDATE ON evento_sincronizacao FOR EACH ROW EXECUTE FUNCTION public.fn_recusa_alteracao();
+CREATE TRIGGER trg_evsinc_imutavel BEFORE DELETE OR UPDATE ON evento_sincronizacao FOR EACH ROW EXECUTE FUNCTION fn_recusa_alteracao();
 
