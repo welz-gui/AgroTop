@@ -64,8 +64,8 @@ pelo mantenedor — **6 telas em 2026-08-04**: nascimento, brincos, GTA, pendên
 
 | 1 | [0029](0029-escore-de-conformidade.md) — escore de conformidade PNIB 🇧🇷 | `feat/escore-conformidade-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
 | 2 | [0028](0028-geometria-lotacao-e-sobreposicao.md) — lotação e sobreposição 🏗️ | `feat/geometria-lotacao-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
-| 3 | [0030](0030-importacao-de-lote-de-brincos.md) — leitura de arquivo de brincos 🇧🇷 | `feat/arquivo-lote-brincos` | 🔍 em revisão — [#90](https://github.com/welz-gui/AgroTop/pull/90) | agente | 2026-08-04 |
-| 4 | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | `feat/mapa-de-conformidade` | 🔍 em revisão — [#89](https://github.com/welz-gui/AgroTop/pull/89) | agente | 2026-08-04 |
+| — | [0030](0030-importacao-de-lote-de-brincos.md) — leitura de arquivo de brincos 🇧🇷 | — | ✅ [#90](https://github.com/welz-gui/AgroTop/pull/90) | | 2026-08-05 |
+| 4 | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | `feat/mapa-de-conformidade-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
 | 5 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
 | 6 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema (destravada) | `feat/hex-para-tokens` | 🟢 livre | — | — |
 
@@ -231,9 +231,9 @@ referência (golden), ou uma extração dos hex de `app.py` comparada token a to
 
 ### 🔁 O que significa "retrabalho"
 
-Duas specs voltaram à fila em 2026-08-05 depois de a PR ser **fechada com defeito
-confirmado**: a [0028](0028-geometria-lotacao-e-sobreposicao.md) e a
-[0029](0029-escore-de-conformidade.md).
+Três specs voltaram à fila em 2026-08-05 depois de a PR ser **fechada com defeito
+confirmado**: a [0028](0028-geometria-lotacao-e-sobreposicao.md), a
+[0029](0029-escore-de-conformidade.md) e a [0032](0032-mapa-de-conformidade.md).
 
 **Elas não são tarefas novas e não devem ser tratadas como tais.** Cada uma ganhou uma
 seção **"O defeito da primeira tentativa"** com a reprodução exata do erro e o teste que
@@ -246,10 +246,14 @@ ligada à PR fechada, para o histórico não sumir; se a spec ainda apontasse pa
 protocolo de "branch existe = tarefa tomada" acusaria a tarefa como ocupada e ninguém a
 pegaria nunca.
 
-**Uma lição vale para as duas, e não é sobre geometria nem sobre escore:** as duas
-entregas **passaram em todos os critérios de aceite** e ainda assim estavam erradas. O
-critério de aceite prova o que alguém pensou em perguntar. Quando você terminar, procure o
-caso que a spec **não** menciona — e se achar, escreva o teste antes de abrir o PR.
+**Uma lição vale para as três, e não é sobre geometria, escore nem documentação:** as
+três entregas **passaram em todos os critérios de aceite** e ainda assim estavam erradas.
+O critério de aceite prova o que alguém pensou em perguntar. Quando você terminar, procure
+o caso que a spec **não** menciona — e se achar, escreva o teste antes de abrir o PR.
+
+A 0032 é a mais desconfortável das três: o defeito era **exatamente o que a spec avisava
+em letras garrafais** que não podia acontecer. Ler a proibição não basta; é preciso
+conferir a própria entrega contra ela antes de abrir o PR.
 
 ---
 
