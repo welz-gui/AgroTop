@@ -87,4 +87,21 @@ CREATE TRIGGER trg_evsinc_imutavel
     BEFORE UPDATE OR DELETE ON evento_sincronizacao
     FOR EACH ROW EXECUTE FUNCTION fn_recusa_alteracao();
 
+-- ── RLS: a tabela nasce fechada ─────────────────────────────────────────────
+-- Sem estas duas linhas, `evento_sincronizacao` entraria em produção legível e
+-- gravável pelo papel `anon` via PostgREST — que é exatamente o que o linter do
+-- Supabase acusou em 2026-08-05 nas onze tabelas criadas pelas migrations 0002
+-- a 0012. Todas as onze foram criadas assim, uma a uma, porque o passo não
+-- estava no checklist. Esta seria a décima segunda.
+--
+-- Sem política nenhuma, de propósito: RLS ligado e zero políticas = negar tudo
+-- para quem não tem BYPASSRLS. O app conecta como `postgres`, que tem, e não
+-- usa PostgREST — o acesso é `_conn()` por DATABASE_URL (R1).
+--
+-- O REVOKE não é redundante: TRUNCATE é privilégio de tabela e **não passa por
+-- RLS**. Hoje o PostgREST não o expõe por HTTP, mas manter o grant é apostar
+-- que essa superfície nunca vai crescer.
+ALTER TABLE evento_sincronizacao ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON evento_sincronizacao FROM anon, authenticated;
+
 COMMIT;
