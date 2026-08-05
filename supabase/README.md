@@ -35,6 +35,8 @@ use apenas o baseline — não é preciso reproduzir a sequência histórica.
 ## Ao alterar o schema
 
 1. Crie a migration na nuvem (Supabase → SQL Editor, ou MCP `apply_migration`).
+   **Tabela nova leva RLS na mesma migration** — ver a seção abaixo; não é opcional
+   e não é para depois.
 2. Ajuste o DDL de `init_db()` em `database.py` para refletir a mesma mudança —
    **as duas pontas precisam andar juntas**, é exatamente aí que a divergência nasce.
 3. Regenere o baseline e o retrato:
@@ -55,6 +57,34 @@ use apenas o baseline — não é preciso reproduzir a sequência histórica.
 
 O passo 5 falha se você esquecer o passo 2 — é para isso que os guardas de
 `tests/test_schema.py` existem.
+
+### 🔒 Tabela nova nasce com RLS ligado
+
+Toda tabela criada no schema `public` fica **exposta ao PostgREST**, e o papel `anon`
+recebe `SELECT/INSERT/UPDATE/DELETE/TRUNCATE` nela por padrão do Supabase. Sem RLS, a
+única coisa entre um estranho e os dados é o sigilo de uma chave que foi **projetada para
+ser pública**.
+
+Toda migration que cria tabela termina com:
+
+```sql
+ALTER TABLE <tabela> ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON <tabela> FROM anon, authenticated;
+```
+
+**Sem política nenhuma, de propósito.** RLS ligado e zero políticas = negar tudo para quem
+não tem `BYPASSRLS`. O app conecta como `postgres`, que tem, e não usa PostgREST — o
+acesso é `_conn()` por `DATABASE_URL` (R1). Política só entra se um dia existir consumidor
+que precise dela.
+
+O `REVOKE` não é redundante: **`TRUNCATE` é privilégio de tabela e não passa por RLS**.
+
+*Histórico: em 2026-08-05 o linter do Supabase acusou `rls_disabled_in_public` em **onze**
+tabelas — exatamente as criadas pelas migrations 0002 a 0012. Nenhuma foi decisão; todas
+foram o mesmo passo faltando, repetido onze vezes, porque não estava escrito aqui. A
+migration 0013 quase fez a décima segunda. A dívida nº 10 do ROADMAP já dizia que o
+baseline não cobre RLS — e o buraco abriu assim mesmo, porque documentar um risco não o
+elimina; escrevê-lo no passo que a pessoa executa, sim.*
 
 ### Coluna nova: no `CREATE TABLE`, não só no `_migrate`
 
@@ -96,6 +126,20 @@ continua ativa — inclusive que a flag vence uma `DATABASE_URL` presente.
 Não inclua `DATABASE_URL` em mensagens de teste ou log: ela contém a senha do banco.
 
 ## Histórico de decisões aplicadas
+
+- **`evento_sincronizacao` criada** (`migrations/0013_fila_de_sincronizacao.sql`,
+  [ADR 0005](../docs/adr/0005-fila-de-sincronizacao.md)). Aditiva: uma tabela nova,
+  nenhuma linha existente tocada. Tira a fila de sincronização (§10.3) de dentro de
+  `animal_events`, que continua **estritamente** append-only —
+  `status_sincronizacao` e `identificador_oficial` viram colunas legadas, congeladas
+  no nascimento do evento.
+  ⚠️ **Pendente de aplicação na nuvem no momento do commit.** O worktree do agente
+  não alcança produção (R29), então o passo 1 deste README não foi executado e o
+  baseline e o retrato foram escritos à mão, no formato que o gerador produz. Antes
+  de mesclar: aplicar a 0013 no Supabase, rodar
+  `python tools/dump_schema_nuvem.py --baseline` e conferir que
+  `git diff docs/ supabase/migrations/0000_baseline_producao.sql` sai **vazio** — se
+  não sair, a verdade é o que a nuvem devolveu.
 
 - **`profiles` removida** de produção em 2026-07-30
   (`migrations/0001_drop_profiles.sql`). Era resíduo do app mobile obsoleto, com PK

@@ -191,6 +191,23 @@ CREATE TABLE IF NOT EXISTS dispositivos (
     CONSTRAINT dispositivos_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE IF NOT EXISTS evento_sincronizacao (
+    id bigserial,
+    evento_id bigint NOT NULL,
+    sistema text DEFAULT 'oficial'::text NOT NULL,
+    situacao text NOT NULL,
+    protocolo text,
+    mensagem text,
+    observacoes text,
+    anexos jsonb,
+    usuario text,
+    conferido_por text,
+    ocorrido_em timestamp with time zone NOT NULL,
+    registrado_em timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT evento_sincronizacao_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE IF NOT EXISTS feeding_checks (
     id bigserial,
     plan_id bigint,
@@ -523,6 +540,7 @@ ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid
 ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
 ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES public.properties(id);
 ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_proprietario_id_fkey FOREIGN KEY (proprietario_id) REFERENCES public.produtores(id);
+ALTER TABLE evento_sincronizacao ADD CONSTRAINT evento_sincronizacao_evento_id_fkey FOREIGN KEY (evento_id) REFERENCES public.animal_events(id);
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.feeding_plans(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES public.insumos(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES public.lotes(id);
@@ -565,6 +583,8 @@ CREATE INDEX IF NOT EXISTS idx_disp_animal ON dispositivos USING btree (animal_u
 CREATE INDEX IF NOT EXISTS idx_disp_lote ON dispositivos USING btree (lote);
 CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos USING btree (status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_disp_visual_ativo ON dispositivos USING btree (codigo_visual) WHERE ((codigo_visual IS NOT NULL) AND (status <> ALL (ARRAY['inutilizado'::text, 'devolvido'::text, 'cancelado'::text])));
+CREATE INDEX IF NOT EXISTS idx_evsinc_evento ON evento_sincronizacao USING btree (evento_id, sistema, id DESC);
+CREATE INDEX IF NOT EXISTS idx_evsinc_situacao ON evento_sincronizacao USING btree (situacao);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
 CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);
@@ -632,4 +652,6 @@ DROP TRIGGER IF EXISTS trg_eventos_imutavel ON animal_events;
 CREATE TRIGGER trg_eventos_imutavel BEFORE DELETE OR UPDATE ON animal_events FOR EACH ROW EXECUTE FUNCTION public.fn_recusa_alteracao();
 DROP TRIGGER IF EXISTS trg_audit_imutavel ON audit_logs;
 CREATE TRIGGER trg_audit_imutavel BEFORE DELETE OR UPDATE ON audit_logs FOR EACH ROW EXECUTE FUNCTION public.fn_recusa_alteracao();
+DROP TRIGGER IF EXISTS trg_evsinc_imutavel ON evento_sincronizacao;
+CREATE TRIGGER trg_evsinc_imutavel BEFORE DELETE OR UPDATE ON evento_sincronizacao FOR EACH ROW EXECUTE FUNCTION public.fn_recusa_alteracao();
 

@@ -35,6 +35,10 @@ class _BloqueiaStreamlit(MetaPathFinder):
 def _schema_sqlite_novo():
     """Cria um SQLite do zero via init_db() e devolve (módulo, caminho, colunas)."""
     sys.meta_path.insert(0, _BloqueiaStreamlit())
+    # O estado de import é global: o que este teste tira de `sys.modules` some
+    # para TODA a suíte. Guardar antes é o que permite devolver depois.
+    salvos = {k: v for k, v in sys.modules.items() if k.startswith("streamlit")}
+    salvos["database"] = sys.modules.get("database")
     try:
         for m in [k for k in list(sys.modules) if k.startswith("streamlit")]:
             del sys.modules[m]
@@ -51,6 +55,19 @@ def _schema_sqlite_novo():
     finally:
         sys.meta_path[:] = [f for f in sys.meta_path
                             if not isinstance(f, _BloqueiaStreamlit)]
+        # Devolve `database` e `streamlit` como estavam. Sem isto, todo módulo
+        # de teste que rode DEPOIS deste continua apontando para o `database`
+        # antigo enquanto o `streamlit` do processo é outro — e o cache passa a
+        # tentar picklar `sqlite3.Row`, quebrando testes que nada têm a ver com
+        # schema. Ficou latente porque nenhum módulo existente vinha depois de
+        # `test_schema` na ordem alfabética; o primeiro a vir quebrou.
+        for m in [k for k in list(sys.modules) if k.startswith("streamlit")]:
+            del sys.modules[m]
+        for nome, modulo in salvos.items():
+            if modulo is not None:
+                sys.modules[nome] = modulo
+            else:
+                sys.modules.pop(nome, None)
 
 
 def _colunas(caminho):

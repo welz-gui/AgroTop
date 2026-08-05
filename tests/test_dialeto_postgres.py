@@ -109,6 +109,109 @@ class TestDialetoPostgres(unittest.TestCase):
             """
         )
 
+    def test_fila_de_sincronizacao_drena(self):
+        """ADR 0005 — o mesmo cenário do SQLite, no dialeto que vai para produção.
+
+        Interessa aqui o que só o Postgres exercita: `bigserial`, `timestamptz`
+        voltando como `datetime` (normalizado pelo repositório) e a subconsulta
+        `MAX(id)` por par (evento, sistema).
+        """
+        self._executar(
+            """
+            import uuid
+
+            import database as db
+            from repositories import eventos
+
+            assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
+            db.init_db()
+            animal_id = "SY" + uuid.uuid4().hex[:10]
+            db.add_animal(
+                animal_id, "Nelore", "F", None, "2026-08-01",
+                280.0, 480.0, 0.0, None, None,
+            )
+            animal_uuid = db.get_animal(animal_id)["uuid"]
+            evento_id = eventos.do_animal(animal_uuid)[0]["id"]
+
+            antes = eventos.contar_pendentes()
+            assert antes > 0, "nenhum evento na fila para exercitar o cenário"
+
+            eventos.registrar_situacao(evento_id, "enviado", usuario="CI")
+            eventos.registrar_situacao(evento_id, "rejeitado", usuario="CI")
+            assert eventos.contar_pendentes() == antes, "rejeitado saiu da fila"
+
+            r = eventos.marcar_sincronizado(
+                [evento_id], protocolo="CI-1", usuario="CI")
+            assert r["ok"], r
+            assert eventos.contar_pendentes() == antes - 1, "a fila não drenou"
+
+            atual = eventos.situacao_atual(evento_id)["oficial"]
+            assert atual["situacao"] == "aceito", atual
+            assert atual["protocolo"] == "CI-1", atual
+            assert isinstance(atual["registrado_em"], str), (
+                "timestamptz não foi normalizado para texto ISO")
+            assert len(eventos.historico_de_sincronizacao(evento_id)) == 3
+            """
+        )
+
+    def test_evento_sincronizacao_recusa_update_e_delete(self):
+        """A tabela nova é append-only como as outras duas (ADR 0005)."""
+        self._executar(
+            """
+            import uuid
+
+            import psycopg2
+
+            import database as db
+            from repositories import eventos
+
+            assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
+            db.init_db()
+            animal_id = "SZ" + uuid.uuid4().hex[:10]
+            db.add_animal(
+                animal_id, "Nelore", "M", None, "2026-08-01",
+                300.0, 500.0, 0.0, None, None,
+            )
+            animal_uuid = db.get_animal(animal_id)["uuid"]
+            evento_id = eventos.do_animal(animal_uuid)[0]["id"]
+            eventos.registrar_situacao(evento_id, "enviado", usuario="CI")
+
+            with db._conn() as con:
+                linha = con.execute(
+                    "SELECT id FROM evento_sincronizacao WHERE evento_id=?",
+                    (evento_id,),
+                ).fetchone()
+            assert linha is not None
+
+            for sql in (
+                "UPDATE evento_sincronizacao SET situacao='aceito' WHERE id=?",
+                "DELETE FROM evento_sincronizacao WHERE id=?",
+            ):
+                try:
+                    with db._conn() as con:
+                        con.execute(sql, (linha["id"],))
+                except psycopg2.Error:
+                    pass
+                else:
+                    raise AssertionError(f"gatilho append-only aceitou: {sql}")
+
+            # E o evento em si continua intocável, inclusive na coluna legada.
+            try:
+                with db._conn() as con:
+                    con.execute(
+                        "UPDATE animal_events SET status_sincronizacao='sincronizado' "
+                        "WHERE id=?",
+                        (evento_id,),
+                    )
+            except psycopg2.Error:
+                pass
+            else:
+                raise AssertionError(
+                    "UPDATE de status_sincronizacao foi aceito — a exceção "
+                    "recusada pelo ADR 0005 entrou por alguma porta")
+            """
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

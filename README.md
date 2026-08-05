@@ -90,6 +90,7 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
 |---|---|---|
 | `animal_events` | linha do tempo do animal, **append-only por gatilho** | §6 |
 | `audit_logs` | quem mudou o quê, quando, com que autorização | §14 |
+| `evento_sincronizacao` | o que já foi comunicado ao sistema oficial, **também append-only** | §10 |
 | `properties` | Organização → Produtor → Propriedade | §3 |
 | `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
 | `dispositivos` | estoque de brincos, 12 estados, conferência visual×eletrônico | §5 |

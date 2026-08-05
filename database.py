@@ -705,6 +705,10 @@ def init_db() -> None:
                 observacoes         TEXT,
                 documento           TEXT,
                 anexos              TEXT,     -- JSON; jsonb no Postgres
+                -- ⚠️ LEGADAS (ADR 0005). Ficam porque o §6.2 as prevê, mas são o
+                -- estado de NASCIMENTO do evento, congelado — a linha é imutável,
+                -- então nunca mudam. Quem responde "já foi comunicado?" é
+                -- `evento_sincronizacao`, logo abaixo. Não use em predicado novo.
                 status_sincronizacao TEXT NOT NULL DEFAULT 'pendente',
                 identificador_oficial TEXT,   -- devolvido pelo sistema oficial
                 versao              INTEGER NOT NULL DEFAULT 1,
@@ -734,6 +738,54 @@ def init_db() -> None:
             BEGIN
                 SELECT RAISE(ABORT,
                     'animal_events e append-only (PNIB 6.3): evento nao se apaga');
+            END;
+
+            -- ADR 0005 — §10.3: a fila de sincronização com os sistemas oficiais.
+            --
+            -- Está FORA de `animal_events` de propósito. O §10.2 manda manter a
+            -- camada de integração fora do núcleo; o §10.3 pede catorze
+            -- situações, não uma bandeira; e uma exceção no gatilho só se
+            -- escreveria, no SQLite, como `BEFORE UPDATE OF <as outras 19
+            -- colunas>` — lista de permissão por omissão, em que toda coluna
+            -- futura nasceria mutável. Ver docs/adr/0005-fila-de-sincronizacao.md.
+            --
+            -- Append-only também: tentativa de envio que aconteceu não
+            -- desacontece. A situação vigente de um par (evento, sistema) é a
+            -- ÚLTIMA linha; não há coluna "atual" para divergir do histórico.
+            CREATE TABLE IF NOT EXISTS evento_sincronizacao (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                evento_id      INTEGER NOT NULL,
+                -- §10.1 prevê vários destinos. 'oficial' é neutro de propósito:
+                -- não presume qual sistema virá primeiro (§23).
+                sistema        TEXT NOT NULL DEFAULT 'oficial',
+                situacao       TEXT NOT NULL,   -- §10.3, validada em services/
+                protocolo      TEXT,            -- §10.4 registro manual
+                mensagem       TEXT,            -- retorno do sistema
+                observacoes    TEXT,            -- texto de quem operou
+                anexos         TEXT,            -- JSON; jsonb no Postgres
+                usuario        TEXT,
+                conferido_por  TEXT,            -- §10.4 dupla conferência
+                ocorrido_em    TEXT NOT NULL,
+                registrado_em  TEXT NOT NULL,
+                created_at     TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (evento_id) REFERENCES animal_events(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_evsinc_evento
+                ON evento_sincronizacao (evento_id, sistema, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_evsinc_situacao
+                ON evento_sincronizacao (situacao);
+
+            CREATE TRIGGER IF NOT EXISTS trg_evsinc_sem_update
+            BEFORE UPDATE ON evento_sincronizacao
+            BEGIN
+                SELECT RAISE(ABORT,
+                    'evento_sincronizacao e append-only (PNIB 10.2): registre outra transicao');
+            END;
+            CREATE TRIGGER IF NOT EXISTS trg_evsinc_sem_delete
+            BEFORE DELETE ON evento_sincronizacao
+            BEGIN
+                SELECT RAISE(ABORT,
+                    'evento_sincronizacao e append-only (PNIB 10.2): transicao nao se apaga');
             END;
 
             -- ADR 0004 · etapa B2 — §14.1: trilha de auditoria.

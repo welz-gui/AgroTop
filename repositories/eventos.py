@@ -1,9 +1,12 @@
-"""Eventos do animal e trilha de auditoria (ADR 0004 · etapa B2).
+"""Eventos, sincronização e trilha de auditoria (ADR 0004 · B2 · ADR 0005).
 
-Duas tabelas append-only, com gatilhos no banco que recusam `UPDATE` e `DELETE`:
+Três tabelas append-only, com gatilhos no banco que recusam `UPDATE` e `DELETE`:
 
 - `animal_events` — §6 do PNIB. A espinha da rastreabilidade. Evento confirmado
   não se corrige: gera-se outro apontando para ele (§6.3).
+- `evento_sincronizacao` — §10.3. O que já foi comunicado ao sistema oficial.
+  Fica fora de `animal_events` por decisão do ADR 0005 (§10.2 manda manter a
+  camada de integração fora do núcleo).
 - `audit_logs` — §14.1. Quem mudou o quê, quando, de onde, com que autorização.
 
 **Adoção incremental** (decisão do ADR 0004): por ora os eventos são
@@ -11,12 +14,20 @@ Duas tabelas append-only, com gatilhos no banco que recusam `UPDATE` e `DELETE`:
 deles é passo posterior — fazer as duas coisas de uma vez seria reescrever o
 sistema num salto.
 
+⚠️ `animal_events.status_sincronizacao` e `animal_events.identificador_oficial`
+são **legadas** (ADR 0005): a linha é imutável, então elas guardam o estado de
+nascimento do evento e nunca mudam. Este módulo é o único lugar que pode
+mencioná-las, e nenhum predicado novo deve usá-las — quem responde "já foi
+comunicado?" é `evento_sincronizacao`.
+
 Camada de dados (ROADMAP R1/R9): aqui mora o SQL, e só aqui.
 """
 
 import json
 from datetime import datetime, timezone
 from typing import Optional
+
+from services import sincronizacao as sinc
 
 from .conexao import _conn, _writes
 
@@ -193,16 +204,189 @@ def do_animal(animal_uuid: str, *, tipo: Optional[str] = None) -> list[dict]:
         return [_normalizar(r) for r in con.execute(sql, args).fetchall()]
 
 
-def pendentes_de_sincronizacao(limite: int = 200) -> list[dict]:
-    """Eventos que ainda não foram aceitos pelo sistema oficial.
+# ─── Fila de sincronização (§10.3 · ADR 0005) ────────────────────────────────
+#
+# A situação vigente de um par (evento, sistema) é a ÚLTIMA linha registrada.
+# Não há coluna "atual" — coluna atual poderia divergir do histórico, e é
+# justamente a divergência entre "o que dizem que aconteceu" e "o que
+# aconteceu" que uma base de rastreabilidade não pode admitir.
+#
+# Um evento está EM ABERTO se: (a) nunca foi encaminhado a sistema nenhum, ou
+# (b) a última transição de algum sistema não é resolvida. Aceito num destino e
+# rejeitado noutro continua pendente — o dever de comunicar é por destino.
+_MARCAS_RESOLVIDAS = ",".join("?" for _ in sinc.RESOLVIDAS)
 
-    Existe desde já porque a fila de sincronização é o que separa "registrei" de
-    "comuniquei" — e o PNIB cobra a segunda.
+_EM_ABERTO = f"""
+    NOT EXISTS (SELECT 1 FROM evento_sincronizacao s WHERE s.evento_id = e.id)
+    OR EXISTS (
+        SELECT 1 FROM evento_sincronizacao s
+         WHERE s.evento_id = e.id
+           AND s.id = (SELECT MAX(s2.id) FROM evento_sincronizacao s2
+                        WHERE s2.evento_id = s.evento_id
+                          AND s2.sistema = s.sistema)
+           AND s.situacao NOT IN ({_MARCAS_RESOLVIDAS}))
+"""
+
+
+@_writes
+def registrar_situacao(evento_id: int, situacao: str, *,
+                       sistema: str = sinc.SISTEMA_PADRAO,
+                       protocolo: Optional[str] = None,
+                       mensagem: str = "",
+                       observacoes: str = "",
+                       anexos=None,
+                       usuario: str = "",
+                       conferido_por: str = "",
+                       ocorrido_em: Optional[str] = None) -> dict:
+    """Acrescenta uma transição de sincronização ao evento (§10.3).
+
+    Nunca altera o evento: `animal_events` continua estritamente imutável
+    (ADR 0005). Esta tabela também é append-only — uma tentativa de envio que
+    aconteceu não desacontece.
+
+    `situacao` é validada contra o §10.3, que é lista fechada. `sistema` **não**
+    é, porque o §10.1 termina em "protocolos privados homologados".
+    """
+    if not sinc.conhecida(situacao):
+        return {"ok": False,
+                "erro": f"Situação de sincronização desconhecida: '{situacao}' (§10.3)."}
+
+    agora = _agora()
+    with _conn() as con:
+        if con.execute("SELECT 1 FROM animal_events WHERE id=?",
+                       (evento_id,)).fetchone() is None:
+            return {"ok": False, "erro": f"Evento {evento_id} não encontrado."}
+
+        con.execute(
+            """INSERT INTO evento_sincronizacao
+               (evento_id,sistema,situacao,protocolo,mensagem,observacoes,
+                anexos,usuario,conferido_por,ocorrido_em,registrado_em)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (evento_id, sistema or sinc.SISTEMA_PADRAO, situacao, protocolo,
+             mensagem or None, observacoes or None, _json(anexos),
+             usuario or None, conferido_por or None,
+             ocorrido_em or agora, agora),
+        )
+    return {"ok": True}
+
+
+@_writes
+def marcar_sincronizado(evento_ids, *,
+                        protocolo: Optional[str] = None,
+                        usuario: str = "",
+                        sistema: str = sinc.SISTEMA_PADRAO,
+                        situacao: str = "aceito",
+                        conferido_por: str = "",
+                        observacoes: str = "") -> dict:
+    """§10.4 — "marcação como comunicado externamente", em lote.
+
+    É o caminho previsto **enquanto não houver API oficial** (§23): lança-se no
+    portal, guarda-se o protocolo, marca-se aqui. `conferido_por` é a dupla
+    conferência que o §10.4 pede; fica vazia se ninguém conferiu, e a ausência é
+    auditável justamente por isso.
+
+    Recusa situação que não tire o evento da fila — quem quer registrar
+    `rejeitado` ou `erro_tecnico` usa `registrar_situacao`, que é onde essa
+    intenção fica explícita.
+    """
+    if not sinc.resolvida(situacao):
+        return {"ok": False,
+                "erro": f"'{situacao}' não encerra a pendência; use "
+                        f"registrar_situacao() para registrá-la."}
+
+    ids = [evento_ids] if isinstance(evento_ids, int) else list(evento_ids)
+    if not ids:
+        return {"ok": False, "erro": "Nenhum evento informado."}
+
+    for eid in ids:
+        r = registrar_situacao(eid, situacao, sistema=sistema,
+                               protocolo=protocolo, usuario=usuario,
+                               conferido_por=conferido_por,
+                               observacoes=observacoes)
+        if not r["ok"]:
+            # Sem gravação parcial silenciosa: o chamador precisa saber que a
+            # lista não foi inteira. As transições já gravadas permanecem —
+            # append-only não se desfaz —, e o erro diz onde parou.
+            return {"ok": False, "erro": r["erro"], "parou_em": eid}
+
+    return {"ok": True, "registrados": len(ids)}
+
+
+def situacao_atual(evento_id: int) -> dict:
+    """Última transição de cada sistema, por sistema. `{}` se nunca foi enviado."""
+    with _conn() as con:
+        linhas = con.execute(
+            """SELECT * FROM evento_sincronizacao s
+                WHERE s.evento_id = ?
+                  AND s.id = (SELECT MAX(s2.id) FROM evento_sincronizacao s2
+                               WHERE s2.evento_id = s.evento_id
+                                 AND s2.sistema = s.sistema)""",
+            (evento_id,)).fetchall()
+    return {r["sistema"]: _normalizar(r) for r in linhas}
+
+
+def historico_de_sincronizacao(evento_id: int) -> list[dict]:
+    """Todas as transições do evento, da mais antiga à mais recente (§10.2).
+
+    É o "log técnico" e a contagem de tentativas que o §10.2 pede — derivados do
+    histórico, não de contador guardado, que poderia mentir.
     """
     with _conn() as con:
         return [_normalizar(r) for r in con.execute(
-            "SELECT * FROM animal_events WHERE status_sincronizacao <> 'sincronizado' "
-            "ORDER BY ocorrido_em LIMIT ?", (limite,)).fetchall()]
+            "SELECT * FROM evento_sincronizacao WHERE evento_id=? ORDER BY id",
+            (evento_id,)).fetchall()]
+
+
+def contar_pendentes_em(con) -> int:
+    """Quantos eventos seguem em aberto — **na conexão do chamador**.
+
+    Existe pelo mesmo motivo de `registrar_em`: quem já está dentro de uma
+    transação não pode abrir outra conexão no meio dela.
+    """
+    return con.execute(
+        f"SELECT count(*) c FROM animal_events e WHERE ({_EM_ABERTO})",
+        list(sinc.RESOLVIDAS)).fetchone()["c"]
+
+
+def contar_pendentes() -> int:
+    with _conn() as con:
+        return contar_pendentes_em(con)
+
+
+def pendentes_de_sincronizacao(limite: int = 200) -> list[dict]:
+    """Eventos que ainda não foram aceitos pelo sistema oficial.
+
+    A fila é o que separa "registrei" de "comuniquei" — e o PNIB cobra a
+    segunda. Cada evento vem com `situacao_sincronizacao`: a última transição
+    em aberto, ou a situação inicial quando nunca houve envio.
+    """
+    with _conn() as con:
+        eventos = [_normalizar(r) for r in con.execute(
+            f"SELECT * FROM animal_events e WHERE ({_EM_ABERTO}) "
+            f"ORDER BY e.ocorrido_em LIMIT ?",
+            list(sinc.RESOLVIDAS) + [limite]).fetchall()]
+
+        if not eventos:
+            return []
+
+        marcas = ",".join("?" for _ in eventos)
+        situacoes = {}
+        for r in con.execute(
+                f"""SELECT s.evento_id, s.situacao FROM evento_sincronizacao s
+                     WHERE s.evento_id IN ({marcas})
+                       AND s.id = (SELECT MAX(s2.id) FROM evento_sincronizacao s2
+                                    WHERE s2.evento_id = s.evento_id
+                                      AND s2.sistema = s.sistema)""",
+                [e["id"] for e in eventos]).fetchall():
+            # Vários sistemas: o que importa é o que ainda prende o evento na
+            # fila, então a situação em aberto vence a resolvida.
+            atual = situacoes.get(r["evento_id"])
+            if atual is None or sinc.resolvida(atual):
+                situacoes[r["evento_id"]] = r["situacao"]
+
+    for e in eventos:
+        e["situacao_sincronizacao"] = situacoes.get(e["id"], sinc.SITUACAO_INICIAL)
+    return eventos
 
 
 # ─── Trilha de auditoria (§14.1) ─────────────────────────────────────────────
