@@ -1,13 +1,13 @@
 # Mapa de conformidade do AgroTop ao PNIB e à regulamentação RS
 
-**Versão:** 2.0  
-**Data de referência:** 05/08/2026  
+**Versão:** 2.1  
+**Data de referência:** 05/08/2026 (revisado após a #98, mesma data)  
 **Documento base:** [`docs/regulatorio/requisitos_sistema_pnib_rs.md`](requisitos_sistema_pnib_rs.md)
 
 ## Resumo executivo
 
-- **`✅ atendido`**: 10
-- **`🟡 parcial`**: 11
+- **`✅ atendido`**: 12
+- **`🟡 parcial`**: 9
 - **`❌ não atendido`**: 1
 - **`⏳ fora de prazo`**: 1
 - **`➖ não se aplica`**: 3
@@ -26,12 +26,12 @@ não atendidas.
 | §3 | Estrutura organizacional e propriedades | ✅ atendido | Onde: `database.py` (`init_db`), `repositories/propriedades.py` (`get`), `services/geometria.py` (`area_hectares`), `app.py`. |
 | §4 | Cadastro individual e identificadores imutáveis | ✅ atendido | Onde: `repositories/animais.py` (`add_animal`), `repositories/identificadores.py` (`aplicar`), `services/identificadores.py` (`validar`), `services/estados_animal.py` (`transicao_permitida`), `app.py`. |
 | §5 | Cadastro e controle de dispositivos de identificação | ✅ atendido | Onde: `repositories/dispositivos.py` (`aplicar`), `services/estados_dispositivo.py` (`transicao_permitida`), `services/dispositivos.py` (`validar_aplicacao`), `app.py`. |
-| §6 | Histórico de eventos e imutabilidade auditável do animal | 🟡 parcial | Os eventos são gravados por `repositories/eventos.py` (`registrar`) e pelos repositórios de nascimentos, movimentações e pesagens. Falta: interface em `app.py` para consultar a linha do tempo do animal. |
+| §6 | Histórico de eventos e imutabilidade auditável do animal | ✅ atendido | Onde: `repositories/eventos.py` (`registrar`, `corrigir`, `do_animal`), `app.py` (`_linha_do_tempo_do_animal`, `_cartao_de_evento`). A correção não sobrescreve — cria evento novo apontando para o original (§6.3). |
 | §7 | Nascimentos e vínculo materno | ✅ atendido | Onde: `repositories/nascimentos.py` (`registrar`), `services/genealogia.py` (`validar_vinculo`), `app.py`. |
 | §8 | Movimentações, vendas, transferências e GTA | ✅ atendido | Onde: `repositories/movimentacoes.py` (`criar`), `services/gta.py` (`validar`), `app.py`. |
 | §9 | Manejo sanitário, vacinação e carência | 🟡 parcial | Onde: `repositories/sanidade.py` (`add_medication`), `services/recomendacoes.py` (`avaliar`). Falta: fluxo de vacinação contra brucelose com evidência individual e integração oficial em `app.py`. |
-| §10 | Integração com sistemas oficiais | 🟡 parcial | Onde: `repositories/eventos.py` (`marcar_sincronizado`), `repositories/eventos.py` (`registrar`). Falta: conectores HTTP/REST homologados para Seapi/RS e PNIB. |
-| §11 | Motor de regras regulatórias configurável | 🟡 parcial | Onde: `services/regras_regulatorias.py` (`avaliar`, `simular`). Falta: interface administrativa para editar e simular regras em `app.py`. |
+| §10 | Integração com sistemas oficiais | 🟡 parcial | Onde: `repositories/eventos.py` (`marcar_sincronizado`, `registrar_situacao`), `app.py` (`page_sincronizacao`, `_sinc_acompanhar`, `_sinc_fechar_em_lote`) — §10.3 e §10.4 (registro manual de protocolo, dupla conferência) atendidos. Falta: §10.1/§10.2, os conectores automáticos por sistema (Seapi/RS, Base Central PNIB, GTA, SISBOV) e a importação/exportação de arquivos de retorno. |
+| §11 | Motor de regras regulatórias configurável | ✅ atendido | Onde: `services/regras_regulatorias.py` (`avaliar`, `simular`), `app.py` (`page_regras`). Não existe editar: só nova versão, com simulação de alcance antes de salvar. |
 | §12 | RFID, leitores e equipamentos | 🟡 parcial | Onde: `services/dispositivos.py` (`expandir_faixa`, `validar_aplicacao`). Falta: integração Bluetooth, USB, serial e offline com equipamentos de campo. |
 | §13 | Aplicativo móvel e funcionamento offline | 🟡 parcial | Onde: `poc/mobile/` e `services/importacao.py` (`parse_pesagens`). Falta: sincronização bidirecional de produção e resolução de conflitos offline. |
 | §14 | Auditoria, integridade e permissões em ações sensíveis | ✅ atendido | Onde: `database.py` (`init_db`), `services/seguranca.py` (`_hash`, `_verify_password`), `services/estados_animal.py` (`transicao_permitida`), `app.py`. |
@@ -50,12 +50,20 @@ não atendidas.
 
 ## Três lacunas prioritárias
 
-1. **§6 — linha do tempo do animal:** sem consulta na interface, o histórico
-   append-only não é auditável pelo operador que precisa conferi-lo.
-2. **§10 — integração oficial:** sem conectores homologados, os registros não
-   chegam aos sistemas públicos nem recebem reconciliação automática.
-3. **§11 — administração das regras:** sem tela de simulação, mudanças de regra
-   não podem ser avaliadas pelos responsáveis antes de entrar em vigor.
+> Revisão de 05/08/2026: a versão anterior listava §6 e §11 aqui. As duas ganharam
+> interface na mesma data (§6 pela PR #98; §11 já a tinha desde a PR #88, e a versão
+> anterior deste mapa não conferiu `app.py` antes de marcar — o mesmo erro que fechou a
+> tentativa anterior desta spec, só que em outra seção).
+
+1. **§10 — integração automática:** o registro manual (§10.3/§10.4) tem tela; os
+   conectores por sistema (§10.1/§10.2) não existem. Enquanto isso, cada comunicação
+   ao órgão depende de alguém lançar no portal e marcar aqui — funciona, mas não
+   escala além do tamanho de operação atual.
+2. **§12 — RFID e equipamentos:** nenhuma linha de código fecha isto sozinha. Depende
+   de leitor em mãos para integrar via Bluetooth/USB/serial — é hardware, não backlog.
+3. **§26 — homologação formal:** o sistema nunca foi submetido à Seapi/RS nem ao MAPA.
+   Todo ✅ deste mapa é "evidência no código", não certificação — é a distinção que a
+   nota de rodapé do resumo executivo existe para não deixar escapar.
 
 ## Limites do mapa
 
