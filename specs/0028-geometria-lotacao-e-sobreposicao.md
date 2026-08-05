@@ -1,8 +1,12 @@
 # Spec 0028 — Lotação e sobreposição de piquetes (função pura)
 
 - **Tipo:** implementação · **Risco:** baixo · **Esforço:** 1–2 dias
-- **Branch:** `feat/geometria-lotacao`
+- **Branch:** `feat/geometria-lotacao-v2` — a `feat/geometria-lotacao` continua no
+  remoto, ligada à PR fechada, e **não** deve ser reaproveitada.
 - **Crie:** `services/lotacao.py` e `tests/test_lotacao.py` — **arquivos novos**
+- **Estado:** 🔁 **retrabalho** — a [PR #82](https://github.com/welz-gui/AgroTop/pull/82)
+  foi fechada com defeito confirmado. Leia a seção **"O defeito da primeira tentativa"**
+  antes de começar: ela não é opcional, é o motivo desta spec estar de volta na fila.
 
 ---
 
@@ -65,6 +69,59 @@ def sobrepostos(piquetes: list[dict]) -> list[dict]:
 
 **Assine exatamente assim.**
 
+## ⛔ O defeito da primeira tentativa (2026-08-05)
+
+A entrega anterior passou nos seis critérios de aceite e **ainda assim estava errada**.
+O defeito não estava coberto por nenhum teste, e é este:
+
+> **`sobrepostos()` projetou cada polígono na zona UTM do próprio centro e depois
+> comparou as geometrias entre si.**
+
+`services/geometria._poligono_projetado` escolhe o CRS a partir do centro do polígono que
+recebe. Dois piquetes em zonas UTM diferentes voltam em **referenciais diferentes** — e
+comparar metros medidos a partir de origens distintas não significa nada. Reprodução:
+
+```
+A em lon -55 (zona 21, EPSG:32721) -> centro métrico (693.388, 6.678.968)
+B em lon -49 (zona 22, EPSG:32722) -> centro métrico (693.388, 6.678.968)
+
+sobrepostos([A, B]) -> [{'a':'A','b':'B','area_sobreposta_ha':106.97,'pct_do_menor':100.0}]
+distância real entre A e B: ~578 km
+```
+
+**100 % de sobreposição entre dois piquetes a 578 km um do outro.**
+
+### Por que isso importa mesmo sendo raro
+
+Numa fazenda só, todos os piquetes caem na mesma zona e o defeito nunca aparece. Mas:
+
+1. As zonas UTM têm 6° de largura e **várias fazendas brasileiras ficam em cima de uma
+   divisa** — em -54° e -48° há divisa, e isso corta MS, MT, RS e PA.
+2. Desde a etapa B4 o sistema é **multi-propriedade** (§3). Comparar piquetes de
+   propriedades diferentes da mesma organização é caso de uso previsto, e propriedades em
+   estados diferentes caem em zonas diferentes.
+
+E o modo de falha é o pior possível: **silencioso e plausível**. Não estoura, não avisa —
+devolve um número com quatro casas decimais que parece resultado de cálculo.
+
+### O que a nova entrega precisa fazer
+
+**Projete todos os polígonos num único CRS**, escolhido uma vez para o conjunto — o do
+centro do primeiro polígono válido, ou o do centro de todos. Diga na docstring qual
+critério usou e por quê.
+
+Se dois polígonos estiverem longe demais para um CRS comum fazer sentido (por exemplo,
+mais de uma zona de distância), **não os compare** e registre isso no retorno. Devolver
+"sem sobreposição" seria a resposta certa pela razão errada, e a próxima pessoa não teria
+como saber a diferença.
+
+### Teste obrigatório
+
+Além dos seis critérios originais, a entrega **só é aceita** com um teste que reproduza o
+caso acima — dois quadrados na mesma latitude, em zonas UTM diferentes, à mesma distância
+do meridiano central de cada uma — e comprove que **não** são reportados como sobrepostos.
+Sem esse teste, o defeito volta na próxima refatoração.
+
 ## Regras que decidem a correção
 
 **Lotação usa peso real, não cabeças.** Vinte bezerros de 200 kg não pesam o mesmo que
@@ -93,6 +150,11 @@ piquete** — e diga isso na docstring, porque é decisão, não detalhe.
 - ❌ Não toque em `app.py`, `database.py`, `repositories/`, `ui/`, nem em módulo existente
   de `services/`.
 - ❌ **Não reimplemente área nem projeção** — importe de `services/geometria.py` (R8).
+  Mas **escolher o CRS do conjunto é decisão desta spec**, não de `geometria.py`: aquele
+  módulo trata um polígono por vez e está correto assim. Se precisar de uma função pública
+  para projetar num CRS dado, **proponha no PR** — a tentativa anterior importou o
+  `_poligono_projetado` privado, e depender de um `_` de outro módulo quebra na primeira
+  refatoração.
 - ❌ Não consulte banco.
 - ❌ Não crie tabela nem migration.
 - ❌ **Não estime capacidade por tipo de pasto.** Exige dado agronômico que o sistema não
