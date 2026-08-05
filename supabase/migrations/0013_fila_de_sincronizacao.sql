@@ -102,6 +102,15 @@ CREATE TRIGGER trg_evsinc_imutavel
 -- RLS**. Hoje o PostgREST não o expõe por HTTP, mas manter o grant é apostar
 -- que essa superfície nunca vai crescer.
 ALTER TABLE evento_sincronizacao ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON evento_sincronizacao FROM anon, authenticated;
+-- `anon` e `authenticated` são papéis do Supabase. Um Postgres puro não os tem
+-- — o CI roda num efêmero, e o ADR 0002 diz que o provedor é substituível.
+-- Travar o nome do papel faria a migration só rodar na nuvem atual, que é o
+-- oposto do que aquele ADR decidiu.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        EXECUTE 'REVOKE ALL ON evento_sincronizacao FROM anon, authenticated';
+    END IF;
+END $$;
 
 COMMIT;
