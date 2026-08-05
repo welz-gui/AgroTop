@@ -4,23 +4,19 @@ Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de ci
 baixo** — a ordem é prioridade, não sugestão.
 
 **Estado em 2026-08-05:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 512 testes ·
-33 tabelas em produção, todas com RLS · integração das telas da Fase B concluída
-pelo mantenedor — **6 telas em 2026-08-04**: nascimento, brincos, GTA, pendências
-§7.3, propriedades com geometria e motor de regras.
+33 tabelas em produção, todas com RLS · **Fase B 100% ligada à interface** (7 de 7 telas,
+2026-08-04 a 2026-08-05) · **3 tarefas na fila**.
 
-> ### ⚠️ O que estas seis specs NÃO cobrem
+> ### ✅ A Fase B fechou — a fila agora é o que resta de verdade delegável
 >
-> A maior pendência do projeto não está nesta fila e não pode estar: **os módulos
-> regulatórios da Fase B existem e quase não têm interface**. Ligar tela é do mantenedor
-> pela R31 — em 2026-08-04 saíram seis telas, e resta uma: a **linha do tempo do
-> animal** (§6). Os eventos são gravados desde o B2; falta mostrá-los.
+> Até 2026-08-05 a maior pendência do projeto não estava nesta fila: os módulos
+> regulatórios da Fase B existiam e não tinham interface. **Isso acabou.** Nenhum
+> repositório da Fase B segue sem tela — a última foi a linha do tempo do animal (§6) com
+> o painel de sincronização (§10.4).
 >
-> ⚠️ **`app.py` está em mudança ativa por causa disso.** Se a sua spec toca `app.py`,
-> conte com rebase — e não reorganize a página `Cadastrar`, que acabou de virar abas.
->
-> Estas seis existem para avançar em frentes que **não colidem** com essa integração. Se
-> você é um agente lendo isto: a fila é o seu escopo, e é legítimo — mas não confunda "a
-> fila está curta" com "falta pouco para o projeto".
+> ⚠️ **`app.py` ainda pode estar em mudança ativa.** Se a sua spec toca `app.py`, confira
+> `git diff --stat origin/main` antes de abrir o PR — várias PRs desta semana precisaram
+> de rebase por terem ficado atrás da `main`, que andou rápido nos últimos dois dias.
 
 > ⚠️ **Este arquivo é visibilidade, não autoridade.** Um arquivo em git **não é um lock**:
 > dois agentes podem lê-lo ao mesmo tempo, ambos verem a mesma tarefa livre e ambos

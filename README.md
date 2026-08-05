@@ -18,29 +18,27 @@ sistema de rastreabilidade com valor regulatório. Ver
 | | |
 |---|---|
 | Produção | Streamlit Community Cloud, deploy a cada push na `main` |
-| Banco | Supabase/PostgreSQL · **32 tabelas, 362 colunas** |
-| Testes | **512**, verdes em SQLite **e** PostgreSQL no CI (~9 min: 6 provas de interface) |
-| Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
-| Migrations | 13, versionadas, com rollback documentado |
+| Banco | Supabase/PostgreSQL · **33 tabelas, 375 colunas**, RLS em 100% |
+| Testes | **512**, verdes em SQLite **e** PostgreSQL no CI (~9 min: 7 provas de interface) |
+| Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
+| Migrations | 14, versionadas, com rollback documentado |
 | Fase A | ✅ concluída — refatoração em camadas |
 | Fase B | ✅ concluída — B1 a B7, fundação regulatória |
-| Fase B na tela | ✅ 6 de 7 — falta a linha do tempo do animal (§6) |
+| Fase B na tela | ✅ **7 de 7 — completa** (2026-08-05) |
 
-### O que a Fase B fez, e o que ainda falta
+### O que a Fase B fez, e como chegou à tela
 
-A fundação regulatória está **em produção e testada**: identidade imutável separada do
-brinco, eventos e auditoria append-only, genealogia, hierarquia de propriedades,
-movimentação com GTA, estoque de dispositivos e motor de regras configurável.
+A fundação regulatória está **em produção, testada e com interface completa**: identidade
+imutável separada do brinco, eventos e auditoria append-only, genealogia, hierarquia de
+propriedades, movimentação com GTA, estoque de dispositivos e motor de regras configurável.
 
-**A interface foi ligada em 2026-08-04**, em seis telas: **nascimento** (§7),
-**estoque de brincos** (§5), **movimentação com GTA** (§8), **pendências de
-conformidade** (§7.3), **propriedades com perímetro** (§3) e **motor de regras** (§11).
+**A interface foi ligada em sete telas**, entre 2026-08-04 e 2026-08-05: **nascimento**
+(§7), **estoque de brincos** (§5), **movimentação com GTA** (§8), **pendências de
+conformidade** (§7.3), **propriedades com perímetro** (§3), **motor de regras** (§11) e,
+por último, a **linha do tempo do animal** (§6) com o **painel de sincronização** (§10.4).
 
-Falta uma: a **linha do tempo do animal** (§6). Os eventos são gravados em toda operação
-desde o B2 — só não há tela que os mostre.
-
-Isso é conformidade de **arquitetura**, não de **uso**. É a maior pendência do projeto, e
-está registrada como tal no [ROADMAP](ROADMAP.md).
+Nenhum repositório da Fase B segue sem tela. Isso era a maior pendência do projeto — deixou
+de ser, e o histórico da virada está no [ROADMAP](ROADMAP.md).
 
 ---
 
@@ -67,7 +65,14 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
   quando há alerta, e confirmação de chegada que registra quem não chegou.
 - **📋 Rebanho** — inventário, ficha individual com curva de peso, histórico sanitário e
   financeiro, e **gestão de identificadores com histórico**: trocar brinco encerra o
-  anterior sem apagá-lo (§4.2.3 do PNIB).
+  anterior sem apagá-lo (§4.2.3 do PNIB). A ficha tem uma aba **🕒 Linha do Tempo** (§6):
+  todo evento gravado sobre o animal, com a diferença entre quando aconteceu e quando foi
+  registrado (§6.2). Não existe editar — só **registrar correção**, que cria outro evento
+  apontando para o original; o original nunca some.
+- **📡 Sincronização** — painel do §10.4 para o que o sistema oficial ainda não confirmou.
+  Duas ações separadas de propósito: **acompanhar** (qualquer situação do §10.3, inclusive
+  as que não resolvem, para o log técnico) e **fechar em lote** (só as que encerram a
+  pendência — oferecer "rejeitado" ali esconderia uma obrigação que continua de pé).
 - **🌿 Lotes / Pastagem** — lotação UA/ha, capacidade, ocupação.
 - **📈 Desempenho** — metas, simulação de terminação, projeção de abate.
 - **💰 Financeiro** — venda por kg/lote/cabeça, custo médio ponderado, breakeven,
@@ -84,17 +89,8 @@ está registrada como tal no [ROADMAP](ROADMAP.md).
   trilha de auditoria.
 - **📄 Relatórios** — CSV, Excel e PDF.
 
-## Fundação regulatória
-
-| Módulo | O que faz | §PNIB |
-|---|---|---|
-| `animal_events` | linha do tempo do animal, **append-only por gatilho** | §6 |
-| `audit_logs` | quem mudou o quê, quando, com que autorização | §14 |
-| `evento_sincronizacao` | o que já foi comunicado ao sistema oficial, **também append-only** | §10 |
-| `properties` | Organização → Produtor → Propriedade | §3 |
-| `movimentacoes` | trânsito entre propriedades, GTA, divergência de recepção | §8 |
-| `dispositivos` | estoque de brincos, 12 estados, conferência visual×eletrônico | §5 |
-| `regras_regulatorias` | regras como **dado**, com vigência e versionamento | §11 |
+> `audit_logs` (§14) segue sem tela própria — é consultado via `db.eventos.trilha()`, hoje
+> só pelo mantenedor, direto no banco. Não é Fase B; fica fora da dívida nº 1.
 
 ---
 

@@ -28,6 +28,7 @@ PROVAS = [
     "tests.ui_pendencias_prova",    # §7.3: prazo futuro não é irregularidade
     "tests.ui_propriedades_prova",  # §3: titular imutável, área calculada
     "tests.ui_regras_prova",        # §11: versão em vez de edição, simular antes
+    "tests.ui_eventos_prova",       # §6/§10: corrigir em vez de editar, fila de sincronização
 ]
 
 

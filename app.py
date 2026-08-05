@@ -24,6 +24,13 @@ from services.geometria import (
     perimetro_metros as geometria_perimetro_m,
     validar as geometria_validar,
 )
+from services.sincronizacao import (
+    SITUACOES as SITUACOES_SINCRONIZACAO,
+    RESOLVIDAS as SITUACOES_RESOLVIDAS,
+    SISTEMAS as SISTEMAS_SINCRONIZACAO,
+    resumo as sincronizacao_resumo,
+    rotulo as sincronizacao_rotulo,
+)
 from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
@@ -506,6 +513,7 @@ def _sidebar():
                 ("🚚","Movimentação","movimentacao",""),
                 ("🏞️","Propriedades","propriedades",""),
                 ("📜","Regras","regras",""),
+                ("📡","Sincronização","sincronizacao",""),
                 ("🌾","Nutrição","nutricao",""),
                 ("💉","Sanitário","sanitario",""),
                 ("🌧️","Clima & Chuva","clima",""),
@@ -1402,6 +1410,133 @@ def _identificadores_do_animal(animal: dict):
             st.rerun()
 
 
+_TIPO_EVENTO_ROTULO = {
+    "nascimento": "Nascimento", "cadastro_inicial": "Cadastro inicial",
+    "identificacao_interna": "Identificação interna",
+    "identificacao_oficial": "Identificação oficial",
+    "aplicacao_dispositivo": "Aplicação de dispositivo",
+    "leitura_conferencia": "Leitura / conferência", "perda_brinco": "Perda de brinco",
+    "dano_dispositivo": "Dano em dispositivo", "substituicao": "Substituição",
+    "retirada_autorizada": "Retirada autorizada",
+    "entrada_propriedade": "Entrada na propriedade",
+    "saida_propriedade": "Saída da propriedade", "venda": "Venda", "compra": "Compra",
+    "transferencia_sem_titularidade": "Transferência (sem titularidade)",
+    "mudanca_titularidade": "Mudança de titularidade",
+    "emissao_gta": "Emissão de GTA", "cancelamento_gta": "Cancelamento de GTA",
+    "chegada_confirmada": "Chegada confirmada", "recusa_recepcao": "Recusa de recepção",
+    "manejo_sanitario": "Manejo sanitário", "vacinacao": "Vacinação",
+    "vacinacao_brucelose": "Vacinação (brucelose)", "teste_sanitario": "Teste sanitário",
+    "tratamento": "Tratamento", "pesagem": "Pesagem", "mudanca_lote": "Mudança de lote",
+    "mudanca_categoria": "Mudança de categoria", "morte": "Morte", "abate": "Abate",
+    "correcao": "Correção", "estorno": "Estorno",
+}
+
+
+def _linha_do_tempo_do_animal(animal: dict):
+    """Histórico completo de eventos do animal (PNIB §6).
+
+    Não se confunde com as abas de peso/sanidade/movimentação acima: aquelas
+    mostram cada operação sob a ótica de quem opera a fazenda. Esta mostra a
+    trilha regulatória — o que foi *registrado como fato*, append-only, com a
+    diferença entre quando aconteceu e quando foi lançado (§6.2).
+
+    Duas decisões que o §6 impõe e que o repositório não pode tomar sozinho:
+
+    - **Não existe editar.** Só "registrar correção", que cria outro evento
+      apontando para o original (§6.3). O original nunca some da tela.
+    - **A diferença entre `ocorrido_em` e `registrado_em` é auditável**, então
+      aparece sempre — inclusive quando é zero, porque zero também é informação.
+    """
+    uuid = animal.get("uuid")
+    if not uuid:
+        st.warning("Este animal ainda não tem identificador interno (uuid).")
+        return
+
+    filtro = st.selectbox(
+        "Filtrar por tipo", ["Todos"] + list(db.eventos.TIPOS),
+        format_func=lambda t: "Todos" if t == "Todos"
+        else _TIPO_EVENTO_ROTULO.get(t, t),
+        key=f"ev_filtro_{uuid}")
+
+    eventos = db.eventos.do_animal(uuid, tipo=None if filtro == "Todos" else filtro)
+    if not eventos:
+        st.info("Nenhum evento registrado" +
+                ("." if filtro == "Todos" else f" do tipo '{filtro}'."))
+        return
+
+    # Quem corrige quem: uma correção aponta pra trás via evento_anterior_id.
+    # Sem isto, o original pareceria a última palavra quando não é.
+    correcoes_de = {}
+    for e in eventos:
+        alvo = e.get("evento_anterior_id")
+        if alvo:
+            correcoes_de.setdefault(alvo, []).append(e)
+
+    for e in eventos:
+        _cartao_de_evento(e, correcoes_de.get(e["id"], []))
+
+
+def _cartao_de_evento(e: dict, correcoes: list[dict]):
+    ocorrido = (e.get("ocorrido_em") or "")[:16].replace("T", " ")
+    registrado = (e.get("registrado_em") or "")[:16].replace("T", " ")
+    atraso = ""
+    try:
+        d1 = datetime.fromisoformat(e["ocorrido_em"])
+        d2 = datetime.fromisoformat(e["registrado_em"])
+        delta = d2 - d1
+        if delta.total_seconds() > 3600:
+            dias = delta.days
+            atraso = (f" · registrado {dias} dia(s) depois" if dias >= 1
+                      else f" · registrado {int(delta.total_seconds()//3600)}h depois")
+    except (ValueError, TypeError, KeyError):
+        pass
+
+    cor = "#fbbf24" if e["tipo"] in ("correcao", "estorno") else "#4ade80"
+    rotulo = _TIPO_EVENTO_ROTULO.get(e["tipo"], e["tipo"])
+
+    with st.container():
+        st.markdown(
+            f'<div class="hist-item" style="border-left-color:{cor}">'
+            f'<b>{rotulo}</b> {"🔺 corrigido depois" if correcoes else ""}<br>'
+            f'<span style="color:#94a3b8;font-size:.82rem">'
+            f'ocorreu: {ocorrido} · registrado: {registrado}{atraso}'
+            f'{"  ·  por: " + e["usuario_registro"] if e.get("usuario_registro") else ""}'
+            f'</span>'
+            + (f'<br><span style="font-size:.85rem">{e["observacoes"]}</span>'
+               if e.get("observacoes") else "")
+            + (f'<br><span style="color:#fbbf24;font-size:.82rem">'
+               f'justificativa: {e["justificativa"]}</span>'
+               if e.get("justificativa") else "")
+            + '</div>', unsafe_allow_html=True)
+
+        for c in correcoes:
+            st.caption(f"↳ corrigido por evento #{c['id']} ({c['ocorrido_em'][:10]}): "
+                       f"{c.get('justificativa', '')}")
+
+        if e["tipo"] not in ("correcao", "estorno"):
+            with st.expander(f"🖊️ Registrar correção do evento #{e['id']}"):
+                st.caption("§6.3: isto NÃO altera o evento acima — ele permanece "
+                           "como está. Cria um evento novo, apontando para este, "
+                           "com o que deveria ter sido registrado.")
+                tipo_corr = st.selectbox(
+                    "Tipo", ["correcao", "estorno"], key=f"corr_tipo_{e['id']}",
+                    format_func=lambda t: "Correção (ajusta o registro)" if t == "correcao"
+                    else "Estorno (desfaz o efeito)")
+                justificativa = st.text_input(
+                    "Justificativa *", key=f"corr_just_{e['id']}").strip()
+                if st.button("Registrar", disabled=not justificativa,
+                             key=f"corr_salvar_{e['id']}"):
+                    r = db.eventos.corrigir(
+                        e["id"], justificativa,
+                        usuario_registro=st.session_state.user["name"],
+                        tipo=tipo_corr)
+                    if r.get("ok"):
+                        db.clear_cache()
+                        st.success("✅ Correção registrada.")
+                        st.rerun()
+                    else:
+                        st.error(f"🚫 {r.get('erro')}")
+
 def page_animal():
     aid=st.session_state.animal_detail
     if not aid: st.warning("Nenhum animal selecionado."); return
@@ -1468,9 +1603,12 @@ def page_animal():
     st.markdown("---")
     _consistencia_regulatoria(animal, movs)
 
-    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id=st.tabs(
+    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id,tl_ev=st.tabs(
         ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto",
-         "🏷️ Identificadores"])
+         "🏷️ Identificadores","🕒 Linha do Tempo"])
+
+    with tl_ev:
+        _linha_do_tempo_do_animal(animal)
 
     with tl_id:
         _identificadores_do_animal(animal)
@@ -4587,6 +4725,140 @@ def _regra_nova():
         else:
             st.error(f"🚫 {res['erro']}")
 
+def page_sincronizacao():
+    """Painel de sincronização com o sistema oficial (PNIB §10.4).
+
+    O §10.2 pede "log técnico e número de tentativas" — vem do histórico de
+    `evento_sincronizacao`, não de contador guardado, que poderia mentir. O
+    §10.4 pede "registro manual de protocolo" e "dupla conferência" **enquanto
+    não houver API** (§23) — hoje. Esta tela é esse "enquanto".
+    """
+    if st.session_state.user["role"] != "admin":
+        st.error("🔒 Acesso restrito ao Administrador."); return
+    st.markdown('<div class="page-title">📡 Sincronização com o Sistema Oficial</div>',
+                unsafe_allow_html=True)
+    st.caption("A fila é o que separa **registrei** de **comuniquei** — e o PNIB cobra "
+               "a segunda (§10). Um evento só some daqui quando alguém confirma que o "
+               "sistema oficial aceitou, cancelou ou não se aplica a ele.")
+
+    pendentes = db.eventos.pendentes_de_sincronizacao(limite=200)
+    c1, c2 = st.columns(2)
+    c1.metric("Eventos pendentes", len(pendentes))
+
+    if not pendentes:
+        st.success("✅ Nenhum evento pendente de comunicação.")
+        return
+
+    resumo = sincronizacao_resumo([e["situacao_sincronizacao"] for e in pendentes])
+    c2.metric("Situações distintas", len(resumo))
+    st.markdown("**Por situação atual**")
+    st.dataframe(
+        pd.DataFrame([{"Situação": sincronizacao_rotulo(s), "Quantidade": n}
+                     for s, n in resumo.items()]),
+        use_container_width=True, hide_index=True)
+
+    t_lista, t_fechar = st.tabs(
+        ["📋 Acompanhar (por evento)", "✅ Marcar como sincronizado (em lote)"])
+
+    with t_lista:
+        _sinc_acompanhar(pendentes)
+    with t_fechar:
+        _sinc_fechar_em_lote(pendentes)
+
+
+def _sinc_acompanhar(pendentes: list[dict]):
+    st.caption("Registra uma transição de qualquer situação do §10.3 — inclusive "
+               "as que NÃO fecham a pendência (enviado, rejeitado, erro técnico). "
+               "É o que dá o histórico técnico que o §10.2 pede.")
+
+    rot = {f"#{e['id']} · {_TIPO_EVENTO_ROTULO.get(e['tipo'], e['tipo'])} · "
+           f"{e['ocorrido_em'][:10]} · atual: {sincronizacao_rotulo(e['situacao_sincronizacao'])}": e
+           for e in pendentes}
+    evento = rot[st.selectbox("Evento", list(rot), key="sinc_ac_evento")]
+
+    c1, c2 = st.columns(2)
+    with c1:
+        situacao = st.selectbox(
+            "Nova situação", list(SITUACOES_SINCRONIZACAO),
+            format_func=sincronizacao_rotulo, key="sinc_ac_situacao")
+    with c2:
+        sistema = st.selectbox("Sistema", list(SISTEMAS_SINCRONIZACAO),
+                               key="sinc_ac_sistema")
+
+    c3, c4 = st.columns(2)
+    with c3:
+        protocolo = st.text_input("Protocolo (se houver)",
+                                  key="sinc_ac_protocolo").strip()
+    with c4:
+        mensagem = st.text_input(
+            "Mensagem do sistema (erro, ressalva)", key="sinc_ac_mensagem").strip()
+
+    if st.button("📝 Registrar transição", key="sinc_ac_salvar"):
+        r = db.eventos.registrar_situacao(
+            evento["id"], situacao, sistema=sistema,
+            protocolo=protocolo or None, mensagem=mensagem,
+            usuario=st.session_state.user["name"])
+        if r.get("ok"):
+            db.clear_cache()
+            st.success("✅ Transição registrada.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('erro')}")
+
+    with st.expander(f"Histórico técnico do evento #{evento['id']}"):
+        hist = db.eventos.historico_de_sincronizacao(evento["id"])
+        if hist:
+            st.dataframe(
+                pd.DataFrame([{"Quando": h["registrado_em"][:16].replace("T", " "),
+                              "Sistema": h["sistema"], "Situação": sincronizacao_rotulo(h["situacao"]),
+                              "Protocolo": h.get("protocolo") or "—",
+                              "Conferido por": h.get("conferido_por") or "—"}
+                             for h in hist]),
+                use_container_width=True, hide_index=True)
+        else:
+            st.caption("Nenhuma transição registrada ainda para este evento.")
+
+
+def _sinc_fechar_em_lote(pendentes: list[dict]):
+    st.caption("Só oferece as situações que **encerram** a pendência (§10.3) — "
+               "registrar aqui uma situação como 'rejeitado' esconderia uma "
+               "obrigação de comunicar que continua de pé; use a aba ao lado.")
+
+    rot = {f"#{e['id']} · {_TIPO_EVENTO_ROTULO.get(e['tipo'], e['tipo'])} · "
+           f"{e['ocorrido_em'][:10]}": e for e in pendentes}
+    escolhidos = st.multiselect("Eventos", list(rot), key="sinc_lote_eventos")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        situacao = st.selectbox(
+            "Situação final", list(SITUACOES_RESOLVIDAS),
+            format_func=sincronizacao_rotulo, key="sinc_lote_situacao")
+    with c2:
+        protocolo = st.text_input("Protocolo (se houver)",
+                                  key="sinc_lote_protocolo").strip()
+
+    conferido_por = st.text_input(
+        "Conferido por", key="sinc_lote_conferido",
+        help="§10.4 pede dupla conferência. Fica em branco se ninguém conferiu — "
+             "e a ausência é auditável, não é erro de preenchimento.").strip()
+
+    if not conferido_por:
+        st.caption("⚠️ Sem conferente informado. Fica registrado assim mesmo.")
+
+    if st.button("✅ Marcar selecionados", type="primary",
+                 disabled=not escolhidos, key="sinc_lote_salvar"):
+        ids = [rot[r]["id"] for r in escolhidos]
+        r = db.eventos.marcar_sincronizado(
+            ids, situacao=situacao, protocolo=protocolo or None,
+            conferido_por=conferido_por, usuario=st.session_state.user["name"])
+        if r.get("ok"):
+            db.clear_cache()
+            st.success(f"✅ {r['registrados']} evento(s) marcado(s) como "
+                       f"{sincronizacao_rotulo(situacao).lower()}.")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('erro')} (parou no evento #{r.get('parou_em')})")
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -4815,6 +5087,7 @@ def main():
         "movimentacao": page_movimentacao,
         "propriedades": page_propriedades,
         "regras":    page_regras,
+        "sincronizacao": page_sincronizacao,
         "nutricao":  page_nutricao,
         "sanitario": page_sanitario,
         "clima":     page_clima,

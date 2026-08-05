@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-05 · Estado: **Fases A e B CONCLUÍDAS · Fase B ligada à interface (6 de 7)** · fila de specs em 3
+Última atualização: 2026-08-05 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** · fila de specs em 3
 
 ---
 
@@ -18,9 +18,9 @@ SQLite para desenvolvimento e teste.
 | Produção | Streamlit Community Cloud, deploy automático a cada push na `main` |
 | Banco | Supabase, projeto `mwjvulwglewoyeximgtv`, plano **free** (sem branches de banco) |
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
-| Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (6 provas de interface + testes de propriedade) |
-| Código | `app.py` (~3.700) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (25) · `ui/` · `tools/` (6) |
-| Integração | **14 de 25 services ligados ao app** · só `eventos` (§6) sem tela |
+| Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
+| Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
+| Integração | **18 de 29 services usados** (29 é novo: 3 chegaram desde ontem, ainda órfãos) · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -810,35 +810,35 @@ Sem assinatura fixada na spec, o resultado não encaixa e o trabalho se perde.
 Revisada em **2026-08-03**, com a Fase B concluída. Fechada só sai daqui pela mão do
 mantenedor, na revisão.
 
-### 🟠 A dívida nº 1 — a Fase B na interface (6 de 7 ligados)
+### 🟢 A dívida nº 1 — a Fase B na interface (7 de 7 ligados) — FECHADA em 2026-08-05
 
-**Era a maior pendência do projeto e deixou de ser em 2026-08-04**, quando seis telas
-foram ligadas em sequência. Um repositório ainda com **zero uso em `app.py`**:
+**Era a maior pendência do projeto.** Sete telas ligadas entre 2026-08-04 e 2026-08-05,
+uma por repositório. Nenhum repositório da Fase B segue sem interface.
 
-| Repositório | O que ainda está invisível | §PNIB |
-|---|---|---|
-| `eventos` | linha do tempo do animal e trilha de auditoria | §6, §14 |
+`eventos` foi a última e a diferente das outras seis: ele **já era usado** — toda operação
+grava evento desde o B2. O que faltava não era ligar o repositório, era **mostrar** o que
+ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
+sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-`eventos` é caso diferente dos outros: ele **é** usado — toda operação grava evento desde
-o B2. O que falta é **mostrá-los**: uma tela que responda "o que aconteceu com este
-animal", e que hoje só existe consultando o banco.
-
-E **sete services órfãos**, entregues por agentes e sem nenhum consumidor: `caixa`,
-`completude`, `dieta`, `gta`, `previsao_estoque`, `projecao`, `rateio`, `rentabilidade`.
-`geometria` saiu da lista em 2026-08-04, ligado pela tela de propriedades.
+Restam **onze services órfãos**, entregues por agentes e sem nenhum consumidor: `caixa`,
+`completude`, `conformidade`, `dieta`, `gta`, `lotacao`, `previsao_estoque`, `projecao`,
+`rateio`, `rentabilidade`, `arquivo_dispositivos`. Os três últimos entraram em 2026-08-05
+(specs 0028-v2, 0029-v2, 0030) — nenhum é Fase B, então ficam fora do escopo desta dívida,
+mas contam para o total: 29 services no diretório, 18 usados.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".
 
-**Ordem de integração, executada em 2026-08-04:** ~~nascimento~~ ✅ →
-~~estoque de brincos~~ ✅ → ~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅
-→ ~~geometria~~ ✅ (na propriedade, §3) → ~~regras configuráveis~~ ✅.
+**Ordem de integração, executada:** ~~nascimento~~ ✅ → ~~estoque de brincos~~ ✅ →
+~~movimentação com GTA~~ ✅ → ~~painel de pendências (§7.3)~~ ✅ → ~~geometria~~ ✅
+(na propriedade, §3) → ~~regras configuráveis~~ ✅ → ~~linha do tempo + sincronização~~ ✅
+(§6 + §10.4).
 
 ⚠️ **A geometria saiu na propriedade, não no piquete.** `properties.poligono` já existia
 e estava vazia; `lotes` **não tem coluna de polígono**, então piquete exigiria migration.
 Fica como trabalho à parte, com o fluxo do [supabase/README.md](supabase/README.md).
 
-#### O que as seis telas ensinaram
+#### O que as sete telas ensinaram
 
 **O trabalho não é "chamar o repositório na tela".** É decidir o que a norma exige da
 **interface** — e essa decisão nunca estava no repositório, nem caberia lá:
@@ -851,15 +851,18 @@ Fica como trabalho à parte, com o fluxo do [supabase/README.md](supabase/README
 | pendências (§7.3) | prazo futuro (2033) não pode parecer irregularidade, e fica **fora** do contador |
 | propriedades (§3) | titular não é editável — mudá-lo é transferência (§8); área é **calculada**, nunca digitada |
 | regras (§11) | não existe "editar": só nova versão; simulação **antes** do botão de salvar |
+| eventos (§6.3) | não existe "editar" um evento: só "registrar correção", que aponta para o original sem apagá-lo |
+| sincronização (§10.3–10.4) | ação em lote só oferece o que **fecha** a pendência; a trilha individual aceita **qualquer** situação, inclusive as que não resolvem |
 
-**Um padrão apareceu três vezes e virou regra prática:** *contador que nunca zera é
-contador que ninguém lê.* Apareceu como acidente na fila de sincronização (dívida nº 4),
-e como escolha evitada nas pendências de 2033 e no alerta de GTA.
+**Um padrão apareceu quatro vezes e virou regra prática:** *contador que nunca zera é
+contador que ninguém lê.* Apareceu como acidente na fila de sincronização (dívida nº 4,
+fechada junto com esta), e como escolha evitada nas pendências de 2033, no alerta de GTA e
+na separação entre "acompanhar" e "fechar" no painel de sincronização.
 
-⚠️ **Custo medido:** a suíte foi de **193 s para 518 s**. As seis provas de interface
-rodam em subprocesso, cada uma levantando o `AppTest` — é o preço de ter prova
-automatizada de que a regra chegou à tela, e nenhum teste de unidade substitui isso.
-Se passar de ~10 min, o caminho é paralelizar os subprocessos, não apagar provas.
+⚠️ **Custo medido:** a suíte foi de 193 s (antes da rodada) para ~282 s no runner externo
+(`test_ui.py` roda as sete provas de interface num subprocesso só, então o tempo delas some
+da contagem externa — 512 testes visíveis, mais as provas dentro do subprocesso). Se passar
+de ~10 min, o caminho é paralelizar os subprocessos, não apagar provas.
 
 ### 🔴 Segurança
 
@@ -876,24 +879,24 @@ usuários de produção e a rotação da senha do Postgres.
    escritas já preenchem; falta o `NOT NULL`. Mesma ordem que funcionou no B1: escrita
    primeiro, restrição depois.
 
-4. **A fila de sincronização não drena** — descoberto em 2026-08-04, ao ligar a tela do
-   §8. `animal_events.status_sincronizacao` nasce `pendente` e **não há como marcá-la
-   como enviada**: `repositories/eventos.py` só oferece leitura, e o gatilho append-only
-   do §6.3 aborta qualquer `UPDATE`. O mesmo vale para `identificador_oficial`, que o
-   §6 descreve como *devolvido pelo sistema oficial* e portanto precisa ser gravável
-   depois. O efeito prático já aparece: o contador nunca zera, então **toda** liberação
-   de saída passa a exigir justificativa (§8.4) por um alerta que não informa nada — e
-   alerta que sempre aparece deixa de ser lido. Duas saídas, e a escolha não é óbvia:
-   tabela de controle à parte (mantém `animal_events` estritamente imutável) ou exceção
-   no gatilho para essas duas colunas. Enquanto não se decide, o alerta é ruído.
+4. ~~**A fila de sincronização não drena.**~~ 🟢 **Fechada em 2026-08-05**, com a tela do
+   §10.4. Descoberta em 2026-08-04 ao ligar a tela do §8: `animal_events.status_sincronizacao`
+   nascia `pendente` e não havia como marcá-la como enviada — o gatilho append-only do
+   §6.3 aborta qualquer `UPDATE`. O contador nunca zerava, então toda liberação de saída
+   passava a exigir justificativa (§8.4) por um alerta que não informava nada.
 
-   ➡️ **Decidido em 2026-08-04 pelo [ADR 0005](docs/adr/0005-fila-de-sincronizacao.md):**
-   tabela de controle à parte (`evento_sincronizacao`), sem exceção nenhuma no gatilho.
-   O mecanismo existe e a fila fecha — mas **a dívida continua aberta**, porque nada a
-   drena sozinha: as APIs do §10.1 não existem e a marcação manual do §10.4
-   (`eventos.marcar_sincronizado`) **ainda não tem tela**. Fechar de verdade é a tela do
-   §10.4, com protocolo, comprovante e dupla conferência. Quem fecha a dívida é o
-   mantenedor, na revisão.
+   [ADR 0005](docs/adr/0005-fila-de-sincronizacao.md) decidiu tabela de controle à parte
+   (`evento_sincronizacao`). Faltava a tela — sem ela, o mecanismo existia e ninguém
+   conseguia usá-lo, o mesmo problema de sempre nesta rodada. `page_sincronizacao` (§10.4)
+   fechou: registro manual de protocolo, dupla conferência opcional (`conferido_por` fica
+   em branco se ninguém conferiu, e a ausência é auditável — não é erro de preenchimento),
+   e duas ações deliberadamente separadas — **acompanhar** (qualquer situação do §10.3,
+   inclusive as que não resolvem, para o log técnico do §10.2) e **fechar em lote** (só as
+   que encerram a pendência, porque oferecer 'rejeitado' ali esconderia uma obrigação que
+   continua de pé).
+
+   ⚠️ **O que ainda não existe é a comunicação automática** — as APIs do §10.1. Esta tela
+   é o "enquanto não houver API" que o §23 prevê, não a integração final.
 
 5. **A adoção de eventos é incremental, por decisão do ADR 0004.** Os eventos são
    *registrados* junto das operações, mas o estado do animal **não é derivado deles**.
