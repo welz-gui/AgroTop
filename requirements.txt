@@ -11,3 +11,4 @@ opencv-python-headless>=4.8.0
 pytesseract>=0.3.10
 pyproj>=3.6.0
 shapely>=2.0.0
+hypothesis>=6.0.0
