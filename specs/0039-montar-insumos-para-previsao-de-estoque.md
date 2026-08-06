@@ -1,11 +1,49 @@
 # Spec 0039 — Montar a lista de insumos que `services/previsao_estoque.py` espera
 
 - **Tipo:** implementação · **Risco:** baixo · **Esforço:** 1-2 dias
-- **Branch:** `feat/montar-insumos-previsao`
+- **Branch:** `feat/montar-insumos-previsao-v2` — a `feat/montar-insumos-previsao` continua
+  no remoto, ligada à PR fechada, e **não** deve ser reaproveitada.
+- **Estado:** 🔁 **retrabalho** — a [PR #101](https://github.com/welz-gui/AgroTop/pull/101)
+  foi fechada com defeito confirmado. Leia **"O defeito da primeira tentativa"** antes de
+  começar.
 - **Crie:** `services/previsao_estoque_adaptador.py` e
   `tests/test_previsao_estoque_adaptador.py` — **arquivos novos**
 
 ---
+
+## ⛔ O defeito da primeira tentativa (2026-08-06)
+
+A entrega implementou `consumo_diario_planejado` quase certa — e errou exatamente o
+ponto que o próprio docstring do contrato citava: *"Frequência desconhecida: mesma
+decisão tomada na spec 0037"*. A spec 0037 manda **pular** o plano quando a frequência
+não está no vocabulário conhecido. A entrega fez o oposto: qualquer frequência
+desconhecida cai num `.get(freq_str, 1.0)`, ou seja, **é tratada como diária**.
+
+Reprodução:
+
+```python
+insumos = {1: {"unit": "kg"}}
+planos = [{"insumo_id": 1, "quantity": 14, "unit": "kg", "frequency": "quinzenal"}]
+consumo_diario_planejado(insumos, planos, conv) == {1: 14.0}
+```
+
+Um trato quinzenal de 14 kg virou **14 kg/dia** — quatorze vezes o valor real. Num
+insumo real, isso é a diferença entre `previsao_estoque.prever()` dizer "ok" e dizer
+"crítico, comprar hoje": o oposto de "não inventar consumo que não existe", que é o
+motivo desta spec existir.
+
+**Isto era parcialmente falha da spec, não só da entrega**, e fica registrado: o
+docstring do contrato citava a regra corretamente, mas **nenhum critério de aceite
+cobrava um teste para ela** — só a incompatibilidade de unidade (critério 2) tinha
+teste obrigatório. Regra citada em prosa e não cobrada em critério de aceite é regra que
+um agente correto pode honestamente perder. Corrigido abaixo: agora há um critério
+numerado só para isso.
+
+### O que a nova tentativa precisa fazer
+
+Frequência fora de `{"diario", "semanal", "mensal"}` faz o **plano inteiro ser
+ignorado** na soma — mesmo comportamento de unidade incompatível (critério 2), não um
+fator multiplicador diferente.
 
 ## Regra de ouro desta spec
 
@@ -96,9 +134,13 @@ saber. Zero é uma resposta válida aqui: "não há plano de trato para isto".
    insumo.
 2. Plano com unidade incompatível com a do insumo (ex.: `"saco"` vs `"kg"` sem conversão
    conhecida) não aparece no resultado — nem erra, nem soma zero por engano.
-3. `montar_insumos` sem `prazos_de_reposicao` produz `prazo_reposicao_dias=0` para todos.
-4. Insumo sem nenhum plano ativo aparece na lista final com `consumo_diario=0.0`.
-5. O resultado de `montar_insumos()`, passado para `previsao_estoque.prever()`, produz
+3. **Plano com `frequency` fora de `{"diario", "semanal", "mensal"}` (ex.: `"quinzenal"`,
+   `""`, `None`) não contribui em nada à soma** — mesmo tratamento do critério 2, não um
+   fator diferente. É o defeito da primeira tentativa: um trato quinzenal de 14 kg não
+   pode virar 14 kg/dia.
+4. `montar_insumos` sem `prazos_de_reposicao` produz `prazo_reposicao_dias=0` para todos.
+5. Insumo sem nenhum plano ativo aparece na lista final com `consumo_diario=0.0`.
+6. O resultado de `montar_insumos()`, passado para `previsao_estoque.prever()`, produz
    `urgencia="critica"` para um insumo com `saldo < estoque_minimo`, coerente com a regra
    que já está em `prever()`.
 

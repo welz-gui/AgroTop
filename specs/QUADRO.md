@@ -3,9 +3,9 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-06:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 522 testes ·
+**Estado em 2026-08-06:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 529 testes ·
 33 tabelas em produção, todas com RLS · **Fase B 100% ligada à interface** (7 de 7 telas,
-2026-08-04 a 2026-08-05) · **11 tarefas na fila**.
+2026-08-04 a 2026-08-05) · **9 tarefas na fila**.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -89,17 +89,17 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | — | ✅ [#96](https://github.com/welz-gui/AgroTop/pull/96) | | 2026-08-05 |
 | — | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | — | ✅ [#93](https://github.com/welz-gui/AgroTop/pull/93) | | 2026-08-05 |
 | — | [0007](0007-hex-para-tokens.md) — hex → tokens de tema 🔁 | — | ✅ [#100](https://github.com/welz-gui/AgroTop/pull/100) | | 2026-08-06 |
-| 1 | [0039](0039-montar-insumos-para-previsao-de-estoque.md) — previsão de ruptura de estoque 🏗️ | `feat/montar-insumos-previsao` | 🟢 livre | — | — |
-| 2 | [0036](0036-montar-rebanho-para-escore-de-conformidade.md) — rebanho p/ escore de conformidade 🇧🇷 | `feat/montar-rebanho-conformidade` | 🟢 livre | — | — |
-| 3 | [0043](0043-montar-lotes-para-lotacao.md) — lotes p/ cálculo de lotação 🏗️ | `feat/montar-lotes-lotacao` | 🟢 livre | — | — |
-| 4 | [0033](0033-reconciliar-lote-de-brincos-com-estoque.md) — reconciliar lote de brincos com estoque 🇧🇷 | `feat/reconciliar-lote-brincos` | 🟢 livre | — | — |
-| 5 | [0034](0034-normalizar-lancamentos-financeiros.md) — normalizar lançamentos financeiros 🏗️ | `feat/normalizar-lancamentos` | 🟢 livre | — | — |
-| 6 | [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) — ciclos p/ rentabilidade por raça 🏗️ | `feat/montar-ciclos-rentabilidade` | 🟢 livre | — | — |
-| 7 | [0038](0038-montar-contexto-de-gta.md) — contexto de GTA para validação 🇧🇷 | `feat/montar-contexto-gta` | 🟢 livre | — | — |
-| 8 | [0035](0035-adaptar-indicadores-de-completude.md) — indicadores de completude de dados ⚙️ | `feat/adaptar-completude` | 🟢 livre | — | — |
-| 9 | [0037](0037-montar-ingredientes-do-trato.md) — ingredientes do trato p/ custo de dieta 🏗️ | `feat/montar-ingredientes-dieta` | 🟢 livre | — | — |
-| 10 | [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) — correlação chuva × GMD ⚙️ | `feat/agrupar-chuva-gmd` | 🟢 livre | — | — |
-| 11 | [0041](0041-calcular-dias-no-lote-para-rateio.md) — dias no lote p/ rateio de custo ⚙️ | `feat/dias-no-lote-rateio` | 🟢 livre | — | — |
+| — | [0036](0036-montar-rebanho-para-escore-de-conformidade.md) — rebanho p/ escore de conformidade 🇧🇷 | — | ✅ [#102](https://github.com/welz-gui/AgroTop/pull/102) | | 2026-08-06 |
+| — | [0043](0043-montar-lotes-para-lotacao.md) — lotes p/ cálculo de lotação 🏗️ | — | ✅ [#103](https://github.com/welz-gui/AgroTop/pull/103) | | 2026-08-06 |
+| 1 | [0039](0039-montar-insumos-para-previsao-de-estoque.md) — previsão de ruptura de estoque 🔁 | `feat/montar-insumos-previsao-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-06 |
+| 2 | [0033](0033-reconciliar-lote-de-brincos-com-estoque.md) — reconciliar lote de brincos com estoque 🇧🇷 | `feat/reconciliar-lote-brincos` | 🟢 livre | — | — |
+| 3 | [0034](0034-normalizar-lancamentos-financeiros.md) — normalizar lançamentos financeiros 🏗️ | `feat/normalizar-lancamentos` | 🟢 livre | — | — |
+| 4 | [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) — ciclos p/ rentabilidade por raça 🏗️ | `feat/montar-ciclos-rentabilidade` | 🟢 livre | — | — |
+| 5 | [0038](0038-montar-contexto-de-gta.md) — contexto de GTA para validação 🇧🇷 | `feat/montar-contexto-gta` | 🟢 livre | — | — |
+| 6 | [0035](0035-adaptar-indicadores-de-completude.md) — indicadores de completude de dados ⚙️ | `feat/adaptar-completude` | 🟢 livre | — | — |
+| 7 | [0037](0037-montar-ingredientes-do-trato.md) — ingredientes do trato p/ custo de dieta 🏗️ | `feat/montar-ingredientes-dieta` | 🟢 livre | — | — |
+| 8 | [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) — correlação chuva × GMD ⚙️ | `feat/agrupar-chuva-gmd` | 🟢 livre | — | — |
+| 9 | [0041](0041-calcular-dias-no-lote-para-rateio.md) — dias no lote p/ rateio de custo ⚙️ | `feat/dias-no-lote-rateio` | 🟢 livre | — | — |
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
@@ -272,7 +272,7 @@ referência (golden), ou uma extração dos hex de `app.py` comparada token a to
 
 ### 🔁 O que significa "retrabalho"
 
-Quatro specs passaram por isto até 2026-08-05: a PR foi **fechada com defeito
+Cinco specs passaram por isto até 2026-08-06: a PR foi **fechada com defeito
 confirmado**, e a spec voltou à fila com o defeito escrito dentro dela — em vez de
 simplesmente reabrir a tarefa como se fosse nova.
 
@@ -282,6 +282,11 @@ simplesmente reabrir a tarefa como se fosse nova.
 | [0029](0029-escore-de-conformidade.md) | #83, fechada | escore 100 com pendência crítica na mesma resposta; faixa chamava a si mesma de "conforme" | ✅ [#95](https://github.com/welz-gui/AgroTop/pull/95), corrigido e verificado |
 | [0032](0032-mapa-de-conformidade.md) | #89, fechada | §6 marcado ✅ sem ter tela | 🔁 v2 **travou sem commitar nada** (ver abaixo) → retomada → [#96](https://github.com/welz-gui/AgroTop/pull/96), que corrigiu §6 **e achou um segundo erro do mesmo tipo em §11** antes do merge |
 | [0007](0007-hex-para-tokens.md) | #97, fechada | teste media "todo hex tem token", não "hex virou token" — 136 de 198 hex ficaram literais | ✅ [#100](https://github.com/welz-gui/AgroTop/pull/100), corrigido e verificado (33 restantes, todos no bloco CSS estático) |
+| [0039](0039-montar-insumos-para-previsao-de-estoque.md) | #101, fechada | frequência de trato desconhecida (`"quinzenal"`) virava 1×/dia — 14 kg quinzenais lidos como 14 kg/dia | 🟢 livre (`-v2`) |
+
+**A 0039 tem uma nuance:** parte do defeito era da própria spec — o docstring do contrato
+citava a regra certa, mas nenhum critério de aceite cobrava um teste para ela. Corrigido
+na spec: agora há um critério numerado só para isso.
 
 **Não trate uma spec com histórico de retrabalho como tarefa nova.** Cada uma ganhou uma
 seção **"O defeito da primeira tentativa"** com a reprodução exata do erro e o teste que
