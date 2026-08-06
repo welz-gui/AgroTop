@@ -276,7 +276,7 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 
 | # | Etapa | Por que aqui |
 |---|---|---|
-| B1 | ✅ **Chave surrogate + `animal_identifiers`** | concluída em 2026-08-02, seis etapas |
+| B1 | ✅ **Chave surrogate + `animal_identifiers`** | concluída em 2026-08-02, seis etapas; 7ª etapa (PK) fechada em 2026-08-06 |
 | B2 | ✅ **`animal_events` + auditoria** | concluída em 2026-08-02, append-only por gatilho |
 | B3 | ✅ **Genealogia e nascimentos** | concluída em 2026-08-03 — `partos`, vínculo materno auditado, pendências do §7.3 |
 | B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; B4.3 (NOT NULL) fechada em 2026-08-06 |
@@ -876,9 +876,15 @@ usuários de produção e a rotação da senha do Postgres.
 
 ### 🟠 Técnicas
 
-2. **`animals.id` ainda é a PK.** A etapa B1.6 removeu a coluna legada das oito filhas, mas
-   a chave primária de `animals` continua sendo o brinco. **Não é urgente:** o vínculo já é
-   o `uuid` em todo lugar, que é o que o §4.1 exige. Trocar a PK é trabalho à parte.
+2. ~~**`animals.id` ainda é a PK.**~~ 🟢 **Fechada em 2026-08-06**, etapa B1.7.
+   As etapas B1.1–B1.6 já tinham deixado `uuid` NOT NULL/UNIQUE e migrado as treze
+   tabelas com FK para `animals` a apontarem para `animals(uuid)`, nunca para `id` —
+   o vínculo real já era o `uuid` havia tempo. Faltava só a PK do SQL reconhecer
+   isso. Por não haver nenhuma query que dependa de "qual coluna é a PK" (todas
+   referenciam `id` ou `uuid` pelo nome), a troca não tocou nenhum outro arquivo
+   além do schema e dos testes que a travam: `id` (o brinco) virou `UNIQUE NOT
+   NULL`, `uuid` virou `PRIMARY KEY NOT NULL`. Mesma limitação da dívida nº 8 para
+   bancos SQLite antigos — a troca só vale para quem nasce depois desta etapa.
 
 3. ~~**B4.3 pendente** — `property_id` continua **anulável** em `animals` e `lotes`.~~
    🟢 **Fechada em 2026-08-06.** `NOT NULL` aplicado nas duas colunas (migration 0016). A
