@@ -61,9 +61,9 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0029](0029-escore-de-conformidade.md) — escore de conformidade PNIB 🇧🇷 | — | ✅ [#95](https://github.com/welz-gui/AgroTop/pull/95) | | 2026-08-05 |
 | — | [0028](0028-geometria-lotacao-e-sobreposicao.md) — lotação e sobreposição 🏗️ | — | ✅ [#94](https://github.com/welz-gui/AgroTop/pull/94) | | 2026-08-05 |
 | — | [0030](0030-importacao-de-lote-de-brincos.md) — leitura de arquivo de brincos 🇧🇷 | — | ✅ [#90](https://github.com/welz-gui/AgroTop/pull/90) | | 2026-08-05 |
-| 1 | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | `feat/mapa-de-conformidade-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
-| 2 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
-| 3 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema (destravada) | `feat/hex-para-tokens` | 🟢 livre | — | — |
+| — | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | — | ✅ [#96](https://github.com/welz-gui/AgroTop/pull/96) | | 2026-08-05 |
+| 1 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
+| 2 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema 🔁 | `feat/hex-para-tokens-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
@@ -227,33 +227,38 @@ referência (golden), ou uma extração dos hex de `app.py` comparada token a to
 
 ### 🔁 O que significa "retrabalho"
 
-Três specs voltaram à fila em 2026-08-05 depois de a PR ser **fechada com defeito
-confirmado**: a [0028](0028-geometria-lotacao-e-sobreposicao.md), a
-[0029](0029-escore-de-conformidade.md) e a [0032](0032-mapa-de-conformidade.md).
+Quatro specs passaram por isto até 2026-08-05: a PR foi **fechada com defeito
+confirmado**, e a spec voltou à fila com o defeito escrito dentro dela — em vez de
+simplesmente reabrir a tarefa como se fosse nova.
 
-**Elas não são tarefas novas e não devem ser tratadas como tais.** Cada uma ganhou uma
+| Spec | 1ª tentativa | Defeito | 2ª tentativa |
+|---|---|---|---|
+| [0028](0028-geometria-lotacao-e-sobreposicao.md) | #82, fechada | CRS por polígono, não por conjunto — 578 km reportados como sobrepostos | ✅ [#94](https://github.com/welz-gui/AgroTop/pull/94), corrigido e verificado |
+| [0029](0029-escore-de-conformidade.md) | #83, fechada | escore 100 com pendência crítica na mesma resposta; faixa chamava a si mesma de "conforme" | ✅ [#95](https://github.com/welz-gui/AgroTop/pull/95), corrigido e verificado |
+| [0032](0032-mapa-de-conformidade.md) | #89, fechada | §6 marcado ✅ sem ter tela | 🔁 v2 **travou sem commitar nada** (ver abaixo) → retomada → [#96](https://github.com/welz-gui/AgroTop/pull/96), que corrigiu §6 **e achou um segundo erro do mesmo tipo em §11** antes do merge |
+| [0007](0007-hex-para-tokens.md) | #97, fechada | teste media "todo hex tem token", não "hex virou token" — 136 de 198 hex ficaram literais | 🟢 livre |
+
+**Não trate uma spec com histórico de retrabalho como tarefa nova.** Cada uma ganhou uma
 seção **"O defeito da primeira tentativa"** com a reprodução exata do erro e o teste que
 passa a ser obrigatório. Começar sem ler essa seção é repetir o mesmo trabalho e chegar ao
-mesmo defeito — que foi justamente o que motivou devolvê-las com o defeito escrito, em vez
-de simplesmente reabrir a tarefa.
+mesmo defeito.
 
-**O nome da branch mudou para `-v2`** de propósito. A branch antiga continua no remoto,
+**O nome da branch muda para `-v2`** de propósito. A branch antiga continua no remoto,
 ligada à PR fechada, para o histórico não sumir; se a spec ainda apontasse para ela, o
 protocolo de "branch existe = tarefa tomada" acusaria a tarefa como ocupada e ninguém a
 pegaria nunca.
 
-**Uma lição vale para as três, e não é sobre geometria, escore nem documentação:** as
-três entregas **passaram em todos os critérios de aceite** e ainda assim estavam erradas.
-O critério de aceite prova o que alguém pensou em perguntar. Quando você terminar, procure
-o caso que a spec **não** menciona — e se achar, escreva o teste antes de abrir o PR.
+**A lição que se repete em todas as quatro, e não é sobre nenhum assunto específico:**
+toda entrega fechada **passou em todos os critérios de aceite** e ainda assim estava
+errada. O critério de aceite prova o que alguém pensou em perguntar. Quando você
+terminar, procure o caso que a spec **não** menciona — e se achar, escreva o teste antes
+de abrir o PR.
 
-A 0032 é a mais desconfortável das três: o defeito era **exatamente o que a spec avisava
-em letras garrafais** que não podia acontecer. Ler a proibição não basta; é preciso
-conferir a própria entrega contra ela antes de abrir o PR.
-
-**Duas das três já voltaram a fechar** — 0028 em [#94](https://github.com/welz-gui/AgroTop/pull/94),
-0029 em [#95](https://github.com/welz-gui/AgroTop/pull/95), as duas corrigindo exatamente o
-defeito registrado, verificado contra o caso de reprodução antes do merge.
+A 0032 rendeu a lição mais afiada, duas vezes seguidas: o defeito original era
+**exatamente o que a spec avisava em letras garrafais** que não podia acontecer, e o
+defeito da correção (#96, §11) era **o mesmo erro em outra seção** — parcial sem checar
+`app.py`, agora ao contrário. Ler a proibição não basta; é preciso conferir a própria
+entrega contra ela, seção por seção, antes de abrir o PR.
 
 ### ⚠️ A 0032-v2 travou sem produzir nada, e foi liberada de novo em 2026-08-05
 
@@ -370,4 +375,6 @@ A fila resolve o problema pela raiz: **a curadoria já foi feita** ao escrever a
 ordená-las. Escolher a primeira livre não é decidir prioridade — é seguir a que já está
 decidida.
 
-O que continua proibido: inventar tarefa fora da fila, reordenar a fila, ou pegar a 0007.
+O que continua proibido: inventar tarefa fora da fila ou reordenar a fila. (A proibição de
+pegar a 0007 valia só enquanto ela estava bloqueada — destravou em 2026-08-03 pela 0024, e
+está na fila normal desde então.)
