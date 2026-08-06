@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS animals (
     purchase_mode text DEFAULT 'cabeca'::text,
     purchase_lot_ref text,
     uuid text NOT NULL,
-    property_id text,
+    property_id text NOT NULL,
     propriedade_nascimento_id text,
     mae_uuid text,
     pai_uuid text,
@@ -316,7 +316,7 @@ CREATE TABLE IF NOT EXISTS lotes (
     last_exit_date text,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    property_id text,
+    property_id text NOT NULL,
     poligono text,
     CONSTRAINT lotes_pkey PRIMARY KEY (id)
 );
