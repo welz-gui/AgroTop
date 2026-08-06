@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-05 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-06 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -317,6 +317,7 @@ CREATE TABLE IF NOT EXISTS lotes (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     property_id text,
+    poligono text,
     CONSTRAINT lotes_pkey PRIMARY KEY (id)
 );
 

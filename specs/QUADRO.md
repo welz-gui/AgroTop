@@ -25,8 +25,12 @@ baixo** — a ordem é prioridade, não sugestão.
 > Duas specs (**0038** e **0037**/**0039**) avisam, no próprio texto, sobre uma coluna que
 > ainda não existe no schema (validade de GTA, matéria seca, prazo de reposição). Não é
 > erro de quem escreveu a spec — é limitação real dos dados, e a spec já diz o que fazer:
-> tratar como ausente, nunca inventar o valor. **0043** avisa que `sobrepostos()` (o
-> quarto método de `lotacao.py`) fica de fora — depende de migration que não existe.
+> tratar como ausente, nunca inventar o valor.
+>
+> **Atualização de 2026-08-06:** a migration **0015** acrescentou `lotes.poligono`, e o
+> mantenedor já ligou `sobrepostos()` direto em `page_lotes` — não sobrou trabalho de
+> adaptador para ele. A **0043** foi revisada: continua valendo só para `lotacao`,
+> `capacidade` e `avaliar_lotacao`, que usam peso de animal, não polígono.
 
 > ### ✅ A Fase B fechou — a fila agora é o que resta de verdade delegável
 >

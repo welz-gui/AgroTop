@@ -24,6 +24,7 @@ from services.geometria import (
     perimetro_metros as geometria_perimetro_m,
     validar as geometria_validar,
 )
+from services.lotacao import sobrepostos as lotacao_sobrepostos
 from services.sincronizacao import (
     SITUACOES as SITUACOES_SINCRONIZACAO,
     RESOLVIDAS as SITUACOES_RESOLVIDAS,
@@ -1716,9 +1717,39 @@ def page_animal():
 # ══════════════════════════════════════════════════════════════════════════════
 # LOTES / PASTAGEM
 # ══════════════════════════════════════════════════════════════════════════════
+def _sobreposicoes_dos_lotes(lotes: list[dict]) -> list[dict]:
+    """Piquetes com polígono desenhado que se cruzam (§ROADMAP, migration 0015).
+
+    Só entram na checagem lotes que **têm** `poligono` — a maioria não vai ter
+    tão cedo, e é isso mesmo: o alerta só aparece quando há dado real para
+    comparar, nunca por omissão.
+    """
+    piquetes = []
+    for l in lotes:
+        if not l.get("poligono"):
+            continue
+        try:
+            anel = _ler_poligono(_poligono_para_texto(l["poligono"]))
+        except (ValueError, TypeError):
+            continue
+        if anel and not geometria_validar(anel):
+            piquetes.append({"id": l["id"], "anel": anel})
+    if len(piquetes) < 2:
+        return []
+    return lotacao_sobrepostos(piquetes)
+
+
 def page_lotes():
     st.markdown('<div class="page-title">🌿 Lotes / Pastagem</div>', unsafe_allow_html=True)
     lotes=db.get_all_lotes()
+
+    sobrepostos = _sobreposicoes_dos_lotes(lotes)
+    if sobrepostos:
+        pares = ", ".join(f"{s['a']}×{s['b']} ({_num_br(s['pct_do_menor'], 0)}% do menor)"
+                          for s in sobrepostos)
+        st.warning(f"⚠️ Piquetes com perímetro sobreposto: {pares}. Confira o desenho — "
+                   "pode ser piquete redesenhado sem apagar o anterior, ou área "
+                   "dividida por engano.")
 
     lt1,lt2=st.tabs(["📋 Visão Geral","➕ Novo Lote"])
 
@@ -1780,6 +1811,50 @@ def page_lotes():
                             "GMD":st.column_config.NumberColumn(format="%.3f")})
                 else:
                     st.caption("Nenhum animal neste lote.")
+
+            # Perímetro do piquete (migration 0015)
+            with st.expander(f"🗺️ Perímetro do {l['name']}"):
+                st.caption("Um vértice por linha, `longitude, latitude` — a ordem do "
+                           "GeoJSON, a mesma da tela de Propriedades. A área é "
+                           "**calculada** do desenho, não digitada.")
+                texto_l = st.text_area(
+                    "Vértices", value=_poligono_para_texto(l.get("poligono")),
+                    height=120, key=f"lote_poligono_{l['id']}",
+                    placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
+                                "-51.2280, -30.0320")
+
+                anel_l, erro_l, problemas_l = [], "", []
+                if texto_l.strip():
+                    try:
+                        anel_l = _ler_poligono(texto_l)
+                    except ValueError as e:
+                        erro_l = str(e)
+                    else:
+                        problemas_l = geometria_validar(anel_l)
+
+                if erro_l:
+                    st.error(f"🚫 {erro_l}")
+                for prob in problemas_l:
+                    st.error(f"🚫 {prob}")
+
+                if anel_l and not problemas_l:
+                    area_desenhada = geometria_area_ha(anel_l)
+                    gl1, gl2 = st.columns(2)
+                    gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha")
+                    gl2.metric("Cadastrada em Área (ha)", f"{_num_br(l['area_ha'], 2)} ha",
+                               help="Os dois valores podem divergir — o campo Área "
+                                    "não é recalculado automaticamente. Ajuste-o na "
+                                    "edição do lote se quiser que combinem.")
+
+                pode_l = not erro_l and not problemas_l
+                if st.button("💾 Salvar perímetro", disabled=not pode_l,
+                             key=f"lote_poligono_salvar_{l['id']}"):
+                    novo = (json.dumps({"type": "Polygon",
+                                        "coordinates": [[list(v) for v in anel_l]]})
+                           if anel_l else None)
+                    db.set_lote_poligono(l["id"], novo)
+                    st.success("✅ Perímetro salvo." if novo else "✅ Perímetro removido.")
+                    st.rerun()
 
         # Gráfico UA por Lote
         if lotes:

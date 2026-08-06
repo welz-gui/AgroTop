@@ -12,15 +12,17 @@
 Você cria **um arquivo novo**. **Não altere `services/lotacao.py`** — acabou de sair de
 um retrabalho (spec 0028 → PR #94, defeito de CRS corrigido e verificado) e está correto.
 
-## ⚠️ Esta spec NÃO cobre `sobrepostos()` — leia antes de reivindicar
+## ✅ `sobrepostos()` não é mais objeto desta spec — já foi ligado
 
-`services/lotacao.py` tem quatro funções públicas: `lotacao`, `capacidade`,
-`avaliar_lotacao` (as três desta spec) e `sobrepostos` (**fora**, de propósito).
-`sobrepostos()` compara polígonos de piquetes — e `lotes` **não tem coluna de
-polígono** (só `properties` tem, desde a spec 0032/PR #87). Ligar `sobrepostos()`
-depende de uma migration que ainda não existe; não é trabalho de adaptador, é trabalho
-de schema, e está registrado à parte no ROADMAP. Não tente contornar isso inventando um
-formato de polígono alternativo.
+Esta spec nasceu excluindo `sobrepostos()` porque `lotes` não tinha coluna de polígono.
+Isso mudou em 2026-08-06: a **migration 0015** acrescentou `lotes.poligono` (GeoJSON,
+mesmo formato de `properties.poligono`), e o mantenedor **já ligou** `sobrepostos()` em
+`page_lotes` — desenho do perímetro por piquete, área calculada, e aviso de sobreposição
+(reaproveitando os mesmos helpers da tela de Propriedades). Não há trabalho de adaptador
+para `sobrepostos()`: a entrada dele é direto o GeoJSON já salvo, sem agregação nenhuma.
+
+Esta spec continua valendo **só** para as outras três funções — `lotacao`, `capacidade`,
+`avaliar_lotacao` — que usam peso de animal, não polígono.
 
 ## Contexto
 
@@ -84,8 +86,9 @@ sem distorcer o cálculo de UA/ha). Filtrar aqui seria decidir algo que já é d
 
 ## Proibições
 
-- ❌ **Não implemente nada relacionado a `sobrepostos()` ou polígonos.** Fora do escopo
-  — ver o aviso no topo desta spec.
+- ❌ Não implemente nada relacionado a `sobrepostos()` ou polígonos — **já foi feito**,
+  ver o aviso no topo desta spec. Reimplementar seria trabalho perdido e provável
+  duplicação (R8).
 - ❌ Não altere `services/lotacao.py`.
 - ❌ Não consulte banco.
 - ❌ Não toque em `database.py`, `repositories/`, `app.py`.

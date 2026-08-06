@@ -199,6 +199,10 @@ def init_db() -> None:
                 last_entry_date TEXT,
                 last_exit_date  TEXT,
                 notes           TEXT,
+                -- Perímetro do piquete, GeoJSON — mesmo formato de
+                -- properties.poligono. Alimenta services.lotacao.sobrepostos()
+                -- (migration 0015; specs 0028/0043).
+                poligono        TEXT,
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (property_id) REFERENCES properties(id)
             );
@@ -887,6 +891,10 @@ def _migrate(con) -> None:
     mcols = {r["name"] for r in con.execute("PRAGMA table_info(medications)").fetchall()}
     if "protocol_id" not in mcols:
         con.execute("ALTER TABLE medications ADD COLUMN protocol_id INTEGER")
+    lcols = {r["name"] for r in con.execute("PRAGMA table_info(lotes)").fetchall()}
+    if "poligono" not in lcols:
+        # Migration 0015 — perímetro do piquete, destrava services.lotacao.sobrepostos().
+        con.execute("ALTER TABLE lotes ADD COLUMN poligono TEXT")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 
@@ -1419,6 +1427,18 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
         )
 
 
+@_writes
+def set_lote_poligono(lote_id: str, poligono_geojson: Optional[str]) -> bool:
+    """Grava o perímetro do piquete (migration 0015). `None` apaga o desenho.
+
+    Não recalcula `area_ha` a partir do polígono — quem chama já fez isso
+    (mesma separação de responsabilidade da tela de propriedades: a tela
+    calcula e mostra; aqui só se grava o que foi calculado).
+    """
+    with _conn() as con:
+        cur = con.execute(
+            "UPDATE lotes SET poligono=? WHERE id=?", (poligono_geojson, lote_id))
+        return cur.rowcount > 0
 
 
 

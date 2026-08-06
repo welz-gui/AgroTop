@@ -820,11 +820,12 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **onze services órfãos**, entregues por agentes e sem nenhum consumidor: `caixa`,
-`completude`, `conformidade`, `dieta`, `gta`, `lotacao`, `previsao_estoque`, `projecao`,
-`rateio`, `rentabilidade`, `arquivo_dispositivos`. Os três últimos entraram em 2026-08-05
-(specs 0028-v2, 0029-v2, 0030) — nenhum é Fase B, então ficam fora do escopo desta dívida,
-mas contam para o total: 29 services no diretório, 18 usados.
+Restam **dez services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06, ver
+abaixo), entregues por agentes e sem nenhum consumidor: `caixa`, `completude`,
+`conformidade`, `dieta`, `gta`, `previsao_estoque`, `projecao`, `rateio`, `rentabilidade`,
+`arquivo_dispositivos`. Nenhum é Fase B, então ficam fora do escopo desta dívida, mas
+contam para o total: 29 services no diretório, 19 usados. Onze specs (0033–0043) já
+pedem a função-ponte de cada um — ver `specs/QUADRO.md`.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".
@@ -834,9 +835,13 @@ Fiscalização não aceita "o repositório tem o método".
 (na propriedade, §3) → ~~regras configuráveis~~ ✅ → ~~linha do tempo + sincronização~~ ✅
 (§6 + §10.4).
 
-⚠️ **A geometria saiu na propriedade, não no piquete.** `properties.poligono` já existia
-e estava vazia; `lotes` **não tem coluna de polígono**, então piquete exigiria migration.
-Fica como trabalho à parte, com o fluxo do [supabase/README.md](supabase/README.md).
+~~⚠️ A geometria saiu na propriedade, não no piquete.~~ 🟢 **Fechado em 2026-08-06.**
+`properties.poligono` cobria a propriedade desde a spec 0032; `lotes` não tinha coluna de
+polígono, e `services.lotacao.sobrepostos()` — pronto e testado desde a spec 0028 — nunca
+teve como ser chamado. A migration **0015** acrescentou `lotes.poligono` (mesmo formato
+GeoJSON), e `page_lotes` ganhou desenho de perímetro por piquete, área calculada e aviso
+de sobreposição — reaproveitando os mesmos helpers da tela de Propriedades, sem duplicar
+nada (R8). `sobrepostos()` deixou de ser um service órfão.
 
 #### O que as sete telas ensinaram
 
