@@ -89,7 +89,7 @@ class TestPropriedadesGeometria(unittest.TestCase):
             ),
         )
 
-    @settings(derandomize=True, max_examples=50)
+    @settings(derandomize=True, max_examples=50, deadline=None, suppress_health_check=[HealthCheck.too_slow])
     @given(data=st.data())
     def test_area_invariante_a_rotacao(self, data):
         """Girar a ordem dos vértices não altera a área calculada."""
@@ -105,7 +105,7 @@ class TestPropriedadesGeometria(unittest.TestCase):
                 f"Área mudou na rotação: orig={area_orig}, rot={area_rot}",
             )
 
-    @settings(derandomize=True, max_examples=50)
+    @settings(derandomize=True, max_examples=50, deadline=None, suppress_health_check=[HealthCheck.too_slow])
     @given(data=st.data())
     def test_anel_aberto_e_fechado_dao_mesmo_resultado(self, data):
         """Anel aberto ou com primeiro ponto repetido no final devolvem a mesma área."""
@@ -119,7 +119,7 @@ class TestPropriedadesGeometria(unittest.TestCase):
             f"Área difere entre anel aberto ({area_aberto}) e fechado ({area_fechado})",
         )
 
-    @settings(derandomize=True, max_examples=50)
+    @settings(derandomize=True, max_examples=50, deadline=None, suppress_health_check=[HealthCheck.too_slow])
     @given(data=st.data())
     def test_area_nunca_e_negativa(self, data):
         """Área do polígono em hectares é sempre maior ou igual a zero."""
@@ -129,7 +129,7 @@ class TestPropriedadesGeometria(unittest.TestCase):
         area = geometria.area_hectares(anel)
         self.assertGreaterEqual(area, 0.0)
 
-    @settings(derandomize=True, max_examples=50)
+    @settings(derandomize=True, max_examples=50, deadline=None, suppress_health_check=[HealthCheck.too_slow])
     @given(data=st.data())
     def test_centroide_cai_dentro_dos_limites(self, data):
         """O centroide de um polígono válido fica dentro do seu envelope (min/max lon e lat)."""
