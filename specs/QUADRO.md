@@ -3,9 +3,30 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-05:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 512 testes ·
+**Estado em 2026-08-06:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 522 testes ·
 33 tabelas em produção, todas com RLS · **Fase B 100% ligada à interface** (7 de 7 telas,
-2026-08-04 a 2026-08-05) · **3 tarefas na fila**.
+2026-08-04 a 2026-08-05) · **11 tarefas na fila**.
+
+> ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
+>
+> Depois da Fase B, restam **11 services em `services/` que nunca foram chamados por
+> nada**: `arquivo_dispositivos`, `caixa`, `completude`, `conformidade`, `dieta`, `gta`,
+> `lotacao`, `previsao_estoque`, `projecao`, `rateio`, `rentabilidade`. Todos são funções
+> puras, testadas, prontas — o problema é só a **entrada**: cada um espera um formato de
+> dado que não existe pronto em lugar nenhum do sistema.
+>
+> **Estas 13 specs (0033–0043) pedem a função-ponte, não a integração.** Cada uma monta,
+> a partir de listas cruas (que a spec descreve com o nome real da tabela e das colunas),
+> exatamente o dict/lista que o service órfão espera — sem tocar `app.py`, sem consultar
+> banco, sem alterar o service em si. É o R31 aplicado ao pé da letra: "a spec fixa a
+> assinatura exata da função; o agente entrega o módulo novo mais os testes; o mantenedor
+> liga à interface depois."
+>
+> Duas specs (**0038** e **0037**/**0039**) avisam, no próprio texto, sobre uma coluna que
+> ainda não existe no schema (validade de GTA, matéria seca, prazo de reposição). Não é
+> erro de quem escreveu a spec — é limitação real dos dados, e a spec já diz o que fazer:
+> tratar como ausente, nunca inventar o valor. **0043** avisa que `sobrepostos()` (o
+> quarto método de `lotacao.py`) fica de fora — depende de migration que não existe.
 
 > ### ✅ A Fase B fechou — a fila agora é o que resta de verdade delegável
 >
@@ -62,14 +83,34 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0028](0028-geometria-lotacao-e-sobreposicao.md) — lotação e sobreposição 🏗️ | — | ✅ [#94](https://github.com/welz-gui/AgroTop/pull/94) | | 2026-08-05 |
 | — | [0030](0030-importacao-de-lote-de-brincos.md) — leitura de arquivo de brincos 🇧🇷 | — | ✅ [#90](https://github.com/welz-gui/AgroTop/pull/90) | | 2026-08-05 |
 | — | [0032](0032-mapa-de-conformidade.md) — mapa de conformidade §-por-§ 🇧🇷 | — | ✅ [#96](https://github.com/welz-gui/AgroTop/pull/96) | | 2026-08-05 |
-| 1 | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | `feat/testes-de-propriedade` | 🟢 livre | — | — |
-| 2 | [0007](0007-hex-para-tokens.md) — hex → tokens de tema 🔁 | `feat/hex-para-tokens-v2` | 🔁 **livre (retrabalho)** | — | 2026-08-05 |
+| — | [0031](0031-testes-de-propriedade.md) — testes de propriedade ⚙️ | — | ✅ [#93](https://github.com/welz-gui/AgroTop/pull/93) | | 2026-08-05 |
+| — | [0007](0007-hex-para-tokens.md) — hex → tokens de tema 🔁 | — | ✅ [#100](https://github.com/welz-gui/AgroTop/pull/100) | | 2026-08-06 |
+| 1 | [0039](0039-montar-insumos-para-previsao-de-estoque.md) — previsão de ruptura de estoque 🏗️ | `feat/montar-insumos-previsao` | 🟢 livre | — | — |
+| 2 | [0036](0036-montar-rebanho-para-escore-de-conformidade.md) — rebanho p/ escore de conformidade 🇧🇷 | `feat/montar-rebanho-conformidade` | 🟢 livre | — | — |
+| 3 | [0043](0043-montar-lotes-para-lotacao.md) — lotes p/ cálculo de lotação 🏗️ | `feat/montar-lotes-lotacao` | 🟢 livre | — | — |
+| 4 | [0033](0033-reconciliar-lote-de-brincos-com-estoque.md) — reconciliar lote de brincos com estoque 🇧🇷 | `feat/reconciliar-lote-brincos` | 🟢 livre | — | — |
+| 5 | [0034](0034-normalizar-lancamentos-financeiros.md) — normalizar lançamentos financeiros 🏗️ | `feat/normalizar-lancamentos` | 🟢 livre | — | — |
+| 6 | [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) — ciclos p/ rentabilidade por raça 🏗️ | `feat/montar-ciclos-rentabilidade` | 🟢 livre | — | — |
+| 7 | [0038](0038-montar-contexto-de-gta.md) — contexto de GTA para validação 🇧🇷 | `feat/montar-contexto-gta` | 🟢 livre | — | — |
+| 8 | [0035](0035-adaptar-indicadores-de-completude.md) — indicadores de completude de dados ⚙️ | `feat/adaptar-completude` | 🟢 livre | — | — |
+| 9 | [0037](0037-montar-ingredientes-do-trato.md) — ingredientes do trato p/ custo de dieta 🏗️ | `feat/montar-ingredientes-dieta` | 🟢 livre | — | — |
+| 10 | [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) — correlação chuva × GMD ⚙️ | `feat/agrupar-chuva-gmd` | 🟢 livre | — | — |
+| 11 | [0041](0041-calcular-dias-no-lote-para-rateio.md) — dias no lote p/ rateio de custo ⚙️ | `feat/dias-no-lote-rateio` | 🟢 livre | — | — |
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
 > **Não confie neste quadro.** Ele é mantido à mão e já ficou desatualizado — em 2026-08-02
 > a spec 0015 foi implementada **duas vezes** ([#46](https://github.com/welz-gui/AgroTop/pull/46) e [#50](https://github.com/welz-gui/AgroTop/pull/50)) porque continuava marcada
 > como livre depois de entregue. O segundo agente trabalhou dois dias para nada.
+>
+> **Aconteceu de novo em 2026-08-06, do jeito bom e do jeito ruim ao mesmo tempo.** Um
+> agente pegou a fila, viu 0031 marcada livre (já tinha sido entregue pela PR #93, dois dias
+> antes) e 0007-v2 marcada livre (já tinha branch com PR aberta). Ele **fez a coisa certa**:
+> checou os dois, confirmou que estavam tomados, não escreveu uma linha, removeu o próprio
+> worktree e voltou. **Zero trabalho perdido, exatamente como este guia pede.** Mas gastou
+> 8h46min da própria sessão só para chegar a essa conclusão, porque o quadro mentia sobre
+> as duas primeiras posições da fila. **Confirme SEMPRE a linha inteira** — branch, PR,
+> arquivo — antes de gastar uma sessão inteira só para descobrir que não havia tarefa.
 >
 > A spec diz qual arquivo criar. **Se ele já existe na `origin/main`, a tarefa está feita:**
 >
@@ -236,7 +277,7 @@ simplesmente reabrir a tarefa como se fosse nova.
 | [0028](0028-geometria-lotacao-e-sobreposicao.md) | #82, fechada | CRS por polígono, não por conjunto — 578 km reportados como sobrepostos | ✅ [#94](https://github.com/welz-gui/AgroTop/pull/94), corrigido e verificado |
 | [0029](0029-escore-de-conformidade.md) | #83, fechada | escore 100 com pendência crítica na mesma resposta; faixa chamava a si mesma de "conforme" | ✅ [#95](https://github.com/welz-gui/AgroTop/pull/95), corrigido e verificado |
 | [0032](0032-mapa-de-conformidade.md) | #89, fechada | §6 marcado ✅ sem ter tela | 🔁 v2 **travou sem commitar nada** (ver abaixo) → retomada → [#96](https://github.com/welz-gui/AgroTop/pull/96), que corrigiu §6 **e achou um segundo erro do mesmo tipo em §11** antes do merge |
-| [0007](0007-hex-para-tokens.md) | #97, fechada | teste media "todo hex tem token", não "hex virou token" — 136 de 198 hex ficaram literais | 🟢 livre |
+| [0007](0007-hex-para-tokens.md) | #97, fechada | teste media "todo hex tem token", não "hex virou token" — 136 de 198 hex ficaram literais | ✅ [#100](https://github.com/welz-gui/AgroTop/pull/100), corrigido e verificado (33 restantes, todos no bloco CSS estático) |
 
 **Não trate uma spec com histórico de retrabalho como tarefa nova.** Cada uma ganhou uma
 seção **"O defeito da primeira tentativa"** com a reprodução exata do erro e o teste que

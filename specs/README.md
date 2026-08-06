@@ -3,9 +3,11 @@
 Cada arquivo `NNNN-<slug>.md` aqui é uma **tarefa fechada**, escrita para ser entregue a
 um agente que **não conhece o projeto**. Ele lê a spec, executa e abre um PR.
 
-**Estado em 2026-08-03:** 32 specs escritas, 26 concluídas, **6 na fila**. Fases A e B do
-[ROADMAP](../ROADMAP.md) concluídas — o que resta de delegável é mais escasso, porque o
-trabalho principal virou integração. Ver *"O que não delegar"*, no fim desta página.
+**Estado em 2026-08-06:** 43 specs escritas, 34 concluídas, **11 na fila**. Fases A e B do
+[ROADMAP](../ROADMAP.md) concluídas — a Fase B está 100% ligada à interface (7 de 7
+telas). O que resta de novo (0033–0043) não é mais tela: são as funções-ponte que faltam
+para os 11 services que sobraram órfãos depois da Fase B. Ver *"O que não delegar"*, no
+fim desta página.
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -45,12 +47,23 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0025](0025-postgres-no-ci.md) | Postgres no CI | infraestrutura | **médio** | ✅ concluída |
 | [0026](0026-controle-de-brincos.md) | 🇧🇷 Controle de estoque de brincos (§5) | implementação | baixo | ✅ concluída |
 | [0027](0027-projecao-de-abate.md) | Projeção de abate e chuva × GMD | implementação | baixo | ✅ concluída |
-| [0007](0007-hex-para-tokens.md) | Substituir hex literais pelos tokens de `ui/tema.py` | manutenção | **médio** | 🟢 disponível |
-| [0028](0028-geometria-lotacao-e-sobreposicao.md) | Lotação e sobreposição de piquetes | implementação | baixo | 🟢 disponível |
-| [0029](0029-escore-de-conformidade.md) | 🇧🇷 Escore de conformidade PNIB | implementação | baixo | 🟢 disponível |
-| [0030](0030-importacao-de-lote-de-brincos.md) | 🇧🇷 Leitura de arquivo de lote de brincos | implementação | baixo | 🟢 disponível |
-| [0031](0031-testes-de-propriedade.md) | Testes de propriedade para os services | teste | baixo | 🟢 disponível |
-| [0032](0032-mapa-de-conformidade.md) | 🇧🇷 Mapa de conformidade §-por-§ | documentação | baixo | 🟢 disponível |
+| [0007](0007-hex-para-tokens.md) | Substituir hex literais pelos tokens de `ui/tema.py` | manutenção | **médio** | ✅ concluída |
+| [0028](0028-geometria-lotacao-e-sobreposicao.md) | Lotação e sobreposição de piquetes | implementação | baixo | ✅ concluída |
+| [0029](0029-escore-de-conformidade.md) | 🇧🇷 Escore de conformidade PNIB | implementação | baixo | ✅ concluída |
+| [0030](0030-importacao-de-lote-de-brincos.md) | 🇧🇷 Leitura de arquivo de lote de brincos | implementação | baixo | ✅ concluída |
+| [0031](0031-testes-de-propriedade.md) | Testes de propriedade para os services | teste | baixo | ✅ concluída |
+| [0032](0032-mapa-de-conformidade.md) | 🇧🇷 Mapa de conformidade §-por-§ | documentação | baixo | ✅ concluída |
+| [0033](0033-reconciliar-lote-de-brincos-com-estoque.md) | 🇧🇷 Reconciliar lote de brincos com o estoque | implementação | baixo | 🟢 disponível |
+| [0034](0034-normalizar-lancamentos-financeiros.md) | Normalizar lançamentos financeiros p/ `caixa.py` | implementação | baixo | 🟢 disponível |
+| [0035](0035-adaptar-indicadores-de-completude.md) | Adaptar dados reais p/ `completude.py` | implementação | baixo | 🟢 disponível |
+| [0036](0036-montar-rebanho-para-escore-de-conformidade.md) | 🇧🇷 Rebanho p/ escore de conformidade | implementação | baixo | 🟢 disponível |
+| [0037](0037-montar-ingredientes-do-trato.md) | Ingredientes do trato p/ `dieta.py` | implementação | baixo | 🟢 disponível |
+| [0038](0038-montar-contexto-de-gta.md) | 🇧🇷 Contexto de GTA p/ `gta.py` | implementação | baixo | 🟢 disponível |
+| [0039](0039-montar-insumos-para-previsao-de-estoque.md) | Insumos p/ previsão de ruptura de estoque | implementação | baixo | 🟢 disponível |
+| [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) | Agrupar chuva × GMD por período | implementação | baixo | 🟢 disponível |
+| [0041](0041-calcular-dias-no-lote-para-rateio.md) | Dias no lote p/ `rateio.py` | implementação | baixo | 🟢 disponível |
+| [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) | Ciclos encerrados p/ rentabilidade por raça | implementação | baixo | 🟢 disponível |
+| [0043](0043-montar-lotes-para-lotacao.md) | Lotes p/ `lotacao.py` (sem `sobrepostos`) | implementação | baixo | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
@@ -445,11 +458,16 @@ tinham valor. Os problemas não foram de capacidade do agente, e sim de **contex
 
 ## O que **não** delegar
 
-> ⚠️ **Isto mudou com o fim da Fase B (2026-08-03).** Antes, quase tudo que restava era
-> função pura em módulo novo — ideal para delegar. Agora o trabalho principal é
-> **integração**: ligar à interface os sete módulos regulatórios que já existem. Integração
-> toca `app.py`, mistura camadas e exige contexto do sistema inteiro. **É do mantenedor,
-> pela R31.**
+> ⚠️ **Histórico: isto mudou duas vezes.** Entre 2026-08-03 e 2026-08-05 a maior parte do
+> trabalho era **integração** — ligar à interface os sete módulos regulatórios da Fase B.
+> Integração toca `app.py`, mistura camadas e exige contexto do sistema inteiro; era do
+> mantenedor, pela R31, e assim ficou até a sétima tela fechar em 2026-08-05.
+>
+> **Com a Fase B 100% ligada, o padrão original volta a valer.** As specs 0033–0043
+> (2026-08-06) são de novo função pura em módulo novo — só que em vez de implementar do
+> zero, cada uma monta a **entrada** que um service órfão já pronto espera (ver a nota no
+> topo do [QUADRO.md](QUADRO.md)). Continua verdade que **ligar o resultado a `app.py` é
+> do mantenedor** — as specs param exatamente onde a integração começaria.
 >
 > A consequência prática: a fila de specs encolheu e vai continuar encolhendo. Escrever
 > spec por escrever, para manter agentes ocupados, produz módulo órfão — e o projeto já tem
