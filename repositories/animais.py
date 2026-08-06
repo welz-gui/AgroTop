@@ -176,7 +176,7 @@ def get_movements(animal_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def _seed_animals(con):
+def _seed_animals(con, property_id: str = None):
     if con.execute("SELECT COUNT(*) FROM animals").fetchone()[0]:
         return
 
@@ -217,10 +217,10 @@ def _seed_animals(con):
             """INSERT INTO animals
                (id,uuid,breed,sex,birth_date,birth_estimated,age_source,entry_date,
                 entry_weight,current_weight,target_weight,status,lote_id,
-                fornecedor_id,purchase_price)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                fornecedor_id,purchase_price,property_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
-             c_weight, target_w, status, lote_id, forn_id, price),
+             c_weight, target_w, status, lote_id, forn_id, price, property_id),
         )
 
         # Pesagens: entrada, meio, recente

@@ -189,10 +189,11 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS lotes (
                 id              TEXT PRIMARY KEY,
                 name            TEXT NOT NULL,
-                -- §3.4: piquete pertence a uma propriedade. Anulável nesta
-                -- etapa; vira obrigatório na B4.3, depois de as escritas
-                -- preencherem — mesma ordem que funcionou no B1.
-                property_id     TEXT,
+                -- §3.4: piquete pertence a uma propriedade. NOT NULL desde a
+                -- B4.3 (migration 0016) — mesma ordem que funcionou no B1:
+                -- escrita primeiro (add_lote sempre resolve uma propriedade
+                -- padrão), restrição depois.
+                property_id     TEXT NOT NULL,
                 area_ha         REAL DEFAULT 0,
                 capacity_ua     REAL DEFAULT 0,
                 status          TEXT DEFAULT 'ativo',
@@ -389,8 +390,11 @@ def init_db() -> None:
                 target_weight    REAL DEFAULT 500,
                 status           TEXT NOT NULL DEFAULT 'ativo',
                 lote_id          TEXT,
-                -- §3.4 · etapa B4. Anulável nesta etapa; obrigatório na B4.3.
-                property_id      TEXT,
+                -- §3.4 · etapa B4. NOT NULL desde a B4.3 (migration 0016) —
+                -- as escritas já preenchiam antes disso (add_animal,
+                -- nascimentos.registrar e o seed sempre resolvem uma
+                -- propriedade padrão via _seed_hierarquia).
+                property_id      TEXT NOT NULL,
                 -- §4.3 · etapa B3. A propriedade de NASCIMENTO é diferente da
                 -- atual: o animal se move, o lugar onde nasceu não muda.
                 propriedade_nascimento_id TEXT,
@@ -840,16 +844,23 @@ def init_db() -> None:
         _migrate(con)
         _seed_users(con)
         _seed_fornecedores(con)
-        _seed_lotes(con)
-        _seed_animals(con)
+        # B4.3 — a hierarquia (§3) precisa existir ANTES do seed de lotes e
+        # animais, para eles nascerem já com `property_id` preenchido, em vez
+        # de depender do backfill abaixo — que só cobre banco com EXATAMENTE
+        # uma propriedade (`_backfill_property_id`), e que em SQLite roda
+        # tarde demais: a coluna é `NOT NULL` desde a migration 0016, e o
+        # próprio `INSERT` do seed já falharia antes de o backfill ser
+        # alcançado.
+        propriedade_padrao_id = propriedades._seed_hierarquia(con)
+        _seed_lotes(con, propriedade_padrao_id)
+        _seed_animals(con, propriedade_padrao_id)
         _seed_insumos(con)
         # Depois dos seeds: animais semeados também precisam de UUID.
         _backfill_uuids(con)
         _backfill_animal_uuid(con)
         _backfill_identificadores(con)
-        # ADR 0004 etapa B4 — hierarquia §3. Vem DEPOIS do seed de animais e
-        # lotes, porque o backfill precisa deles já existindo para apontar.
-        propriedades._seed_hierarquia(con)
+        # Safety net só para banco EXISTENTE, criado antes da B4 — o seed
+        # novo acima já não deixa NULL nenhum para este backfill cobrir.
         propriedades._backfill_property_id(con)
 
 
@@ -1028,7 +1039,7 @@ def _seed_fornecedores(con):
         )
 
 
-def _seed_lotes(con):
+def _seed_lotes(con, property_id: str = None):
     if con.execute("SELECT COUNT(*) FROM lotes").fetchone()[0]:
         return
     for lid, name, area, cap, status in [
@@ -1039,8 +1050,9 @@ def _seed_lotes(con):
         ("CRL", "Curral Principal",   0.5,  0.0, "ativo"),
     ]:
         con.execute(
-            "INSERT INTO lotes (id,name,area_ha,capacity_ua,status) VALUES(?,?,?,?,?)",
-            (lid, name, area, cap, status),
+            "INSERT INTO lotes (id,name,area_ha,capacity_ua,status,property_id) "
+            "VALUES(?,?,?,?,?,?)",
+            (lid, name, area, cap, status, property_id),
         )
 
 

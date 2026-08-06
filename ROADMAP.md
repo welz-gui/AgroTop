@@ -279,7 +279,7 @@ Nutrição ou Mobile antes da chave surrogate é erguer sobre fundação que ser
 | B1 | ✅ **Chave surrogate + `animal_identifiers`** | concluída em 2026-08-02, seis etapas |
 | B2 | ✅ **`animal_events` + auditoria** | concluída em 2026-08-02, append-only por gatilho |
 | B3 | ✅ **Genealogia e nascimentos** | concluída em 2026-08-03 — `partos`, vínculo materno auditado, pendências do §7.3 |
-| B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; falta só a B4.3 (NOT NULL) |
+| B4 | ✅ **Hierarquia de propriedades** | concluída em 2026-08-03 — `properties` + `property_id`; B4.3 (NOT NULL) fechada em 2026-08-06 |
 | B5 | ✅ **Motor de regras regulatórias** | concluída em 2026-08-03 — regras como dado, com vigência, versionamento e simulação |
 | B6 | ✅ **Movimentações entre propriedades + GTA** | concluída em 2026-08-03 — três níveis do §8.4, divergência de recepção |
 | B7 | ✅ **Módulo de dispositivos (brincos)** | concluída em 2026-08-03 — 12 estados, conferência visual×eletrônico, inventário |
@@ -880,9 +880,18 @@ usuários de produção e a rotação da senha do Postgres.
    a chave primária de `animals` continua sendo o brinco. **Não é urgente:** o vínculo já é
    o `uuid` em todo lugar, que é o que o §4.1 exige. Trocar a PK é trabalho à parte.
 
-3. **B4.3 pendente** — `property_id` continua **anulável** em `animals` e `lotes`. As
-   escritas já preenchem; falta o `NOT NULL`. Mesma ordem que funcionou no B1: escrita
-   primeiro, restrição depois.
+3. ~~**B4.3 pendente** — `property_id` continua **anulável** em `animals` e `lotes`.~~
+   🟢 **Fechada em 2026-08-06.** `NOT NULL` aplicado nas duas colunas (migration 0016). A
+   escrita já preenchia desde o B4, mas `init_db()` ainda chamava `_seed_lotes`/
+   `_seed_animals` **antes** de `propriedades._seed_hierarquia`, então um banco novo
+   nascia com as duas tabelas vazias de propriedade e dependia de `_backfill_property_id`
+   rodar depois — que só age com exatamente uma propriedade (§ linha abaixo). Reordenado
+   para a hierarquia nascer primeiro; o backfill continua existindo, mas agora só como
+   rede de segurança para bancos anteriores a esta migração, não como parte do fluxo
+   normal. `tests/test_propriedades.py` tinha um teste que gravava `NULL` direto na coluna
+   para simular esse caso legado — com a constraint em vigor isso vira `IntegrityError`
+   em vez de testar algo, então o teste passou a montar um schema à parte, sem a
+   restrição, só para esse cenário antigo.
 
 4. ~~**A fila de sincronização não drena.**~~ 🟢 **Fechada em 2026-08-05**, com a tela do
    §10.4. Descoberta em 2026-08-04 ao ligar a tela do §8: `animal_events.status_sincronizacao`
@@ -907,8 +916,11 @@ usuários de produção e a rotação da senha do Postgres.
    *registrados* junto das operações, mas o estado do animal **não é derivado deles**.
    Fazer as duas coisas de uma vez seria reescrever o sistema num salto.
 
-6. **`expected_sale_value` é regra de negócio em `repositories/financeiro.py`.** Anotada no
-   próprio arquivo; mover para `services/` é trabalho posterior e sem urgência.
+6. ~~**`expected_sale_value` é regra de negócio em `repositories/financeiro.py`.**~~
+   🟢 **Fechada em 2026-08-06.** A conta (peso × preço/kg) virou
+   `services/financeiro.py::valor_esperado_venda`, pura. `repositories/financeiro.py`
+   manteve só a consulta ao preço (`_conn()`, R1) e passou a importar a conta em vez de
+   reimplementá-la (R8).
 
 7. **PWA: validar num aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
    deploy fica atrás do portão de autenticação do Streamlit Cloud, e o PWA instalado precisa
