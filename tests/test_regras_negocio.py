@@ -47,7 +47,10 @@ class BaseRegras(unittest.TestCase):
                  "_seed_animals", "_seed_insumos"]
         self._originais = {n: getattr(db, n) for n in seeds}
         for n in seeds:
-            setattr(db, n, lambda con: None)
+            # `_seed_lotes`/`_seed_animals` recebem `property_id` desde a B4.3
+            # (init_db chama as duas com dois argumentos); as demais continuam
+            # de um só. Aceitar `*a` cobre as duas formas sem duplicar a lista.
+            setattr(db, n, lambda *a: None)
         try:
             db.init_db()
         finally:
@@ -72,12 +75,25 @@ class BaseRegras(unittest.TestCase):
     def animal(self, aid="A1", *, peso=400.0, entrada=None, peso_entrada=300.0,
                nascimento=None, sexo="M", alvo=None, lote=None, status="ativo"):
         # O uuid é obrigatório desde a etapa B1.6: as filhas só se ligam por ele.
+        # `property_id` é NOT NULL desde a B4.3 — `_seed_hierarquia` roda no
+        # `init_db()` deste setUp mesmo com os outros seeds neutralizados
+        # (ela não está na lista `seeds` acima), então sempre há uma
+        # propriedade padrão para apontar.
+        con = sqlite3.connect(db.DB_PATH)
+        try:
+            row = con.execute(
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
+        finally:
+            con.close()
+        property_id = row[0] if row else None
+
         self._sql(
             "INSERT INTO animals (id,uuid,breed,sex,birth_date,entry_date,entry_weight,"
-            "current_weight,target_weight,status,lote_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "current_weight,target_weight,status,lote_id,property_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (aid, f"uuid-{aid}", "Nelore", sexo, nascimento,
              entrada or _dias_atras(100),
-             peso_entrada, peso, alvo, status, lote))
+             peso_entrada, peso, alvo, status, lote, property_id))
         return aid
 
     def _uuid(self, aid):

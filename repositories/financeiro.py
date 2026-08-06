@@ -13,10 +13,9 @@ from .animais import get_animal, uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
 
-# `expected_sale_value` é regra de negócio (peso × preço da categoria) que ficou
-# nesta camada por ora — mover para `services/` é trabalho posterior. Enquanto
-# isso, importa a regra de idade em vez de reimplementá-la (ROADMAP R8).
+# Regras puras importadas em vez de reimplementadas (ROADMAP R8).
 from services.zootecnia import get_age_category
+from services.financeiro import valor_esperado_venda
 
 
 @_cache
@@ -343,10 +342,14 @@ def get_expected_price_kg(age_band: str, sex: str) -> float:
 
 
 def expected_sale_value(animal: dict) -> float:
-    """Valor esperado de venda do animal = peso atual × preço/kg da categoria."""
+    """Valor esperado de venda do animal = peso atual × preço/kg da categoria.
+
+    A consulta (preço da categoria) mora aqui — é `_conn()`, e só este
+    módulo acessa banco (R1). A conta em si é `services.financeiro`.
+    """
     band = get_age_category(animal.get("birth_date"))
     price = get_expected_price_kg(band, animal["sex"])
-    return round(animal["current_weight"] * price, 2)
+    return valor_esperado_venda(animal["current_weight"], price)
 
 
 def get_category_prices_list() -> list[dict]:

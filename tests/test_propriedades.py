@@ -143,24 +143,37 @@ class TestMovimentacaoEntrePropriedades(BaseB4):
                          "animal mudou de piquete mas ficou na propriedade antiga")
 
 
-class TestBackfillComVariasPropriedades(BaseB4):
+class TestBackfillComVariasPropriedades(unittest.TestCase):
+    """_backfill_property_id só serve como rede de segurança para bancos
+    anteriores à migração 0016 (property_id virou NOT NULL) — no schema
+    atual, criado por db.init_db(), a coluna nunca fica NULL. Por isso este
+    teste monta à parte um schema mínimo sem a restrição, simulando um banco
+    antigo, em vez de usar BaseB4 (onde `UPDATE ... SET property_id=NULL`
+    hoje violaria a constraint e mascararia o que se quer provar)."""
+
     def test_backfill_nao_adivinha_com_mais_de_uma(self):
         """Com várias propriedades, atribuir seria inventar localização.
 
         Localização errada num sistema de rastreabilidade é pior que ausente.
         """
-        propriedades.criar_propriedade(
-            propriedades.padrao()["produtor_id"], "Segunda")
-        con = sqlite3.connect(db.DB_PATH)
+        con = sqlite3.connect(":memory:")
         con.row_factory = sqlite3.Row
-        try:
-            con.execute("UPDATE animals SET property_id=NULL")
-            con.commit()
-            n = propriedades._backfill_property_id(con)
-            con.commit()
-        finally:
-            con.close()
+        con.execute("CREATE TABLE properties (id TEXT PRIMARY KEY)")
+        con.execute("CREATE TABLE animals (id TEXT PRIMARY KEY, property_id TEXT)")
+        con.execute("CREATE TABLE lotes (id TEXT PRIMARY KEY, property_id TEXT)")
+        con.execute("INSERT INTO properties VALUES ('P1')")
+        con.execute("INSERT INTO properties VALUES ('P2')")
+        con.execute("INSERT INTO animals VALUES ('A1', NULL)")
+        con.commit()
+
+        n = propriedades._backfill_property_id(con)
+        con.commit()
+
         self.assertEqual(n, 0, "backfill adivinhou a propriedade")
+        a = con.execute(
+            "SELECT property_id FROM animals WHERE id='A1'").fetchone()
+        self.assertIsNone(a["property_id"],
+                           "backfill preencheu mesmo sem poder decidir")
 
 
 if __name__ == "__main__":
