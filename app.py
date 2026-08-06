@@ -35,7 +35,7 @@ from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
 )
-from ui.tema import cores
+from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -48,6 +48,8 @@ st.set_page_config(
 
 db.init_db()
 db.refresh_carencia_status()
+c = cores()
+c = cores()
 
 # ─── CSS ──────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -118,13 +120,7 @@ COST_TYPES = ["compra","insumo","operacional","veterinário","outro"]
 # Cotação padrão centralizada (usada no Simulador e no Relatório Financeiro)
 DEFAULT_PRICE_ARROBA = 320.0   # R$ por arroba (boi gordo)
 DEFAULT_PRICE_KG     = 10.0    # R$ por kg de boi vivo
-PLOTLY = dict(
-    template="plotly_dark",
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#f1f5f9",size=12),
-    margin=dict(l=10,r=10,t=30,b=10),
-)
+PLOTLY = plotly_layout()
 
 def _layout(**overrides):
     """Mescla o layout padrão PLOTLY com overrides (evita conflito de kwargs)."""
@@ -272,7 +268,7 @@ def _ocr_number(raw: bytes) -> Optional[str]:
         img = ImageOps.autocontrast(img)
         txt = pytesseract.image_to_string(
             img, config="--psm 7 -c tessedit_char_whitelist=0123456789")
-        digitos = "".join(c for c in txt if c.isdigit())
+        digitos = "".join(ch for ch in txt if ch.isdigit())
         return digitos or None
     except Exception:
         return None
@@ -415,7 +411,7 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
         pdf.set_fill_color(30, 60, 30)
         pdf.set_text_color(200, 255, 200)
         pdf.set_font("Helvetica", "B", 6)
-        for c in cols:
+        for col in cols:
             pdf.cell(col_w, 6, _pdf_safe(c)[:22], border=1, fill=True, align="C")
         pdf.ln()
         pdf.set_font("Helvetica", "", 6)
@@ -425,7 +421,7 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
                 pdf.set_fill_color(245, 245, 245)
             else:
                 pdf.set_fill_color(255, 255, 255)
-            for c in cols:
+            for col in cols:
                 pdf.cell(col_w, 5, _pdf_safe(row[c])[:22], border=1, fill=True)
             pdf.ln()
         out = pdf.output()
@@ -445,8 +441,8 @@ def page_login():
         st.markdown("""
         <div style="text-align:center;padding:2rem 0 1.5rem">
             <div style="font-size:4.5rem;line-height:1">🐄</div>
-            <h1 style="color:#4ade80;margin:.4rem 0 0">AgroTop</h1>
-            <p style="color:#64748b;margin:0;font-size:.95rem">Sistema de Gestão de Gado de Corte</p>
+            <h1 style="color:{c["primaria"]};margin:.4rem 0 0">AgroTop</h1>
+            <p style="color:{c["texto_terciario"]};margin:0;font-size:.95rem">Sistema de Gestão de Gado de Corte</p>
         </div>""", unsafe_allow_html=True)
         with st.form("login"):
             user = st.text_input("👤 Usuário", placeholder="seu.usuario")
@@ -491,10 +487,10 @@ def _sidebar():
         st.markdown(f"""
         <div style="text-align:center;padding:.8rem 0 .5rem">
             <div style="font-size:2.5rem">🐄</div>
-            <h2 style="color:#4ade80;margin:0">AgroTop</h2>
-            <div style="color:#94a3b8;font-size:.8rem;margin-top:.25rem">
+            <h2 style="color:{c["primaria"]};margin:0">AgroTop</h2>
+            <div style="color:{c["texto_secundario"]};font-size:.8rem;margin-top:.25rem">
                 {user['name']}<br>
-                <span style="color:#4ade80">●</span>&nbsp;
+                <span style="color:{c["primaria"]}">●</span>&nbsp;
                 {"Administrador" if user['role']=='admin' else "Operador"}
             </div>
         </div>""", unsafe_allow_html=True)
@@ -552,17 +548,17 @@ def _sidebar():
         if stats:
             # Usa a MESMA fonte da página (_use_arroba) — sempre consistente
             if _use_arroba():
-                prod_str = f"🏷️ <b style='color:#fbbf24'>{stats['arrobas_prod']:.1f} @</b> ganhas"
+                prod_str = f"🏷️ <b style='color:{c['atencao']}'>{stats['arrobas_prod']:.1f} @</b> ganhas"
             else:
                 total_gain_kg = sum(a["current_weight"]-a["entry_weight"]
                                     for a in db.get_all_animals())
-                prod_str = f"📦 <b style='color:#fbbf24'>{total_gain_kg:.0f} kg</b> ganhos"
+                prod_str = f"📦 <b style='color:{c['atencao']}'>{total_gain_kg:.0f} kg</b> ganhos"
 
             st.markdown(f"""
-            <div style="font-size:.78rem;color:#64748b;text-align:center;line-height:2">
-                🐄 <b style="color:#f1f5f9">{stats['total']}</b> animais ativos &nbsp;
-                ⚖️ <b style="color:#f1f5f9">{stats['avg_weight']:.0f} kg</b> médio<br>
-                📈 GMD <b style="color:#4ade80">{stats['avg_gmd']:.3f} kg/dia</b> &nbsp;
+            <div style="font-size:.78rem;color:{c["texto_terciario"]};text-align:center;line-height:2">
+                🐄 <b style="color:{c["texto"]}">{stats['total']}</b> animais ativos &nbsp;
+                ⚖️ <b style="color:{c["texto"]}">{stats['avg_weight']:.0f} kg</b> médio<br>
+                📈 GMD <b style="color:{c["primaria"]}">{stats['avg_gmd']:.3f} kg/dia</b> &nbsp;
                 {prod_str}
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
@@ -622,18 +618,18 @@ def page_dashboard():
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
             st.markdown(f"""<div class="card-red">
-                <b style="color:#f87171">🔴 {n_sum} Sumidos</b><br>
-                <span style="color:#94a3b8;font-size:.85rem">Sem pesagem há +30 dias</span>
+                <b style="color:{c["perigo"]}">🔴 {n_sum} Sumidos</b><br>
+                <span style="color:{c["texto_secundario"]};font-size:.85rem">Sem pesagem há +30 dias</span>
             </div>""", unsafe_allow_html=True)
         with ac2:
             st.markdown(f"""<div class="card-yellow">
-                <b style="color:#fbbf24">🟡 {n_car} Em Carência</b><br>
-                <span style="color:#94a3b8;font-size:.85rem">Não podem ser abatidos</span>
+                <b style="color:{c["atencao"]}">🟡 {n_car} Em Carência</b><br>
+                <span style="color:{c["texto_secundario"]};font-size:.85rem">Não podem ser abatidos</span>
             </div>""", unsafe_allow_html=True)
         with ac3:
             st.markdown(f"""<div class="card-green">
-                <b style="color:#4ade80">🟢 {n_pro} Prontos para Abate</b><br>
-                <span style="color:#94a3b8;font-size:.85rem">Peso-alvo atingido</span>
+                <b style="color:{c["primaria"]}">🟢 {n_pro} Prontos para Abate</b><br>
+                <span style="color:{c["texto_secundario"]};font-size:.85rem">Peso-alvo atingido</span>
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
 
@@ -653,17 +649,17 @@ def page_dashboard():
                 sub = df_all[df_all["animal_id"]==aid].sort_values("weigh_date")
                 fig.add_trace(go.Scatter(x=sub["weigh_date"],y=sub["weight"],
                     mode="lines+markers",showlegend=False,opacity=0.35,
-                    line=dict(width=1,color="#334155"),marker=dict(size=3),
+                    line=dict(width=1,color=c["borda"]),marker=dict(size=3),
                     hovertemplate=f"<b>{aid}</b><br>%{{x|%d/%m/%Y}}<br>%{{y:.1f}} kg<extra></extra>"))
             fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
                 mode="lines+markers",name="Média do Rebanho",
-                line=dict(width=3,color="#4ade80"),
-                marker=dict(size=9,color="#4ade80",line=dict(width=2,color="#0f172a")),
+                line=dict(width=3,color=c["primaria"]),
+                marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
                 hovertemplate="<b>Média</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"))
             fig.update_layout(**PLOTLY,height=350,
                 legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1),
-                xaxis=dict(gridcolor="#1e293b",title="Data"),
-                yaxis=dict(gridcolor="#1e293b",title="Peso (kg)"))
+                xaxis=dict(gridcolor=c["superficie"],title="Data"),
+                yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"))
             st.plotly_chart(fig, use_container_width=True)
 
     with col_side:
@@ -671,7 +667,7 @@ def page_dashboard():
         df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
         df_br.columns=["Raça","Qtd"]
         fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
-            color_discrete_sequence=["#4ade80","#22d3ee","#a78bfa","#f472b6","#fb923c","#facc15","#34d399"])
+            color_discrete_sequence=SERIES)
         fig_p.update_layout(**_layout(height=240,margin=dict(l=0,r=0,t=10,b=10),
             legend=dict(orientation="h",yanchor="bottom",y=-0.2)))
         fig_p.update_traces(textposition="inside",textinfo="percent+label")
@@ -682,12 +678,12 @@ def page_dashboard():
         df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
         if not df_g.empty:
             fig_g=px.bar(df_g,x="GMD",y="ID",orientation="h",color="GMD",
-                color_continuous_scale=["#f87171","#fbbf24","#4ade80"],
+                color_continuous_scale=ESCALA_RUIM_BOM,
                 labels={"GMD":"kg/dia"})
-            fig_g.add_vline(x=0,line_dash="dash",line_color="#475569")
+            fig_g.add_vline(x=0,line_dash="dash",line_color=c["borda_suave"])
             fig_g.update_layout(**PLOTLY,height=max(180,len(df_g)*27),
                 coloraxis_showscale=False,
-                xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b",title=""))
+                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title=""))
             st.plotly_chart(fig_g, use_container_width=True)
 
     # Tabela resumo
@@ -743,16 +739,16 @@ def _campo_trato():
 
         # Cabeçalho do piquete
         st.markdown(f'<div class="card" style="margin-bottom:.4rem">'
-                    f'<b style="font-size:1.05rem;color:#4ade80">🌿 {lid} — {lote_nome}</b>'
+                    f'<b style="font-size:1.05rem;color:{c["primaria"]}">🌿 {lid} — {lote_nome}</b>'
                     f'</div>', unsafe_allow_html=True)
 
         for p in itens:
             freq = db.FEEDING_FREQUENCIES.get(p["frequency"], p["frequency"])
             if p["done_this_period"]:
                 st.markdown(
-                    f'<div class="hist-item" style="border-left-color:#166534;opacity:.7">'
+                    f'<div class="hist-item" style="border-left-color:{c["sucesso_escuro"]};opacity:.7">'
                     f'✅ <b>{p["product_name"]}</b> — {p["quantity"]:.0f} {p["unit"]} '
-                    f'· {freq} · <span style="color:#4ade80">confirmado</span> '
+                    f'· {freq} · <span style="color:{c["primaria"]}">confirmado</span> '
                     f'(último: {p["last_check"] or "—"})</div>', unsafe_allow_html=True)
                 continue
 
@@ -870,11 +866,11 @@ def _campo_animal():
 
     gmd=db.calculate_gmd(animal["id"])
     wd =db.get_withdrawal_end(animal["id"])
-    gc ="#4ade80" if (gmd and gmd>0) else "#f87171" if (gmd and gmd<0) else "#94a3b8"
+    gc =c["primaria"] if (gmd and gmd>0) else c["perigo"] if (gmd and gmd<0) else c["texto_secundario"]
     cat=db.get_age_category(animal.get("birth_date"))
     idade=db.get_age_display(animal)
 
-    carencia_html = (f'<div style="color:#fbbf24;font-size:.82rem;margin-top:.3rem">'
+    carencia_html = (f'<div style="color:{c["atencao"]};font-size:.82rem;margin-top:.3rem">'
                      f'⚠️ Carência até {wd.isoformat()}</div>') if wd else ''
     sex_sym = "♂" if animal['sex']=='M' else "♀"
     gmd_txt = f'{gmd:+.3f} kg/dia' if gmd is not None else '— sem dados'
@@ -882,16 +878,16 @@ def _campo_animal():
         f'<div class="card-green">'
         f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">'
         f'<div>'
-        f'<div style="font-size:2rem;font-weight:900;color:#4ade80;line-height:1.1">🐄 {animal["id"]}</div>'
-        f'<div style="color:#94a3b8;font-size:.92rem;margin-top:.2rem">'
+        f'<div style="font-size:2rem;font-weight:900;color:{c["primaria"]};line-height:1.1">🐄 {animal["id"]}</div>'
+        f'<div style="color:{c["texto_secundario"]};font-size:.92rem;margin-top:.2rem">'
         f'{animal["breed"]} · {sex_sym} · {cat} ({idade})<br>'
-        f'Lote: <b style="color:#f1f5f9">{animal.get("lote_name") or "—"}</b> &nbsp;'
+        f'Lote: <b style="color:{c["texto"]}">{animal.get("lote_name") or "—"}</b> &nbsp;'
         f'{_status_badge(animal["status"])}'
         f'</div>{carencia_html}</div>'
         f'<div style="text-align:right">'
-        f'<div style="font-size:2.4rem;font-weight:900;color:#f1f5f9;line-height:1">'
-        f'{animal["current_weight"]:.1f}<span style="font-size:1rem;color:#64748b"> kg</span></div>'
-        f'<div style="color:#fbbf24;font-size:.85rem">{_fmt_live(animal["current_weight"])}</div>'
+        f'<div style="font-size:2.4rem;font-weight:900;color:{c["texto"]};line-height:1">'
+        f'{animal["current_weight"]:.1f}<span style="font-size:1rem;color:{c["texto_terciario"]}"> kg</span></div>'
+        f'<div style="color:{c["atencao"]};font-size:.85rem">{_fmt_live(animal["current_weight"])}</div>'
         f'<div style="color:{gc};font-size:.88rem;font-weight:600">GMD: {gmd_txt}</div>'
         f'</div></div></div>',
         unsafe_allow_html=True)
@@ -1077,9 +1073,9 @@ def _campo_animal():
                 df_hw=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
                 df_hw.columns=["Data","Peso (kg)"]; df_hw["Data"]=pd.to_datetime(df_hw["Data"])
                 fig_hw=px.line(df_hw,x="Data",y="Peso (kg)",markers=True,
-                    color_discrete_sequence=["#4ade80"])
-                fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor="#1e293b"),
-                    yaxis=dict(gridcolor="#1e293b"))
+                    color_discrete_sequence=[c["primaria"]])
+                fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=c["superficie"]),
+                    yaxis=dict(gridcolor=c["superficie"]))
                 st.plotly_chart(fig_hw,use_container_width=True)
             for w in ws[:5]:
                 met = w.get("method") or "pesado"
@@ -1087,25 +1083,25 @@ def _campo_animal():
                           "estimado":'<span class="badge-yellow">estimado</span>',
                           "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
                 st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
-                    f'<span style="color:#64748b;font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
-                    f'<span style="color:#94a3b8;font-size:.78rem">{w["operator"] or "—"}</span></div>',
+                    f'<span style="color:{c["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
+                    f'<span style="color:{c["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
                     unsafe_allow_html=True)
         with h2:
             st.markdown("**💉 Medicamentos**")
             for m in db.get_medications(animal["id"])[:5]:
                 end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
                 badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
-                st.markdown(f'<div class="hist-item" style="border-left-color:#22d3ee">'
+                st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
                     f'<b>{m["medication_name"]}</b> {badge}<br>'
-                    f'<span style="color:#64748b;font-size:.78rem">'
+                    f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
                     f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
                     f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
                     f'</span></div>',unsafe_allow_html=True)
             st.markdown("**🚚 Movimentações**")
             for mv in db.get_movements(animal["id"])[:4]:
-                st.markdown(f'<div class="hist-item" style="border-left-color:#a78bfa">'
+                st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
                     f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
-                    f'<span style="color:#64748b;font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
+                    f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
                     f'</div>',unsafe_allow_html=True)
 
 
@@ -1491,27 +1487,27 @@ def _cartao_de_evento(e: dict, correcoes: list[dict]):
     except (ValueError, TypeError, KeyError):
         pass
 
-    cor = "#fbbf24" if e["tipo"] in ("correcao", "estorno") else "#4ade80"
+    cor = c["atencao"] if e["tipo"] in ("correcao", "estorno") else c["primaria"]
     rotulo = _TIPO_EVENTO_ROTULO.get(e["tipo"], e["tipo"])
 
     with st.container():
         st.markdown(
             f'<div class="hist-item" style="border-left-color:{cor}">'
             f'<b>{rotulo}</b> {"🔺 corrigido depois" if correcoes else ""}<br>'
-            f'<span style="color:#94a3b8;font-size:.82rem">'
+            f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
             f'ocorreu: {ocorrido} · registrado: {registrado}{atraso}'
             f'{"  ·  por: " + e["usuario_registro"] if e.get("usuario_registro") else ""}'
             f'</span>'
             + (f'<br><span style="font-size:.85rem">{e["observacoes"]}</span>'
                if e.get("observacoes") else "")
-            + (f'<br><span style="color:#fbbf24;font-size:.82rem">'
+            + (f'<br><span style="color:{c["atencao"]};font-size:.82rem">'
                f'justificativa: {e["justificativa"]}</span>'
                if e.get("justificativa") else "")
             + '</div>', unsafe_allow_html=True)
 
-        for c in correcoes:
-            st.caption(f"↳ corrigido por evento #{c['id']} ({c['ocorrido_em'][:10]}): "
-                       f"{c.get('justificativa', '')}")
+        for corr in correcoes:
+            st.caption(f"↳ corrigido por evento #{corr['id']} ({corr['ocorrido_em'][:10]}): "
+                       f"{corr.get('justificativa', '')}")
 
         if e["tipo"] not in ("correcao", "estorno"):
             with st.expander(f"🖊️ Registrar correção do evento #{e['id']}"):
@@ -1625,15 +1621,15 @@ def page_animal():
             coef=np.polyfit(x_num,df_w["Peso (kg)"],1)
             fig=go.Figure()
             fig.add_trace(go.Scatter(x=df_w["Data"],y=np.polyval(coef,x_num),
-                mode="lines",name="Tendência",line=dict(dash="dot",color="#fbbf24",width=2),hoverinfo="skip"))
+                mode="lines",name="Tendência",line=dict(dash="dot",color=c["atencao"],width=2),hoverinfo="skip"))
             fig.add_trace(go.Scatter(x=df_w["Data"],y=df_w["Peso (kg)"],
                 mode="lines+markers",name="Pesagens",
-                line=dict(color="#4ade80",width=2.5),
-                marker=dict(size=10,color="#4ade80",line=dict(width=2,color="#0f172a")),
+                line=dict(color=c["primaria"],width=2.5),
+                marker=dict(size=10,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
                 hovertemplate="%{x|%d/%m/%Y}<br><b>%{y:.1f} kg</b><extra></extra>"))
             fig.update_layout(**PLOTLY,height=300,
-                xaxis=dict(gridcolor="#1e293b",title="Data"),
-                yaxis=dict(gridcolor="#1e293b",title="Peso (kg)"),
+                xaxis=dict(gridcolor=c["superficie"],title="Data"),
+                yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"),
                 legend=dict(orientation="h",y=1.08))
             st.plotly_chart(fig,use_container_width=True)
         else:
@@ -1652,11 +1648,11 @@ def page_animal():
             for m_ in meds:
                 end_=datetime.strptime(m_["med_date"],"%Y-%m-%d").date()+timedelta(days=m_["withdrawal_days"] or 0)
                 active=m_["withdrawal_days"] and end_>=date.today()
-                bc="border-left-color:#f87171" if active else "border-left-color:#22d3ee"
+                bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
                 st.markdown(f'<div class="hist-item" style="{bc}">'
                     f'<b style="font-size:1rem">{m_["medication_name"]}</b>'
                     f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
-                    f'<span style="color:#94a3b8;font-size:.82rem">'
+                    f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
                     f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
                     f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+end_.isoformat()+")" if m_["withdrawal_days"] else ""}'
                     f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
@@ -1667,9 +1663,9 @@ def page_animal():
     with tl_mov:
         if movs:
             for mv in movs:
-                st.markdown(f'<div class="hist-item" style="border-left-color:#a78bfa">'
+                st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
                     f'<b>{mv.get("from_name") or "Entrada"} → {mv.get("to_name","?")}</b><br>'
-                    f'<span style="color:#94a3b8;font-size:.82rem">'
+                    f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
                     f'{mv["movement_date"]} · {mv["reason"]} · {mv.get("operator") or "—"}'
                     f'</span></div>',unsafe_allow_html=True)
         else:
@@ -1732,7 +1728,7 @@ def page_lotes():
             cap = l["capacity_ua"] or 0
             has_cap = cap > 0
             pct = min(ua/cap*100, 100) if has_cap else 0
-            bar_col="#4ade80" if pct<75 else "#fbbf24" if pct<95 else "#f87171"
+            bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
             status_badge={"ativo":'<span class="badge-green">Ativo</span>',
                 "descanso":'<span class="badge-yellow">Descanso</span>',
                 "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
@@ -1749,7 +1745,7 @@ def page_lotes():
             if has_cap:
                 ocup_txt = f"{ua:.1f} / {cap:.0f} UA ({pct:.0f}%)"
                 cap_txt  = f"Cap. {cap:.0f} UA"
-                barra = (f'<div style="background:#0f172a;border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
+                barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
                          f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
             else:
                 ocup_txt = f"{ua:.1f} UA · sem capacidade definida"
@@ -1760,14 +1756,14 @@ def page_lotes():
             <div class="card">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
                 <div>
-                  <b style="font-size:1.1rem;color:#f1f5f9">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
-                  <div style="color:#94a3b8;font-size:.82rem;margin-top:.2rem">
+                  <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
+                  <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
                     {l['area_ha']} ha · {cap_txt} · {dias_ocup}
                   </div>
                 </div>
                 <div style="text-align:right">
-                  <div style="font-size:1.5rem;font-weight:800;color:#4ade80">{_plural(l['animal_count'],'animal','animais')}</div>
-                  <div style="color:#94a3b8;font-size:.82rem">{ocup_txt}</div>
+                  <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
+                  <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
                 </div>
               </div>
               {barra}
@@ -1791,12 +1787,12 @@ def page_lotes():
                 "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
             fig_l=go.Figure()
             fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
-                marker_color="#334155")
+                marker_color=c["borda"])
             fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
-                marker_color="#4ade80")
+                marker_color=c["primaria"])
             fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
                 legend=dict(orientation="h",y=1.1),
-                xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b",title="UA"))
+                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
             st.plotly_chart(fig_l,use_container_width=True)
 
     with lt2:
@@ -1906,7 +1902,7 @@ def _fin_venda(animals):
                 else:
                     r = db.register_sale(sel_ids, sale_date.strftime("%Y-%m-%d"), tipo, modo,
                         valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes)
-                    cor = "#4ade80" if r["lucro"] >= 0 else "#f87171"
+                    cor = c["primaria"] if r["lucro"] >= 0 else c["perigo"]
                     st.success(f"✅ {r['n']} animal(is) vendido(s)!")
                     st.markdown(
                         f"<div class='card'>Receita: <b>R$ {r['receita']:,.2f}</b> · "
@@ -1927,7 +1923,7 @@ def _fin_venda(animals):
         df_v.columns=["Data","Animal","Raça","Tipo","Modo","Peso (kg)","Receita (R$)","Custo (R$)","Lucro (R$)","Comprador"]
         st.dataframe(df_v, use_container_width=True, hide_index=True,
             column_config={c: st.column_config.NumberColumn(format="R$ %.2f")
-                           for c in ["Receita (R$)","Custo (R$)","Lucro (R$)"]})
+                           for col in ["Receita (R$)","Custo (R$)","Lucro (R$)"]})
         tot_luc = sum(v["profit"] for v in vendas)
         st.metric("Lucro/Prejuízo acumulado nas vendas", f"R$ {tot_luc:,.2f}")
     else:
@@ -1968,7 +1964,7 @@ def _fin_resultado():
 
     st.markdown("---")
     res = fin["resultado"]
-    cor = "#4ade80" if res >= 0 else "#f87171"
+    cor = c["primaria"] if res >= 0 else c["perigo"]
     rk = st.columns(3)
     rk[0].metric("Total de Saídas",  f"R$ {fin['saidas_total']:,.2f}")
     rk[1].metric("Total de Entradas",f"R$ {fin['receita_total']:,.2f}")
@@ -1985,8 +1981,8 @@ def _fin_resultado():
                   fin['operacional'],fin['custos_fixos'],fin['receita_total']],
         "Tipo": ["Saída"]*5+["Entrada"]})
     fig=px.bar(df_fluxo,x="Categoria",y="Valor",color="Tipo",
-        color_discrete_map={"Saída":"#f87171","Entrada":"#4ade80"})
-    fig.update_layout(**PLOTLY,height=300,xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+        color_discrete_map={"Saída":c["perigo"],"Entrada":c["primaria"]})
+    fig.update_layout(**PLOTLY,height=300,xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
     st.plotly_chart(fig,use_container_width=True)
 
 
@@ -2013,7 +2009,7 @@ def _fin_mortalidade():
         st.markdown("**Por causa**")
         dfc = pd.DataFrame([{"Causa":k2,"Mortes":v} for k2,v in m["por_causa"].items()]).sort_values("Mortes",ascending=False)
         figc = px.pie(dfc, names="Causa", values="Mortes", hole=0.45,
-            color_discrete_sequence=["#f87171","#fb923c","#facc15","#a78bfa","#22d3ee","#4ade80","#f472b6"])
+            color_discrete_sequence=[c["perigo"], c["atencao_secundario"], c["atencao_brilhante"], c["destaque"], c["info"], c["sucesso"], c["destaque_secundario"]])
         figc.update_layout(**_layout(height=260, margin=dict(l=0,r=0,t=10,b=10),
             legend=dict(orientation="h",yanchor="bottom",y=-0.35)))
         st.plotly_chart(figc, use_container_width=True)
@@ -2021,9 +2017,9 @@ def _fin_mortalidade():
         st.markdown("**Por piquete**")
         dfl = pd.DataFrame([{"Piquete":k2,"Mortes":v} for k2,v in m["por_lote"].items()]).sort_values("Mortes",ascending=True)
         figl = px.bar(dfl, x="Mortes", y="Piquete", orientation="h",
-            color="Mortes", color_continuous_scale=["#fbbf24","#f87171"])
+            color="Mortes", color_continuous_scale=[c["atencao"], c["perigo"]])
         figl.update_layout(**_layout(height=260, coloraxis_showscale=False,
-            xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b",title="")))
+            xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"],title="")))
         st.plotly_chart(figl, use_container_width=True)
 
     st.markdown("**📜 Registro de óbitos**")
@@ -2097,7 +2093,7 @@ def page_financeiro():
 
         fig_c=px.scatter(df_f,x=prod_col,y="Custo Total (R$)",
             color=cpu_col,text="ID",
-            color_continuous_scale=["#4ade80","#fbbf24","#f87171"],
+            color_continuous_scale=ESCALA_BOM_RUIM,
             labels={prod_col:f"Produção ({ul})","Custo Total (R$)":"Custo Total (R$)"})
         fig_c.update_traces(textposition="top center",marker=dict(size=12))
         fig_c.update_layout(**PLOTLY,height=320,coloraxis_colorbar=dict(title=f"R$/{ul}"))
@@ -2155,7 +2151,7 @@ def page_financeiro():
                 df_cat=pd.DataFrame(by_cat)
                 df_cat.columns=["Categoria","Total"]
                 fig_fx=px.pie(df_cat,names="Categoria",values="Total",hole=0.45,
-                    color_discrete_sequence=["#4ade80","#22d3ee","#a78bfa","#f472b6","#fb923c","#facc15","#34d399","#f87171"])
+                    color_discrete_sequence=SERIES + [c["perigo"]])
                 fig_fx.update_layout(**_layout(height=260,margin=dict(l=0,r=0,t=10,b=10),
                     legend=dict(orientation="h",yanchor="bottom",y=-0.25)))
                 fig_fx.update_traces(textposition="inside",textinfo="percent")
@@ -2204,9 +2200,9 @@ def page_financeiro():
             with sc2:
                 sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
                 st.markdown(
-                    f'<div class="card"><div style="color:#94a3b8;font-size:.85rem">Cotação única</div>'
-                    f'<div style="font-size:2rem;font-weight:800;color:#4ade80">R$ {cotacao:.2f}/{ul}</div>'
-                    f'<div style="color:#94a3b8;font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
+                    f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
+                    f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {cotacao:.2f}/{ul}</div>'
+                    f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
                     unsafe_allow_html=True)
         else:  # categoria
             st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
@@ -2311,10 +2307,10 @@ def page_financeiro():
         fmt_prod = "%.2f" if _use_arroba() else "%.1f"
         fig_be=px.bar(df_be.sort_values(be_col),
             x="ID",y=be_col,color=be_col,
-            color_continuous_scale=["#4ade80","#fbbf24","#f87171"],
+            color_continuous_scale=ESCALA_BOM_RUIM,
             labels={be_col:f"R$ mínimo por {ul}"})
         fig_be.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
-            xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
         st.plotly_chart(fig_be,use_container_width=True)
         st.dataframe(df_be,use_container_width=True,hide_index=True,
             column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
@@ -2349,22 +2345,22 @@ def page_financeiro():
             with c1:
                 fig_p=px.bar(df_p,x="Fornecedor",y="GMD Médio (kg/dia)",
                     color="GMD Médio (kg/dia)",
-                    color_continuous_scale=["#f87171","#fbbf24","#4ade80"],
+                    color_continuous_scale=ESCALA_RUIM_BOM,
                     text="GMD Médio (kg/dia)")
                 fig_p.update_traces(texttemplate="%{text:.3f}",textposition="outside")
                 fig_p.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
                     title="GMD médio por fornecedor",
-                    xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+                    xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
                 st.plotly_chart(fig_p,use_container_width=True)
             with c2:
                 fig_m=px.bar(df_p,x="Fornecedor",y="Mortalidade (%)",
                     color="Mortalidade (%)",
-                    color_continuous_scale=["#4ade80","#fbbf24","#f87171"],
+                    color_continuous_scale=ESCALA_BOM_RUIM,
                     text="Mortalidade (%)")
                 fig_m.update_traces(texttemplate="%{text:.1f}%",textposition="outside")
                 fig_m.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
                     title="Taxa de mortalidade por fornecedor",
-                    xaxis=dict(gridcolor="#1e293b"),yaxis=dict(gridcolor="#1e293b"))
+                    xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
                 st.plotly_chart(fig_m,use_container_width=True)
 
             melhor=next((r for r in rank if r["arrobas_produzidas"]>0),None)
@@ -2417,12 +2413,12 @@ def page_estoque():
             "% do Mínimo":min(r["Estoque"]/max(r["Mínimo"],0.01)*100,200)} for r in rows_i])
         fig_e=px.bar(df_bar.sort_values("% do Mínimo"),x="% do Mínimo",y="Insumo",
             orientation="h",color="% do Mínimo",
-            color_continuous_scale=["#f87171","#fbbf24","#4ade80"],range_color=[0,200])
-        fig_e.add_vline(x=100,line_dash="dash",line_color="#fbbf24",
+            color_continuous_scale=ESCALA_RUIM_BOM,range_color=[0,200])
+        fig_e.add_vline(x=100,line_dash="dash",line_color=c["atencao"],
             annotation_text="Mínimo",annotation_position="top")
         fig_e.update_layout(**PLOTLY,height=280,coloraxis_showscale=False,
-            xaxis=dict(gridcolor="#1e293b",title="% do Estoque Mínimo"),
-            yaxis=dict(gridcolor="#1e293b",title=""))
+            xaxis=dict(gridcolor=c["superficie"],title="% do Estoque Mínimo"),
+            yaxis=dict(gridcolor=c["superficie"],title=""))
         st.plotly_chart(fig_e,use_container_width=True)
 
     with et2:
@@ -3013,7 +3009,7 @@ def _cadastro_nascimento():
 
     obs = st.text_area("Observações", key="nasc_obs").strip()
 
-    brincos = [c["id"] for c in crias if c["id"]]
+    brincos = [cr["id"] for cr in crias if cr["id"]]
     faltando = len(brincos) < int(n_crias)
     repetidos = len(brincos) != len(set(brincos))
     if repetidos:
@@ -3326,15 +3322,15 @@ def page_clima():
                 mk[3].metric("Chuva prevista (7 dias)", f"{sum(d['precipitation_sum']):.0f} mm")
 
                 fig = px.bar(df, x="Data", y="Chuva (mm)", color="Prob. chuva (%)",
-                    color_continuous_scale=["#94a3b8","#22d3ee","#3b82f6"],
+                    color_continuous_scale=[c["texto_secundario"], c["info"], c["info_secundario"]],
                     labels={"Chuva (mm)":"Chuva prevista (mm)"})
-                fig.update_layout(**_layout(height=280, xaxis=dict(gridcolor="#1e293b"),
-                    yaxis=dict(gridcolor="#1e293b")))
+                fig.update_layout(**_layout(height=280, xaxis=dict(gridcolor=c["superficie"]),
+                    yaxis=dict(gridcolor=c["superficie"])))
                 st.plotly_chart(fig, use_container_width=True)
                 dfx = df.copy(); dfx["Data"] = dfx["Data"].dt.strftime("%d/%m (%a)")
                 st.dataframe(dfx, use_container_width=True, hide_index=True,
                     column_config={c: st.column_config.NumberColumn(format="%.0f")
-                                   for c in ["Chuva (mm)","Prob. chuva (%)","Mín (°C)","Máx (°C)"]})
+                                   for col in ["Chuva (mm)","Prob. chuva (%)","Mín (°C)","Máx (°C)"]})
                 st.caption("Fonte: Open-Meteo · a mesma previsão vale para todos os piquetes da fazenda.")
             else:
                 st.warning("Não foi possível obter a previsão agora (sem internet ou serviço "
@@ -3378,18 +3374,18 @@ def page_clima():
                        .sum().reset_index())
                 dfm.columns = ["Mês","Chuva (mm)"]
                 figm = px.bar(dfm, x="Mês", y="Chuva (mm)",
-                    color_discrete_sequence=["#3b82f6"])
-                figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor="#1e293b"),
-                    yaxis=dict(gridcolor="#1e293b")))
+                    color_discrete_sequence=[c["info_secundario"]])
+                figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor=c["superficie"]),
+                    yaxis=dict(gridcolor=c["superficie"])))
                 st.plotly_chart(figm, use_container_width=True)
             with gc2:
                 st.markdown("**Por piquete**")
                 dfl = df.groupby("piquete")["rain_mm"].sum().reset_index().sort_values("rain_mm")
                 figl = px.bar(dfl, x="rain_mm", y="piquete", orientation="h",
-                    color="rain_mm", color_continuous_scale=["#94a3b8","#3b82f6"],
+                    color="rain_mm", color_continuous_scale=[c["texto_secundario"], c["info_secundario"]],
                     labels={"rain_mm":"Chuva (mm)","piquete":""})
                 figl.update_layout(**_layout(height=250, coloraxis_showscale=False,
-                    xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b")))
+                    xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"])))
                 st.plotly_chart(figl, use_container_width=True)
             dft = df[["read_date","rain_mm","piquete","operator"]].copy()
             dft["read_date"] = dft["read_date"].dt.strftime("%d/%m/%Y")
@@ -3555,11 +3551,11 @@ def page_desempenho():
                     "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
             fig = px.bar(df.sort_values("GMD (kg/dia)"), x="GMD (kg/dia)", y="ID",
                 orientation="h", color="GMD (kg/dia)",
-                color_continuous_scale=["#f87171","#fbbf24","#4ade80"])
-            fig.add_vline(x=meta_atual, line_dash="dash", line_color="#4ade80",
+                color_continuous_scale=ESCALA_RUIM_BOM)
+            fig.add_vline(x=meta_atual, line_dash="dash", line_color=c["primaria"],
                 annotation_text="Meta", annotation_position="top")
             fig.update_layout(**PLOTLY, height=max(180,len(df)*30), coloraxis_showscale=False,
-                xaxis=dict(gridcolor="#1e293b"), yaxis=dict(gridcolor="#1e293b",title=""))
+                xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"],title=""))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.success("✅ Todos os animais estão na meta ou acima!")
@@ -3614,14 +3610,14 @@ def page_desempenho():
                     "Custo por GMD (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
             fig = go.Figure()
             fig.add_bar(x=[p["lote_name"] for p in perf], y=[p["gmd_medio"] for p in perf],
-                name="GMD médio", marker_color="#4ade80", yaxis="y")
+                name="GMD médio", marker_color=c["primaria"], yaxis="y")
             fig.add_trace(go.Scatter(x=[p["lote_name"] for p in perf],
                 y=[p["custo_nut_por_animal"] for p in perf], name="Nutrição/animal (R$)",
-                mode="lines+markers", line=dict(color="#fbbf24",width=3), yaxis="y2"))
+                mode="lines+markers", line=dict(color=c["atencao"],width=3), yaxis="y2"))
             fig.update_layout(**_layout(height=320,
                 legend=dict(orientation="h",y=1.1),
-                xaxis=dict(gridcolor="#1e293b"),
-                yaxis=dict(title="GMD (kg/dia)",gridcolor="#1e293b"),
+                xaxis=dict(gridcolor=c["superficie"]),
+                yaxis=dict(title="GMD (kg/dia)",gridcolor=c["superficie"]),
                 yaxis2=dict(title="R$/animal",overlaying="y",side="right",showgrid=False)))
             st.plotly_chart(fig, use_container_width=True)
             if all(p["custo_nutricao"]==0 for p in perf):
@@ -3724,15 +3720,15 @@ def page_desempenho():
             fig = go.Figure()
             nomes = [s["nome"] for s in validos]
             fig.add_bar(x=nomes, y=[s["lucro"] for s in validos], name="Lucro (R$)",
-                marker_color=["#4ade80" if s["viavel"] else "#f87171" for s in validos],
+                marker_color=[c["primaria"] if s["viavel"] else c["perigo"] for s in validos],
                 yaxis="y")
             fig.add_trace(go.Scatter(x=nomes, y=[s["dias"] for s in validos],
                 name="Dias no trato", mode="lines+markers",
-                line=dict(color="#fbbf24", width=3), yaxis="y2"))
+                line=dict(color=c["atencao"], width=3), yaxis="y2"))
             fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
-                xaxis=dict(gridcolor="#1e293b"),
-                yaxis=dict(title="Lucro (R$)", gridcolor="#1e293b", zeroline=True,
-                    zerolinecolor="#475569"),
+                xaxis=dict(gridcolor=c["superficie"]),
+                yaxis=dict(title="Lucro (R$)", gridcolor=c["superficie"], zeroline=True,
+                    zerolinecolor=c["borda_suave"]),
                 yaxis2=dict(title="Dias", overlaying="y", side="right", showgrid=False)))
             st.plotly_chart(fig, use_container_width=True)
             st.caption("Receita = peso de abate × rendimento ÷ 15 × preço da @. "
@@ -3773,7 +3769,7 @@ def page_nutricao():
                         st.markdown(
                             f'<div class="hist-item">'
                             f'<b>{p["product_name"]}</b> — {p["quantity"]:.0f} {p["unit"]} '
-                            f'· <span style="color:#4ade80">{freq}</span> · {ativo}'
+                            f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo}'
                             f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
                             f'</div>', unsafe_allow_html=True)
                     with c2:
@@ -4917,7 +4913,7 @@ def page_admin():
             updates, inserts, seen = [], [], set()
 
             for rec in edited.to_dict("records"):
-                clean = {c: _pyval(rec.get(c)) for c in cols}
+                clean = {col: _pyval(rec.get(col)) for col in cols}
                 pkv = clean.get(pk)
                 if _is_empty_pk(pkv) or pkv not in orig_by_pk:
                     row_ins = dict(clean)
@@ -4929,7 +4925,7 @@ def page_admin():
                 else:
                     seen.add(pkv)
                     orig = orig_by_pk[pkv]
-                    if any(str(_pyval(orig.get(c))) != str(clean.get(c)) for c in cols):
+                    if any(str(_pyval(orig.get(col))) != str(clean.get(col)) for col in cols):
                         updates.append(clean)
 
             delete_pks = [k for k in orig_by_pk if k not in seen]
