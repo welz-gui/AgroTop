@@ -4,7 +4,7 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-05 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** · fila de specs em 3
+Última atualização: 2026-08-05 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** · fila de specs em 2
 
 ---
 
@@ -973,8 +973,9 @@ usuários de produção e a rotação da senha do Postgres.
 
 ### 🔵 Processo
 
-12. **Fila de specs com três tarefas** (`specs/QUADRO.md`). O que resta de delegável é mais
-    escasso que antes: o trabalho principal virou integração, e integração é do mantenedor
-    pela R31. Das seis que estavam na fila em 2026-08-04, três fecharam em 2026-08-05
-    (0030, 0028-v2, 0029-v2); a 0032-v2 ficou livre de novo depois de um agente travar
-    sem produzir nada — ver a nota no quadro.
+12. **Fila de specs com duas tarefas** (`specs/QUADRO.md`): 0031 e 0007-v2. O que resta de
+    delegável é mais escasso que antes: o trabalho principal virou integração, e
+    integração é do mantenedor pela R31. Das seis que estavam na fila em 2026-08-04,
+    quatro fecharam em 2026-08-05 (0030, 0028-v2, 0029-v2, 0032-v2 — esta na segunda
+    tentativa, depois de a primeira travar sem produzir nada, ver a nota no quadro); a
+    0007 fechou com defeito e voltou como 0007-v2.
