@@ -1927,16 +1927,34 @@ def get_alert_animals() -> dict:
     today   = date.today()
     sumidos, carencia_active, prontos = [], [], []
 
+    all_weighings = _weighings_by_animal()
+    all_medications = _medications_by_animal()
+
+    withdrawal_ends = {}
+    for animal_id, meds in all_medications.items():
+        latest = None
+        for r in meds:
+            if not r["withdrawal_days"]:
+                continue
+            try:
+                end = datetime.strptime(r["med_date"], "%Y-%m-%d").date() + timedelta(days=r["withdrawal_days"])
+                if end > today and (latest is None or end > latest):
+                    latest = end
+            except ValueError:
+                pass
+        withdrawal_ends[animal_id] = latest
+
     for a in animals:
+        animal_id = a["id"]
         # Sumidos: sem pesagem nos últimos 30 dias
-        ws = get_weighings(a["id"])
+        ws = all_weighings.get(animal_id, [])
         if ws:
             last_w = datetime.strptime(ws[0]["weigh_date"], "%Y-%m-%d").date()
             if (today - last_w).days > 30:
                 sumidos.append({**a, "days_since_weighing": (today - last_w).days})
 
         # Em carência ativa
-        end = get_withdrawal_end(a["id"])
+        end = withdrawal_ends.get(animal_id)
         if end and end >= today:
             carencia_active.append({**a, "withdrawal_end": end.isoformat(),
                                     "days_remaining": (end - today).days})
