@@ -2,14 +2,14 @@
 
 Contexto (ver docs/adr/0001-multi-fazenda-schema-por-tenant.md): o schema já foi
 definido em quatro mecanismos diferentes ao mesmo tempo, e a divergência entre eles
-causou bugs reais:
+causou problemas reais:
 
   - `protocol_id` / `lote_id` existiam apenas como ALTER em `_migrate()` e faltavam
     no CREATE TABLE → `init_db()` quebrava em banco novo (corrigido em 75dce18).
   - `sessions` era criada sob demanda dentro de três funções → banco novo ficava sem
     a tabela até o primeiro login (corrigido em 599162a).
 
-Estes testes rodam offline, sem credenciais, e falham se a classe de bug voltar.
+Estes testes rodam offline, sem credenciais, e falham se a classe de problema voltar.
 """
 
 import os
