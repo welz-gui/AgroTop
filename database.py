@@ -2055,6 +2055,43 @@ def projecao_abate(animal: dict) -> dict:
     return {"dias": dias, "data": data, "gmd": g, "falta": round(falta, 1)}
 
 
+def projecao_abate_bulk(animals: list[dict]) -> dict:
+    """
+    Calcula a projeção de abate e o GMD de vida em massa apenas para
+    os animais passados na lista. Resolve o problema N+1 delegando o
+    cálculo vetorizado (por animal_id) ao repositório e serviços.
+    """
+    from repositories.pesagens import calculate_gmd_bulk
+    from services.zootecnia import calculate_gmd_total_bulk
+
+    animal_ids = [a["id"] for a in animals]
+    gmds = calculate_gmd_bulk(animal_ids)
+    gmd_totals = calculate_gmd_total_bulk(animals)
+
+    hoje = date.today()
+    hoje_iso = hoje.isoformat()
+
+    result = {}
+    for a in animals:
+        aid = a["id"]
+        g = gmds.get(aid)
+        target = a.get("target_weight") or 500
+        falta = target - a["current_weight"]
+
+        if falta <= 0:
+            p = {"dias": 0, "data": hoje_iso, "gmd": g, "falta": 0}
+        elif g is None or g <= 0:
+            p = {"dias": None, "data": None, "gmd": g, "falta": round(falta, 1)}
+        else:
+            dias = int(round(falta / g))
+            data_est = (hoje + timedelta(days=dias)).isoformat()
+            p = {"dias": dias, "data": data_est, "gmd": g, "falta": round(falta, 1)}
+
+        result[aid] = {"projecao": p, "gmd_total": gmd_totals.get(aid)}
+
+    return result
+
+
 def get_performance_by_lote() -> list[dict]:
     """Por piquete: GMD médio × investimento em nutrição → custo por GMD."""
     animals = get_all_animals()
