@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-06 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-07 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS animals (
     parto_id text,
     peso_nascimento double precision,
     origem text DEFAULT 'comprado'::text NOT NULL,
-    CONSTRAINT animals_pkey PRIMARY KEY (id),
+    CONSTRAINT animals_pkey PRIMARY KEY (uuid),
+    CONSTRAINT animals_id_key UNIQUE (id),
     CONSTRAINT animals_uuid_key UNIQUE (uuid)
 );
 
