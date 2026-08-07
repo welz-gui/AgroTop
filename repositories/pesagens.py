@@ -84,6 +84,45 @@ def calculate_gmd(animal_id: str) -> Optional[float]:
         return None
 
 
+def calculate_gmd_batch(animal_ids: list[str]) -> dict[str, Optional[float]]:
+    """Calcula o GMD recente em lote, usando os dados cacheados em memória.
+    Retorna um dicionário mapeando animal_id para o valor de GMD (float ou None)."""
+    import pandas as pd
+
+    ws_all = _weighings_by_animal()
+    gmd_records = []
+
+    for aid in animal_ids:
+        ws = ws_all.get(aid, [])
+        if len(ws) >= 2:
+            try:
+                gmd_records.append({
+                    'id': aid,
+                    'w0': ws[0]['weight'],
+                    'w1': ws[1]['weight'],
+                    'd0': ws[0]['weigh_date'],
+                    'd1': ws[1]['weigh_date']
+                })
+            except KeyError:
+                pass
+
+    if not gmd_records:
+        return {aid: None for aid in animal_ids}
+
+    df = pd.DataFrame(gmd_records)
+    df['d0'] = pd.to_datetime(df['d0'])
+    df['d1'] = pd.to_datetime(df['d1'])
+    df['days'] = (df['d0'] - df['d1']).dt.days.abs()
+
+    mask = df['days'] > 0
+    df.loc[mask, 'GMD'] = ((df.loc[mask, 'w0'] - df.loc[mask, 'w1']) / df.loc[mask, 'days']).round(3)
+
+    gmd_dict = df.set_index('id')['GMD'].where(pd.notna(df.set_index('id')['GMD']), None).to_dict()
+
+    # Preencher com None para animais que não têm pesagens suficientes
+    return {aid: gmd_dict.get(aid) for aid in animal_ids}
+
+
 def get_last_estimate(animal_id: str) -> Optional[dict]:
     """Retorna a pesagem estimada (operador ou medição) mais recente ainda não
     confirmada por uma pesagem real posterior. Usada para comparação."""
