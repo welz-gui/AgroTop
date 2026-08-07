@@ -169,6 +169,27 @@ class TestGMD(BaseRegras):
             {"entry_date": "31/12/2025", "entry_weight": 300.0,
              "current_weight": 400.0}))
 
+    def test_gmd_total_chaves_ausentes(self):
+        """Testa o comportamento de calculate_gmd_total quando faltam chaves (KeyError)."""
+        a_sem_entry_date = {"entry_weight": 300.0, "current_weight": 400.0}
+        self.assertIsNone(db.calculate_gmd_total(a_sem_entry_date))
+
+        a_sem_entry_weight = {"entry_date": _dias_atras(100), "current_weight": 400.0}
+        self.assertIsNone(db.calculate_gmd_total(a_sem_entry_weight))
+
+        a_sem_current_weight = {"entry_date": _dias_atras(100), "entry_weight": 300.0}
+        self.assertIsNone(db.calculate_gmd_total(a_sem_current_weight))
+
+    def test_gmd_total_tipos_invalidos(self):
+        """Testa o comportamento de calculate_gmd_total quando tipos são inválidos (TypeError)."""
+        self.assertIsNone(db.calculate_gmd_total(None))
+
+        a_tipos_invalidos_peso = {"entry_date": _dias_atras(100), "entry_weight": "texto", "current_weight": 400.0}
+        self.assertIsNone(db.calculate_gmd_total(a_tipos_invalidos_peso))
+
+        a_tipos_invalidos_data = {"entry_date": None, "entry_weight": 300.0, "current_weight": 400.0}
+        self.assertIsNone(db.calculate_gmd_total(a_tipos_invalidos_data))
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 class TestArrobaEIdade(BaseRegras):
