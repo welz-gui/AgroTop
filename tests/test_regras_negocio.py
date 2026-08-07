@@ -194,6 +194,10 @@ class TestArrobaEIdade(BaseRegras):
     def test_sem_data_de_nascimento(self):
         self.assertEqual(db.get_age_category(None), "Sem idade")
 
+    def test_idade_com_data_invalida(self):
+        self.assertIsNone(db.get_age_months("invalid-date"))
+        self.assertIsNone(db.get_age_months("2024/01/01")) # Formato incorreto
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 class TestCustos(BaseRegras):
