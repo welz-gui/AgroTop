@@ -5,6 +5,7 @@ PWA responsivo: Streamlit + SQLite + Plotly
 
 import io
 import csv
+import html
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -1093,7 +1094,7 @@ def _campo_animal():
                 end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
                 badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
                 st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
-                    f'<b>{m["medication_name"]}</b> {badge}<br>'
+                    f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
                     f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
                     f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
                     f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
@@ -1651,7 +1652,7 @@ def page_animal():
                 active=m_["withdrawal_days"] and end_>=date.today()
                 bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
                 st.markdown(f'<div class="hist-item" style="{bc}">'
-                    f'<b style="font-size:1rem">{m_["medication_name"]}</b>'
+                    f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
                     f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
                     f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
                     f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
