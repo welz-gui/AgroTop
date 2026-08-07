@@ -26,7 +26,7 @@ from services.constantes import (  # noqa: F401
     CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT, AGE_BANDS,
 )
 from services.zootecnia import (  # noqa: F401
-    _months_between, get_age_months, get_age_category, get_age_display,
+    get_age_months, get_age_category, get_age_display,
     kg_to_arrobas, estimate_weight_by_measurement, calculate_gmd_total,
 )
 from services.terminacao import (  # noqa: F401
@@ -36,7 +36,7 @@ from services.seguranca import (  # noqa: F401
     _hash, _is_legacy_hash, _verify_password,
 )
 from services.estados_animal import (  # noqa: F401
-    transicao_permitida, estados_finais,
+    transicao_permitida,
 )
 from services.importacao import parse_pesagens  # noqa: F401
 
@@ -57,27 +57,26 @@ from repositories.animais import (  # noqa: F401
     _seed_animals,
 )
 from repositories.pesagens import (  # noqa: F401
-    _weighings_by_animal, get_weighings, add_weighing, get_all_weighings,
+    get_weighings, add_weighing, get_all_weighings,
     calculate_gmd, get_last_estimate,
 )
 from repositories.sanidade import (  # noqa: F401
-    _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
+    get_medications, add_medication, get_withdrawal_end,
     get_protocols, add_protocol, set_protocol_active, delete_protocol,
-    _protocol_pending, get_protocol_plan, apply_protocol_campaign, _dose_for_animal,
+    get_protocol_plan, apply_protocol_campaign,
 )
 from repositories.financeiro import (  # noqa: F401
-    _costs_by_animal, get_total_cost, get_animal_costs, add_animal_cost,
+    get_total_cost, get_animal_costs, add_animal_cost,
     add_fixed_cost, get_fixed_costs, get_total_fixed_costs, delete_fixed_cost,
     get_fixed_costs_by_category, register_sale, get_sales, get_financial_summary,
     register_death, get_deaths, get_mortality_stats, get_category_prices,
     set_category_price, get_expected_price_kg, expected_sale_value,
-    get_category_prices_list,
 )
 
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
 # Movida para repositories/conexao.py. Reexportada aqui para os chamadores atuais.
 from repositories.conexao import (  # noqa: F401
-    FORCE_SQLITE_ENV, _database_url, _translate, _PGConn, _conn,
+    FORCE_SQLITE_ENV, _conn,
     _cache, clear_cache, _writes, configurar_sqlite,
 )
 import repositories.conexao as _conexao
