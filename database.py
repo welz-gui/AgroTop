@@ -57,11 +57,13 @@ from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
     _seed_animals,
 )
-from repositories.pesagens import (  # noqa: F401
+from repositories.pesagens import (
+    calculate_gmd_batch,  # noqa: F401
     _weighings_by_animal, get_weighings, add_weighing, get_all_weighings,
     calculate_gmd, get_last_estimate,
 )
-from repositories.sanidade import (  # noqa: F401
+from repositories.sanidade import (
+    get_withdrawal_end_batch,  # noqa: F401
     _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
     get_protocols, add_protocol, set_protocol_active, delete_protocol,
     _protocol_pending, get_protocol_plan, apply_protocol_campaign, _dose_for_animal,
