@@ -414,34 +414,34 @@ class TestEstatisticasDoRebanho(BaseRegras):
         db.clear_cache()
         s = db.get_rebanho_stats()
 
-        self.assertEqual(s["total"], 2)              # o vendido não entra
-        self.assertEqual(s["avg_weight"], 450.0)
-        self.assertEqual(s["total_kg"], 900)
-        self.assertEqual(s["males"], 1)
-        self.assertEqual(s["females"], 1)
+        self.assertEqual(s.total, 2)              # o vendido não entra
+        self.assertEqual(s.avg_weight, 450.0)
+        self.assertEqual(s.total_kg, 900)
+        self.assertEqual(s.males, 1)
+        self.assertEqual(s.females, 1)
         # UA = peso ÷ 450: (400+500)/450 = 2,0
-        self.assertEqual(s["total_ua"], 2.0)
+        self.assertEqual(s.total_ua, 2.0)
         # @ produzidas: ganho de 100 kg cada → 100×0,52÷15 = 3,47 @ → 6,94 → 6,9
-        self.assertEqual(s["arrobas_prod"], 6.9)
+        self.assertEqual(s.arrobas_prod, 6.9)
         # sem pesagens não há GMD; o campo vira 0, não None
-        self.assertEqual(s["avg_gmd"], 0)
+        self.assertEqual(s.avg_gmd, 0)
 
     def test_sem_piquete_com_area_a_lotacao_e_zero(self):
         self.animal("S4", peso=450.0)
         db.clear_cache()
         s = db.get_rebanho_stats()
-        self.assertEqual(s["total_area"], 0)
-        self.assertEqual(s["lotacao_ua_ha"], 0)
+        self.assertEqual(s.total_area, 0)
+        self.assertEqual(s.lotacao_ua_ha, 0)
 
     def test_rebanho_vazio_devolve_dicionario_vazio(self):
-        """QUIRK: sem animais ativos, o retorno é `{}` — não um dict com zeros.
-
-        Contrato frágil: um `stats["total"]` direto estoura KeyError. **Não é bug
-        ativo** — os dois chamadores atuais protegem (`if stats:` na barra lateral,
-        `if not animals: return` no dashboard). Mas quem for consumir em código novo
-        (API, mobile) precisa checar antes.
+        """O contrato frágil (retornar {} que estourava KeyError) foi corrigido
+        com a introdução da dataclass AnimalStats. Agora, rebanho vazio retorna
+        um objeto com zeros.
         """
-        self.assertEqual(db.get_rebanho_stats(), {})
+        s = db.get_rebanho_stats()
+        self.assertEqual(s.total, 0)
+        self.assertEqual(s.avg_weight, 0.0)
+        self.assertEqual(s.arrobas_prod, 0.0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

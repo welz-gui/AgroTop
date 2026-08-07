@@ -546,10 +546,10 @@ def _sidebar():
 
         st.markdown("---")
         stats = db.get_rebanho_stats()
-        if stats:
+        if stats.total > 0:
             # Usa a MESMA fonte da página (_use_arroba) — sempre consistente
             if _use_arroba():
-                prod_str = f"🏷️ <b style='color:{c['atencao']}'>{stats['arrobas_prod']:.1f} @</b> ganhas"
+                prod_str = f"🏷️ <b style='color:{c['atencao']}'>{stats.arrobas_prod:.1f} @</b> ganhas"
             else:
                 total_gain_kg = sum(a["current_weight"]-a["entry_weight"]
                                     for a in db.get_all_animals())
@@ -557,9 +557,9 @@ def _sidebar():
 
             st.markdown(f"""
             <div style="font-size:.78rem;color:{c["texto_terciario"]};text-align:center;line-height:2">
-                🐄 <b style="color:{c["texto"]}">{stats['total']}</b> animais ativos &nbsp;
-                ⚖️ <b style="color:{c["texto"]}">{stats['avg_weight']:.0f} kg</b> médio<br>
-                📈 GMD <b style="color:{c["primaria"]}">{stats['avg_gmd']:.3f} kg/dia</b> &nbsp;
+                🐄 <b style="color:{c["texto"]}">{stats.total}</b> animais ativos &nbsp;
+                ⚖️ <b style="color:{c["texto"]}">{stats.avg_weight:.0f} kg</b> médio<br>
+                📈 GMD <b style="color:{c["primaria"]}">{stats.avg_gmd:.3f} kg/dia</b> &nbsp;
                 {prod_str}
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
@@ -596,20 +596,20 @@ def page_dashboard():
     # Produção na unidade configurada
     if _use_arroba():
         prod_label = "🏷️ @ Ganhas"
-        prod_value = f"{stats['arrobas_prod']:.1f} @"
+        prod_value = f"{stats.arrobas_prod:.1f} @"
     else:
         total_gain_kg = sum(a["current_weight"]-a["entry_weight"] for a in animals)
         prod_label = "📦 Ganho Total"
         prod_value = f"{total_gain_kg:.0f} kg"
 
     k = st.columns(7)
-    k[0].metric("🐄 Animais",    stats["total"])
-    k[1].metric("⚖️ Peso Médio", f"{stats['avg_weight']:.1f} kg")
-    k[2].metric("📈 GMD Médio",  f"{stats['avg_gmd']:.3f} kg/dia")
+    k[0].metric("🐄 Animais",    stats.total)
+    k[1].metric("⚖️ Peso Médio", f"{stats.avg_weight:.1f} kg")
+    k[2].metric("📈 GMD Médio",  f"{stats.avg_gmd:.3f} kg/dia")
     k[3].metric(prod_label,      prod_value)
-    k[4].metric("🌿 Lotação",    f"{stats['lotacao_ua_ha']:.2f} UA/ha")
-    k[5].metric("♂ Machos",      stats["males"])
-    k[6].metric("♀ Fêmeas",      stats["females"])
+    k[4].metric("🌿 Lotação",    f"{stats.lotacao_ua_ha:.2f} UA/ha")
+    k[5].metric("♂ Machos",      stats.males)
+    k[6].metric("♀ Fêmeas",      stats.females)
 
     st.markdown("---")
 

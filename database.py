@@ -18,6 +18,7 @@ import random
 from datetime import datetime, date, timedelta
 from contextlib import contextmanager
 from typing import Optional
+from dataclasses import dataclass
 
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
@@ -1959,12 +1960,25 @@ def check_low_stock() -> list[dict]:
 
 # ─── KPIs e Estatísticas ─────────────────────────────────────────────────────
 
+@dataclass
+class AnimalStats:
+    total: int = 0
+    avg_weight: float = 0.0
+    avg_gmd: float = 0.0
+    total_kg: float = 0.0
+    males: int = 0
+    females: int = 0
+    total_ua: float = 0.0
+    total_area: float = 0.0
+    lotacao_ua_ha: float = 0.0
+    arrobas_prod: float = 0.0
+
 @_cache
-def get_rebanho_stats() -> dict:
+def get_rebanho_stats() -> AnimalStats:
     animals = get_all_animals()
     lotes   = get_all_lotes()
     if not animals:
-        return {}
+        return AnimalStats()
 
     weights = [a["current_weight"] for a in animals]
     gains   = [a["current_weight"] - a["entry_weight"] for a in animals]
@@ -1975,18 +1989,18 @@ def get_rebanho_stats() -> dict:
     lotacao     = round(total_ua / total_area, 2) if total_area else 0
     arrobas_prod = sum(kg_to_arrobas(g) for g in gains if g > 0)
 
-    return {
-        "total":         len(animals),
-        "avg_weight":    round(sum(weights) / len(weights), 1),
-        "avg_gmd":       round(sum(gmds) / len(gmds), 3) if gmds else 0,
-        "total_kg":      round(sum(weights), 0),
-        "males":         sum(1 for a in animals if a["sex"] == "M"),
-        "females":       sum(1 for a in animals if a["sex"] == "F"),
-        "total_ua":      round(total_ua, 1),
-        "total_area":    total_area,
-        "lotacao_ua_ha": lotacao,
-        "arrobas_prod":  round(arrobas_prod, 1),
-    }
+    return AnimalStats(
+        total=len(animals),
+        avg_weight=round(sum(weights) / len(weights), 1),
+        avg_gmd=round(sum(gmds) / len(gmds), 3) if gmds else 0,
+        total_kg=round(sum(weights), 0),
+        males=sum(1 for a in animals if a["sex"] == "M"),
+        females=sum(1 for a in animals if a["sex"] == "F"),
+        total_ua=round(total_ua, 1),
+        total_area=total_area,
+        lotacao_ua_ha=lotacao,
+        arrobas_prod=round(arrobas_prod, 1),
+    )
 
 
 
