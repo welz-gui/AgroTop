@@ -2128,8 +2128,9 @@ def page_financeiro():
     with ft1:  # CUSTOS
         ul   = _unit_label()
         rows_f=[]
+        costs = db._costs_by_animal()
         for a in animals:
-            tc    = db.get_total_cost(a["id"])
+            tc    = costs.get(a["id"], 0.0)
             yield_= a.get("carcass_yield") or 0.52
             prod  = _live_weight(a["current_weight"], yield_)
             gain  = a["current_weight"] - a["entry_weight"]
@@ -2310,8 +2311,9 @@ def page_financeiro():
 
         sim_rows=[]
         sem_preco=[]
+        costs = db._costs_by_animal()
         for a in animals:
-            tc  = db.get_total_cost(a["id"]) + rateio_fixo
+            tc  = costs.get(a["id"], 0.0) + rateio_fixo
             band = db.get_age_category(a.get("birth_date"))
             if base == "categoria":
                 price_kg = precos_cat.get((band, a["sex"]), 0.0) * (1+ajuste_pct/100)
@@ -2367,8 +2369,9 @@ def page_financeiro():
         ul = _unit_label()
         st.subheader("⚖️ Ponto de Equilíbrio (Breakeven)")
         be_rows=[]
+        costs = db._costs_by_animal()
         for a in animals:
-            tc   = db.get_total_cost(a["id"])
+            tc   = costs.get(a["id"], 0.0)
             prod = _live_weight(a["current_weight"], a.get("carcass_yield") or 0.52)
             be   = round(tc/prod, 2) if prod else 0
             be_rows.append({"ID":a["id"],"Raça":a["breed"],
@@ -2612,8 +2615,9 @@ def _custo_medio_por_arroba():
     if not ativos:
         return None
     custo = arrobas = 0.0
+    costs = db._costs_by_animal()
     for a in ativos:
-        custo += db.get_total_cost(a["id"]) or 0
+        custo += costs.get(a["id"], 0.0) or 0
         arrobas += db.kg_to_arrobas(a["current_weight"],
                                     a.get("carcass_yield") or 0.52) or 0
     return round(custo / arrobas, 2) if arrobas else None
@@ -2894,9 +2898,10 @@ def page_relatorios():
             rend_r = st.slider("Rendimento de Carcaça (%)", 40, 65, 52,
                 key="rend_relatorio")
         rows_fin=[]
+        costs = db._costs_by_animal()
         for a in animals:
             if a["status"] not in ("ativo","carencia"): continue
-            tc   = db.get_total_cost(a["id"])
+            tc   = costs.get(a["id"], 0.0)
             prod = _live_weight(a["current_weight"], rend_r/100)
             be   = round(tc/prod, 2) if prod else 0
             receita = round(prod * cotacao_r, 2)
