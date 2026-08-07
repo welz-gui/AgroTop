@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, timedelta
 
-from services.qualidade import avaliar_pesagem
+from services.qualidade import avaliar_pesagem, _percentage_change
 
 HOJE = date.today()
 
@@ -66,6 +66,21 @@ class TestQualidadePesagem(unittest.TestCase):
         self.assertIn("data_futura", tipos)
         self.assertIn("variacao_absurda", tipos)
         self.assertIn("gmd_implausivel", tipos)
+
+
+class TestPercentageChange(unittest.TestCase):
+    def test_divide_by_zero_current_zero(self):
+        self.assertEqual(_percentage_change(0.0, 0.0), 0.0)
+
+    def test_divide_by_zero_current_nonzero(self):
+        self.assertEqual(_percentage_change(10.0, 0.0), float("inf"))
+
+    def test_normal_increase(self):
+        self.assertEqual(_percentage_change(150.0, 100.0), 50.0)
+
+    def test_normal_decrease(self):
+        self.assertEqual(_percentage_change(50.0, 100.0), 50.0)
+
 
 if __name__ == "__main__":
     unittest.main()
