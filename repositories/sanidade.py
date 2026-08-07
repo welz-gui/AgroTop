@@ -29,8 +29,9 @@ def _medications_by_animal() -> dict:
     return out
 
 
-def get_medications(animal_id: str) -> list[dict]:
-    return list(_medications_by_animal().get(animal_id, []))
+def get_medications(animal_id: str, limit: Optional[int] = None) -> list[dict]:
+    meds = _medications_by_animal().get(animal_id, [])
+    return meds[:limit] if limit is not None else list(meds)
 
 
 @_writes
