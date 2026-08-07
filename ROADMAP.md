@@ -229,7 +229,7 @@ inclusive comportamentos estranhos. Se encontrar um bug, **relate ao usuário e 
 mudar o número silenciosamente altera relatórios que ele já usa.
 
 Cobertura mínima: `calculate_gmd`, `calculate_gmd_total`, `get_total_cost`,
-`expected_sale_value`, `get_withdrawal_end`, `projecao_abate`, `register_sale` (os três
+`get_withdrawal_end`, `projecao_abate`, `register_sale` (os três
 modos de precificação), `register_death`, baixa de estoque, `kg_to_arrobas`,
 `get_age_category`, `get_rebanho_stats`.
 
@@ -926,7 +926,7 @@ usuários de produção e a rotação da senha do Postgres.
    🟢 **Fechada em 2026-08-06.** A conta (peso × preço/kg) virou
    `services/financeiro.py::valor_esperado_venda`, pura. `repositories/financeiro.py`
    manteve só a consulta ao preço (`_conn()`, R1) e passou a importar a conta em vez de
-   reimplementá-la (R8).
+   reimplementá-la (R8). E posteriormente a função `expected_sale_value` foi totalmente removida por não possuir chamadores.
 
 7. **PWA: validar num aparelho** que a sessão persiste ao reabrir pelo ícone instalado. O
    deploy fica atrás do portão de autenticação do Streamlit Cloud, e o PWA instalado precisa
