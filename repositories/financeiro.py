@@ -341,17 +341,6 @@ def get_expected_price_kg(age_band: str, sex: str) -> float:
     return get_category_prices().get((age_band, sex), 0.0)
 
 
-def expected_sale_value(animal: dict) -> float:
-    """Valor esperado de venda do animal = peso atual × preço/kg da categoria.
-
-    A consulta (preço da categoria) mora aqui — é `_conn()`, e só este
-    módulo acessa banco (R1). A conta em si é `services.financeiro`.
-    """
-    band = get_age_category(animal.get("birth_date"))
-    price = get_expected_price_kg(band, animal["sex"])
-    return valor_esperado_venda(animal["current_weight"], price)
-
-
 def get_category_prices_list() -> list[dict]:
     with _conn() as con:
         rows = con.execute(

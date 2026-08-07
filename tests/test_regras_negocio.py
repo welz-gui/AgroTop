@@ -343,20 +343,6 @@ class TestObito(BaseRegras):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-class TestValorEsperadoDeVenda(BaseRegras):
-    def test_valor_esperado_usa_preco_da_categoria(self):
-        nasc = (HOJE - timedelta(days=int(18 * 30.44))).isoformat()   # 13–24 meses
-        a = self.animal("E1", peso=400.0, nascimento=nasc, sexo="M")
-        db.set_category_price("13 a 24 meses", "M", 12.50)
-        db.clear_cache()
-        self.assertEqual(db.expected_sale_value(db.get_animal(a)), 5000.0)
-
-    def test_sem_preco_cadastrado_o_valor_e_zero(self):
-        a = self.animal("E2", peso=400.0, nascimento=None)
-        self.assertEqual(db.expected_sale_value(db.get_animal(a)), 0.0)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 class TestEstoque(BaseRegras):
     def _insumo(self):
         self._sql("INSERT INTO insumos (name,category,unit,current_stock,min_stock,"
