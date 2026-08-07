@@ -1234,7 +1234,13 @@ def page_rebanho():
             "Fornecedor":a.get("fornecedor_name") or "—"})
     df=pd.DataFrame(rows)
 
-    if busca: df=df[df["ID"].str.contains(busca,na=False)|df["Raça"].str.contains(busca,case=False,na=False)|df["Lote"].str.contains(busca,na=False)]
+    if busca:
+        b = busca.lower()
+        df = df[
+            df["ID"].str.contains(busca, na=False, regex=False) |
+            df["Raça"].str.lower().str.contains(b, na=False, regex=False) |
+            df["Lote"].str.contains(busca, na=False, regex=False)
+        ]
     if fr!="Todas": df=df[df["Raça"]==fr]
     if fcat!="Todas": df=df[df["Categoria"]==fcat]
     if fs!="Todos": df=df[df["Status"]==fs]
