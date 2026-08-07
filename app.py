@@ -417,13 +417,13 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
         pdf.ln()
         pdf.set_font("Helvetica", "", 6)
         pdf.set_text_color(20, 20, 20)
-        for i, row in df.iterrows():
+        for i, row in enumerate(df.itertuples(index=False)):
             if i % 2 == 0:
                 pdf.set_fill_color(245, 245, 245)
             else:
                 pdf.set_fill_color(255, 255, 255)
-            for col in cols:
-                pdf.cell(col_w, 5, _pdf_safe(row[c])[:22], border=1, fill=True)
+            for val in row:
+                pdf.cell(col_w, 5, _pdf_safe(val)[:22], border=1, fill=True)
             pdf.ln()
         out = pdf.output()
         return bytes(out)
