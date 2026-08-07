@@ -71,7 +71,6 @@ from repositories.financeiro import (  # noqa: F401
     get_fixed_costs_by_category, register_sale, get_sales, get_financial_summary,
     register_death, get_deaths, get_mortality_stats, get_category_prices,
     set_category_price, get_expected_price_kg, expected_sale_value,
-    get_category_prices_list,
 )
 
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
