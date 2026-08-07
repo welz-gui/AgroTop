@@ -1,9 +1,10 @@
 """Guardas da chave surrogate de `animals` (ADR 0004, etapa B1).
 
 O PNIB §4.1 exige identificador interno **imutável e separado do brinco**: trocar
-o brinco não pode trocar a identidade do animal. Hoje `animals.id` ainda é o
-brinco e ainda é a PK — a migração acontece por etapas, e estes testes travam o
-que já foi conquistado em cada uma.
+o brinco não pode trocar a identidade do animal. A migração aconteceu por
+etapas (B1.1 a B1.7), e estes testes travam o que cada uma conquistou —
+`uuid` é a PK desde a B1.7; `id` (o brinco) continua único, mas não é mais a
+identidade do registro.
 """
 
 import os
@@ -67,15 +68,28 @@ class TestUuidGerado(BaseSurrogate):
         self.assertEqual(antes, depois)
 
     def test_backfill_preenche_quem_esta_sem(self):
-        con = sqlite3.connect(db.DB_PATH)
-        con.execute("UPDATE animals SET uuid=NULL WHERE id=(SELECT MIN(id) FROM animals)")
-        con.commit(); con.close()
+        """`_backfill_uuids` só importa para banco anterior à etapa B1.1, de
+        quando `uuid` nem existia. Desde a B1.7 a coluna é PK NOT NULL, então
+        um `UPDATE ... SET uuid=NULL` real vira `IntegrityError` em vez de
+        simular o cenário legado — por isso o teste monta um schema à parte,
+        sem a restrição, só para esse caso antigo (mesma solução usada para
+        `_backfill_property_id` na dívida nº 3 do ROADMAP)."""
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.execute("CREATE TABLE animals (id TEXT PRIMARY KEY, uuid TEXT)")
+        con.execute("INSERT INTO animals VALUES ('A1', 'uuid-existente')")
+        con.execute("INSERT INTO animals VALUES ('A2', NULL)")
+        con.commit()
 
-        with db._conn() as c:
-            alterados = db._backfill_uuids(c)
+        alterados = db._backfill_uuids(con)
+        con.commit()
+
         self.assertEqual(alterados, 1)
-        self.assertEqual(
-            self._linhas("SELECT id FROM animals WHERE uuid IS NULL"), [])
+        depois = {r["id"]: r["uuid"] for r in con.execute(
+            "SELECT id, uuid FROM animals").fetchall()}
+        self.assertEqual(depois["A1"], "uuid-existente",
+                          "backfill mexeu em quem já tinha uuid")
+        self.assertTrue(depois["A2"], "backfill não preencheu quem estava sem")
 
 
 class TestFormatoDoUuid(unittest.TestCase):
@@ -364,6 +378,34 @@ class TestIntegridadeReferencial(BaseSurrogate):
             for c in self._linhas(f"PRAGMA index_info({i['name']})"):
                 colunas.add(c["name"])
         self.assertIn("uuid", colunas, "animals.uuid não é único — a FK não se sustenta")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+class TestPkEhUuid(BaseSurrogate):
+    """Etapa B1.7 — `uuid` vira a PK de fato, não só o alvo das FKs.
+
+    As etapas 1 a 6 já deixavam o §4.1 verdadeiro na prática: `uuid` era
+    NOT NULL/UNIQUE desde a etapa 1, e as treze tabelas com FK para `animals`
+    já apontavam para `animals(uuid)`, nunca para `id` (etapa 5). Faltava só
+    a PK do SQL reconhecer isso — dívida nº 2 do ROADMAP. Bancos SQLite
+    antigos não recebem a troca via ALTER (mesma limitação aceita para as
+    FKs, dívida nº 8): só quem nasce depois desta etapa tem `uuid` como PK.
+    """
+
+    def test_uuid_e_a_pk(self):
+        cols = self._linhas("PRAGMA table_info(animals)")
+        pk = {c["name"] for c in cols if c["pk"]}
+        self.assertEqual(pk, {"uuid"}, f"PK de animals é {pk}, esperado uuid")
+
+    def test_id_continua_unico_mesmo_sem_ser_pk(self):
+        """O brinco não perde a unicidade ao deixar de ser identidade."""
+        idx = self._linhas("PRAGMA index_list(animals)")
+        colunas_unicas = set()
+        for i in (r for r in idx if r["unique"]):
+            for c in self._linhas(f"PRAGMA index_info({i['name']})"):
+                colunas_unicas.add(c["name"])
+        self.assertIn("id", colunas_unicas,
+                       "id perdeu a unicidade ao deixar de ser PK")
 
 
 if __name__ == "__main__":

@@ -371,12 +371,17 @@ def init_db() -> None:
 
             -- Animais
             CREATE TABLE IF NOT EXISTS animals (
-                -- `id` é o número do brinco e HOJE ainda é a PK. Ver ADR 0004:
-                -- o PNIB (§4.1) exige identificador interno imutável e separado
-                -- do brinco, porque trocar brinco não pode trocar a identidade.
-                -- `uuid` é essa chave; a troca da PK acontece por etapas.
-                id               TEXT PRIMARY KEY,
-                uuid             TEXT UNIQUE,
+                -- `id` é o número do brinco: continua único, mas deixou de ser a
+                -- PK na etapa B1.7 (ADR 0004 §4.1 — identificador interno
+                -- imutável e separado do brinco). As etapas B1.1-B1.6 já tinham
+                -- deixado `uuid` NOT NULL/UNIQUE e migrado as 13 tabelas
+                -- filhas para apontar a FK para `animals(uuid)`, nunca para
+                -- `id` — esta etapa só formaliza na PK o que já era verdade.
+                -- Bancos SQLite antigos não recebem a troca via ALTER (mesma
+                -- limitação aceita para as FKs, dívida nº 8 do ROADMAP); só
+                -- quem nasce depois desta etapa tem `uuid` como PK.
+                id               TEXT UNIQUE NOT NULL,
+                uuid             TEXT PRIMARY KEY NOT NULL,
                 breed            TEXT NOT NULL,
                 sex              TEXT NOT NULL DEFAULT 'M',
                 birth_date       TEXT,
