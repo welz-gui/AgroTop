@@ -3,10 +3,10 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-06:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 575 testes ·
+**Estado em 2026-08-07:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 595 testes ·
 33 tabelas em produção, todas com RLS · **Fase B 100% ligada à interface** (7 de 7 telas,
-2026-08-04 a 2026-08-05) · **3 tarefas na fila** (6 adaptadores fecharam em 2026-08-06:
-0033, 0034, 0035, 0038, 0039-v2, 0042).
+2026-08-04 a 2026-08-05) · **fila vazia** — as 13 specs de adaptador (0033–0043)
+fecharam entre 2026-08-06 e 2026-08-07.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -98,9 +98,17 @@ baixo** — a ordem é prioridade, não sugestão.
 | — | [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) — ciclos p/ rentabilidade por raça 🏗️ | — | ✅ [#110](https://github.com/welz-gui/AgroTop/pull/110) | | 2026-08-06 |
 | — | [0038](0038-montar-contexto-de-gta.md) — contexto de GTA para validação 🇧🇷 | — | ✅ [#111](https://github.com/welz-gui/AgroTop/pull/111) | | 2026-08-06 |
 | — | [0035](0035-adaptar-indicadores-de-completude.md) — indicadores de completude de dados ⚙️ | — | ✅ [#112](https://github.com/welz-gui/AgroTop/pull/112) | | 2026-08-06 |
-| 1 | [0037](0037-montar-ingredientes-do-trato.md) — ingredientes do trato p/ custo de dieta 🏗️ | `feat/montar-ingredientes-dieta` | 🟢 livre | — | — |
-| 2 | [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) — correlação chuva × GMD ⚙️ | `feat/agrupar-chuva-gmd` | 🟢 livre | — | — |
-| 3 | [0041](0041-calcular-dias-no-lote-para-rateio.md) — dias no lote p/ rateio de custo ⚙️ | `feat/dias-no-lote-rateio` | 🟢 livre | — | — |
+| — | [0037](0037-montar-ingredientes-do-trato.md) — ingredientes do trato p/ custo de dieta 🏗️ | — | ✅ [#116](https://github.com/welz-gui/AgroTop/pull/116) | | 2026-08-07 |
+| — | [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) — correlação chuva × GMD ⚙️ | — | ✅ [#117](https://github.com/welz-gui/AgroTop/pull/117) | | 2026-08-07 |
+| — | [0041](0041-calcular-dias-no-lote-para-rateio.md) — dias no lote p/ rateio de custo ⚙️ | — | ✅ [#118](https://github.com/welz-gui/AgroTop/pull/118) | | 2026-08-07 |
+
+> ### 🎉 Fila zerada em 2026-08-07
+>
+> As 13 specs de adaptador (0033–0043) fecharam todas. Os 11 services órfãos do
+> ROADMAP ganharam ponte de entrada — falta só o mantenedor ligar cada um à
+> interface (R31: a spec entrega o módulo puro, a integração é trabalho à parte).
+> Nenhuma tarefa nova está pronta para delegação neste momento; ver ROADMAP §5
+> (trilhas) para o que vem a seguir.
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
