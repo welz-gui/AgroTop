@@ -1891,6 +1891,7 @@ def get_fornecedor_ranking() -> list[dict]:
     death_w = {r["animal_id"]: r["weight_at_death"] for r in drows}
 
     agg: dict[str, dict] = {}
+    costs = _costs_by_animal()
     for a in animals:
         fname = a.get("fornecedor_name") or "Não informado"
         d = agg.setdefault(fname, {"n": 0, "ativos": 0, "vendidos": 0, "mortos": 0,
@@ -1908,7 +1909,7 @@ def get_fornecedor_ranking() -> list[dict]:
         if g is not None:
             d["gmds"].append(g)
 
-        d["custo_total"] += get_total_cost(a["id"])
+        d["custo_total"] += costs.get(a["id"], 0.0)
 
         peso_final = death_w.get(a["id"]) or a.get("current_weight") or 0
         ganho = peso_final - (a.get("entry_weight") or 0)
