@@ -2278,14 +2278,6 @@ def get_latest_photo(animal_id: str):
     return bytes(row["image"]), row["mime"]
 
 
-def count_photos(animal_id: str) -> int:
-    with _conn() as con:
-        row = con.execute("SELECT COUNT(*) c FROM animal_photos p "
-                          "JOIN animals a ON a.uuid=p.animal_uuid WHERE a.id=?",
-                          (animal_id,)).fetchone()
-    return int(row["c"])
-
-
 @_writes
 def delete_photo(photo_id: int) -> None:
     with _conn() as con:
