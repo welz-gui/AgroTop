@@ -646,13 +646,15 @@ def page_dashboard():
             df_avg = (df_all.groupby("weigh_date")["weight"]
                       .mean().reset_index()
                       .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
-            fig = go.Figure()
-            for aid in df_all["animal_id"].unique():
-                sub = df_all[df_all["animal_id"]==aid].sort_values("weigh_date")
-                fig.add_trace(go.Scatter(x=sub["weigh_date"],y=sub["weight"],
-                    mode="lines+markers",showlegend=False,opacity=0.35,
-                    line=dict(width=1,color=c["borda"]),marker=dict(size=3),
-                    hovertemplate=f"<b>{aid}</b><br>%{{x|%d/%m/%Y}}<br>%{{y:.1f}} kg<extra></extra>"))
+            df_all = df_all.sort_values(["animal_id", "weigh_date"])
+            fig = px.line(
+                df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
+                color_discrete_sequence=[c["borda"]]
+            )
+            fig.update_traces(
+                showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
+                hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
+            )
             fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
                 mode="lines+markers",name="Média do Rebanho",
                 line=dict(width=3,color=c["primaria"]),
