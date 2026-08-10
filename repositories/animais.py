@@ -162,17 +162,20 @@ def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator=
             )
 
 
-def get_movements(animal_id: str) -> list[dict]:
+def get_movements(animal_id: str, limit: Optional[int] = None) -> list[dict]:
     with _conn() as con:
-        rows = con.execute(
-            """SELECT m.*, l1.name as from_name, l2.name as to_name
+        sql = """SELECT m.*, l1.name as from_name, l2.name as to_name
                FROM animal_movements m
                LEFT JOIN lotes l1 ON l1.id=m.from_lote_id
                LEFT JOIN lotes l2 ON l2.id=m.to_lote_id
                JOIN animals a ON a.uuid=m.animal_uuid
-               WHERE a.id=? ORDER BY m.movement_date DESC""",
-            (animal_id,),
-        ).fetchall()
+               WHERE a.id=? ORDER BY m.movement_date DESC"""
+        args = [animal_id]
+        if limit is not None:
+            sql += " LIMIT ?"
+            args.append(limit)
+
+        rows = con.execute(sql, args).fetchall()
     return [dict(r) for r in rows]
 
 

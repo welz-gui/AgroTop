@@ -1090,7 +1090,7 @@ def _campo_animal():
                     unsafe_allow_html=True)
         with h2:
             st.markdown("**💉 Medicamentos**")
-            for m in db.get_medications(animal["id"])[:5]:
+            for m in db.get_medications(animal["id"], limit=5):
                 end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
                 badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
                 st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
@@ -1100,7 +1100,7 @@ def _campo_animal():
                     f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
                     f'</span></div>',unsafe_allow_html=True)
             st.markdown("**🚚 Movimentações**")
-            for mv in db.get_movements(animal["id"])[:4]:
+            for mv in db.get_movements(animal["id"], limit=4):
                 st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
                     f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
                     f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
