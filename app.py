@@ -413,7 +413,7 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
         pdf.set_text_color(200, 255, 200)
         pdf.set_font("Helvetica", "B", 6)
         for col in cols:
-            pdf.cell(col_w, 6, _pdf_safe(c)[:22], border=1, fill=True, align="C")
+            pdf.cell(col_w, 6, _pdf_safe(col)[:22], border=1, fill=True, align="C")
         pdf.ln()
         pdf.set_font("Helvetica", "", 6)
         pdf.set_text_color(20, 20, 20)
