@@ -5,6 +5,7 @@ PWA responsivo: Streamlit + SQLite + Plotly
 
 import io
 import csv
+import html
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -490,7 +491,7 @@ def _sidebar():
             <div style="font-size:2.5rem">🐄</div>
             <h2 style="color:{c["primaria"]};margin:0">AgroTop</h2>
             <div style="color:{c["texto_secundario"]};font-size:.8rem;margin-top:.25rem">
-                {user['name']}<br>
+                {html.escape(user['name'])}<br>
                 <span style="color:{c["primaria"]}">●</span>&nbsp;
                 {"Administrador" if user['role']=='admin' else "Operador"}
             </div>
