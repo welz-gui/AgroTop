@@ -74,31 +74,10 @@ def calculate_gmd_total(animal: dict) -> Optional[float]:
     """GMD de vida: (peso atual − peso de entrada) ÷ dias desde a entrada.
     Tendência geral do animal na fazenda (recebe o dict do animal)."""
     try:
-        entrada = date.fromisoformat(animal["entry_date"])
+        entrada = datetime.strptime(animal["entry_date"], "%Y-%m-%d").date()
         dias = (date.today() - entrada).days
         if dias <= 0:
             return None
         return round((animal["current_weight"] - animal["entry_weight"]) / dias, 3)
     except (ValueError, KeyError, TypeError):
         return None
-
-
-def calculate_gmd_total_bulk(animals: list[dict]) -> dict[str, Optional[float]]:
-    """
-    GMD de vida em massa. Retorna um dicionário {animal_id: GMD total}.
-    Pre-calcula 'hoje' uma única vez para otimização em listas grandes.
-    """
-    hoje = date.today()
-    result = {}
-    for a in animals:
-        aid = a["id"]
-        try:
-            entrada = date.fromisoformat(a["entry_date"])
-            dias = (hoje - entrada).days
-            if dias <= 0:
-                result[aid] = None
-            else:
-                result[aid] = round((a["current_weight"] - a["entry_weight"]) / dias, 3)
-        except (ValueError, KeyError, TypeError):
-            result[aid] = None
-    return result

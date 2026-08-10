@@ -413,17 +413,17 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
         pdf.set_text_color(200, 255, 200)
         pdf.set_font("Helvetica", "B", 6)
         for col in cols:
-            pdf.cell(col_w, 6, _pdf_safe(c)[:22], border=1, fill=True, align="C")
+            pdf.cell(col_w, 6, _pdf_safe(col)[:22], border=1, fill=True, align="C")
         pdf.ln()
         pdf.set_font("Helvetica", "", 6)
         pdf.set_text_color(20, 20, 20)
-        for i, row in df.iterrows():
+        for i, row in enumerate(df.itertuples(index=False)):
             if i % 2 == 0:
                 pdf.set_fill_color(245, 245, 245)
             else:
                 pdf.set_fill_color(255, 255, 255)
-            for col in cols:
-                pdf.cell(col_w, 5, _pdf_safe(row[c])[:22], border=1, fill=True)
+            for val in row:
+                pdf.cell(col_w, 5, _pdf_safe(val)[:22], border=1, fill=True)
             pdf.ln()
         out = pdf.output()
         return bytes(out)
@@ -3640,11 +3640,9 @@ def page_desempenho():
         st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
                    "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
         rows = []
-        bulk_data = db.projecao_abate_bulk(animals)
         for a in animals:
-            data = bulk_data[a["id"]]
-            p = data["projecao"]
-            g_total = data["gmd_total"]
+            p = db.projecao_abate(a)
+            g_total = db.calculate_gmd_total(a)
             rows.append({"ID":a["id"],"Raça":a["breed"],
                 "Peso Atual (kg)":a["current_weight"],
                 "Peso-Alvo (kg)":a.get("target_weight") or 500,

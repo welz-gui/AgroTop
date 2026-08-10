@@ -8,7 +8,7 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional
 
 from . import eventos
@@ -76,34 +76,12 @@ def calculate_gmd(animal_id: str) -> Optional[float]:
     if len(ws) < 2:
         return None
     try:
-        d0 = date.fromisoformat(ws[0]["weigh_date"])
-        d1 = date.fromisoformat(ws[1]["weigh_date"])
+        d0 = datetime.strptime(ws[0]["weigh_date"], "%Y-%m-%d").date()
+        d1 = datetime.strptime(ws[1]["weigh_date"], "%Y-%m-%d").date()
         days = abs((d0 - d1).days)
         return round((ws[0]["weight"] - ws[1]["weight"]) / days, 3) if days else None
     except (ValueError, KeyError):
         return None
-
-
-def calculate_gmd_bulk(animal_ids: list[str]) -> dict[str, Optional[float]]:
-    """
-    GMD recente em massa. Retorna um dicionário {animal_id: GMD}.
-    Evita chamadas repetitivas pegando o cache de uma vez e operando em memória.
-    """
-    all_ws = _weighings_by_animal()
-    gmds = {}
-    for aid in animal_ids:
-        ws = all_ws.get(aid, [])
-        if len(ws) < 2:
-            gmds[aid] = None
-            continue
-        try:
-            d0 = date.fromisoformat(ws[0]["weigh_date"])
-            d1 = date.fromisoformat(ws[1]["weigh_date"])
-            days = abs((d0 - d1).days)
-            gmds[aid] = round((ws[0]["weight"] - ws[1]["weight"]) / days, 3) if days else None
-        except (ValueError, KeyError, TypeError):
-            gmds[aid] = None
-    return gmds
 
 
 def get_last_estimate(animal_id: str) -> Optional[dict]:
