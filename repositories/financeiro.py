@@ -350,11 +350,3 @@ def expected_sale_value(animal: dict) -> float:
     band = get_age_category(animal.get("birth_date"))
     price = get_expected_price_kg(band, animal["sex"])
     return valor_esperado_venda(animal["current_weight"], price)
-
-
-def get_category_prices_list() -> list[dict]:
-    with _conn() as con:
-        rows = con.execute(
-            "SELECT * FROM category_prices ORDER BY age_band, sex"
-        ).fetchall()
-    return [dict(r) for r in rows]
