@@ -3640,9 +3640,11 @@ def page_desempenho():
         st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
                    "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
         rows = []
+        bulk_data = db.projecao_abate_bulk(animals)
         for a in animals:
-            p = db.projecao_abate(a)
-            g_total = db.calculate_gmd_total(a)
+            data = bulk_data[a["id"]]
+            p = data["projecao"]
+            g_total = data["gmd_total"]
             rows.append({"ID":a["id"],"Raça":a["breed"],
                 "Peso Atual (kg)":a["current_weight"],
                 "Peso-Alvo (kg)":a.get("target_weight") or 500,
