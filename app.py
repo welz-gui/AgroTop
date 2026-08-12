@@ -678,7 +678,9 @@ def page_dashboard():
         st.plotly_chart(fig_p, use_container_width=True)
 
         st.subheader("📊 GMD por Animal")
-        gmd_data=[{"ID":a["id"],"GMD":db.calculate_gmd(a["id"])} for a in animals]
+        a_ids = [a["id"] for a in animals]
+        gmd_batch = db.calculate_gmd_bulk(a_ids)
+        gmd_data=[{"ID":a["id"],"GMD":gmd_batch.get(a["id"])} for a in animals]
         df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
         if not df_g.empty:
             fig_g=px.bar(df_g,x="GMD",y="ID",orientation="h",color="GMD",
@@ -694,9 +696,12 @@ def page_dashboard():
     st.markdown("---"); st.subheader("📋 Resumo Rápido")
     rows=[]
     ul = _unit_label()
+    a_ids = [a["id"] for a in animals]
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
+    wd_batch = db.get_withdrawal_end_batch(a_ids)
     for a in animals:
-        gmd  = db.calculate_gmd(a["id"])
-        wd   = db.get_withdrawal_end(a["id"])
+        gmd  = gmd_batch.get(a["id"])
+        wd   = wd_batch.get(a["id"])
         gain = round(a["current_weight"]-a["entry_weight"], 1)
         rows.append({"ID":a["id"],"Raça":a["breed"],
             "Sexo":"♂" if a["sex"]=="M" else "♀",
@@ -1223,9 +1228,12 @@ def page_rebanho():
 
     ul = _unit_label()
     rows=[]
+    a_ids_all = [a["id"] for a in animals_all]
+    gmd_batch = db.calculate_gmd_bulk(a_ids_all)
+    wd_batch = db.get_withdrawal_end_batch(a_ids_all)
     for a in animals_all:
-        gmd=db.calculate_gmd(a["id"])
-        wd =db.get_withdrawal_end(a["id"])
+        gmd=gmd_batch.get(a["id"])
+        wd =wd_batch.get(a["id"])
         rows.append({"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
             "Categoria":db.get_age_category(a.get("birth_date")),
             "Idade":db.get_age_display(a),
@@ -1813,8 +1821,10 @@ def page_lotes():
             with st.expander(f"Ver animais do {l['name']}"):
                 anilist=db.get_all_animals(lote_id=l["id"])
                 if anilist:
+                    a_ids = [a["id"] for a in anilist]
+                    gmd_batch = db.calculate_gmd_bulk(a_ids)
                     rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
-                        "Peso (kg)":a["current_weight"],"GMD":db.calculate_gmd(a["id"])} for a in anilist]
+                        "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
                     st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
                         column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
                             "GMD":st.column_config.NumberColumn(format="%.3f")})
@@ -2580,13 +2590,17 @@ def _contexto_recomendacoes() -> dict:
     hoje = date.today()
 
     animais = []
-    for a in db.get_all_animals(status="ativo"):
-        fim = db.get_withdrawal_end(a["id"])
+    animais_brutos = db.get_all_animals(status="ativo")
+    a_ids = [a["id"] for a in animais_brutos]
+    wd_batch = db.get_withdrawal_end_batch(a_ids)
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
+    for a in animais_brutos:
+        fim = wd_batch.get(a["id"])
         animais.append({
             "id": a["id"],
             "peso": a.get("current_weight"),
             "peso_alvo": a.get("target_weight"),
-            "gmd": db.calculate_gmd(a["id"]),
+            "gmd": gmd_batch.get(a["id"]),
             "lote_id": a.get("lote_id"),
             "carencia_ate": fim.isoformat() if fim and fim >= hoje else None,
         })
@@ -2860,9 +2874,12 @@ def page_relatorios():
     with rt1:
         st.subheader("🐄 Inventário Completo do Rebanho")
         rows_inv=[]
+        a_ids = [a["id"] for a in animals]
+        gmd_batch = db.calculate_gmd_bulk(a_ids)
+        wd_batch = db.get_withdrawal_end_batch(a_ids)
         for a in animals:
-            gmd=db.calculate_gmd(a["id"])
-            wd=db.get_withdrawal_end(a["id"])
+            gmd=gmd_batch.get(a["id"])
+            wd=wd_batch.get(a["id"])
             rows_inv.append({"ID":a["id"],"Raça":a["breed"],
                 "Sexo":"M" if a["sex"]=="M" else "F",
                 "Categoria":db.get_age_category(a.get("birth_date")),

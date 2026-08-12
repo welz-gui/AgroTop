@@ -96,6 +96,41 @@ def get_withdrawal_end(animal_id: str) -> Optional[date]:
     return latest
 
 
+def get_withdrawal_end_batch(animal_ids: list[str]) -> dict[str, Optional[date]]:
+    """Calcula o fim de carência em lote, usando Pandas para vetorização.
+    Retorna um dicionário mapeando animal_id para a data de fim (date ou None)."""
+    import pandas as pd
+
+    meds_all = _medications_by_animal()
+    wd_records = []
+
+    for aid in animal_ids:
+        rows = meds_all.get(aid, [])
+        for r in rows:
+            if r["withdrawal_days"]:
+                wd_records.append({
+                    "id": aid,
+                    "med_date": r["med_date"],
+                    "wd_days": r["withdrawal_days"]
+                })
+
+    if not wd_records:
+        return {aid: None for aid in animal_ids}
+
+    df = pd.DataFrame(wd_records)
+    df["med_date"] = pd.to_datetime(df["med_date"])
+    df["end_date"] = df["med_date"] + pd.to_timedelta(df["wd_days"], unit="D")
+
+    if df.empty:
+        return {aid: None for aid in animal_ids}
+
+    df_max = df.groupby("id")["end_date"].max()
+    # Converter para date e dicionário
+    wd_dict = {aid: ts.date() for aid, ts in df_max.items()}
+
+    return {aid: wd_dict.get(aid) for aid in animal_ids}
+
+
 def get_protocols(active_only: bool = True) -> list[dict]:
     sql = ("SELECT p.*, i.name AS insumo_name, i.current_stock, i.unit AS insumo_unit "
            "FROM health_protocols p LEFT JOIN insumos i ON i.id=p.insumo_id WHERE 1=1")
