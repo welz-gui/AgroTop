@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **20 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **21 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,13 +820,13 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **nove services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
-`previsao_estoque` saiu em 2026-08-11, ver abaixo), entregues por agentes e sem nenhum
-consumidor: `caixa`, `completude`, `conformidade`, `dieta`, `gta`, `projecao`, `rateio`,
-`rentabilidade`, `arquivo_dispositivos`. Nenhum é Fase B, então ficam fora do escopo desta
-dívida, mas contam para o total: 29 services no diretório, 20 usados. As 13 specs de
-adaptador (0033–0043) já entregaram a função-ponte de cada um — ver `specs/QUADRO.md`;
-falta ligar a UI dos que restam.
+Restam **oito services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+`previsao_estoque` e `arquivo_dispositivos` saíram em 2026-08-11/12, ver abaixo),
+entregues por agentes e sem nenhum consumidor: `caixa`, `completude`, `conformidade`,
+`dieta`, `gta`, `projecao`, `rateio`, `rentabilidade`. Nenhum é Fase B, então ficam fora
+do escopo desta dívida, mas contam para o total: 29 services no diretório, 21 usados. As
+13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um — ver
+`specs/QUADRO.md`; falta ligar a UI dos que restam.
 
 ~~⚠️ `previsao_estoque` continuava órfão mesmo com o adaptador pronto (spec 0039 v2).~~
 🟢 **Fechado em 2026-08-11.** `page_estoque` ganhou a aba "📈 Previsão de Ruptura",
@@ -836,6 +836,17 @@ motor de recomendações) fazia a mesma conta de consumo planejado *inline*, com
 bug da PR #101 — frequência desconhecida (`"quinzenal"`) caía num `.get(freq, 1.0)` e
 virava consumo diário inventado. A função passou a delegar ao adaptador, fechando o
 defeito nos dois consumidores de uma vez (R8).
+
+~~⚠️ `arquivo_dispositivos` tinha `ler()` pronto desde a spec 0030 (PR #90), mas
+`page_brincos` só importava por faixa numérica contígua.~~ 🟢 **Fechado em 2026-08-12.**
+Nova aba "📄 Importar arquivo" lê o CSV do fornecedor e reconcilia contra **todo** o
+estoque via `services.reconciliacao_dispositivos.reconciliar` (spec 0033) — não só a
+faixa sendo importada, e em qualquer situação, inclusive as três terminais (um código já
+`inutilizado` que reaparece no arquivo é erro do fornecedor, não vira um segundo
+registro). Exigiu duas peças novas em `repositories/dispositivos.py`, fora do escopo das
+specs de adaptador e por isso trabalho do mantenedor (R31): `codigos_em_estoque()`
+(mapa completo código→status, sem o filtro de estados terminais que `por_codigo()` usa
+de propósito) e `importar_arquivo()` (grava só o que `reconciliar()` aprovou).
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".

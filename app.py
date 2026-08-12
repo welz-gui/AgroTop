@@ -42,6 +42,11 @@ from services.previsao_estoque_adaptador import (
     consumo_diario_planejado,
     montar_insumos as previsao_estoque_montar_insumos,
 )
+from services.arquivo_dispositivos import (
+    ler as arquivo_dispositivos_ler,
+    conferir_pareamento as arquivo_dispositivos_conferir_pareamento,
+)
+from services.reconciliacao_dispositivos import reconciliar as dispositivos_reconciliar
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -4009,8 +4014,9 @@ def page_brincos():
             "Foi registrado na aplicação e **não bloqueou** o trabalho (§5.3) — "
             "mas precisa de conferência no campo.")
 
-    t_inv, t_aplicar, t_import = st.tabs(
-        ["📋 Inventário", "🏷️ Aplicar em animal", "📥 Importar lote"])
+    t_inv, t_aplicar, t_import, t_arquivo = st.tabs(
+        ["📋 Inventário", "🏷️ Aplicar em animal", "📥 Importar lote",
+         "📄 Importar arquivo"])
 
     with t_inv:
         _brincos_inventario(inv)
@@ -4018,6 +4024,8 @@ def page_brincos():
         _brincos_aplicar()
     with t_import:
         _brincos_importar()
+    with t_arquivo:
+        _brincos_importar_arquivo()
 
 
 def _brincos_inventario(inv):
@@ -4217,6 +4225,99 @@ def _brincos_importar():
             st.rerun()
         else:
             st.error(f"🚫 {r['erro']}")
+
+
+def _brincos_importar_arquivo():
+    """Importa um lote de códigos arbitrários vindo de arquivo do fornecedor.
+
+    Diferente da aba "Importar lote" (faixa numérica contígua): aqui o
+    arquivo pode trazer qualquer conjunto de códigos, então a garantia de
+    não duplicar precisa reconciliar contra **todo** o estoque, em qualquer
+    situação (spec 0033) — não só a faixa que está sendo importada.
+    """
+    st.caption("Arquivo do fornecedor (CSV), uma linha por dispositivo — "
+               "`codigo_visual` obrigatório; `codigo_eletronico`, `tipo`, "
+               "`fabricante`, `modelo` e `data_fabricacao` quando existirem no "
+               "arquivo. Aceita `;` ou `,`, com ou sem cabeçalho.")
+
+    arquivo = st.file_uploader("Arquivo do fornecedor", type=["csv", "txt"],
+                               key="brarq_upload")
+    if arquivo is None:
+        return
+
+    bruto = arquivo.getvalue()
+    try:
+        texto = bruto.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        texto = bruto.decode("latin-1")
+
+    lido = arquivo_dispositivos_ler(texto)
+    aceitos, rejeitados = lido["aceitos"], lido["rejeitados"]
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Linhas lidas", lido["total_linhas"])
+    m2.metric("Aceitas", len(aceitos))
+    m3.metric("Rejeitadas", len(rejeitados))
+
+    if rejeitados:
+        st.error(f"{len(rejeitados)} linha(s) não serão importadas:")
+        st.dataframe(pd.DataFrame([
+            {"Linha": r["linha"], "Motivo": r["motivo"], "Conteúdo": r["conteudo"]}
+            for r in rejeitados
+        ]), use_container_width=True, hide_index=True)
+
+    if not aceitos:
+        st.info("Nada a reconciliar.")
+        return
+
+    codigos = db.dispositivos.codigos_em_estoque()
+    reconciliado = dispositivos_reconciliar(aceitos, codigos)
+    para_gravar = reconciliado["para_gravar"]
+    ja_existentes = reconciliado["ja_existentes"]
+
+    r1, r2 = st.columns(2)
+    r1.metric("Novos (a gravar)", len(para_gravar))
+    r2.metric("Já em estoque", len(ja_existentes))
+
+    if ja_existentes:
+        with st.expander(
+            f"Ver os {len(ja_existentes)} já cadastrados (não serão duplicados)"):
+            st.dataframe(pd.DataFrame([
+                {"Código": i["codigo_visual"],
+                 "Situação atual": _ESTADO_BRINCO.get(
+                     i["status_atual"], i["status_atual"])}
+                for i in ja_existentes
+            ]), use_container_width=True, hide_index=True)
+
+    if not para_gravar:
+        st.info("Todos os códigos do arquivo já estão cadastrados — nada novo a gravar.")
+        return
+
+    divergencias = arquivo_dispositivos_conferir_pareamento(para_gravar)
+    if divergencias:
+        st.warning(
+            f"⚠️ {_plural(len(divergencias), 'dispositivo', 'dispositivos')} com "
+            "possível divergência entre código visual e eletrônico no arquivo — "
+            "não bloqueia a importação (§5.3), mas vale conferir antes.")
+
+    st.markdown(f"**Prévia dos {len(para_gravar)} novos**")
+    st.dataframe(pd.DataFrame([
+        {"Código": i["codigo_visual"],
+         "Eletrônico": i.get("codigo_eletronico") or "—",
+         "Tipo": _TIPO_BRINCO.get(i.get("tipo"), i.get("tipo") or "—"),
+         "Fabricante": i.get("fabricante") or "—"}
+        for i in para_gravar
+    ]), use_container_width=True, hide_index=True)
+
+    lote = st.text_input("Lote de compra *", placeholder="NF 1234",
+                         key="brarq_lote").strip()
+    if st.button(f"📥 Importar {len(para_gravar)} novo(s)", type="primary",
+                 disabled=not lote, key="brarq_salvar"):
+        r = db.dispositivos.importar_arquivo(
+            para_gravar, lote=lote, usuario=st.session_state.user["name"])
+        db.clear_cache()
+        st.success(f"✅ {r['criados']} dispositivo(s) importado(s) de {arquivo.name}.")
+        st.rerun()
 
 _TIPO_MOV = {
     "entre_propriedades_mesmo_titular": "Entre propriedades (mesmo titular)",

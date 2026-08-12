@@ -251,3 +251,62 @@ def disponiveis(limite: int = 20) -> list[dict]:
         return [dict(r) for r in con.execute(
             "SELECT * FROM dispositivos WHERE status='disponivel' "
             "ORDER BY codigo_visual LIMIT ?", (limite,)).fetchall()]
+
+
+def codigos_em_estoque() -> dict[str, str]:
+    """{codigo_visual: status} de TODO dispositivo já cadastrado, em qualquer
+    situação — inclusive as três terminais (inutilizado, devolvido, cancelado).
+
+    É o que `services.reconciliacao_dispositivos.reconciliar` (spec 0033)
+    precisa para nunca deixar um código duplicado entrar na tabela: um código
+    já inutilizado que reaparece num arquivo novo é erro do fornecedor, não
+    motivo para virar um segundo registro — por isso não filtra por status,
+    diferente de `por_codigo`.
+    """
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT codigo_visual, status FROM dispositivos "
+            "WHERE codigo_visual IS NOT NULL AND codigo_visual != ''"
+        ).fetchall()
+    return {r["codigo_visual"]: r["status"] for r in rows}
+
+
+@_writes
+def importar_arquivo(itens: list[dict], *, lote: str,
+                     proprietario_id: Optional[str] = None,
+                     propriedade_destino_id: Optional[str] = None,
+                     usuario: str = "") -> dict:
+    """Importa dispositivos já reconciliados contra o estoque (spec 0033).
+
+    Cada item vem de `services.arquivo_dispositivos.ler` (spec 0030) —
+    `codigo_visual` obrigatório, `codigo_eletronico`/`tipo`/`fabricante`/
+    `modelo`/`data_fabricacao` quando presentes no arquivo — já filtrado por
+    `services.reconciliacao_dispositivos.reconciliar` para conter só o que
+    não colide com nada em estoque (§4.2.1/§4.2.2). Diferente de
+    `importar_lote` (faixa numérica contígua gerada aqui), os códigos chegam
+    prontos e arbitrários; a garantia de não duplicar já foi decidida antes
+    desta função ser chamada.
+    """
+    criados = 0
+    with _conn() as con:
+        for item in itens:
+            tipo = item.get("tipo") or ""
+            if tipo not in TIPOS:
+                tipo = "brinco_visual"
+            con.execute(
+                """INSERT INTO dispositivos
+                   (id,codigo_visual,codigo_eletronico,tipo,fabricante,modelo,
+                    lote,data_fabricacao,proprietario_id,propriedade_destino_id,
+                    status)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,'disponivel')""",
+                (_novo_id(), item["codigo_visual"],
+                 item.get("codigo_eletronico") or None, tipo,
+                 item.get("fabricante") or None, item.get("modelo") or None,
+                 lote, item.get("data_fabricacao") or None,
+                 proprietario_id, propriedade_destino_id))
+            criados += 1
+
+    eventos.auditar("importacao_de_arquivo_de_dispositivos", usuario=usuario,
+                    entidade="dispositivos", entidade_id=lote,
+                    registro_posterior={"lote": lote, "criados": criados})
+    return {"ok": True, "criados": criados}
