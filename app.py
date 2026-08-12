@@ -37,6 +37,11 @@ from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
 )
+from services.previsao_estoque import prever as previsao_estoque_prever
+from services.previsao_estoque_adaptador import (
+    consumo_diario_planejado,
+    montar_insumos as previsao_estoque_montar_insumos,
+)
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -2478,7 +2483,7 @@ def page_estoque():
         st.warning(f"⚠️ **{_plural(len(low),'insumo','insumos')} abaixo do estoque mínimo:** " +
             ", ".join(f"**{i['name']}** ({_num_br(i['current_stock'],0)} {i['unit']})" for i in low))
 
-    et1,et2,et3=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo"])
+    et1,et2,et3,et4=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo","📈 Previsão de Ruptura"])
 
     CAT_LABELS={"racao":"Ração","trato":"Trato (volumoso)","medicamento":"Medicamento",
                 "vacina":"Vacina","mineral":"Mineral","outro":"Outro"}
@@ -2552,33 +2557,63 @@ def page_estoque():
                 else:
                     st.error("Nome é obrigatório.")
 
+    with et4:
+        st.caption("Dias até faltar cada insumo, no ritmo de consumo **planejado** "
+            "(soma dos planos de trato ativos) — diferente do aviso de "
+            "'abaixo do mínimo' acima, que só olha o saldo de hoje.")
+        previsao = _previsao_estoque()
+        URGENCIA_LABEL = {"critica": "🔴 Crítica", "atencao": "🟡 Atenção",
+                          "ok": "🟢 OK", "sem_dados": "⚪ Sem dados"}
+        criticos = [p for p in previsao if p["urgencia"] == "critica"]
+        if criticos:
+            st.warning(f"⚠️ **{_plural(len(criticos),'insumo','insumos')} em situação crítica:** " +
+                ", ".join(f"**{p['nome']}**" for p in criticos))
+        rows_p = [{
+            "Insumo": p["nome"],
+            "Dias Restantes": _num_br(p["dias_restantes"]) if p["dias_restantes"] is not None else "—",
+            "Data de Ruptura": p["data_ruptura"] or "—",
+            "Comprar Até": p["comprar_ate"] or "—",
+            "Urgência": URGENCIA_LABEL.get(p["urgencia"], p["urgencia"]),
+        } for p in previsao]
+        st.dataframe(pd.DataFrame(rows_p),use_container_width=True,hide_index=True)
+        st.caption("⚪ **Sem dados** = nenhum plano de trato ativo para o insumo, não é erro. "
+            "**Comprar Até** hoje é igual à **Data de Ruptura** — o sistema ainda não guarda "
+            "o prazo de reposição de cada insumo (fica para quando essa coluna existir).")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERTAS
 # ══════════════════════════════════════════════════════════════════════════════
-_FREQ_POR_DIA = {"diario": 1.0, "semanal": 1/7, "mensal": 1/30}
-
-
 def _consumo_diario_por_insumo() -> dict:
     """Consumo diário previsto de cada insumo, somando os planos de trato ativos.
 
     É consumo **planejado**, não realizado — que é justamente o que a regra de
     estoque precisa: ela pergunta se o saldo cobre os próximos dias de trato.
-    Plano com unidade incompatível com a do estoque é ignorado, porque converter
-    saco para kg exige densidade que o sistema não guarda.
+
+    Delega a `services.previsao_estoque_adaptador.consumo_diario_planejado`
+    (spec 0039) em vez de calcular aqui. Antes a conta era feita inline, com
+    `_FREQ_POR_DIA.get(p.get("frequency"), 1.0)` — frequência desconhecida
+    (ex.: "quinzenal") caía no default `1.0` e virava consumo diário
+    inventado (o defeito real da primeira tentativa da spec, PR 101).
+    Ligar o adaptador aqui fecha o mesmo defeito neste consumidor: frequência
+    fora de {"diario","semanal","mensal"} agora é ignorada, não vira 1×/dia.
     """
-    insumos = {i["id"]: i for i in db.get_all_insumos()}
-    consumo: dict = {}
-    for p in db.get_feeding_plans(active_only=True):
-        iid = p.get("insumo_id")
-        if not iid or iid not in insumos:
-            continue
-        qtd = db.convert_quantity(p.get("quantity") or 0,
-                                  p.get("unit"), insumos[iid].get("unit"))
-        if qtd is None:
-            continue
-        consumo[iid] = consumo.get(iid, 0.0) + qtd * _FREQ_POR_DIA.get(
-            p.get("frequency"), 1.0)
-    return consumo
+    insumos_por_id = {i["id"]: i for i in db.get_all_insumos()}
+    planos_ativos = db.get_feeding_plans(active_only=True)
+    return consumo_diario_planejado(insumos_por_id, planos_ativos, db.convert_quantity)
+
+
+def _previsao_estoque() -> list[dict]:
+    """Previsão de ruptura por insumo — dias restantes, data de ruptura, urgência.
+
+    Liga `services/previsao_estoque.py::prever` (nunca chamado até aqui) através
+    do adaptador da spec 0039. `prazo_reposicao_dias` não existe no schema ainda
+    (fora do escopo daquela spec) — todo insumo entra com prazo 0, que `prever()`
+    já trata como "desconhecido", não como erro.
+    """
+    insumos = db.get_all_insumos()
+    consumo = _consumo_diario_por_insumo()
+    montados = previsao_estoque_montar_insumos(insumos, consumo)
+    return previsao_estoque_prever(montados, date.today().isoformat())
 
 
 def _contexto_recomendacoes() -> dict:

@@ -30,6 +30,7 @@ PROVAS = [
     "tests.ui_regras_prova",        # §11: versão em vez de edição, simular antes
     "tests.ui_eventos_prova",       # §6/§10: corrigir em vez de editar, fila de sincronização
     "tests.ui_perimetro_lote_prova", # perímetro do piquete, sobrepostos() ligado (migration 0015)
+    "tests.ui_previsao_estoque_prova", # previsao_estoque.prever() ligado (spec 0018/0039)
 ]
 
 
