@@ -58,7 +58,7 @@ from repositories.animais import (  # noqa: F401
     _seed_animals,
 )
 from repositories.pesagens import (
-    calculate_gmd_batch,  # noqa: F401
+    calculate_gmd_bulk,  # noqa: F401
     _weighings_by_animal, get_weighings, add_weighing, get_all_weighings,
     calculate_gmd, get_last_estimate,
 )

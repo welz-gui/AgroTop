@@ -679,7 +679,7 @@ def page_dashboard():
 
         st.subheader("📊 GMD por Animal")
         a_ids = [a["id"] for a in animals]
-        gmd_batch = db.calculate_gmd_batch(a_ids)
+        gmd_batch = db.calculate_gmd_bulk(a_ids)
         gmd_data=[{"ID":a["id"],"GMD":gmd_batch.get(a["id"])} for a in animals]
         df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
         if not df_g.empty:
@@ -697,7 +697,7 @@ def page_dashboard():
     rows=[]
     ul = _unit_label()
     a_ids = [a["id"] for a in animals]
-    gmd_batch = db.calculate_gmd_batch(a_ids)
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
     wd_batch = db.get_withdrawal_end_batch(a_ids)
     for a in animals:
         gmd  = gmd_batch.get(a["id"])
@@ -1229,7 +1229,7 @@ def page_rebanho():
     ul = _unit_label()
     rows=[]
     a_ids_all = [a["id"] for a in animals_all]
-    gmd_batch = db.calculate_gmd_batch(a_ids_all)
+    gmd_batch = db.calculate_gmd_bulk(a_ids_all)
     wd_batch = db.get_withdrawal_end_batch(a_ids_all)
     for a in animals_all:
         gmd=gmd_batch.get(a["id"])
@@ -1822,7 +1822,7 @@ def page_lotes():
                 anilist=db.get_all_animals(lote_id=l["id"])
                 if anilist:
                     a_ids = [a["id"] for a in anilist]
-                    gmd_batch = db.calculate_gmd_batch(a_ids)
+                    gmd_batch = db.calculate_gmd_bulk(a_ids)
                     rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
                         "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
                     st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
@@ -2593,7 +2593,7 @@ def _contexto_recomendacoes() -> dict:
     animais_brutos = db.get_all_animals(status="ativo")
     a_ids = [a["id"] for a in animais_brutos]
     wd_batch = db.get_withdrawal_end_batch(a_ids)
-    gmd_batch = db.calculate_gmd_batch(a_ids)
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
     for a in animais_brutos:
         fim = wd_batch.get(a["id"])
         animais.append({
@@ -2875,7 +2875,7 @@ def page_relatorios():
         st.subheader("🐄 Inventário Completo do Rebanho")
         rows_inv=[]
         a_ids = [a["id"] for a in animals]
-        gmd_batch = db.calculate_gmd_batch(a_ids)
+        gmd_batch = db.calculate_gmd_bulk(a_ids)
         wd_batch = db.get_withdrawal_end_batch(a_ids)
         for a in animals:
             gmd=gmd_batch.get(a["id"])
