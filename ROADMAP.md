@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **21 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **22 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,11 +820,11 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **oito services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
-`previsao_estoque` e `arquivo_dispositivos` saíram em 2026-08-11/12, ver abaixo),
-entregues por agentes e sem nenhum consumidor: `caixa`, `completude`, `conformidade`,
+Restam **sete services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa` em 2026-08-12, ver
+abaixo), entregues por agentes e sem nenhum consumidor: `completude`, `conformidade`,
 `dieta`, `gta`, `projecao`, `rateio`, `rentabilidade`. Nenhum é Fase B, então ficam fora
-do escopo desta dívida, mas contam para o total: 29 services no diretório, 21 usados. As
+do escopo desta dívida, mas contam para o total: 29 services no diretório, 22 usados. As
 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um — ver
 `specs/QUADRO.md`; falta ligar a UI dos que restam.
 
@@ -847,6 +847,26 @@ registro). Exigiu duas peças novas em `repositories/dispositivos.py`, fora do e
 specs de adaptador e por isso trabalho do mantenedor (R31): `codigos_em_estoque()`
 (mapa completo código→status, sem o filtro de estados terminais que `por_codigo()` usa
 de propósito) e `importar_arquivo()` (grava só o que `reconciliar()` aprovou).
+
+~~⚠️ `caixa` (`resultado_por_competencia`, `fluxo_de_caixa`, `em_aberto`) nunca foi
+chamado; o dinheiro do sistema ficava espalhado em quatro tabelas sem formato comum.~~
+🟢 **Fechado em 2026-08-12.** Nova aba "📅 Competência" em `page_financeiro`, alimentada
+por `services.lancamentos.normalizar` (spec 0034) — receita e despesa contadas no mês do
+fato, últimos 6 meses, com "teste do centavo" (spec 0031) valendo ponta a ponta com dados
+reais do banco. Duas descobertas de integração, fora do escopo da spec 0034 e por isso
+trabalho do mantenedor (R31):
+- **Compra de insumo nunca foi `type='compra'`** no schema real — é sempre
+  `type='entrada'` + `reason='compra'` (`add_insumo_entry`), que é o formato que a spec
+  supôs. `repositories/financeiro.py::get_insumo_compras` traduz isso antes de entregar
+  a `normalizar()`; sem a tradução, toda compra de insumo desapareceria do resultado em
+  silêncio.
+- **`get_financial_summary` estava quebrada desde o refactor A2** (2026-07-31, #24):
+  chamava `_insumo_cost_by_reason`, que ficou para trás em `database.py` quando a função
+  foi extraída para `repositories/financeiro.py` — `NameError` toda vez que alguém abria
+  a aba "📒 Resultado". `database.py` importa **de** `repositories/`, nunca o contrário,
+  então nenhum import resolvia isso; a correção foi mover `_insumo_cost_by_reason` para
+  onde ela é usada. Achado só porque a prova de interface desta integração exercita
+  `page_financeiro` de ponta a ponta — nenhuma prova anterior chegava a essa tela.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".

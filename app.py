@@ -47,6 +47,8 @@ from services.arquivo_dispositivos import (
     conferir_pareamento as arquivo_dispositivos_conferir_pareamento,
 )
 from services.reconciliacao_dispositivos import reconciliar as dispositivos_reconciliar
+from services.lancamentos import normalizar as lancamentos_normalizar
+from services.caixa import resultado_por_competencia
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -2034,6 +2036,88 @@ def _fin_venda(animals):
         st.info("Nenhuma venda registrada ainda.")
 
 
+def _fin_lancamentos(start_iso=None, end_iso=None) -> list[dict]:
+    """Lista única de lançamentos (spec 0034) — vendas, custos fixos, custos
+    por animal e compras de insumo, no formato que `services.caixa` espera.
+
+    Compra de insumo hoje é gravada como `type='entrada'` + `reason='compra'`
+    (nunca `type='compra'`, que é o que a spec 0034 supunha existir na
+    tabela) — `db.get_insumo_compras` já traduz isso; aqui só falta encaixar
+    o preço unitário no formato aninhado que `normalizar()` espera.
+    """
+    vendas = db.get_sales(start_iso, end_iso)
+    custos_fixos = db.get_fixed_costs(start_iso, end_iso)
+    custos_animal = db.get_all_animal_costs(start_iso, end_iso)
+    compras_insumo = [{
+        "transaction_date": c["transaction_date"],
+        "quantity": c["quantity"],
+        "type": "compra",
+        "insumo": {"name": c["insumo_nome"], "cost_per_unit": c["insumo_cost_per_unit"]},
+    } for c in db.get_insumo_compras(start_iso, end_iso)]
+    return lancamentos_normalizar(vendas=vendas, custos_fixos=custos_fixos,
+                                  custos_animal=custos_animal,
+                                  compras_insumo=compras_insumo)
+
+
+def _fin_competencia():
+    """Resultado por competência (spec 0034 + `services.caixa`), últimos 6 meses.
+
+    Diferente do "Resultado Consolidado" (um total só para o intervalo
+    escolhido), aqui cada lançamento conta no mês do fato — o que revela
+    tendência entre meses que um total único esconde.
+    """
+    st.subheader("📅 Resultado por Competência")
+    st.caption("Receita e despesa contadas no mês do fato — venda, custo fixo, custo "
+               "de animal ou compra de insumo —, não somadas num total só. "
+               "Últimos 6 meses.")
+
+    hoje = date.today()
+    meses = []
+    for i in range(5, -1, -1):
+        m, a = hoje.month - i, hoje.year
+        while m <= 0:
+            m += 12; a -= 1
+        meses.append((a, m))
+
+    inicio_janela = date(meses[0][0], meses[0][1], 1)
+    lancamentos = _fin_lancamentos(inicio_janela.isoformat(), hoje.isoformat())
+
+    linhas = []
+    for ano, mes in meses:
+        r = resultado_por_competencia(lancamentos, ano, mes)
+        linhas.append({"Mês": f"{mes:02d}/{ano}", "Receitas": r["receitas"],
+                       "Despesas": r["despesas"], "Resultado": r["resultado"],
+                       "_por_categoria": r["por_categoria"]})
+
+    ultimo = linhas[-1]
+    k1, k2, k3 = st.columns(3)
+    k1.metric(f"Receitas — {ultimo['Mês']}", f"R$ {ultimo['Receitas']:,.2f}")
+    k2.metric(f"Despesas — {ultimo['Mês']}", f"R$ {ultimo['Despesas']:,.2f}")
+    k3.metric(f"Resultado — {ultimo['Mês']}", f"R$ {ultimo['Resultado']:,.2f}",
+             delta=f"{ultimo['Resultado']:+,.2f}")
+
+    df_comp = pd.DataFrame(linhas)[["Mês", "Receitas", "Despesas", "Resultado"]]
+    df_melt = df_comp.melt(id_vars="Mês", value_vars=["Receitas", "Despesas"],
+                           var_name="Tipo", value_name="Valor")
+    fig = px.bar(df_melt, x="Mês", y="Valor", color="Tipo", barmode="group",
+        color_discrete_map={"Receitas": c["primaria"], "Despesas": c["perigo"]})
+    fig.update_layout(**PLOTLY, height=300, xaxis=dict(gridcolor=c["superficie"]),
+                      yaxis=dict(gridcolor=c["superficie"]))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.dataframe(df_comp, use_container_width=True, hide_index=True,
+        column_config={"Receitas": st.column_config.NumberColumn(format="R$ %.2f"),
+                       "Despesas": st.column_config.NumberColumn(format="R$ %.2f"),
+                       "Resultado": st.column_config.NumberColumn(format="R$ %.2f")})
+
+    if ultimo["_por_categoria"]:
+        st.markdown(f"**Por categoria — {ultimo['Mês']}**")
+        st.dataframe(pd.DataFrame(ultimo["_por_categoria"]).rename(
+            columns={"categoria": "Categoria", "valor": "Valor (R$)"}),
+            use_container_width=True, hide_index=True,
+            column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+
 def _fin_resultado():
     """Planilha financeira consolidada (todas as entradas e saídas)."""
     st.subheader("📒 Resultado Consolidado")
@@ -2140,11 +2224,13 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4)=st.tabs(
-        ["📒 Resultado","💵 Registrar Venda","🏷️ Preços/Categoria","☠️ Mortalidade",
-         "📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem"])
+    (t_res,t_comp,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4)=st.tabs(
+        ["📒 Resultado","📅 Competência","💵 Registrar Venda","🏷️ Preços/Categoria",
+         "☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador",
+         "⚖️ Breakeven","🏆 Origem"])
 
     with t_res: _fin_resultado()
+    with t_comp: _fin_competencia()
     with t_ven: _fin_venda(animals)
     with t_pre: _fin_precos()
     with t_mort: _fin_mortalidade()

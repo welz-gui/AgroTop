@@ -69,11 +69,12 @@ from repositories.sanidade import (
     _protocol_pending, get_protocol_plan, apply_protocol_campaign, _dose_for_animal,
 )
 from repositories.financeiro import (  # noqa: F401
-    _costs_by_animal, get_total_cost, get_animal_costs, add_animal_cost,
-    add_fixed_cost, get_fixed_costs, get_total_fixed_costs, delete_fixed_cost,
-    get_fixed_costs_by_category, register_sale, get_sales, get_financial_summary,
-    register_death, get_deaths, get_mortality_stats, get_category_prices,
-    set_category_price, get_expected_price_kg, expected_sale_value,
+    _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,
+    add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
+    delete_fixed_cost, get_fixed_costs_by_category, register_sale, get_sales,
+    get_financial_summary, get_insumo_compras, register_death, get_deaths,
+    get_mortality_stats, get_category_prices, set_category_price,
+    get_expected_price_kg, expected_sale_value,
 )
 
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
@@ -1756,26 +1757,6 @@ DEATH_CAUSES = [
 ]
 
 
-
-
-
-
-
-# ─── Resumo Financeiro Consolidado ───────────────────────────────────────────
-
-def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
-    """Custo dos insumos consumidos (saída) por motivo, usando o custo unitário atual."""
-    placeholders = ",".join("?" for _ in reasons)
-    sql = ("SELECT COALESCE(SUM(t.quantity * i.cost_per_unit),0) AS total "
-           "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
-           f"WHERE t.type='saida' AND t.reason IN ({placeholders})")
-    args = list(reasons)
-    if start:
-        sql += " AND t.transaction_date >= ?"; args.append(start)
-    if end:
-        sql += " AND t.transaction_date <= ?"; args.append(end)
-    row = con.execute(sql, args).fetchone()
-    return round(float((row["total"] if row else 0) or 0), 2)
 
 
 
