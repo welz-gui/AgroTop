@@ -45,6 +45,26 @@ def get_animal_costs(animal_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_all_animal_costs(start_date: Optional[str] = None,
+                         end_date: Optional[str] = None) -> list[dict]:
+    """Todos os custos por animal, de todos os animais — não um só.
+
+    `get_animal_costs` é por animal, pensada para a ficha individual;
+    `services.lancamentos.normalizar` (spec 0034) precisa da lista inteira,
+    a mesma fonte que `get_financial_summary` já soma por `cost_type`, aqui
+    linha a linha.
+    """
+    sql = "SELECT c.* FROM animal_costs c WHERE 1=1"
+    args: list = []
+    if start_date:
+        sql += " AND c.cost_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND c.cost_date <= ?"; args.append(end_date)
+    sql += " ORDER BY c.cost_date DESC, c.id DESC"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
 @_writes
 def add_animal_cost(animal_id, cost_type, description, amount, cost_date, notes="") -> None:
     with _conn() as con:
@@ -182,9 +202,55 @@ def get_sales(start_date: Optional[str] = None,
         return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
+def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
+    """Custo dos insumos consumidos (saída) por motivo, usando o custo unitário atual."""
+    placeholders = ",".join("?" for _ in reasons)
+    sql = ("SELECT COALESCE(SUM(t.quantity * i.cost_per_unit),0) AS total "
+           "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
+           f"WHERE t.type='saida' AND t.reason IN ({placeholders})")
+    args = list(reasons)
+    if start:
+        sql += " AND t.transaction_date >= ?"; args.append(start)
+    if end:
+        sql += " AND t.transaction_date <= ?"; args.append(end)
+    row = con.execute(sql, args).fetchone()
+    return round(float((row["total"] if row else 0) or 0), 2)
+
+
+def get_insumo_compras(start_date: Optional[str] = None,
+                       end_date: Optional[str] = None) -> list[dict]:
+    """Compras de insumo, com o nome e o custo por unidade já resolvidos.
+
+    `services.lancamentos.normalizar` (spec 0034) espera `type == "compra"` em
+    cada linha, mas o schema real grava compra como `type='entrada'` +
+    `reason='compra'` (ver `database.add_insumo_entry`) — `type='compra'`
+    nunca existiu de fato. Esta função já filtra pelo par certo; quem chama
+    não precisa saber da diferença.
+    """
+    sql = ("SELECT t.transaction_date, t.quantity, "
+           "i.name AS insumo_nome, i.cost_per_unit AS insumo_cost_per_unit "
+           "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
+           "WHERE t.type='entrada' AND t.reason='compra'")
+    args: list = []
+    if start_date:
+        sql += " AND t.transaction_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND t.transaction_date <= ?"; args.append(end_date)
+    sql += " ORDER BY t.transaction_date DESC, t.id DESC"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
 def get_financial_summary(start_date: Optional[str] = None,
                           end_date: Optional[str] = None) -> dict:
-    """Planilha financeira consolidada do período (todas as saídas e entradas)."""
+    """Planilha financeira consolidada do período (todas as saídas e entradas).
+
+    ⚠️ `_insumo_cost_by_reason` morou em `database.py` desde o refactor A2
+    (2026-07-31, #24) e nunca foi trazida para cá — toda chamada real a esta
+    função estourava `NameError`, porque `database.py` importa **de**
+    `repositories/`, nunca o contrário. Corrigido em 2026-08-12: a função
+    passou a viver aqui, ao lado de quem a usa.
+    """
     def _period(col):
         s, a = "", []
         if start_date: s += f" AND {col} >= ?"; a.append(start_date)
