@@ -55,6 +55,8 @@ from services.completude_adaptador import normalizar_pesagens, janela_do_mes
 from services.completude import avaliar_mes
 from services.conformidade_adaptador import montar_rebanho
 from services.conformidade import avaliar as conformidade_avaliar
+from services.dieta_adaptador import ingredientes_por_cabeca
+from services.dieta import custo_por_cabeca_dia, custo_por_arroba_produzida
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -4211,7 +4213,8 @@ def page_nutricao():
     lotes = db.get_all_lotes()
     insumos = db.get_all_insumos()
 
-    nt1, nt2, nt3 = st.tabs(["📋 Planos Ativos", "➕ Novo Item de Trato", "✅ Histórico de Checagens"])
+    nt1, nt2, nt3, nt4 = st.tabs(["📋 Planos Ativos", "➕ Novo Item de Trato",
+                                  "✅ Histórico de Checagens", "💰 Custo por Piquete"])
 
     with nt1:
         plans = db.get_feeding_plans(active_only=False)
@@ -4288,6 +4291,75 @@ def page_nutricao():
             st.dataframe(df_c, use_container_width=True, hide_index=True)
         else:
             st.info("Nenhuma checagem registrada no período.")
+
+    with nt4:
+        _nutricao_custo_por_piquete(lotes, insumos)
+
+
+def _nutricao_custo_por_piquete(lotes, insumos):
+    """Custo de dieta por piquete (spec 0037 + `services/dieta.py`, nunca chamado).
+
+    `services.dieta.custo_por_cabeca_dia` espera ingredientes já por cabeça;
+    `services.dieta_adaptador.ingredientes_por_cabeca` (spec 0037) é a ponte
+    a partir de `feeding_plans`, que são por piquete.
+    """
+    st.caption("Custo diário de trato por cabeça, a partir dos planos **ativos** de "
+               "cada piquete. Matéria seca aparece zerada — a coluna não existe no "
+               "schema hoje (fora do escopo desta integração, decisão registrada no "
+               "ROADMAP); custo em R$ não é afetado.")
+
+    insumos_por_id = {i["id"]: i for i in insumos}
+    lotes_com_plano_ativo = sorted({
+        p["lote_id"] for p in db.get_feeding_plans(active_only=True)
+    })
+    if not lotes_com_plano_ativo:
+        st.info("Nenhum piquete com plano de trato ativo.")
+        return
+
+    for lid in lotes_com_plano_ativo:
+        lote_nome = next((l["name"] for l in lotes if l["id"] == lid), lid)
+        animais_lote = db.get_all_animals(status="ativo", lote_id=lid)
+        cabecas = len(animais_lote)
+        planos = db.get_feeding_plans(lote_id=lid, active_only=True)
+
+        ingredientes = ingredientes_por_cabeca(
+            planos, insumos_por_id, cabecas, converter_quantidade=db.convert_quantity)
+        resultado = custo_por_cabeca_dia(ingredientes)
+
+        with st.expander(f"🌿 {lid} — {lote_nome} · {cabecas} cabeça(s) · "
+                         f"R$ {resultado['custo_dia']:.2f}/cabeça/dia"):
+            if cabecas == 0:
+                st.warning("Piquete sem animais ativos — custo por cabeça não se "
+                          "aplica (os planos continuam ativos, mas ninguém consome).")
+                continue
+            if not ingredientes:
+                st.info("Nenhum plano deste piquete pôde ser convertido para a "
+                       "unidade do insumo vinculado — confira o vínculo insumo↔plano "
+                       "e a frequência de cada item.")
+                continue
+
+            gmds = db.calculate_gmd_bulk([a["id"] for a in animais_lote])
+            validos = [g for g in gmds.values() if g is not None]
+            gmd_medio = sum(validos) / len(validos) if validos else 0.0
+            rendimento_medio = sum(
+                a.get("carcass_yield") or 0.52 for a in animais_lote) / cabecas
+            custo_arroba = custo_por_arroba_produzida(
+                resultado["custo_dia"], gmd_medio, rendimento_medio)
+
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("Custo/cabeça/dia", f"R$ {resultado['custo_dia']:.2f}")
+            k2.metric("Matéria natural/dia", f"{resultado['kg_materia_natural']:.2f} kg")
+            k3.metric("Matéria seca/dia", f"{resultado['kg_materia_seca']:.2f} kg")
+            k4.metric("Custo/@ produzida",
+                     f"R$ {custo_arroba:.2f}" if custo_arroba is not None else "—",
+                     help="Precisa de GMD positivo no piquete para calcular.")
+
+            if resultado["participacao"]:
+                df_p = pd.DataFrame(resultado["participacao"])
+                df_p.columns = ["Ingrediente", "Participação (%)"]
+                fig = px.pie(df_p, names="Ingrediente", values="Participação (%)", hole=0.45)
+                fig.update_layout(**PLOTLY, height=260)
+                st.plotly_chart(fig, use_container_width=True)
 
 
 # Rótulos dos doze estados do §5.2. O código é o que vai ao banco; o rótulo é o
