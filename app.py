@@ -49,6 +49,8 @@ from services.arquivo_dispositivos import (
 from services.reconciliacao_dispositivos import reconciliar as dispositivos_reconciliar
 from services.lancamentos import normalizar as lancamentos_normalizar
 from services.caixa import resultado_por_competencia
+from services.rentabilidade_adaptador import montar_ciclos
+from services.rentabilidade import ranking_por_raca
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -2028,7 +2030,7 @@ def _fin_venda(animals):
         df_v["pricing_mode"]=df_v["pricing_mode"].map(lambda m: {"kg":"kg","cabeca":"cabeça","lote":"lote"}.get(m,m))
         df_v.columns=["Data","Animal","Raça","Tipo","Modo","Peso (kg)","Receita (R$)","Custo (R$)","Lucro (R$)","Comprador"]
         st.dataframe(df_v, use_container_width=True, hide_index=True,
-            column_config={c: st.column_config.NumberColumn(format="R$ %.2f")
+            column_config={col: st.column_config.NumberColumn(format="R$ %.2f")
                            for col in ["Receita (R$)","Custo (R$)","Lucro (R$)"]})
         tot_luc = sum(v["profit"] for v in vendas)
         st.metric("Lucro/Prejuízo acumulado nas vendas", f"R$ {tot_luc:,.2f}")
@@ -2116,6 +2118,76 @@ def _fin_competencia():
             columns={"categoria": "Categoria", "valor": "Valor (R$)"}),
             use_container_width=True, hide_index=True,
             column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+
+def _fin_rentabilidade_por_raca():
+    """Rentabilidade de ciclos encerrados por raça (spec 0042).
+
+    Diferente de "🏆 Origem" (agrupa por fornecedor, todo o histórico), aqui
+    agrupa por raça e olha só para ciclos que já venderam — um ciclo por
+    venda, não por animal. Por isso usa `get_all_animals(status=None)`, não
+    o rebanho ativo: o animal vendido já não está mais ativo.
+    """
+    st.subheader("🐄 Rentabilidade por Raça")
+    st.caption("Lucro por cabeça, por arroba produzida e GMD médio de cada raça — "
+               "só ciclos **encerrados** (já vendidos), um ciclo por venda.")
+
+    vendas = db.get_sales()
+    if not vendas:
+        st.info("Nenhuma venda registrada ainda.")
+        return
+
+    animais_por_uuid = {a["uuid"]: a for a in db.get_all_animals(status=None)
+                        if a.get("uuid")}
+    custos_por_id = db._costs_by_animal()
+    custo_total_por_uuid = {uuid: custos_por_id.get(a["id"], 0.0)
+                            for uuid, a in animais_por_uuid.items()}
+
+    ciclos = montar_ciclos(vendas, animais_por_uuid, custo_total_por_uuid)
+    ranking = ranking_por_raca(ciclos)
+    if not ranking:
+        st.info("Nenhum ciclo com receita informada ainda.")
+        return
+
+    df_r = pd.DataFrame([{
+        "Raça": r["raca"], "Animais": r["animais"],
+        "Lucro/Cabeça (R$)": r["lucro_por_cabeca"],
+        "Lucro/@ produzida (R$)": r["lucro_por_arroba_produzida"],
+        "GMD Médio (kg/dia)": r["gmd_medio"],
+        "Margem (%)": r["margem"] * 100,
+    } for r in ranking])
+
+    st.dataframe(df_r, use_container_width=True, hide_index=True,
+        column_config={
+            "Lucro/Cabeça (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+            "Lucro/@ produzida (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+            "GMD Médio (kg/dia)": st.column_config.NumberColumn(format="%.3f"),
+            "Margem (%)": st.column_config.NumberColumn(format="%.1f%%")})
+
+    c1, c2 = st.columns(2)
+    with c1:
+        fig_l = px.bar(df_r, x="Raça", y="Lucro/Cabeça (R$)",
+            color="Lucro/Cabeça (R$)", color_continuous_scale=ESCALA_RUIM_BOM,
+            text="Lucro/Cabeça (R$)")
+        fig_l.update_traces(texttemplate="R$ %{text:.0f}", textposition="outside")
+        fig_l.update_layout(**PLOTLY, height=300, coloraxis_showscale=False,
+            title="Lucro por cabeça, por raça",
+            xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"]))
+        st.plotly_chart(fig_l, use_container_width=True)
+    with c2:
+        fig_m = px.bar(df_r, x="Raça", y="Margem (%)",
+            color="Margem (%)", color_continuous_scale=ESCALA_RUIM_BOM,
+            text="Margem (%)")
+        fig_m.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
+        fig_m.update_layout(**PLOTLY, height=300, coloraxis_showscale=False,
+            title="Margem por raça",
+            xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"]))
+        st.plotly_chart(fig_m, use_container_width=True)
+
+    melhor = ranking[0]
+    st.success(f"🥇 Melhor lucro por cabeça: **{melhor['raca']}** "
+               f"(R$ {melhor['lucro_por_cabeca']:,.2f}). Raça com margem negativa "
+               "teve custo maior que receita no período — não é erro de exibição.")
 
 
 def _fin_resultado():
@@ -2224,16 +2296,21 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_comp,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4)=st.tabs(
+    (t_res,t_comp,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5)=st.tabs(
         ["📒 Resultado","📅 Competência","💵 Registrar Venda","🏷️ Preços/Categoria",
          "☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador",
-         "⚖️ Breakeven","🏆 Origem"])
+         "⚖️ Breakeven","🏆 Origem","🐄 Por Raça"])
 
     with t_res: _fin_resultado()
     with t_comp: _fin_competencia()
     with t_ven: _fin_venda(animals)
     with t_pre: _fin_precos()
     with t_mort: _fin_mortalidade()
+
+    # "Por raça" olha para ciclos ENCERRADOS (vendas), não para o rebanho
+    # ativo — por isso fica fora do guard abaixo: rebanho ativo zerado não
+    # significa que não há histórico de venda para ranquear.
+    with ft5: _fin_rentabilidade_por_raca()
 
     if not animals:
         for t in (ft1,ft_fix,ft2,ft3,ft4):

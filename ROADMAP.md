@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **22 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **23 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,13 +820,13 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **sete services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
-`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa` em 2026-08-12, ver
-abaixo), entregues por agentes e sem nenhum consumidor: `completude`, `conformidade`,
-`dieta`, `gta`, `projecao`, `rateio`, `rentabilidade`. Nenhum é Fase B, então ficam fora
-do escopo desta dívida, mas contam para o total: 29 services no diretório, 22 usados. As
-13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um — ver
-`specs/QUADRO.md`; falta ligar a UI dos que restam.
+Restam **seis services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa` e `rentabilidade`
+em 2026-08-12/13, ver abaixo), entregues por agentes e sem nenhum consumidor:
+`completude`, `conformidade`, `dieta`, `gta`, `projecao`, `rateio`. Nenhum é Fase B,
+então ficam fora do escopo desta dívida, mas contam para o total: 29 services no
+diretório, 23 usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte
+de cada um — ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
 
 ~~⚠️ `previsao_estoque` continuava órfão mesmo com o adaptador pronto (spec 0039 v2).~~
 🟢 **Fechado em 2026-08-11.** `page_estoque` ganhou a aba "📈 Previsão de Ruptura",
@@ -867,6 +867,24 @@ trabalho do mantenedor (R31):
   então nenhum import resolvia isso; a correção foi mover `_insumo_cost_by_reason` para
   onde ela é usada. Achado só porque a prova de interface desta integração exercita
   `page_financeiro` de ponta a ponta — nenhuma prova anterior chegava a essa tela.
+
+~~⚠️ `rentabilidade` (`ranking_por_raca`) nunca foi chamado.~~ 🟢 **Fechado em
+2026-08-13.** Nova aba "🐄 Por Raça" em `page_financeiro`, alimentada por
+`services.rentabilidade_adaptador.montar_ciclos` (spec 0042) a partir de `sales` +
+`animals` + custo acumulado por animal. Duas descobertas de integração, fora do escopo
+da spec 0042 — trabalho do mantenedor (R31):
+- **Venda muda o status do animal para `vendido`** (`register_sale`) — a aba não pode
+  depender do rebanho **ativo** (`get_all_animals()` sem argumento filtra por
+  `status="ativo"`), senão o animal sumiria da análise no instante em que fosse vendido.
+  A aba ficou fora do guard "sem animais ativos" que as outras abas de Financeiro usam,
+  e usa `get_all_animals(status=None)` para montar `animais_por_uuid`.
+- **Bug de produção independente, achado pela mesma via** (prova de interface exercitando
+  `page_financeiro` de ponta a ponta com vendas de verdade): a aba "💵 Registrar Venda"
+  quebrava com `TypeError: cannot use 'dict' as a dict key` toda vez que existia ao menos
+  uma venda registrada — desde 2026-07-23 (`dad8582`, "Fase 1: Financeiro completo").
+  `column_config={c: ... for col in [...]}` usava `c` (a paleta de cores, variável de
+  escopo externo) em vez de `col` (a variável do próprio loop) como chave do dict.
+  Corrigido para `col`.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".

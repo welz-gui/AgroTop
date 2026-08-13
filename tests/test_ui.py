@@ -33,6 +33,7 @@ PROVAS = [
     "tests.ui_previsao_estoque_prova", # previsao_estoque.prever() ligado (spec 0018/0039)
     "tests.ui_reconciliacao_brincos_prova", # reconciliacao_dispositivos.reconciliar() ligado (spec 0033)
     "tests.ui_lancamentos_financeiros_prova", # lancamentos.normalizar() + caixa ligados (spec 0034)
+    "tests.ui_rentabilidade_raca_prova", # rentabilidade_adaptador.montar_ciclos() ligado (spec 0042)
 ]
 
 
