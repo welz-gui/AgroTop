@@ -310,3 +310,16 @@ def importar_arquivo(itens: list[dict], *, lote: str,
                     entidade="dispositivos", entidade_id=lote,
                     registro_posterior={"lote": lote, "criados": criados})
     return {"ok": True, "criados": criados}
+
+
+def com_divergencia() -> list[dict]:
+    """Dispositivos aplicados com divergência visual×eletrônico (§5.3),
+    com o uuid do animal — é o que `services.conformidade_adaptador
+    .montar_rebanho` (spec 0036) precisa para contar por animal ativo.
+    """
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT animal_uuid, divergencia FROM dispositivos "
+            "WHERE divergencia IS NOT NULL AND animal_uuid IS NOT NULL"
+        ).fetchall()
+    return [dict(r) for r in rows]
