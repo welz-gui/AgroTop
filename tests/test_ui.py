@@ -34,6 +34,7 @@ PROVAS = [
     "tests.ui_reconciliacao_brincos_prova", # reconciliacao_dispositivos.reconciliar() ligado (spec 0033)
     "tests.ui_lancamentos_financeiros_prova", # lancamentos.normalizar() + caixa ligados (spec 0034)
     "tests.ui_rentabilidade_raca_prova", # rentabilidade_adaptador.montar_ciclos() ligado (spec 0042)
+    "tests.ui_completude_dados_prova", # completude_adaptador + avaliar_mes() ligados (spec 0035)
 ]
 
 
