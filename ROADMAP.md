@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **25 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **26 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,11 +820,11 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **quatro services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+Restam **três services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
 `previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade`,
-`completude` e `conformidade` em 2026-08-12/13, ver abaixo), entregues por agentes e sem
-nenhum consumidor: `dieta`, `gta`, `projecao`, `rateio`. Nenhum é Fase B, então ficam
-fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 25
+`completude`, `conformidade` e `dieta` em 2026-08-12/13, ver abaixo), entregues por
+agentes e sem nenhum consumidor: `gta`, `projecao`, `rateio`. Nenhum é Fase B, então
+ficam fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 26
 usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um —
 ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
 
@@ -907,6 +907,16 @@ dispositivo aplicado — só agregados por status (`inventario()`, sem uuid) ou 
 dimensão "Sem divergência de dispositivo". Prova de interface trava que a regra "antes
 de 2033" (já testada em `tests/test_conformidade.py`) recebe a data real (`date.today()`)
 e não vira pendência crítica por engano.
+
+~~⚠️ `dieta` (`custo_por_cabeca_dia`) nunca foi chamado.~~ 🟢 **Fechado em 2026-08-13.**
+Nova aba "💰 Custo por Piquete" em `page_nutricao` — custo/cabeça/dia, matéria natural e
+seca, participação por ingrediente e custo/@ produzida, por piquete com plano de trato
+ativo. Alimentada por `services.dieta_adaptador.ingredientes_por_cabeca` (spec 0037), que
+traduz `feeding_plans` (por piquete) para o formato por cabeça que `services/dieta.py`
+espera. `materia_seca_pct` aparece zerada — a coluna não existe no schema (decisão já
+registrada na spec, fora do escopo). `custo_por_arroba_produzida` (também órfão até
+aqui) entrou de brinde: usa GMD médio e rendimento médio de carcaça dos animais do
+piquete.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".
