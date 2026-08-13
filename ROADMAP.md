@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **23 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **24 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,13 +820,13 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **seis services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
-`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa` e `rentabilidade`
-em 2026-08-12/13, ver abaixo), entregues por agentes e sem nenhum consumidor:
-`completude`, `conformidade`, `dieta`, `gta`, `projecao`, `rateio`. Nenhum é Fase B,
-então ficam fora do escopo desta dívida, mas contam para o total: 29 services no
-diretório, 23 usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte
-de cada um — ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
+Restam **cinco services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade` e
+`completude` em 2026-08-12/13, ver abaixo), entregues por agentes e sem nenhum
+consumidor: `conformidade`, `dieta`, `gta`, `projecao`, `rateio`. Nenhum é Fase B, então
+ficam fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 24
+usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um —
+ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
 
 ~~⚠️ `previsao_estoque` continuava órfão mesmo com o adaptador pronto (spec 0039 v2).~~
 🟢 **Fechado em 2026-08-11.** `page_estoque` ganhou a aba "📈 Previsão de Ruptura",
@@ -885,6 +885,15 @@ da spec 0042 — trabalho do mantenedor (R31):
   `column_config={c: ... for col in [...]}` usava `c` (a paleta de cores, variável de
   escopo externo) em vez de `col` (a variável do próprio loop) como chave do dict.
   Corrigido para `col`.
+
+~~⚠️ `completude` (`avaliar_mes`) nunca foi chamado.~~ 🟢 **Fechado em 2026-08-13.** Nova
+seção "📋 Completude dos Dados" no Dashboard (expander fechado por padrão — é
+diagnóstico, não operação do dia a dia), alimentada por
+`services.completude_adaptador.normalizar_pesagens`/`janela_do_mes` (spec 0035),
+mostrando os últimos 3 meses. Diferente das outras integrações, aqui não houve defeito
+de produção nem confusão de contrato — só a construção correta do intervalo
+`inicio`/`fim` do mês para `db.get_feeding_checks`/`db.get_rain` (trabalho do
+mantenedor, R31), travada por teste próprio contra off-by-one no último dia do mês.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".

@@ -51,6 +51,8 @@ from services.lancamentos import normalizar as lancamentos_normalizar
 from services.caixa import resultado_por_competencia
 from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca
+from services.completude_adaptador import normalizar_pesagens, janela_do_mes
+from services.completude import avaliar_mes
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -732,6 +734,81 @@ def page_dashboard():
         column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
             gain_col:st.column_config.NumberColumn(format=fmt_gain),
             "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+
+    _dash_completude()
+
+
+def _dash_completude():
+    """Indicador de completude de dados (spec 0016 + adaptador 0035).
+
+    ROADMAP Trilha 4: "mostra, mês a mês, se a base está ficando treinável" —
+    é diagnóstico de qualidade de coleta, não operação do dia a dia, por
+    isso fica num expander fechado por padrão.
+    """
+    with st.expander("📋 Completude dos Dados (últimos 3 meses)", expanded=False):
+        st.caption("Cinco indicadores de qualidade de coleta: pesagem em dia, "
+                   "intervalo útil pro GMD, contexto da pesagem (lote+método), "
+                   "execução do trato planejado e cobertura de leitura de chuva. "
+                   "Abaixo do mínimo gera alerta — é o que torna a base "
+                   "confiável para os modelos preditivos da Trilha 4.")
+
+        hoje = date.today()
+        meses = []
+        for i in range(2, -1, -1):
+            m, a = hoje.month - i, hoje.year
+            while m <= 0:
+                m += 12; a -= 1
+            meses.append((a, m))
+
+        animais_ativos = len(db.get_all_animals(status="ativo"))
+        pesagens = normalizar_pesagens(db.get_all_weighings())
+
+        linhas = []
+        alertas_ultimo_mes = []
+        for ano, mes in meses:
+            inicio = date(ano, mes, 1)
+            prox_mes = date(ano + (1 if mes == 12 else 0),
+                            1 if mes == 12 else mes + 1, 1)
+            fim = prox_mes - timedelta(days=1)
+            checagens = db.get_feeding_checks(
+                start_date=inicio.isoformat(), end_date=fim.isoformat())
+            chuvas = db.get_rain(
+                start_date=inicio.isoformat(), end_date=fim.isoformat())
+            janela = janela_do_mes(ano, mes, checagens_de_trato=checagens,
+                                   leituras_de_chuva=chuvas)
+            r = avaliar_mes(ano, mes, animais_ativos, pesagens, **janela)
+            linhas.append({
+                "Mês": f"{mes:02d}/{ano}",
+                "Pesagem em dia": round(r["animais_com_pesagem_em_dia"] * 100, 1),
+                "Intervalo útil GMD": round(r["intervalos_uteis_gmd"] * 100, 1),
+                "Contexto da pesagem": round(r["contexto_da_pesagem"] * 100, 1),
+                "Execução nutricional": round(r["execucao_nutricional"] * 100, 1),
+                "Cobertura ambiental": round(r["cobertura_ambiental"] * 100, 1),
+            })
+            alertas_ultimo_mes = r["alertas"]
+
+        df_c = pd.DataFrame(linhas)
+        df_melt = df_c.melt(id_vars="Mês", var_name="Indicador",
+                            value_name="Completude (%)")
+        fig = px.line(df_melt, x="Mês", y="Completude (%)", color="Indicador",
+                     markers=True)
+        fig.update_layout(**PLOTLY, height=320,
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(gridcolor=c["superficie"], range=[0, 105]))
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(df_c, use_container_width=True, hide_index=True,
+            column_config={col: st.column_config.NumberColumn(format="%.1f%%")
+                           for col in df_c.columns if col != "Mês"})
+
+        mes_label = linhas[-1]["Mês"]
+        if alertas_ultimo_mes:
+            for al in alertas_ultimo_mes:
+                st.warning(f"⚠️ **{al['indicador']}** em "
+                          f"{al['valor']*100:.0f}% (mínimo {al['minimo']*100:.0f}%) "
+                          f"em {mes_label} — {al['mensagem']}")
+        else:
+            st.success(f"✅ Todos os indicadores dentro do mínimo em {mes_label}.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MODO CAMPO  (Mobile-first, máx. 3 cliques)
