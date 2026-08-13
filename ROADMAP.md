@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **24 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **25 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,11 +820,11 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **cinco services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
-`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade` e
-`completude` em 2026-08-12/13, ver abaixo), entregues por agentes e sem nenhum
-consumidor: `conformidade`, `dieta`, `gta`, `projecao`, `rateio`. Nenhum é Fase B, então
-ficam fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 24
+Restam **quatro services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade`,
+`completude` e `conformidade` em 2026-08-12/13, ver abaixo), entregues por agentes e sem
+nenhum consumidor: `dieta`, `gta`, `projecao`, `rateio`. Nenhum é Fase B, então ficam
+fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 25
 usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um —
 ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
 
@@ -894,6 +894,19 @@ mostrando os últimos 3 meses. Diferente das outras integrações, aqui não hou
 de produção nem confusão de contrato — só a construção correta do intervalo
 `inicio`/`fim` do mês para `db.get_feeding_checks`/`db.get_rain` (trabalho do
 mantenedor, R31), travada por teste próprio contra off-by-one no último dia do mês.
+
+~~⚠️ `conformidade` (`avaliar`) nunca foi chamado.~~ 🟢 **Fechado em 2026-08-13.** Nova
+seção "🛡️ Conformidade PNIB" no Dashboard — escore e as seis dimensões do §4, aberta por
+padrão quando a faixa não é "completo"/"bom" (é o tipo de pendência que precisa
+aparecer, não esperar alguém abrir), alimentada por
+`services.conformidade_adaptador.montar_rebanho` (spec 0036). Peça nova em
+`repositories/dispositivos.py::com_divergencia` (fora do escopo da spec, trabalho do
+mantenedor R31): nenhuma função existente devolvia `{animal_uuid, divergencia}` de todo
+dispositivo aplicado — só agregados por status (`inventario()`, sem uuid) ou por código
+único (`por_codigo()`). Sem ela, toda divergência visual×eletrônico desapareceria da
+dimensão "Sem divergência de dispositivo". Prova de interface trava que a regra "antes
+de 2033" (já testada em `tests/test_conformidade.py`) recebe a data real (`date.today()`)
+e não vira pendência crítica por engano.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".

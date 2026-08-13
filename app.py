@@ -53,6 +53,8 @@ from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca
 from services.completude_adaptador import normalizar_pesagens, janela_do_mes
 from services.completude import avaliar_mes
+from services.conformidade_adaptador import montar_rebanho
+from services.conformidade import avaliar as conformidade_avaliar
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -735,7 +737,80 @@ def page_dashboard():
             gain_col:st.column_config.NumberColumn(format=fmt_gain),
             "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
 
+    _dash_conformidade()
     _dash_completude()
+
+
+_FAIXA_CONFORMIDADE = {
+    "completo": ("🟢", "Completo"), "bom": ("🟢", "Bom"),
+    "atencao": ("🟡", "Atenção"), "critico": ("🔴", "Crítico"),
+}
+
+
+def _dash_conformidade():
+    """Escore de conformidade PNIB (spec 0029 + adaptador 0036).
+
+    Indicador de GESTÃO — não substitui avaliação legal (o próprio
+    `services.conformidade.avaliar` repete isso em cada dimensão e em cada
+    mensagem). Fica aberto por padrão quando a faixa não é "completo"/"bom":
+    é o tipo de pendência que precisa aparecer, não esperar alguém abrir.
+    """
+    animais = db.get_all_animals(status=None)
+    identificadores_ativos = [
+        item for itens in db.identificadores._por_animal().values()
+        for item in itens if item.get("status") == "ativo"
+    ]
+    dispositivos = db.dispositivos.com_divergencia()
+    eventos_pendentes = db.eventos.contar_pendentes()
+    movimentacoes_abertas = db.movimentacoes.abertas()
+    referencia = date.today().isoformat()
+
+    rebanho = montar_rebanho(
+        animais=animais, identificadores_ativos=identificadores_ativos,
+        dispositivos=dispositivos, eventos_pendentes=eventos_pendentes,
+        movimentacoes_abertas=movimentacoes_abertas, referencia=referencia)
+    resultado = conformidade_avaliar(rebanho, referencia)
+
+    emoji, rotulo = _FAIXA_CONFORMIDADE.get(resultado["faixa"], ("⚪", resultado["faixa"]))
+    aberto_por_padrao = resultado["faixa"] not in ("completo", "bom")
+
+    with st.expander(
+        f"🛡️ Conformidade PNIB — {emoji} {rotulo} ({resultado['escore']:.1f}/100)",
+        expanded=aberto_por_padrao):
+        st.caption("Indicador de gestão a partir dos dados cadastrados — não substitui "
+                   "avaliação de conformidade legal nem certificação oficial.")
+        if resultado["prazo_relevante"]:
+            st.info(f"ℹ️ Identificação oficial exigível no trânsito a partir de "
+                   f"**{resultado['prazo_relevante']}** — animais em preparo contam "
+                   "à parte até lá.")
+
+        df_dim = pd.DataFrame([{
+            "Dimensão": d["nome"], "Peso (%)": d["peso"], "Nota": d["nota"],
+            "Faltam": d["faltam"], "Situação": d["mensagem"],
+        } for d in resultado["dimensoes"]])
+        st.dataframe(df_dim, use_container_width=True, hide_index=True,
+            column_config={
+                "Peso (%)": st.column_config.NumberColumn(format="%.0f%%"),
+                "Nota": st.column_config.NumberColumn(format="%.1f")})
+
+        fig = px.bar(df_dim, x="Dimensão", y="Nota", color="Nota",
+                     color_continuous_scale=ESCALA_RUIM_BOM, range_color=[0, 100],
+                     text="Nota")
+        fig.update_traces(texttemplate="%{text:.0f}", textposition="outside")
+        fig.add_hline(y=70, line_dash="dash", line_color=c["borda_suave"])
+        fig.update_layout(**PLOTLY, height=300, coloraxis_showscale=False,
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(gridcolor=c["superficie"], range=[0, 105]))
+        st.plotly_chart(fig, use_container_width=True)
+
+        if resultado["pendencias_criticas"]:
+            st.warning("**Pendências:**\n" + "\n".join(
+                f"- {p}" for p in resultado["pendencias_criticas"]))
+        if resultado["pendencias_informativas"]:
+            st.caption("**Também vale saber:** " + " · ".join(
+                resultado["pendencias_informativas"]))
+        if not resultado["pendencias_criticas"] and not resultado["pendencias_informativas"]:
+            st.success("✅ Nenhuma pendência identificada.")
 
 
 def _dash_completude():
