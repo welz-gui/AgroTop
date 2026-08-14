@@ -422,26 +422,42 @@ autoria e horário registrados, e o resultado aparece no web.
 **Pré-requisito:** Fase A completa. Independe da Trilha 1 (mas o GPS depende do mobile v1).
 
 **Escopo**
-1. Mapa da propriedade; desenhar ou importar o polígono de cada piquete; guardar a geometria.
-2. **Área calculada a partir do polígono.** Hoje `area_ha` é **digitada à mão**
-   ([app.py:1390](app.py:1390)) — e ela alimenta `capacity_ua` e a lotação UA/ha do dashboard,
-   que herda qualquer erro de digitação. **Este item se paga sozinho, sem satélite nenhum.**
-3. Localização do piquete (centroide) — útil também para a previsão do tempo, hoje presa a
-   uma coordenada única da fazenda (`farm_lat`/`farm_lon`).
-4. Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1, etapa 2).
+1. 🟡 **Guardar a geometria de cada piquete e da propriedade** — feito, mas parcial: o
+   perímetro entra **digitando vértices** (`longitude, latitude`, um por linha, formato
+   GeoJSON), em `page_lotes` (por piquete, migration 0015) e na edição de propriedade
+   (`properties.poligono`). **Não tem "desenhar no mapa" nem "importar arquivo"** — quem
+   tem um KML/shapefile do piquete precisa converter os vértices à mão. Isso é uma
+   limitação real, não uma etapa concluída.
+2. ~~**Área calculada a partir do polígono**, não digitada.~~ 🟢 **Fechado em 2026-08-14.**
+   `services/geometria.py::area_hectares` existia desde a etapa B (spec 0015/PR #46), e a
+   tela já **mostrava** a área calculada lado a lado com a digitada — mas
+   `database.py::set_lote_poligono` não persistia isso: salvar o perímetro só gravava o
+   desenho, `lotes.area_ha` continuava com o que foi digitado antes, e o próprio docstring
+   da função dizia "quem chama já fez isso" sobre um recálculo que a UI nunca fazia.
+   Agora `set_lote_poligono` deriva e grava `area_ha` na mesma escrita quando o polígono é
+   válido; apagar o polígono preserva o último valor calculado como fallback manual (regra
+   abaixo, intacta).
+3. ⬜ Localização do piquete (centroide) — útil também para a previsão do tempo, hoje presa a
+   uma coordenada única da fazenda (`farm_lat`/`farm_lon`, `page_clima`).
+   `services/geometria.py::centroide` já existe e já é usado para a propriedade
+   (`properties.longitude`/`latitude`); falta usá-lo por piquete e decidir como isso entra
+   na previsão (chamar a API de tempo uma vez por piquete tem custo — decisão de UX/API
+   ainda em aberto, não é só "chamar de novo").
+4. ⬜ Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1, etapa 2).
 
-**Técnico:** **PostGIS 3.3.7 está disponível** no projeto (não instalado). É extensão padrão
-do Postgres, compatível com o ADR 0002. Cálculo de área em projeção geográfica é traiçoeiro
-de fazer à mão — vale a extensão. Alternativa mais simples: GeoJSON em `JSONB`.
-Instalar extensão é mudança de schema: seguir R4.
+**Técnico:** **PostGIS 3.3.7 está disponível** no projeto (não instalado, **e não foi
+necessário até aqui**) — a geometria roda via `pyproj`/`shapely` em Python puro, sobre
+`poligono TEXT` (GeoJSON serializado), sem extensão nenhuma. Se a demanda crescer (item 1,
+desenhar/importar), reavaliar a extensão nesse momento, não antes.
 
 **Regras específicas**
 - Não remover `lotes.area_ha`; passe a **derivá-la** do polígono e mantenha a digitação
-  manual como fallback para piquete sem geometria.
+  manual como fallback para piquete sem geometria. *(Cumprida pelo item 2.)*
 - NDVI **não** entra nesta trilha (ver Trilha 4).
 
 **Pronto quando:** cada piquete tem polígono, a área exibida vem da geometria, e piquete sem
-polígono continua funcionando como hoje.
+polígono continua funcionando como hoje. *(Os dois últimos, cumpridos. Falta desenhar/
+importar no mapa — item 1 — e localização por piquete na previsão do tempo — item 3.)*
 
 ---
 

@@ -1449,15 +1449,34 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
 
 @_writes
 def set_lote_poligono(lote_id: str, poligono_geojson: Optional[str]) -> bool:
-    """Grava o perímetro do piquete (migration 0015). `None` apaga o desenho.
+    """Grava o perímetro do piquete (migration 0015) e deriva `area_ha` dele.
 
-    Não recalcula `area_ha` a partir do polígono — quem chama já fez isso
-    (mesma separação de responsabilidade da tela de propriedades: a tela
-    calcula e mostra; aqui só se grava o que foi calculado).
+    ROADMAP Trilha 2: "área calculada, não digitada" — mesmo princípio já
+    usado na tela de Propriedades, agora também na escrita do piquete, não
+    só na exibição. Perímetro válido recalcula `area_ha` na mesma escrita;
+    `None` apaga o desenho e preserva o último `area_ha` como fallback
+    manual — regra explícita da Trilha 2: piquete sem geometria continua
+    funcionando como hoje.
     """
+    from services.geometria import area_hectares
+
+    area_calculada = None
+    if poligono_geojson:
+        try:
+            geo = json.loads(poligono_geojson)
+            anel = [tuple(v) for v in geo["coordinates"][0]]
+            area_calculada = round(area_hectares(anel), 2)
+        except (ValueError, KeyError, TypeError, IndexError):
+            area_calculada = None
+
     with _conn() as con:
-        cur = con.execute(
-            "UPDATE lotes SET poligono=? WHERE id=?", (poligono_geojson, lote_id))
+        if area_calculada is not None:
+            cur = con.execute(
+                "UPDATE lotes SET poligono=?, area_ha=? WHERE id=?",
+                (poligono_geojson, area_calculada, lote_id))
+        else:
+            cur = con.execute(
+                "UPDATE lotes SET poligono=? WHERE id=?", (poligono_geojson, lote_id))
         return cur.rowcount > 0
 
 
