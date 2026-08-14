@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **27 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **28 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,13 +820,13 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **dois services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+Resta **um service órfão** (eram onze — `lotacao` saiu da lista em 2026-08-06,
 `previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade`,
-`completude`, `conformidade`, `dieta` e `projecao` em 2026-08-12/14, ver abaixo),
-entregues por agentes e sem nenhum consumidor: `gta`, `rateio`. Nenhum é Fase B, então
-ficam fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 27
+`completude`, `conformidade`, `dieta`, `projecao` e `rateio` em 2026-08-12/14, ver
+abaixo), entregue por agente e sem nenhum consumidor: `gta`. Não é Fase B, então fica
+fora do escopo desta dívida, mas conta para o total: 29 services no diretório, 28
 usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um —
-ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
+ver `specs/QUADRO.md`; falta ligar a UI da última.
 
 ~~⚠️ `previsao_estoque` continuava órfão mesmo com o adaptador pronto (spec 0039 v2).~~
 🟢 **Fechado em 2026-08-11.** `page_estoque` ganhou a aba "📈 Previsão de Ruptura",
@@ -932,6 +932,19 @@ chamado.~~ 🟢 **Fechado em 2026-08-14.** Duas peças, não uma:
   precisar mudar de forma. De brinde: `situacao` (que a reimplementação não distinguia)
   agora separa "perdendo peso" (alerta de saúde/pasto) de "sem dado nenhum" — antes os
   dois casos apareciam com a mesma cara ("— sem GMD") na tela.
+
+~~⚠️ `rateio` (`ratear`) nunca foi chamado.~~ 🟢 **Fechado em 2026-08-14.** Nova aba
+"➗ Rateio de Lote" em `page_financeiro`. A spec 0019 documentou o motivo de existir:
+custo de trato coletivo, medicamento aplicado ao lote inteiro ou frete chegam como **um
+valor para N animais**, e até aqui **não havia nenhum jeito de lançar isso** — só dava
+para lançar custo por um animal de cada vez (Ficha do Animal), então esse custo
+simplesmente não entrava no individual, subestimando o custo por arroba. A aba fecha
+essa lacuna de verdade: escolhe o piquete, o critério (`peso_dia`/`peso`/`igual`), mostra
+a prévia com o "teste do centavo" (soma sempre fecha, spec 0031) e grava um
+`animal_costs` por animal ao confirmar. Peça nova, fora do escopo da spec 0041, trabalho
+do mantenedor (R31): `entrada_no_lote` (necessário para `peso_dia`) não vem pronta de
+lugar nenhum — resolvida como a movimentação mais recente do animal para aquele piquete
+(`get_movements`), ou `entry_date` se ele nunca se moveu.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".
