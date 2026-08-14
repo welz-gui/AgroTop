@@ -132,6 +132,48 @@ class TestPerimetroDoLote(unittest.TestCase):
         self.assertEqual(g["type"], "Polygon")
         self.assertEqual(len(g["coordinates"][0]), 3)
 
+    def test_salvar_perimetro_atualiza_area_ha(self):
+        """A peça que faltava (2026-08-14): a tela já calculava e MOSTRAVA a
+        área do desenho, mas `lotes.area_ha` — o campo que alimenta
+        capacity_ua e a lotação UA/ha do dashboard — não era atualizado.
+        Salvar o perímetro precisa gravar a área calculada, não só exibi-la."""
+        from services.geometria import area_hectares
+        lid = self.lotes[0]["id"]
+        anel = [(-51.2300, -30.0300), (-51.2280, -30.0300), (-51.2280, -30.0320)]
+        esperado = round(area_hectares(anel), 2)
+
+        at = self._tela()
+        self._por_chave(at.text_area, f"lote_poligono_{lid}").set_value(
+            "-51.2300, -30.0300\n-51.2280, -30.0300\n-51.2280, -30.0320")
+        at.run()
+        self._por_chave(at.button, f"lote_poligono_salvar_{lid}").click()
+        at.run()
+
+        db.clear_cache()
+        self.assertEqual(db.get_lote(lid)["area_ha"], esperado)
+
+    def test_apagar_perimetro_preserva_area_ha_como_fallback(self):
+        """ROADMAP Trilha 2: piquete sem geometria continua funcionando —
+        apagar o desenho não pode zerar nem mexer na última área calculada,
+        que vira o fallback editável à mão."""
+        lid = self.lotes[0]["id"]
+        db.set_lote_poligono(lid, QUADRADO_A)
+        db.clear_cache()
+        area_com_poligono = db.get_lote(lid)["area_ha"]
+        self.assertGreater(area_com_poligono, 0)
+
+        at = self._tela()
+        self._por_chave(at.text_area, f"lote_poligono_{lid}").set_value("")
+        at.run()
+        self._por_chave(at.button, f"lote_poligono_salvar_{lid}").click()
+        at.run()
+
+        db.clear_cache()
+        lote = db.get_lote(lid)
+        self.assertIsNone(lote["poligono"])
+        self.assertEqual(lote["area_ha"], area_com_poligono,
+                         "apagar o perímetro mexeu na área cadastrada")
+
     def test_sobreposicao_avisa_sem_bloquear_a_pagina(self):
         """Piquete redesenhado sem apagar o anterior é situação real — a
         página continua funcionando, só avisa."""

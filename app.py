@@ -2009,7 +2009,8 @@ def page_lotes():
             with st.expander(f"🗺️ Perímetro do {l['name']}"):
                 st.caption("Um vértice por linha, `longitude, latitude` — a ordem do "
                            "GeoJSON, a mesma da tela de Propriedades. A área é "
-                           "**calculada** do desenho, não digitada.")
+                           "**calculada** do desenho, não digitada — salvar o perímetro "
+                           "atualiza o campo Área do piquete automaticamente.")
                 texto_l = st.text_area(
                     "Vértices", value=_poligono_para_texto(l.get("poligono")),
                     height=120, key=f"lote_poligono_{l['id']}",
@@ -2032,12 +2033,17 @@ def page_lotes():
 
                 if anel_l and not problemas_l:
                     area_desenhada = geometria_area_ha(anel_l)
+                    diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
                     gl1, gl2 = st.columns(2)
-                    gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha")
-                    gl2.metric("Cadastrada em Área (ha)", f"{_num_br(l['area_ha'], 2)} ha",
-                               help="Os dois valores podem divergir — o campo Área "
-                                    "não é recalculado automaticamente. Ajuste-o na "
-                                    "edição do lote se quiser que combinem.")
+                    gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
+                               help="É o que vai gravar no campo Área ao salvar.")
+                    gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
+                               delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
+                                     if diverge else None))
+                elif not texto_l.strip() and l.get("poligono"):
+                    st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
+                               "último valor calculado, editável à mão (Trilha 2: "
+                               "piquete sem geometria continua funcionando).")
 
                 pode_l = not erro_l and not problemas_l
                 if st.button("💾 Salvar perímetro", disabled=not pode_l,
@@ -2046,7 +2052,11 @@ def page_lotes():
                                         "coordinates": [[list(v) for v in anel_l]]})
                            if anel_l else None)
                     db.set_lote_poligono(l["id"], novo)
-                    st.success("✅ Perímetro salvo." if novo else "✅ Perímetro removido.")
+                    if novo:
+                        st.success(f"✅ Perímetro salvo — Área atualizada para "
+                                  f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
+                    else:
+                        st.success("✅ Perímetro removido.")
                     st.rerun()
 
         # Gráfico UA por Lote
