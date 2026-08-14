@@ -83,12 +83,21 @@ class TestCompraDeInsumoNaTela(unittest.TestCase):
 
     def _registrar(self, at, *, fornecedor="Agropecuária Teste", doc="NF-1",
                    parcelas=1):
+        """Clica em Registrar e devolve o `at` já rodado de novo.
+
+        Não checa `at.success` aqui: o handler faz `st.success(...)` seguido de
+        `st.rerun()` — o `AppTest` persegue o rerun interno e devolve o estado
+        da execução final, não da que exibiu a mensagem. A prova real de que
+        registrou é o banco (é o que os testes conferem depois), não o toast.
+        """
         self._por_chave(at.text_input, "compra_fornecedor").set_value(fornecedor)
         self._por_chave(at.text_input, "compra_doc_num").set_value(doc)
         self._por_chave(at.number_input, "compra_num_parcelas").set_value(parcelas)
         at.run()
         self._por_chave(at.button, "compra_registrar_btn").click()
         at.run()
+        self.assertEqual(list(at.exception), [],
+                         f"app levantou exceção ao registrar: {[e.value for e in at.exception]}")
         return at
 
     # ── testes ───────────────────────────────────────────────────────────────
@@ -127,7 +136,6 @@ class TestCompraDeInsumoNaTela(unittest.TestCase):
         self._adicionar_item(at, 20.0, 9.5)
         self._registrar(at, parcelas=2)
 
-        self.assertTrue(list(at.success), "não confirmou o registro")
         self.assertEqual(at.session_state["compra_itens_atual"], [],
                          "carrinho não foi limpo após registrar")
 
@@ -146,7 +154,6 @@ class TestCompraDeInsumoNaTela(unittest.TestCase):
         at_e = self._tela("estoque")
         self._adicionar_item(at_e, 10.0, 4.0)
         self._registrar(at_e, fornecedor="Fornecedor ABC", doc="NF-42", parcelas=1)
-        self.assertTrue(list(at_e.success))
 
         at_f = self._tela("financeiro")
         metricas = {m.label: m.value for m in at_f.metric}
@@ -157,7 +164,6 @@ class TestCompraDeInsumoNaTela(unittest.TestCase):
         at_e = self._tela("estoque")
         self._adicionar_item(at_e, 5.0, 2.0)
         self._registrar(at_e, parcelas=1)
-        self.assertTrue(list(at_e.success))
 
         db.clear_cache()
         conta_id = db.compras.listar_contas_pagar("aberto")[0]["id"]
