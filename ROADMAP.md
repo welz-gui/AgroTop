@@ -4,7 +4,8 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-05 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** · fila de specs em 2
+Última atualização: 2026-08-14 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada
+à interface (7 de 7) · 29 de 29 services usados** · fila de specs vazia (0)
 
 ---
 
@@ -20,7 +21,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **28 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **29 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,13 +821,15 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Resta **um service órfão** (eram onze — `lotacao` saiu da lista em 2026-08-06,
-`previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade`,
-`completude`, `conformidade`, `dieta`, `projecao` e `rateio` em 2026-08-12/14, ver
-abaixo), entregue por agente e sem nenhum consumidor: `gta`. Não é Fase B, então fica
-fora do escopo desta dívida, mas conta para o total: 29 services no diretório, 28
-usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um —
-ver `specs/QUADRO.md`; falta ligar a UI da última.
+~~Onze services órfãos, entregues por agentes e sem nenhum consumidor.~~ 🟢 **Zerados em
+2026-08-14.** `lotacao` (2026-08-06), `previsao_estoque` e `arquivo_dispositivos`
+(2026-08-11/12), `caixa`, `rentabilidade`, `completude`, `conformidade`, `dieta`,
+`projecao`, `rateio` e `gta` (2026-08-12/14, ver abaixo) — todos ligados. 29 services no
+diretório, **29 usados**. As 13 specs de adaptador (0033–0043) entregaram a função-ponte
+de cada um; ligar a UI foi trabalho do mantenedor (R31) em cada caso — ver
+`specs/QUADRO.md` e as entradas abaixo para o que cada integração exigiu além da função
+pura (a maioria expôs pelo menos uma peça de dado que a spec não podia prever, e três
+expuseram bugs de produção reais, não relacionados às specs).
 
 ~~⚠️ `previsao_estoque` continuava órfão mesmo com o adaptador pronto (spec 0039 v2).~~
 🟢 **Fechado em 2026-08-11.** `page_estoque` ganhou a aba "📈 Previsão de Ruptura",
@@ -945,6 +948,20 @@ a prévia com o "teste do centavo" (soma sempre fecha, spec 0031) e grava um
 do mantenedor (R31): `entrada_no_lote` (necessário para `peso_dia`) não vem pronta de
 lugar nenhum — resolvida como a movimentação mais recente do animal para aquele piquete
 (`get_movements`), ou `entry_date` se ele nunca se moveu.
+
+~~⚠️ `gta` (`validar`) nunca foi chamado.~~ 🟢 **Fechado em 2026-08-14 — última das onze.**
+Novo expander "📄 Conferir a GTA física (§8)" na fila "Em andamento" de
+`page_movimentacao`, alimentado por `services.gta_adaptador.montar_contexto` (spec 0038).
+Diferente das outras dez integrações: a própria spec avisou que `movimentacoes` não
+guarda `emissao`/`validade`/`quantidade_declarada` do papel — só `gta_numero` — e deixou
+a decisão de onde coletar isso para o mantenedor (R31). Decidido **não persistir**: o
+operador digita o que está escrito no papel na hora de conferir, sem virar coluna nova
+(schema fica fora do escopo). Duas peças de dado resolvidas na integração, nenhuma pronta
+em lugar nenhum: `animais_em_carencia_uuids` (cruza `get_withdrawal_end_batch` com hoje,
+mesmo padrão já usado em `page_desempenho`) e `animais_no_embarque_uuids` (pré-marcado
+com todos os animais da movimentação, editável — é o que embarcou de fato, que pode
+divergir do que o sistema espera). Não bloqueia liberar/confirmar: é apoio à decisão,
+complementar à pré-validação do §8.3 que já bloqueia (`movimentacoes.pre_validar`).
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".
