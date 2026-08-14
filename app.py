@@ -59,6 +59,8 @@ from services.dieta_adaptador import ingredientes_por_cabeca
 from services.dieta import custo_por_cabeca_dia, custo_por_arroba_produzida
 from services.projecao_adaptador import series_mensais
 from services.projecao import correlacao_chuva_gmd
+from services.rateio_adaptador import com_dias_no_lote
+from services.rateio import ratear
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -2452,10 +2454,10 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_comp,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5)=st.tabs(
+    (t_res,t_comp,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
         ["📒 Resultado","📅 Competência","💵 Registrar Venda","🏷️ Preços/Categoria",
          "☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador",
-         "⚖️ Breakeven","🏆 Origem","🐄 Por Raça"])
+         "⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
 
     with t_res: _fin_resultado()
     with t_comp: _fin_competencia()
@@ -2469,7 +2471,7 @@ def page_financeiro():
     with ft5: _fin_rentabilidade_por_raca()
 
     if not animals:
-        for t in (ft1,ft_fix,ft2,ft3,ft4):
+        for t in (ft1,ft_fix,ft2,ft3,ft4,ft6):
             with t: st.info("Sem animais ativos para esta análise.")
         return
 
@@ -2795,6 +2797,90 @@ def page_financeiro():
                            f"({rank[0]['gmd_medio']:.3f} kg/dia). "
                            f"Compare com o **custo por @** e a **mortalidade** na tabela para "
                            f"decidir de quem vale a pena comprar de novo.")
+
+    with ft6:
+        _fin_rateio_de_lote(animals)
+
+
+def _fin_rateio_de_lote(animals):
+    """Rateio de custo de lote entre os animais (spec 0019 + adaptador 0041).
+
+    `services.rateio.ratear` existia pura e testada desde a spec 0019, mas
+    sem consumidor — e a lacuna que a motivou continuava aberta: **não
+    existe hoje nenhum jeito de lançar um custo para "o lote inteiro"**
+    (trato coletivo, medicamento aplicado a todos, frete). Só dá pra
+    lançar custo por um animal de cada vez (Ficha do Animal → Adicionar
+    Custo). Sem isso, custo de lote simplesmente não entra no individual, e
+    o custo por arroba de cada animal fica subestimado — exatamente o
+    problema que a spec 0019 documentou.
+
+    `dias_no_lote` (critério `peso_dia`) não vem de lugar nenhum pronto —
+    resolvido aqui (R31, fora do escopo da spec 0041): a movimentação mais
+    recente do animal para este piquete, ou `entry_date` se ele nunca se
+    moveu (está no piquete desde que entrou no rebanho).
+    """
+    st.caption("Lança um custo único (trato do lote, medicamento aplicado a todos, "
+               "frete...) dividido entre os animais do piquete — proporcionalmente, "
+               "não em partes iguais que ignoram peso.")
+
+    lotes = db.get_all_lotes()
+    if not lotes:
+        st.info("Cadastre piquetes primeiro (em Lotes / Pastagem).")
+        return
+
+    lote_sel = st.selectbox("Piquete *", lotes,
+        format_func=lambda l: f"{l['id']} — {l['name']}", key="rat_lote")
+    animais_lote = [a for a in animals if a.get("lote_id") == lote_sel["id"]]
+    if not animais_lote:
+        st.info("Nenhum animal ativo neste piquete.")
+        return
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        valor_total = st.number_input("Valor total (R$) *", min_value=0.0, step=10.0,
+                                      format="%.2f", key="rat_valor")
+    with c2:
+        criterio = st.selectbox("Critério", ["peso_dia", "peso", "igual"],
+            format_func=lambda k: {"peso_dia": "Peso × dias no piquete",
+                                   "peso": "Peso atual",
+                                   "igual": "Igual para todos"}[k], key="rat_criterio")
+    with c3:
+        tipo = st.selectbox("Tipo de custo", COST_TYPES, key="rat_tipo")
+    desc = st.text_input("Descrição *", placeholder="Ex: Vermífugo aplicado no lote",
+                         key="rat_desc").strip()
+    data_custo = st.date_input("Data", value=date.today(), key="rat_data")
+    referencia = data_custo.isoformat()
+
+    animais_para_ratear = [{"id": a["id"], "peso": a["current_weight"]}
+                           for a in animais_lote]
+    if criterio == "peso_dia":
+        for item, a in zip(animais_para_ratear, animais_lote):
+            movs = db.get_movements(a["id"], limit=1)
+            item["entrada_no_lote"] = movs[0]["movement_date"] if movs else a["entry_date"]
+        animais_para_ratear = com_dias_no_lote(animais_para_ratear, referencia)
+
+    if not valor_total:
+        st.info("Informe o valor total para ver a prévia do rateio.")
+        return
+
+    preview = ratear(valor_total, animais_para_ratear, criterio)
+    st.markdown(f"**Prévia do rateio entre {len(preview)} animal(is)**")
+    df_prev = pd.DataFrame(preview).rename(
+        columns={"animal_id": "Animal", "valor": "Valor (R$)"})
+    st.dataframe(df_prev, use_container_width=True, hide_index=True,
+        column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+    soma = sum(p["valor"] for p in preview)
+    st.caption(f"Soma do rateio: R$ {soma:,.2f} (fecha exatamente com o valor total).")
+
+    if st.button(f"💾 Lançar custo rateado para {len(preview)} animal(is)",
+                 type="primary", disabled=not desc, key="rat_salvar"):
+        for item in preview:
+            db.add_animal_cost(item["animal_id"], tipo, desc, item["valor"], referencia,
+                               notes=f"Rateio do piquete {lote_sel['id']} ({criterio}), "
+                                     f"total R$ {valor_total:,.2f}")
+        db.clear_cache()
+        st.success(f"✅ R$ {valor_total:,.2f} rateado entre {len(preview)} animal(is).")
+        st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ESTOQUE DE INSUMOS
