@@ -2290,6 +2290,73 @@ def _fin_competencia():
             column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
 
 
+def _fin_contas_a_pagar():
+    """Parcelas geradas por compra de insumo com nota fiscal (§5, Trilha 3).
+
+    Diferente de Custos Fixos e Custos por Animal (gasto já ocorrido, sem
+    prazo), aqui a conta nasce **antes** do pagamento — tem vencimento e pode
+    estar vencida. `db.compras.registrar()` (aba 🛒 Compra com Nota Fiscal,
+    em Estoque) é quem gera; aqui só se acompanha e se marca como paga.
+    """
+    st.caption("Parcelas das compras de insumo com nota fiscal (aba 🛒 Compra com "
+               "Nota Fiscal, em Estoque). Vencidas aparecem destacadas.")
+
+    contas = db.compras.listar_contas_pagar()
+    if not contas:
+        st.info("Nenhuma conta a pagar registrada ainda.")
+        return
+
+    hoje = date.today().isoformat()
+    abertas = [c for c in contas if c["status"] == "aberto"]
+    vencidas = [c for c in abertas if c["vencimento"] < hoje]
+
+    kk = st.columns(3)
+    kk[0].metric("Em Aberto", len(abertas))
+    kk[1].metric("Vencidas", len(vencidas))
+    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
+
+    if vencidas:
+        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
+            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
+                     for c in vencidas))
+
+    STATUS_LABEL = {"aberto": "🟡 Aberto", "pago": "🟢 Pago", "cancelado": "⚪ Cancelado"}
+    f_status = st.selectbox("Filtrar por situação", ["Todas", "aberto", "pago", "cancelado"],
+        format_func=lambda s: s if s == "Todas" else STATUS_LABEL.get(s, s),
+        key="pag_filtro_status")
+    filtradas = contas if f_status == "Todas" else [c for c in contas if c["status"] == f_status]
+
+    rows = [{"Descrição": c["descricao"], "Parcela": f"{c['parcela_numero']}/{c['parcela_total']}",
+        "Vencimento": c["vencimento"], "Valor (R$)": c["valor"],
+        "Situação": ("🔴 Vencida" if c["status"] == "aberto" and c["vencimento"] < hoje
+                     else STATUS_LABEL.get(c["status"], c["status"]))}
+        for c in filtradas]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True,
+        column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+    pendentes = [c for c in filtradas if c["status"] == "aberto"]
+    if pendentes:
+        with st.expander("💳 Marcar como paga"):
+            conta_sel = st.selectbox("Conta", pendentes,
+                format_func=lambda c: f"{c['descricao']} ({c['parcela_numero']}/{c['parcela_total']}) — "
+                    f"R$ {c['valor']:.2f}, vence {c['vencimento']}",
+                key="pag_conta_selecionada")
+            pg1, pg2 = st.columns(2)
+            with pg1:
+                data_pg = st.date_input("Data do pagamento", value=date.today(), key="pag_data")
+            with pg2:
+                forma_pg = st.selectbox("Forma de pagamento",
+                    ["pix", "boleto", "transferência", "dinheiro", "cartão", "outro"],
+                    key="pag_forma")
+            if st.button("✅ Confirmar Pagamento", type="primary", key="pag_confirmar_btn"):
+                ok = db.compras.marcar_pago(conta_sel["id"], data_pg.isoformat(), forma_pg)
+                if ok:
+                    st.success("✅ Conta marcada como paga.")
+                    st.rerun()
+                else:
+                    st.error("Não foi possível marcar como paga.")
+
+
 def _fin_rentabilidade_por_raca():
     """Rentabilidade de ciclos encerrados por raça (spec 0042).
 
@@ -2466,13 +2533,14 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_comp,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
-        ["📒 Resultado","📅 Competência","💵 Registrar Venda","🏷️ Preços/Categoria",
-         "☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador",
-         "⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
+    (t_res,t_comp,t_pag,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
+        ["📒 Resultado","📅 Competência","📋 Contas a Pagar","💵 Registrar Venda",
+         "🏷️ Preços/Categoria","☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos",
+         "💹 Simulador","⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
 
     with t_res: _fin_resultado()
     with t_comp: _fin_competencia()
+    with t_pag: _fin_contas_a_pagar()
     with t_ven: _fin_venda(animals)
     with t_pre: _fin_precos()
     with t_mort: _fin_mortalidade()
@@ -2905,7 +2973,8 @@ def page_estoque():
         st.warning(f"⚠️ **{_plural(len(low),'insumo','insumos')} abaixo do estoque mínimo:** " +
             ", ".join(f"**{i['name']}** ({_num_br(i['current_stock'],0)} {i['unit']})" for i in low))
 
-    et1,et2,et3,et4=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo","📈 Previsão de Ruptura"])
+    et1,et2,et3,et4,et5=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo",
+        "📈 Previsão de Ruptura","🛒 Compra com Nota Fiscal"])
 
     CAT_LABELS={"racao":"Ração","trato":"Trato (volumoso)","medicamento":"Medicamento",
                 "vacina":"Vacina","mineral":"Mineral","outro":"Outro"}
@@ -3001,6 +3070,112 @@ def page_estoque():
         st.caption("⚪ **Sem dados** = nenhum plano de trato ativo para o insumo, não é erro. "
             "**Comprar Até** hoje é igual à **Data de Ruptura** — o sistema ainda não guarda "
             "o prazo de reposição de cada insumo (fica para quando essa coluna existir).")
+
+    with et5:
+        _estoque_compra_com_nota(insumos)
+
+
+def _estoque_compra_com_nota(insumos):
+    """Trilha 3 (Estoque → Financeiro): compra com documento fiscal.
+
+    Diferente da aba "Entrada de Estoque" (1 insumo por lançamento, sem
+    fornecedor/documento/parcelamento), esta tela junta vários itens numa
+    nota só e, ao registrar, grava estoque **e** contas a pagar na mesma
+    operação (`repositories.compras.registrar` — ROADMAP §5, "Pronto quando").
+    """
+    st.caption("Lança vários insumos de uma nota só, aplica custo médio ponderado "
+               "(mesma regra da Entrada de Estoque, ADR 0003) e já gera as "
+               "parcelas em Contas a Pagar (aba 📋 em Financeiro).")
+
+    if not insumos:
+        st.info("Cadastre um insumo antes (aba ➕ Novo Insumo).")
+        return
+
+    itens_key = "compra_itens_atual"
+    st.session_state.setdefault(itens_key, [])
+
+    st.markdown("**1. Itens da nota**")
+    ic1, ic2, ic3, ic4 = st.columns([3, 1, 1, 1])
+    with ic1:
+        ins_add = st.selectbox("Insumo", insumos,
+            format_func=lambda x: f"{x['name']} ({x['unit']})",
+            key="compra_add_insumo")
+    with ic2:
+        qtd_add = st.number_input("Quantidade", min_value=0.0, step=1.0,
+            format="%.2f", key="compra_add_qtd")
+    with ic3:
+        custo_add = st.number_input("Custo Un. (R$)", min_value=0.0, step=0.01,
+            format="%.2f", key="compra_add_custo",
+            value=float(ins_add["cost_per_unit"]) if ins_add else 0.0)
+    with ic4:
+        st.write("")
+        st.write("")
+        if st.button("➕ Adicionar", key="compra_add_btn", use_container_width=True):
+            if ins_add and qtd_add > 0:
+                st.session_state[itens_key].append({
+                    "insumo_id": ins_add["id"], "insumo_nome": ins_add["name"],
+                    "unidade": ins_add["unit"], "quantidade": qtd_add,
+                    "custo_unitario": custo_add})
+                st.rerun()
+            else:
+                st.error("Escolha um insumo e uma quantidade maior que zero.")
+
+    itens_atuais = st.session_state[itens_key]
+    if itens_atuais:
+        for idx, item in enumerate(itens_atuais):
+            rc1, rc2 = st.columns([5, 1])
+            with rc1:
+                st.write(f"{item['insumo_nome']}: {item['quantidade']:.2f} "
+                    f"{item['unidade']} × R$ {item['custo_unitario']:.2f} = "
+                    f"R$ {item['quantidade']*item['custo_unitario']:,.2f}")
+            with rc2:
+                if st.button("🗑️", key=f"compra_remover_{idx}"):
+                    itens_atuais.pop(idx)
+                    st.rerun()
+        total_nota = sum(i["quantidade"] * i["custo_unitario"] for i in itens_atuais)
+        st.metric("Total da nota", f"R$ {total_nota:,.2f}")
+    else:
+        st.info("Nenhum item adicionado ainda — a nota precisa de ao menos 1 item.")
+
+    st.markdown("**2. Documento e parcelamento**")
+    fc1, fc2 = st.columns(2)
+    with fc1:
+        fornecedor_nome = st.text_input("Fornecedor", key="compra_fornecedor")
+        doc_numero = st.text_input("Nº do documento fiscal", key="compra_doc_num")
+        doc_serie = st.text_input("Série", key="compra_doc_serie")
+    with fc2:
+        data_emissao = st.date_input("Data de emissão", value=date.today(),
+            key="compra_data_emissao")
+        data_recebimento = st.date_input("Data de recebimento", value=date.today(),
+            key="compra_data_recebimento")
+
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        num_parcelas = st.number_input("Número de parcelas", min_value=1, max_value=36,
+            value=1, step=1, key="compra_num_parcelas")
+    with pc2:
+        primeira_parcela = st.date_input("Vencimento da 1ª parcela",
+            value=date.today()+timedelta(days=30), key="compra_primeira_parcela")
+
+    if st.button("✅ Registrar Compra", type="primary", use_container_width=True,
+                 key="compra_registrar_btn", disabled=not itens_atuais):
+        r = db.compras.registrar(
+            data_emissao=data_emissao.isoformat(),
+            data_recebimento=data_recebimento.isoformat(),
+            itens=[{"insumo_id": i["insumo_id"], "quantidade": i["quantidade"],
+                    "custo_unitario": i["custo_unitario"]} for i in itens_atuais],
+            primeiro_vencimento=primeira_parcela.isoformat(),
+            num_parcelas=int(num_parcelas),
+            fornecedor_nome=fornecedor_nome, documento_numero=doc_numero,
+            documento_serie=doc_serie, operator=st.session_state.user["name"])
+        if r["ok"]:
+            st.success(f"✅ Compra registrada — R$ {r['valor_total']:,.2f} em "
+                f"{_plural(r['parcelas'],'parcela','parcelas')}. Estoque e contas a "
+                f"pagar atualizados.")
+            st.session_state[itens_key] = []
+            st.rerun()
+        else:
+            st.error(f"❌ {r['erro']}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERTAS

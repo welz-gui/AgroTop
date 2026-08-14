@@ -52,6 +52,7 @@ from repositories import nascimentos as nascimentos  # noqa: F401
 from repositories import movimentacoes as movimentacoes  # noqa: F401
 from repositories import dispositivos as dispositivos  # noqa: F401
 from repositories import regras as regras  # noqa: F401
+from repositories import compras as compras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_animal, add_animal, move_animal, get_movements,
@@ -506,6 +507,58 @@ def init_db() -> None:
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
+            -- Compra de insumos (Trilha 3, migration 0018): cabeçalho da nota.
+            -- "compra gera conta a pagar" (ROADMAP §5) — o item e a conta a
+            -- pagar abaixo nascem juntos, na mesma transação de `repositories/
+            -- compras.py::registrar`, nunca soltos um do outro.
+            CREATE TABLE IF NOT EXISTS compras (
+                id                TEXT PRIMARY KEY,   -- uuid
+                fornecedor_id     INTEGER,             -- anulável: fornecedor pode não estar cadastrado
+                fornecedor_nome   TEXT,
+                documento_numero  TEXT,
+                documento_serie   TEXT,
+                data_emissao      TEXT NOT NULL,
+                data_recebimento  TEXT NOT NULL,
+                valor_total       REAL NOT NULL DEFAULT 0,
+                operator          TEXT,
+                notes             TEXT,
+                created_at        TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id)
+            );
+
+            -- Itens da compra — 1 linha por insumo da nota.
+            CREATE TABLE IF NOT EXISTS compra_itens (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                compra_id      TEXT NOT NULL,
+                insumo_id      INTEGER NOT NULL,
+                quantidade     REAL NOT NULL,
+                custo_unitario REAL NOT NULL,
+                subtotal       REAL NOT NULL,
+                FOREIGN KEY (compra_id) REFERENCES compras(id),
+                FOREIGN KEY (insumo_id) REFERENCES insumos(id)
+            );
+
+            -- Contas a pagar — parcelas geradas por `services.compras.gerar_parcelas`.
+            -- `compra_id` anulável de propósito: nem toda conta a pagar nasce de
+            -- uma compra de insumo (aluguel, prestador, etc. ficam para depois,
+            -- mas a coluna já não bloqueia isso).
+            CREATE TABLE IF NOT EXISTS contas_pagar (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                compra_id      TEXT,
+                fornecedor_nome TEXT,
+                descricao      TEXT,
+                valor          REAL NOT NULL,
+                vencimento     TEXT NOT NULL,
+                parcela_numero INTEGER NOT NULL DEFAULT 1,
+                parcela_total  INTEGER NOT NULL DEFAULT 1,
+                status         TEXT NOT NULL DEFAULT 'aberto',  -- aberto | pago | cancelado
+                data_pagamento TEXT,
+                forma_pagamento TEXT,
+                operator       TEXT,
+                created_at     TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (compra_id) REFERENCES compras(id)
+            );
+
             -- Custos por animal
             CREATE TABLE IF NOT EXISTS animal_costs (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -664,6 +717,9 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions (lote_id);
             CREATE INDEX IF NOT EXISTS idx_animals_status ON animals (status);
             CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos (animal_uuid);
+            CREATE INDEX IF NOT EXISTS idx_compra_itens_compra ON compra_itens (compra_id);
+            CREATE INDEX IF NOT EXISTS idx_contas_pagar_status ON contas_pagar (status, vencimento);
+            CREATE INDEX IF NOT EXISTS idx_contas_pagar_compra ON contas_pagar (compra_id);
 
             -- Sessões de login persistente (cookie). Definida aqui, e só aqui:
             -- antes era criada sob demanda dentro de create_session/get_session_user/

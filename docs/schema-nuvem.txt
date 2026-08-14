@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-08-07 por tools/dump_schema_nuvem.py
+# Extraído em 2026-08-14 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -112,6 +112,36 @@ category_prices.sex
 category_prices.price_per_kg
 category_prices.price_per_head
 category_prices.updated_at
+compra_itens.id
+compra_itens.compra_id
+compra_itens.insumo_id
+compra_itens.quantidade
+compra_itens.custo_unitario
+compra_itens.subtotal
+compras.id
+compras.fornecedor_id
+compras.fornecedor_nome
+compras.documento_numero
+compras.documento_serie
+compras.data_emissao
+compras.data_recebimento
+compras.valor_total
+compras.operator
+compras.notes
+compras.created_at
+contas_pagar.id
+contas_pagar.compra_id
+contas_pagar.fornecedor_nome
+contas_pagar.descricao
+contas_pagar.valor
+contas_pagar.vencimento
+contas_pagar.parcela_numero
+contas_pagar.parcela_total
+contas_pagar.status
+contas_pagar.data_pagamento
+contas_pagar.forma_pagamento
+contas_pagar.operator
+contas_pagar.created_at
 deaths.id
 deaths.death_date
 deaths.cause
