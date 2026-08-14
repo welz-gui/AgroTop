@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-07 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-14 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -150,6 +150,48 @@ CREATE TABLE IF NOT EXISTS category_prices (
     updated_at timestamp with time zone DEFAULT now(),
     CONSTRAINT category_prices_pkey PRIMARY KEY (id),
     CONSTRAINT category_prices_age_band_sex_key UNIQUE (age_band, sex)
+);
+
+CREATE TABLE IF NOT EXISTS compra_itens (
+    id bigserial,
+    compra_id text NOT NULL,
+    insumo_id integer NOT NULL,
+    quantidade numeric NOT NULL,
+    custo_unitario numeric NOT NULL,
+    subtotal numeric NOT NULL,
+    CONSTRAINT compra_itens_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS compras (
+    id text NOT NULL,
+    fornecedor_id integer,
+    fornecedor_nome text,
+    documento_numero text,
+    documento_serie text,
+    data_emissao text NOT NULL,
+    data_recebimento text NOT NULL,
+    valor_total numeric DEFAULT 0 NOT NULL,
+    operator text,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT compras_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS contas_pagar (
+    id bigserial,
+    compra_id text,
+    fornecedor_nome text,
+    descricao text,
+    valor numeric NOT NULL,
+    vencimento text NOT NULL,
+    parcela_numero integer DEFAULT 1 NOT NULL,
+    parcela_total integer DEFAULT 1 NOT NULL,
+    status text DEFAULT 'aberto'::text NOT NULL,
+    data_pagamento text,
+    forma_pagamento text,
+    operator text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT contas_pagar_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS deaths (
@@ -538,6 +580,10 @@ ALTER TABLE animals ADD CONSTRAINT fk_animals_pai FOREIGN KEY (pai_uuid) REFEREN
 ALTER TABLE animals ADD CONSTRAINT fk_animals_parto FOREIGN KEY (parto_id) REFERENCES partos(id);
 ALTER TABLE animals ADD CONSTRAINT fk_animals_prop_nascimento FOREIGN KEY (propriedade_nascimento_id) REFERENCES properties(id);
 ALTER TABLE animals ADD CONSTRAINT fk_animals_property FOREIGN KEY (property_id) REFERENCES properties(id);
+ALTER TABLE compra_itens ADD CONSTRAINT compra_itens_compra_id_fkey FOREIGN KEY (compra_id) REFERENCES compras(id);
+ALTER TABLE compra_itens ADD CONSTRAINT compra_itens_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
+ALTER TABLE compras ADD CONSTRAINT compras_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
+ALTER TABLE contas_pagar ADD CONSTRAINT contas_pagar_compra_id_fkey FOREIGN KEY (compra_id) REFERENCES compras(id);
 ALTER TABLE deaths ADD CONSTRAINT fk_deaths_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE dispositivos ADD CONSTRAINT dispositivos_propriedade_destino_id_fkey FOREIGN KEY (propriedade_destino_id) REFERENCES properties(id);
@@ -580,6 +626,9 @@ CREATE INDEX IF NOT EXISTS idx_animals_property ON animals USING btree (property
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_audit_entidade ON audit_logs USING btree (entidade, entidade_id);
 CREATE INDEX IF NOT EXISTS idx_audit_ocorrido ON audit_logs USING btree (ocorrido_em DESC);
+CREATE INDEX IF NOT EXISTS idx_compra_itens_compra ON compra_itens USING btree (compra_id);
+CREATE INDEX IF NOT EXISTS idx_contas_pagar_compra ON contas_pagar USING btree (compra_id);
+CREATE INDEX IF NOT EXISTS idx_contas_pagar_status ON contas_pagar USING btree (status, vencimento);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_disp_animal ON dispositivos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_disp_lote ON dispositivos USING btree (lote);

@@ -5,7 +5,9 @@
 > se violadas, quebram produção ou desfazem trabalho feito.
 
 Última atualização: 2026-08-14 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada
-à interface (7 de 7) · 29 de 29 services usados** · fila de specs vazia (0)
+à interface (7 de 7) · 29 de 29 services usados** · fila de specs vazia (0) · Trilha 2 (área
+do piquete) e a primeira fatia da Trilha 3 (compra com nota fiscal → contas a pagar) em
+andamento, sem spec — trabalho direto do mantenedor (schema novo em produção)
 
 ---
 
@@ -472,24 +474,41 @@ trilha deve ser o **dono do schema** durante o trabalho paralelo.
 **Ordem obrigatória:** Estoque **antes** de Financeiro (compra gera conta a pagar), e
 Financeiro antes de Nutrição (a dieta precisa apropriar custo).
 
-**Escopo resumido:** pedido e compra, documento fiscal, entrada automática, lotes de
-fabricação e validade, custo médio ponderado, transferências, inventário e ajuste, previsão
-de dias restantes · contas a pagar/receber, parcelas, caixa, centros de custo, competência ×
-caixa, fluxo realizado e projetado, DRE gerencial, custo por kg e por arroba · alimentos e
-composição, dietas multi-ingrediente com vigência, ordem de trato, previsto × realizado,
-custo por cabeça/dia e por arroba produzida.
+**Escopo resumido:** ~~pedido e compra, documento fiscal, entrada automática~~ 🟢 (ver abaixo,
+2026-08-14) · lotes de fabricação e validade, custo médio ponderado (✅ desde a etapa anterior,
+ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
+· ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · contas a receber, caixa (✅ spec 0021/0034),
+centros de custo, competência × caixa (✅), fluxo realizado e projetado, DRE gerencial, custo
+por kg e por arroba (✅ por animal — falta por lote/piquete) · alimentos e composição, dietas
+multi-ingrediente com vigência, ordem de trato, previsto × realizado, custo por cabeça/dia e
+por arroba produzida (✅ spec 0020/0037 — falta vigência/histórico de dieta).
+
+🟢 **"Compra com documento fiscal" fechada em 2026-08-14.** Até aqui só existia entrada avulsa
+de estoque (`add_insumo_entry`): 1 insumo por lançamento, sem fornecedor, sem documento, sem
+parcelamento, e sem nenhum rastro no financeiro — comprar só mexia no saldo de estoque.
+`services/compras.py` (total da nota e parcelamento, puro) e
+`repositories/compras.py::registrar` (a operação atômica — nota, itens, entrada de estoque com
+custo médio ponderado e as parcelas em `contas_pagar`, tudo na mesma transação) ligam isso às
+abas "🛒 Compra com Nota Fiscal" (Estoque) e "📋 Contas a Pagar" (Financeiro). Três tabelas
+novas (`compras`, `compra_itens`, `contas_pagar` — migration 0018). `fornecedor_nome` é texto
+livre de propósito: `fornecedores` já existia, mas é a origem do **gado** comprado, não um
+cadastro de fornecedor de insumo — misturar os dois domínios numa FK só mentiria sobre o que
+ela representa.
 
 **Cuidados que definem o sucesso**
-- **Custo médio ponderado altera custo histórico já lançado.** Decidir e documentar: recalcula
-  retroativo ou vale só para entradas novas? Sem essa decisão explícita, os números de margem
-  mudam sem ninguém entender por quê.
+- **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —
+  docs/adr/0003-custo-medio-ponderado.md: **não-retroativo**, vale só para entradas novas.
 - **Nunca misturar competência, vencimento e data de caixa** — é onde nascem os bugs de DRE.
+  `contas_pagar.vencimento` é a data de cobrança, nunca usada como competência; a competência
+  de uma compra continua sendo `data_recebimento` em `insumo_transactions`/`lancamentos`.
 - Saldo de estoque deve ser **reconstruível pelas movimentações**; nenhuma movimentação sem
-  origem identificada.
+  origem identificada. *(A entrada de uma compra grava em `insumo_transactions` com
+  `reason='compra'` e nota vinculada — mesma trilha de sempre, agora com fornecedor/documento.)*
 - Mudança de dieta **preserva histórico** (vigência, não sobrescrita).
 
-**Pronto quando:** compra atualiza estoque e financeiro na mesma operação; resultado por lote
-fecha com a soma dos animais; DRE e fluxo de caixa não se contradizem.
+**Pronto quando:** ~~compra atualiza estoque e financeiro na mesma operação~~ 🟢 cumprido
+(2026-08-14, ver acima); resultado por lote fecha com a soma dos animais; DRE e fluxo de caixa
+não se contradizem.
 
 ---
 
