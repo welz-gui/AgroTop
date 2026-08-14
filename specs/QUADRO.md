@@ -302,10 +302,17 @@ seção **"O defeito da primeira tentativa"** com a reprodução exata do erro e
 passa a ser obrigatório. Começar sem ler essa seção é repetir o mesmo trabalho e chegar ao
 mesmo defeito.
 
-**O nome da branch muda para `-v2`** de propósito. A branch antiga continua no remoto,
-ligada à PR fechada, para o histórico não sumir; se a spec ainda apontasse para ela, o
-protocolo de "branch existe = tarefa tomada" acusaria a tarefa como ocupada e ninguém a
-pegaria nunca.
+**O nome da branch muda para `-v2`** de propósito — se a spec ainda apontasse para o nome
+antigo, o protocolo de "branch existe = tarefa tomada" acusaria a tarefa como ocupada e
+ninguém a pegaria nunca.
+
+**A branch da 1ª tentativa não fica no remoto para sempre.** Ela cumpria o papel de "o
+histórico não pode sumir" enquanto existia — mas isso o próprio PR fechado já garante (o
+GitHub mantém o diff de uma PR acessível mesmo depois que a branch de origem é apagada).
+Deixar a branch ali só acumulava lixo na lista. Desde 2026-08-14, a branch da 1ª
+tentativa vira uma **tag anotada** (`retrabalho/<spec>-<assunto>-v1-pr<N>`, ex.:
+`retrabalho/0028-geometria-lotacao-v1-pr82`) e é apagada do remoto — mesmo commit,
+mesmo histórico, sem poluir a lista de branches ativas.
 
 **A lição que se repete em todas as quatro, e não é sobre nenhum assunto específico:**
 toda entrega fechada **passou em todos os critérios de aceite** e ainda assim estava
