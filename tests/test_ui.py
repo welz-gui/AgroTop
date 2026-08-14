@@ -37,6 +37,7 @@ PROVAS = [
     "tests.ui_completude_dados_prova", # completude_adaptador + avaliar_mes() ligados (spec 0035)
     "tests.ui_conformidade_prova", # conformidade_adaptador.montar_rebanho() ligado (spec 0036)
     "tests.ui_dieta_por_piquete_prova", # dieta_adaptador.ingredientes_por_cabeca() ligado (spec 0037)
+    "tests.ui_projecao_prova", # projecao_adaptador.series_mensais() + projetar_abate() ligados (spec 0040)
 ]
 
 

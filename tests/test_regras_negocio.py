@@ -293,11 +293,42 @@ class TestProjecaoAbate(BaseRegras):
         self.assertEqual(r["falta"], 100.0)
 
     def test_gmd_negativo_nao_estima_data(self):
-        """QUIRK: perdendo peso, a projeção devolve None em vez de data infinita."""
+        """QUIRK: perdendo peso, a projeção devolve None em vez de data infinita
+        — mas `situacao` (spec 0040/services.projecao, ligado em 2026-08-14)
+        diferencia isso de "sem dados nenhum", que `test_sem_gmd_nao_estima_data`
+        cobre: ambos dão `dias=None`, só `situacao` muda."""
         a = self.animal("P5", peso=400.0, alvo=500.0)
         self.pesagem(a, 420.0, _dias_atras(11))
         self.pesagem(a, 400.0, _dias_atras(1))
-        self.assertIsNone(db.projecao_abate(db.get_animal(a))["dias"])
+        r = db.projecao_abate(db.get_animal(a))
+        self.assertIsNone(r["dias"])
+        self.assertEqual(r["situacao"], "perdendo_peso")
+
+    def test_dias_fracionados_arredondam_para_cima(self):
+        """O defeito corrigido ao ligar services.projecao (2026-08-14):
+        `round()` podia arredondar dias PARA BAIXO — falta 100 kg a 3 kg/dia
+        são 33,33 dias; `round` virava 33, o certo (`ceil`, dia fracionado
+        não conta) é 34. Arredondar para baixo prometia abate um dia cedo
+        demais."""
+        a = self.animal("P6", peso=400.0, alvo=500.0)
+        self.pesagem(a, 370.0, _dias_atras(11))
+        self.pesagem(a, 400.0, _dias_atras(1))     # GMD = 3,0
+        r = db.projecao_abate(db.get_animal(a))
+        self.assertEqual(r["falta"], 100.0)
+        self.assertEqual(r["dias"], 34, "arredondou para baixo (round) em vez de ceil")
+        self.assertEqual(r["data"], (HOJE + timedelta(days=34)).isoformat())
+
+    def test_bulk_concorda_com_a_versao_individual(self):
+        """projecao_abate_bulk (usada pela tela, spec 0040) precisa devolver
+        exatamente a mesma projeção que projecao_abate — mesma delegação a
+        services.projecao.projetar_abate, caminhos de GMD diferentes
+        (calculate_gmd_bulk vs calculate_gmd)."""
+        a = self.animal("P7", peso=400.0, alvo=500.0)
+        self.pesagem(a, 370.0, _dias_atras(11))
+        self.pesagem(a, 400.0, _dias_atras(1))
+        individual = db.projecao_abate(db.get_animal(a))
+        bulk = db.projecao_abate_bulk([db.get_animal(a)])[a]["projecao"]
+        self.assertEqual(individual, bulk)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
