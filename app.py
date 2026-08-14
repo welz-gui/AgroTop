@@ -61,6 +61,8 @@ from services.projecao_adaptador import series_mensais
 from services.projecao import correlacao_chuva_gmd
 from services.rateio_adaptador import com_dias_no_lote
 from services.rateio import ratear
+from services.gta_adaptador import montar_contexto as gta_montar_contexto
+from services.gta import validar as gta_validar
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -4916,10 +4918,95 @@ def _mov_fila(abertas, props):
                 f"**Transportador:** {mov.get('transportador') or '—'} · "
                 f"**Animais:** {len(mov['animais'])}")
 
+    _mov_conferir_gta(mov, props)
+
     if mov["status"] == "rascunho":
         _mov_liberar(mov)
     else:
         _mov_confirmar_chegada(mov)
+
+
+def _mov_conferir_gta(mov, props):
+    """Confere o documento físico da GTA contra o que o sistema já sabe (spec 0038).
+
+    `services.gta.validar` checa emissão/validade/quantidade declarada/UF —
+    dados que só existem no PAPEL da GTA; `movimentacoes` não guarda isso, e
+    a spec 0038 deixou a decisão de onde coletar para o mantenedor (R31).
+    Optou-se por **não persistir**: a conferência é ad-hoc, feita na hora,
+    porque nem toda movimentação tem o papel em mãos no momento do cadastro.
+
+    Não bloqueia liberar/confirmar — é apoio à decisão, não substitui a
+    pré-validação do §8.3 (`movimentacoes.pre_validar`, que já bloqueia).
+    """
+    with st.expander("📄 Conferir a GTA física (§8)"):
+        st.caption("Digite o que está escrito no papel da GTA na hora de conferir — "
+                   "não fica salvo, é conferência pontual, não um campo do cadastro.")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            tem_emissao = st.checkbox("Tenho a data de emissão",
+                                      key=f"gta_hasE_{mov['id']}")
+            emissao = st.date_input("Emissão", value=date.today(),
+                                    key=f"gta_emissao_{mov['id']}",
+                                    disabled=not tem_emissao)
+        with c2:
+            tem_validade = st.checkbox("Tenho a data de validade",
+                                       key=f"gta_hasV_{mov['id']}")
+            validade = st.date_input("Validade", value=date.today(),
+                                     key=f"gta_validade_{mov['id']}",
+                                     disabled=not tem_validade)
+        with c3:
+            qtd = st.number_input("Quantidade declarada no papel", min_value=0,
+                                  step=1, value=len(mov["animais"]),
+                                  key=f"gta_qtd_{mov['id']}")
+
+        opcoes_embarque = {(a["brinco"] or a["animal_uuid"][:8]): a["animal_uuid"]
+                           for a in mov["animais"]}
+        sel_embarque = st.multiselect(
+            "Animais que realmente subiram no caminhão", list(opcoes_embarque),
+            default=list(opcoes_embarque), key=f"gta_embarque_{mov['id']}",
+            help="Pré-marcado com todos os animais da movimentação — desmarque "
+                 "quem não embarcou de fato.")
+        animais_no_embarque_uuids = [opcoes_embarque[s] for s in sel_embarque]
+
+        brincos = [a["brinco"] for a in mov["animais"] if a["brinco"]]
+        wd_batch = db.get_withdrawal_end_batch(brincos)
+        hoje = date.today()
+        animais_em_carencia_uuids = [
+            a["animal_uuid"] for a in mov["animais"]
+            if a["brinco"] and wd_batch.get(a["brinco"])
+            and wd_batch[a["brinco"]] > hoje
+        ]
+
+        movimentacao_ctx = {
+            "gta_numero": mov.get("gta_numero"),
+            "propriedade_origem_nome": _rotulo_prop(props, mov.get("propriedade_origem_id")),
+            "propriedade_destino_nome": _rotulo_prop(props, mov.get("propriedade_destino_id")),
+            "finalidade": mov.get("finalidade"),
+            "animais_uuids": [a["animal_uuid"] for a in mov["animais"]],
+        }
+        dados_do_documento = {
+            "emissao": emissao.isoformat() if tem_emissao else None,
+            "validade": validade.isoformat() if tem_validade else None,
+            "quantidade_declarada": int(qtd),
+        }
+
+        gta, contexto = gta_montar_contexto(
+            movimentacao_ctx, dados_do_documento, animais_no_embarque_uuids,
+            animais_em_carencia_uuids, hoje.isoformat())
+        problemas = gta_validar(gta, contexto)
+
+        if problemas:
+            for p in problemas:
+                texto = f"{_GRAVIDADE_ICONE.get(p['gravidade'], '•')} {p['mensagem']}"
+                if p["gravidade"] == "bloqueio":
+                    st.error(texto)
+                elif p["gravidade"] == "alerta":
+                    st.warning(texto)
+                else:
+                    st.info(texto)
+        else:
+            st.success("✅ Nenhum problema encontrado na conferência da GTA.")
 
 
 def _mov_liberar(mov):
