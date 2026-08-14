@@ -20,7 +20,7 @@ SQLite para desenvolvimento e teste.
 | Schema | **375 colunas / 33 tabelas**, paridade total entre DDL local e produção |
 | Testes | **512**, verdes no CI em SQLite **e** PostgreSQL · ~9 min (7 provas de interface + testes de propriedade) |
 | Código | `app.py` (~3.900) · `database.py` (~2.100, fachada) · `repositories/` (12) · `services/` (29) · `ui/` · `tools/` (6) |
-| Integração | **26 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
+| Integração | **27 de 29 services usados** · todos os 7 repositórios da Fase B com tela |
 | Segurança | 🟢 nenhuma dívida aberta — RLS em 100% das tabelas, verificado em 2026-08-05 |
 | Rebanho real | ~150–200 animais ativos + histórico (os 14 do banco atual são **dados fictícios de seed**) |
 
@@ -820,11 +820,11 @@ grava evento desde o B2. O que faltava não era ligar o repositório, era **most
 ele já grava. Duas telas: a linha do tempo na ficha do animal (§6) e o painel de
 sincronização (§10.4) — e a segunda também fechou a dívida nº 4.
 
-Restam **três services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
+Restam **dois services órfãos** (eram onze — `lotacao` saiu da lista em 2026-08-06,
 `previsao_estoque` e `arquivo_dispositivos` em 2026-08-11/12, `caixa`, `rentabilidade`,
-`completude`, `conformidade` e `dieta` em 2026-08-12/13, ver abaixo), entregues por
-agentes e sem nenhum consumidor: `gta`, `projecao`, `rateio`. Nenhum é Fase B, então
-ficam fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 26
+`completude`, `conformidade`, `dieta` e `projecao` em 2026-08-12/14, ver abaixo),
+entregues por agentes e sem nenhum consumidor: `gta`, `rateio`. Nenhum é Fase B, então
+ficam fora do escopo desta dívida, mas contam para o total: 29 services no diretório, 27
 usados. As 13 specs de adaptador (0033–0043) já entregaram a função-ponte de cada um —
 ver `specs/QUADRO.md`; falta ligar a UI dos que restam.
 
@@ -917,6 +917,21 @@ espera. `materia_seca_pct` aparece zerada — a coluna não existe no schema (de
 registrada na spec, fora do escopo). `custo_por_arroba_produzida` (também órfão até
 aqui) entrou de brinde: usa GMD médio e rendimento médio de carcaça dos animais do
 piquete.
+
+~~⚠️ `projecao` (`correlacao_chuva_gmd`, `projetar_abate`, `projetar_lote`) nunca foi
+chamado.~~ 🟢 **Fechado em 2026-08-14.** Duas peças, não uma:
+- **Nova aba "🌧️ Chuva × GMD"** em `page_desempenho`, alimentada por
+  `services.projecao_adaptador.series_mensais` (spec 0040) + `correlacao_chuva_gmd`.
+- **`database.py::projecao_abate`/`projecao_abate_bulk` reimplementavam** a mesma conta
+  de `services.projecao.projetar_abate` — violação do R8 descoberta ao ligar o service —
+  **e a reimplementação tinha um bug real**: usava `round()` em vez de `ceil()` para
+  converter `falta/gmd` em dias inteiros. Um animal a 100 kg do alvo, ganhando 3 kg/dia,
+  precisa de 33,33 dias — `round()` arredondava para 33 (abate um dia antes do
+  possível), `ceil()` (o certo: dia fracionado não conta) dá 34. Corrigido delegando ao
+  service; a tela "📅 Projeção de Abate" já existente passou a usar a conta certa sem
+  precisar mudar de forma. De brinde: `situacao` (que a reimplementação não distinguia)
+  agora separa "perdendo peso" (alerta de saúde/pasto) de "sem dado nenhum" — antes os
+  dois casos apareciam com a mesma cara ("— sem GMD") na tela.
 
 **Por que era a dívida nº 1:** conformidade de arquitetura não é conformidade de uso.
 Fiscalização não aceita "o repositório tem o método".

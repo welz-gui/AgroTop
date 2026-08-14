@@ -57,6 +57,8 @@ from services.conformidade_adaptador import montar_rebanho
 from services.conformidade import avaliar as conformidade_avaliar
 from services.dieta_adaptador import ingredientes_por_cabeca
 from services.dieta import custo_por_cabeca_dia, custo_por_arroba_produzida
+from services.projecao_adaptador import series_mensais
+from services.projecao import correlacao_chuva_gmd
 from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
@@ -3981,8 +3983,9 @@ def page_desempenho():
     if not animals:
         st.info("Sem animais ativos."); return
 
-    dt1, dt2, dt3, dt4 = st.tabs(["🎯 Meta & Baixo Desempenho", "📅 Projeção de Abate",
-                                  "🌿 Comparativo por Piquete", "🐂 Simulador de Terminação"])
+    dt1, dt2, dt3, dt4, dt5 = st.tabs(
+        ["🎯 Meta & Baixo Desempenho", "📅 Projeção de Abate",
+         "🌿 Comparativo por Piquete", "🐂 Simulador de Terminação", "🌧️ Chuva × GMD"])
 
     # ── Meta de GMD e baixo desempenho ────────────────────────────────────────
     with dt1:
@@ -4029,10 +4032,15 @@ def page_desempenho():
                    "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
         rows = []
         bulk_data = db.projecao_abate_bulk(animals)
+        _SITUACAO_ROTULO = {
+            "perdendo_peso": "⚠️ Perdendo peso",
+            "sem_ganho": "— (sem GMD)",
+        }
         for a in animals:
             data = bulk_data[a["id"]]
             p = data["projecao"]
             g_total = data["gmd_total"]
+            data_estimada = p["data"] or _SITUACAO_ROTULO.get(p["situacao"], "— (sem GMD)")
             rows.append({"ID":a["id"],"Raça":a["breed"],
                 "Peso Atual (kg)":a["current_weight"],
                 "Peso-Alvo (kg)":a.get("target_weight") or 500,
@@ -4040,7 +4048,7 @@ def page_desempenho():
                 "GMD recente":round(p["gmd"],3) if p["gmd"] else None,
                 "GMD total":round(g_total,3) if g_total else None,
                 "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
-                "Data estimada":p["data"] or "— (sem GMD)"})
+                "Data estimada":data_estimada})
         df = pd.DataFrame(rows)
         st.dataframe(df, use_container_width=True, hide_index=True, height=420,
             column_config={
@@ -4053,6 +4061,10 @@ def page_desempenho():
         if prontos:
             st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "
                        f"(peso-alvo atingido).")
+        perdendo = [r for r in rows if r["Data estimada"] == "⚠️ Perdendo peso"]
+        if perdendo:
+            st.warning(f"⚠️ {_plural(len(perdendo),'animal está','animais estão')} perdendo peso — "
+                       f"diferente de faltar dado, é sinal de saúde/pasto/verminose a investigar.")
 
     # ── Comparativo por piquete ───────────────────────────────────────────────
     with dt3:
@@ -4200,6 +4212,47 @@ def page_desempenho():
                        "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
                        "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
                        "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
+
+    # ── Correlação chuva × GMD ────────────────────────────────────────────────
+    with dt5:
+        st.caption("Associação entre a chuva do mês e o GMD médio do rebanho no mesmo "
+                   "mês — usa todo o histórico de leituras de chuva e pesagens. "
+                   "Correlação não demonstra causalidade.")
+
+        leituras = db.get_rain()
+        pesagens = db.get_all_weighings()
+        series = series_mensais(leituras, pesagens)
+
+        if not series:
+            st.info("Ainda não há mês com leitura de chuva **e** GMD calculável ao "
+                   "mesmo tempo — registre chuva (Clima) e pesagens no mesmo período.")
+        else:
+            resultado = correlacao_chuva_gmd(series)
+            k1, k2 = st.columns(2)
+            k1.metric("Coeficiente de correlação",
+                     f"{resultado['coeficiente']:.2f}"
+                     if resultado["coeficiente"] is not None else "—")
+            k2.metric("Períodos avaliados", resultado["n"])
+            st.info(f"ℹ️ {resultado['interpretacao']}")
+
+            df_s = pd.DataFrame(series).sort_values("periodo")
+            fig = go.Figure()
+            fig.add_bar(x=df_s["periodo"], y=df_s["chuva_mm"], name="Chuva (mm)",
+                       marker_color=c["primaria"], yaxis="y")
+            fig.add_trace(go.Scatter(x=df_s["periodo"], y=df_s["gmd_medio"],
+                name="GMD médio (kg/dia)", mode="lines+markers",
+                line=dict(color=c["atencao"], width=3), yaxis="y2"))
+            fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
+                xaxis=dict(gridcolor=c["superficie"], title="Mês"),
+                yaxis=dict(title="Chuva (mm)", gridcolor=c["superficie"]),
+                yaxis2=dict(title="GMD médio (kg/dia)", overlaying="y", side="right",
+                           showgrid=False)))
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.dataframe(df_s.rename(columns={
+                "periodo": "Mês", "chuva_mm": "Chuva (mm)",
+                "gmd_medio": "GMD médio (kg/dia)"}),
+                use_container_width=True, hide_index=True)
 
 
 def page_nutricao():

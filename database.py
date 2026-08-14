@@ -2067,17 +2067,23 @@ def get_low_performance(meta: Optional[float] = None) -> list[dict]:
 
 
 def projecao_abate(animal: dict) -> dict:
-    """Dias e data estimada para atingir o peso-alvo, pelo GMD atual."""
+    """Dias e data estimada para atingir o peso-alvo, pelo GMD atual.
+
+    Delega a `services.projecao.projetar_abate` (R8) — antes essa conta era
+    reimplementada aqui com `round()` em vez de `ceil()`, o que podia
+    arredondar dias PARA BAIXO (ex.: falta 10 kg a 3 kg/dia são 3,33 dias;
+    `round` virava 3, `ceil` — o certo, já que dia fracionado não conta —
+    vira 4), estimando o abate um dia antes do possível. Corrigido em
+    2026-08-14, ligando o service que nunca tinha sido chamado.
+    """
+    from services.projecao import projetar_abate
+
     g = calculate_gmd(animal["id"])
     target = animal.get("target_weight") or 500
-    falta = target - animal["current_weight"]
-    if falta <= 0:
-        return {"dias": 0, "data": date.today().isoformat(), "gmd": g, "falta": 0}
-    if g is None or g <= 0:
-        return {"dias": None, "data": None, "gmd": g, "falta": round(falta, 1)}
-    dias = int(round(falta / g))
-    data = (date.today() + timedelta(days=dias)).isoformat()
-    return {"dias": dias, "data": data, "gmd": g, "falta": round(falta, 1)}
+    falta = round(max(0.0, target - animal["current_weight"]), 1)
+    r = projetar_abate(animal["current_weight"], target, g, date.today().isoformat())
+    return {"dias": r["dias_restantes"], "data": r["data_prevista"], "gmd": g,
+            "falta": falta, "situacao": r["situacao"]}
 
 
 def projecao_abate_bulk(animals: list[dict]) -> dict:
@@ -2085,33 +2091,28 @@ def projecao_abate_bulk(animals: list[dict]) -> dict:
     Calcula a projeção de abate e o GMD de vida em massa apenas para
     os animais passados na lista. Resolve o problema N+1 delegando o
     cálculo vetorizado (por animal_id) ao repositório e serviços.
+
+    A conta de dias/data delega a `services.projecao.projetar_abate` (R8) —
+    mesma correção de arredondamento de `projecao_abate()` acima.
     """
     from repositories.pesagens import calculate_gmd_bulk
     from services.zootecnia import calculate_gmd_total_bulk
+    from services.projecao import projetar_abate
 
     animal_ids = [a["id"] for a in animals]
     gmds = calculate_gmd_bulk(animal_ids)
     gmd_totals = calculate_gmd_total_bulk(animals)
-
-    hoje = date.today()
-    hoje_iso = hoje.isoformat()
+    hoje_iso = date.today().isoformat()
 
     result = {}
     for a in animals:
         aid = a["id"]
         g = gmds.get(aid)
         target = a.get("target_weight") or 500
-        falta = target - a["current_weight"]
-
-        if falta <= 0:
-            p = {"dias": 0, "data": hoje_iso, "gmd": g, "falta": 0}
-        elif g is None or g <= 0:
-            p = {"dias": None, "data": None, "gmd": g, "falta": round(falta, 1)}
-        else:
-            dias = int(round(falta / g))
-            data_est = (hoje + timedelta(days=dias)).isoformat()
-            p = {"dias": dias, "data": data_est, "gmd": g, "falta": round(falta, 1)}
-
+        falta = round(max(0.0, target - a["current_weight"]), 1)
+        r = projetar_abate(a["current_weight"], target, g, hoje_iso)
+        p = {"dias": r["dias_restantes"], "data": r["data_prevista"], "gmd": g,
+             "falta": falta, "situacao": r["situacao"]}
         result[aid] = {"projecao": p, "gmd_total": gmd_totals.get(aid)}
 
     return result
