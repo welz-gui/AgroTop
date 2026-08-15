@@ -478,10 +478,12 @@ Financeiro antes de Nutrição (a dieta precisa apropriar custo).
 2026-08-14) · lotes de fabricação e validade, custo médio ponderado (✅ desde a etapa anterior,
 ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
 · ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · ~~contas a receber~~ 🟢 (2026-08-15) · caixa
-(✅ spec 0021/0034), centros de custo, competência × caixa (✅), fluxo realizado e projetado,
-DRE gerencial, custo por kg e por arroba (✅ por animal — falta por lote/piquete) · alimentos e
-composição, dietas multi-ingrediente com vigência, ordem de trato, previsto × realizado, custo
-por cabeça/dia e por arroba produzida (✅ spec 0020/0037 — falta vigência/histórico de dieta).
+(✅ spec 0021/0034), centros de custo, competência × caixa (✅), fluxo realizado e projetado
+(⬜ ver nota abaixo — `services.caixa.fluxo_de_caixa`/`em_aberto` seguem órfãos), ~~DRE
+gerencial~~ 🟢 (2026-08-15), custo por kg e por arroba (✅ por animal — falta por lote/piquete)
+· alimentos e composição, dietas multi-ingrediente com vigência, ordem de trato, previsto ×
+realizado, custo por cabeça/dia e por arroba produzida (✅ spec 0020/0037 — falta
+vigência/histórico de dieta).
 
 🟢 **"Compra com documento fiscal" fechada em 2026-08-14.** Até aqui só existia entrada avulsa
 de estoque (`add_insumo_entry`): 1 insumo por lançamento, sem fornecedor, sem documento, sem
@@ -506,6 +508,31 @@ gerar nenhuma linha — comportamento preservado (ROADMAP §3). Uma tabela nova 
 — migration 0019), UI em "💵 Registrar Venda" (checkbox "Venda a prazo?") e nova aba
 "📥 Contas a Receber" em Financeiro. `lot_ref` em `contas_receber` é texto livre, não FK —
 espelha `sales.lot_ref`, que também não é chave.
+
+🟢 **"DRE gerencial" fechada em 2026-08-15.** `services/dre.py::montar_dre` reorganiza o mesmo
+resumo do período que "📒 Resultado" já usa (`get_financial_summary`) — nenhuma consulta nova,
+nenhuma tabela nova, só a forma certa de somar números que já existiam. A diferença de fundo
+para o "Resultado (Caixa)": o CPV usa o custo do animal **casado com a venda**
+(`sales.cost_at_sale`), não o que foi **gasto comprando** animais no período
+(`compra_animais`). Um bezerro comprado em janeiro e ainda no pasto em dezembro não vira
+despesa da DRE de dezembro — o dinheiro saiu, mas o valor virou rebanho (patrimônio), não
+custo do período; só a venda (ou a morte) "libera" esse custo acumulado como resultado. Por
+essa razão `animal_costs` com `cost_type='operacional'` também fica fora da DRE: o que foi
+incorrido em animal já vendido já está dentro de `cost_at_sale`, somar de novo contaria duas
+vezes; o que foi incorrido em animal ainda ativo continua capitalizado. Medicamentos e
+Nutrição/Trato continuam como despesa operacional do período — o schema atual não aloca esses
+custos por animal (moram em `insumo_transactions`, nunca em `animal_costs`), então não têm
+como entrar no CPV; alocar por animal é trabalho futuro, não desta fatia. Nova aba
+"📈 DRE Gerencial" em Financeiro, ao lado de "📒 Resultado".
+
+⬜ **Achado nesta fatia, não fechado:** `services/caixa.py::fluxo_de_caixa` e `em_aberto`
+existem desde a spec 0021 e continuam **órfãos** — nunca chamados. Não tinham como ser: as
+duas funções precisam de `vencimento`/`pagamento` reais para distinguir "a receber/pagar" de
+"já recebido/pago", e `services.lancamentos.normalizar` sempre preencheu os três campos
+(`competencia`/`vencimento`/`pagamento`) com a **mesma data**, porque nenhuma fonte de dado
+carregava um vencimento de verdade até `contas_pagar`/`contas_receber` existirem (as duas
+fatias anteriores desta trilha). Ligar isso é o próximo passo natural de "fluxo realizado e
+projetado" — não fez parte desta fatia porque o pedido foi especificamente a DRE.
 
 **Cuidados que definem o sucesso**
 - **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —

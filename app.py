@@ -49,6 +49,7 @@ from services.arquivo_dispositivos import (
 from services.reconciliacao_dispositivos import reconciliar as dispositivos_reconciliar
 from services.lancamentos import normalizar as lancamentos_normalizar
 from services.caixa import resultado_por_competencia
+from services.dre import montar_dre
 from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca
 from services.completude_adaptador import normalizar_pesagens, janela_do_mes
@@ -2568,6 +2569,69 @@ def _fin_resultado():
     st.plotly_chart(fig,use_container_width=True)
 
 
+def _fin_dre():
+    """DRE gerencial (§5, Trilha 3) — `services.dre.montar_dre` sobre o mesmo
+    resumo do período que "📒 Resultado" já usa.
+
+    Diferente do Resultado (Caixa): o CPV aqui é o custo do animal **casado
+    com a venda** (`cost_at_sale`), não o que foi gasto comprando/mantendo
+    animais no período. Comprar um lote em janeiro e vendê-lo só em julho não
+    vira despesa da DRE de janeiro — o dinheiro saiu, mas o valor virou
+    rebanho (patrimônio), não custo do período.
+    """
+    st.subheader("📈 DRE Gerencial")
+    st.caption("Receita casada com o custo do animal na hora da venda (competência), "
+               "não com o que foi gasto comprando no período — essa é a diferença para "
+               "a aba **Resultado**, que é caixa. Ver o porquê no código "
+               "(`services/dre.py::montar_dre`).")
+    c1, c2 = st.columns(2)
+    with c1: start = st.date_input("De", value=date(date.today().year,1,1), key="dre_start")
+    with c2: end = st.date_input("Até", value=date.today(), key="dre_end")
+
+    fin = db.get_financial_summary(start.isoformat(), end.isoformat())
+    dre = montar_dre(fin)
+
+    def _linha(rotulo, valor, negrito=False, indent=False):
+        cor_valor = c["perigo"] if valor < 0 else c["texto"]
+        peso = "700" if negrito else "400"
+        rec = f"padding-left:{'1.5rem' if indent else '0'}"
+        st.markdown(
+            f"<div style='display:flex;justify-content:space-between;{rec};"
+            f"font-weight:{peso}'><span>{rotulo}</span>"
+            f"<span style='color:{cor_valor}'>R$ {valor:,.2f}</span></div>",
+            unsafe_allow_html=True)
+
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    _linha("Receita Bruta de Vendas", dre["receita_bruta"], negrito=True)
+    _linha("(–) CPV — Custo dos Animais Vendidos", -dre["cpv"], indent=True)
+    st.markdown("<hr style='margin:.3rem 0'>", unsafe_allow_html=True)
+    _linha("= Lucro Bruto", dre["lucro_bruto"], negrito=True)
+    if dre["margem_bruta_pct"] is not None:
+        st.caption(f"Margem bruta: {dre['margem_bruta_pct']:.1f}%")
+    for rotulo, valor in dre["despesas_operacionais"].items():
+        _linha(f"(–) {rotulo}", -valor, indent=True)
+    st.markdown("<hr style='margin:.3rem 0'>", unsafe_allow_html=True)
+    _linha("= Resultado Operacional", dre["resultado_operacional"], negrito=True)
+    if dre["perda_mortalidade"] > 0:
+        _linha("(–) Perda por Mortalidade", -dre["perda_mortalidade"], indent=True)
+    st.markdown("<hr style='margin:.3rem 0'>", unsafe_allow_html=True)
+    _linha("= Resultado Líquido do Período", dre["resultado_liquido"], negrito=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if dre["margem_liquida_pct"] is not None:
+        st.metric("Margem Líquida", f"{dre['margem_liquida_pct']:.1f}%")
+
+    with st.expander("Por que o CPV não é igual à 'Compra de animais' do Resultado (Caixa)?"):
+        st.markdown(
+            "Um animal comprado neste período mas ainda ativo no rebanho **não** entra "
+            "na DRE como despesa — o valor pago por ele continua no patrimônio (é um "
+            "boi no pasto, não um custo do período). Só quando ele é **vendido** (o "
+            "custo acumulado dele vira CPV, casado com a receita da venda) ou **morre** "
+            "(vira perda) é que o valor sai do 'estoque' e afeta o resultado. "
+            "Medicamentos, nutrição e custos fixos continuam como despesa operacional "
+            "do período — o sistema ainda não aloca esses custos por animal individual.")
+
+
 def _fin_mortalidade():
     """Taxas de mortalidade: geral, por causa e por piquete."""
     st.subheader("☠️ Mortalidade")
@@ -2618,13 +2682,14 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_comp,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
-        ["📒 Resultado","📅 Competência","📋 Contas a Pagar","💵 Registrar Venda",
-         "📥 Contas a Receber","🏷️ Preços/Categoria","☠️ Mortalidade","📊 Custos por Animal",
-         "🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem","🐄 Por Raça",
-         "➗ Rateio de Lote"])
+    (t_res,t_dre,t_comp,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
+        ["📒 Resultado","📈 DRE Gerencial","📅 Competência","📋 Contas a Pagar",
+         "💵 Registrar Venda","📥 Contas a Receber","🏷️ Preços/Categoria","☠️ Mortalidade",
+         "📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem",
+         "🐄 Por Raça","➗ Rateio de Lote"])
 
     with t_res: _fin_resultado()
+    with t_dre: _fin_dre()
     with t_comp: _fin_competencia()
     with t_pag: _fin_contas_a_pagar()
     with t_ven: _fin_venda(animals)
