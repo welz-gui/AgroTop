@@ -2133,6 +2133,19 @@ def _fin_venda(animals):
         tipo = st.radio("Tipo de venda", list(db.SALE_TYPES.keys()),
             format_func=lambda t: db.SALE_TYPES[t], horizontal=True, key="venda_tipo")
 
+        prazo = st.checkbox("Venda a prazo?", key="venda_a_prazo",
+            help="Desmarcado (padrão) = à vista, comportamento de sempre. Marcado gera "
+                 "as parcelas em Contas a Receber (aba em Financeiro).")
+        num_parcelas_v, primeira_parcela_v = 1, None
+        if prazo:
+            pvc1, pvc2 = st.columns(2)
+            with pvc1:
+                num_parcelas_v = st.number_input("Número de parcelas", min_value=1,
+                    max_value=36, value=1, step=1, key="venda_num_parcelas")
+            with pvc2:
+                primeira_parcela_v = st.date_input("Vencimento da 1ª parcela",
+                    value=date.today()+timedelta(days=30), key="venda_primeira_parcela")
+
         # Seleção de animais
         opts = {f"{a['id']} · {a['breed']} · {a['current_weight']:.0f}kg · {db.get_age_category(a.get('birth_date'))}": a['id']
                 for a in animals}
@@ -2177,9 +2190,13 @@ def _fin_venda(animals):
                     st.error("Selecione ao menos um animal.")
                 elif valor <= 0:
                     st.error("Informe um valor maior que zero.")
+                elif prazo and not primeira_parcela_v:
+                    st.error("Informe o vencimento da 1ª parcela.")
                 else:
                     r = db.register_sale(sel_ids, sale_date.strftime("%Y-%m-%d"), tipo, modo,
-                        valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes)
+                        valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
+                        a_prazo=prazo, num_parcelas=int(num_parcelas_v),
+                        primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None)
                     cor = c["primaria"] if r["lucro"] >= 0 else c["perigo"]
                     st.success(f"✅ {r['n']} animal(is) vendido(s)!")
                     st.markdown(
@@ -2187,6 +2204,9 @@ def _fin_venda(animals):
                         f"Custo: <b>R$ {r['custo']:,.2f}</b> · "
                         f"<b style='color:{cor}'>{'Lucro' if r['lucro']>=0 else 'Prejuízo'}: "
                         f"R$ {r['lucro']:,.2f}</b></div>", unsafe_allow_html=True)
+                    if r.get("parcelas_a_receber"):
+                        st.caption(f"📥 {r['parcelas_a_receber']} parcela(s) geradas em "
+                                  "Contas a Receber (aba em Financeiro).")
                     st.rerun()
 
     # Histórico de vendas
@@ -2355,6 +2375,71 @@ def _fin_contas_a_pagar():
                     st.rerun()
                 else:
                     st.error("Não foi possível marcar como paga.")
+
+
+def _fin_contas_a_receber():
+    """Parcelas geradas por venda a prazo (§5, Trilha 3) — espelha `_fin_contas_a_pagar`.
+
+    `db.register_sale(..., a_prazo=True, ...)` (aba 💵 Registrar Venda) é quem
+    gera; venda à vista (o padrão) nunca aparece aqui.
+    """
+    st.caption("Parcelas das vendas a prazo (aba 💵 Registrar Venda, marcando \"Venda a "
+               "prazo?\"). Venda à vista não gera nada aqui. Vencidas aparecem destacadas.")
+
+    contas = db.listar_contas_receber()
+    if not contas:
+        st.info("Nenhuma conta a receber registrada ainda.")
+        return
+
+    hoje = date.today().isoformat()
+    abertas = [c for c in contas if c["status"] == "aberto"]
+    vencidas = [c for c in abertas if c["vencimento"] < hoje]
+
+    kk = st.columns(3)
+    kk[0].metric("Em Aberto", len(abertas))
+    kk[1].metric("Vencidas", len(vencidas))
+    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
+
+    if vencidas:
+        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
+            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
+                     for c in vencidas))
+
+    STATUS_LABEL = {"aberto": "🟡 Aberto", "recebido": "🟢 Recebido", "cancelado": "⚪ Cancelado"}
+    f_status = st.selectbox("Filtrar por situação", ["Todas", "aberto", "recebido", "cancelado"],
+        format_func=lambda s: s if s == "Todas" else STATUS_LABEL.get(s, s),
+        key="rec_filtro_status")
+    filtradas = contas if f_status == "Todas" else [c for c in contas if c["status"] == f_status]
+
+    rows = [{"Descrição": c["descricao"], "Parcela": f"{c['parcela_numero']}/{c['parcela_total']}",
+        "Vencimento": c["vencimento"], "Valor (R$)": c["valor"],
+        "Situação": ("🔴 Vencida" if c["status"] == "aberto" and c["vencimento"] < hoje
+                     else STATUS_LABEL.get(c["status"], c["status"]))}
+        for c in filtradas]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True,
+        column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+    pendentes = [c for c in filtradas if c["status"] == "aberto"]
+    if pendentes:
+        with st.expander("💳 Marcar como recebida"):
+            conta_sel = st.selectbox("Conta", pendentes,
+                format_func=lambda c: f"{c['descricao']} ({c['parcela_numero']}/{c['parcela_total']}) — "
+                    f"R$ {c['valor']:.2f}, vence {c['vencimento']}",
+                key="rec_conta_selecionada")
+            rg1, rg2 = st.columns(2)
+            with rg1:
+                data_rec = st.date_input("Data do recebimento", value=date.today(), key="rec_data")
+            with rg2:
+                forma_rec = st.selectbox("Forma de recebimento",
+                    ["pix", "boleto", "transferência", "dinheiro", "cartão", "outro"],
+                    key="rec_forma")
+            if st.button("✅ Confirmar Recebimento", type="primary", key="rec_confirmar_btn"):
+                ok = db.marcar_recebido(conta_sel["id"], data_rec.isoformat(), forma_rec)
+                if ok:
+                    st.success("✅ Conta marcada como recebida.")
+                    st.rerun()
+                else:
+                    st.error("Não foi possível marcar como recebida.")
 
 
 def _fin_rentabilidade_por_raca():
@@ -2533,15 +2618,17 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_comp,t_pag,t_ven,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
+    (t_res,t_comp,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
         ["📒 Resultado","📅 Competência","📋 Contas a Pagar","💵 Registrar Venda",
-         "🏷️ Preços/Categoria","☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos",
-         "💹 Simulador","⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
+         "📥 Contas a Receber","🏷️ Preços/Categoria","☠️ Mortalidade","📊 Custos por Animal",
+         "🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem","🐄 Por Raça",
+         "➗ Rateio de Lote"])
 
     with t_res: _fin_resultado()
     with t_comp: _fin_competencia()
     with t_pag: _fin_contas_a_pagar()
     with t_ven: _fin_venda(animals)
+    with t_rec: _fin_contas_a_receber()
     with t_pre: _fin_precos()
     with t_mort: _fin_mortalidade()
 

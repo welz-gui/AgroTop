@@ -16,6 +16,10 @@ from .conexao import _cache, _conn, _writes
 # Regras puras importadas em vez de reimplementadas (ROADMAP R8).
 from services.zootecnia import get_age_category
 from services.financeiro import valor_esperado_venda
+# Parcelamento é a mesma conta de `repositories/compras.py` — venda a prazo e
+# compra a prazo dividem o total do mesmo jeito (resto na última parcela,
+# vencimento mensal com o dia preso ao mês). Reexportar em vez de duplicar (R8).
+from services.compras import gerar_parcelas
 
 
 @_cache
@@ -133,11 +137,24 @@ def get_fixed_costs_by_category(start_date: Optional[str] = None,
 @_writes
 def register_sale(animal_ids: list, sale_date: str, sale_type: str,
                   pricing_mode: str, value: float, buyer: str = "",
-                  operator: str = "", notes: str = "") -> dict:
+                  operator: str = "", notes: str = "",
+                  a_prazo: bool = False, num_parcelas: int = 1,
+                  primeiro_vencimento: Optional[str] = None) -> dict:
     """Registra a venda de um ou mais animais.
     - pricing_mode='kg':     `value` é o preço por kg (cada animal: peso × preço).
     - pricing_mode='cabeca': `value` é o valor por cabeça (igual para cada animal).
     - pricing_mode='lote':   `value` é o valor TOTAL do lote, rateado pelo peso.
+
+    `a_prazo=True` gera as parcelas em `contas_receber` a partir da receita
+    total (`gerar_parcelas`, mesma conta de `repositories/compras.py`) — o
+    padrão continua sendo à vista (nenhuma linha em `contas_receber`), o
+    comportamento de sempre, preservado (ROADMAP §3).
+
+    `sale_date` continua sendo a competência da receita (usada por
+    `lancamentos.normalizar`/`services.caixa`); `vencimento` em
+    `contas_receber` é só quando o dinheiro chega — as duas datas não se
+    misturam (ROADMAP §5, Trilha 3, "cuidados que definem o sucesso").
+
     Retorna {'receita':..., 'custo':..., 'lucro':..., 'n':...}."""
     animais = [get_animal(a) for a in animal_ids]
     animais = [a for a in animais if a]
@@ -183,9 +200,25 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
                 con, a["uuid"], "venda", ocorrido_em=sale_date,
                 usuario_registro=operator, documento=lot_ref,
                 observacoes=f"R$ {val:.2f} para {buyer or 'comprador nao informado'}")
+
+        n_parcelas_receber = 0
+        if a_prazo and tot_receita > 0:
+            if not primeiro_vencimento:
+                raise ValueError("venda a prazo exige primeiro_vencimento")
+            rotulo = f"Venda {lot_ref}" if lot_ref else "Venda"
+            rotulo += f" — {buyer or 'comprador não informado'}"
+            for p in gerar_parcelas(round(tot_receita, 2), num_parcelas, primeiro_vencimento):
+                con.execute(
+                    """INSERT INTO contas_receber
+                       (lot_ref, comprador, descricao, valor, vencimento,
+                        parcela_numero, parcela_total, status, operator)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (lot_ref, buyer, rotulo, p["valor"], p["vencimento"],
+                     p["numero"], p["total"], "aberto", operator))
+            n_parcelas_receber = num_parcelas
     return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
             "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
-            "lot_ref": lot_ref}
+            "lot_ref": lot_ref, "parcelas_a_receber": n_parcelas_receber}
 
 
 def get_sales(start_date: Optional[str] = None,
@@ -200,6 +233,42 @@ def get_sales(start_date: Optional[str] = None,
     sql += " ORDER BY s.sale_date DESC, s.id DESC"
     with _conn() as con:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
+def listar_contas_receber(status: Optional[str] = None) -> list[dict]:
+    """Parcelas de venda a prazo, mais próximas do vencimento primeiro.
+
+    `status=None` traz todas; `"aberto"`/`"recebido"`/`"cancelado"` filtra.
+    Espelha `repositories.compras.listar_contas_pagar`.
+    """
+    sql = "SELECT * FROM contas_receber WHERE 1=1"
+    args: list = []
+    if status:
+        sql += " AND status=?"
+        args.append(status)
+    sql += " ORDER BY vencimento ASC"
+    with _conn() as con:
+        return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
+@_writes
+def marcar_recebido(conta_id: int, data_recebimento: str, forma_recebimento: str = "") -> bool:
+    with _conn() as con:
+        cur = con.execute(
+            """UPDATE contas_receber SET status='recebido', data_recebimento=?,
+               forma_recebimento=? WHERE id=? AND status='aberto'""",
+            (data_recebimento, forma_recebimento, conta_id))
+        return cur.rowcount > 0
+
+
+@_writes
+def cancelar_receber(conta_id: int) -> bool:
+    """Cancela uma conta a receber em aberto — não apaga (venda desfeita, etc.)."""
+    with _conn() as con:
+        cur = con.execute(
+            "UPDATE contas_receber SET status='cancelado' WHERE id=? AND status='aberto'",
+            (conta_id,))
+        return cur.rowcount > 0
 
 
 def _insumo_cost_by_reason(con, reasons: tuple, start=None, end=None) -> float:
