@@ -76,6 +76,7 @@ from repositories.financeiro import (  # noqa: F401
     get_financial_summary, get_insumo_compras, register_death, get_deaths,
     get_mortality_stats, get_category_prices, set_category_price,
     get_expected_price_kg, expected_sale_value,
+    listar_contas_receber, marcar_recebido, cancelar_receber,
 )
 
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
@@ -646,6 +647,27 @@ def init_db() -> None:
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
+            -- Contas a receber — parcelas de venda a prazo (Trilha 3, ROADMAP §5).
+            -- Espelha `contas_pagar`: `lot_ref` é anulável e NÃO é FK (o mesmo texto
+            -- livre que `sales.lot_ref` já usa para agrupar venda de vários animais,
+            -- que por sua vez também não é chave — ver comentário de `sales` acima).
+            -- Venda à vista (o padrão, sempre foi) não gera nenhuma linha aqui.
+            CREATE TABLE IF NOT EXISTS contas_receber (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                lot_ref          TEXT,
+                comprador        TEXT,
+                descricao        TEXT,
+                valor            REAL NOT NULL,
+                vencimento       TEXT NOT NULL,
+                parcela_numero   INTEGER NOT NULL DEFAULT 1,
+                parcela_total    INTEGER NOT NULL DEFAULT 1,
+                status           TEXT NOT NULL DEFAULT 'aberto',  -- aberto | recebido | cancelado
+                data_recebimento TEXT,
+                forma_recebimento TEXT,
+                operator         TEXT,
+                created_at       TEXT DEFAULT (datetime('now','localtime'))
+            );
+
             -- Óbitos (mortalidade) com causa
             CREATE TABLE IF NOT EXISTS deaths (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -720,6 +742,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_compra_itens_compra ON compra_itens (compra_id);
             CREATE INDEX IF NOT EXISTS idx_contas_pagar_status ON contas_pagar (status, vencimento);
             CREATE INDEX IF NOT EXISTS idx_contas_pagar_compra ON contas_pagar (compra_id);
+            CREATE INDEX IF NOT EXISTS idx_contas_receber_status ON contas_receber (status, vencimento);
 
             -- Sessões de login persistente (cookie). Definida aqui, e só aqui:
             -- antes era criada sob demanda dentro de create_session/get_session_user/

@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-14 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-15 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -192,6 +192,23 @@ CREATE TABLE IF NOT EXISTS contas_pagar (
     operator text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT contas_pagar_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS contas_receber (
+    id bigserial,
+    lot_ref text,
+    comprador text,
+    descricao text,
+    valor numeric NOT NULL,
+    vencimento text NOT NULL,
+    parcela_numero integer DEFAULT 1 NOT NULL,
+    parcela_total integer DEFAULT 1 NOT NULL,
+    status text DEFAULT 'aberto'::text NOT NULL,
+    data_recebimento text,
+    forma_recebimento text,
+    operator text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT contas_receber_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE IF NOT EXISTS deaths (
@@ -629,6 +646,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_ocorrido ON audit_logs USING btree (ocorrid
 CREATE INDEX IF NOT EXISTS idx_compra_itens_compra ON compra_itens USING btree (compra_id);
 CREATE INDEX IF NOT EXISTS idx_contas_pagar_compra ON contas_pagar USING btree (compra_id);
 CREATE INDEX IF NOT EXISTS idx_contas_pagar_status ON contas_pagar USING btree (status, vencimento);
+CREATE INDEX IF NOT EXISTS idx_contas_receber_status ON contas_receber USING btree (status, vencimento);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_disp_animal ON dispositivos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_disp_lote ON dispositivos USING btree (lote);

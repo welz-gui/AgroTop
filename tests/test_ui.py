@@ -41,6 +41,7 @@ PROVAS = [
     "tests.ui_rateio_de_lote_prova", # rateio_adaptador.com_dias_no_lote() + ratear() ligados (spec 0019/0041)
     "tests.ui_gta_prova", # gta_adaptador.montar_contexto() + gta.validar() ligados (spec 0038)
     "tests.ui_compra_de_insumo_prova", # compras.registrar() ligado (Trilha 3: estoque + contas a pagar)
+    "tests.ui_contas_a_receber_prova", # register_sale(a_prazo=True) ligado (Trilha 3: venda + contas a receber)
 ]
 
 

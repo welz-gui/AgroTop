@@ -375,6 +375,45 @@ class TestVenda(BaseRegras):
         self.assertEqual(r, {"receita": 0, "custo": 0, "lucro": 0, "n": 0})
         self.assertNotIn("lot_ref", r)
 
+    def test_venda_a_vista_nao_gera_conta_a_receber(self):
+        """Padrão de sempre, preservado (ROADMAP §3): à vista não muda nada."""
+        a = self.animal("V9", peso=400.0)
+        r = db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0)
+        self.assertEqual(r["parcelas_a_receber"], 0)
+        self.assertEqual(db.listar_contas_receber(), [])
+
+    def test_venda_a_prazo_gera_parcelas_em_contas_a_receber(self):
+        a = self.animal("V10", peso=400.0)
+        venc = (HOJE + timedelta(days=30)).isoformat()
+        r = db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0,
+                             buyer="Frigorífico Z", a_prazo=True, num_parcelas=3,
+                             primeiro_vencimento=venc)
+        self.assertEqual(r["parcelas_a_receber"], 3)
+        contas = db.listar_contas_receber()
+        self.assertEqual(len(contas), 3)
+        self.assertEqual(round(sum(c["valor"] for c in contas), 2), r["receita"])
+        self.assertTrue(all(c["status"] == "aberto" for c in contas))
+        self.assertTrue(all(c["comprador"] == "Frigorífico Z" for c in contas))
+
+    def test_venda_a_prazo_sem_vencimento_recusa(self):
+        a = self.animal("V11", peso=400.0)
+        with self.assertRaises(ValueError):
+            db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0, a_prazo=True)
+
+    def test_marcar_recebido_fecha_a_conta_e_preserva_as_outras(self):
+        a = self.animal("V12", peso=400.0)
+        venc = (HOJE + timedelta(days=30)).isoformat()
+        db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0,
+                         a_prazo=True, num_parcelas=2, primeiro_vencimento=venc)
+        aberta1, aberta2 = db.listar_contas_receber("aberto")
+        self.assertTrue(db.marcar_recebido(aberta1["id"], HOJE.isoformat(), "pix"))
+        abertas = db.listar_contas_receber("aberto")
+        self.assertEqual(len(abertas), 1)
+        self.assertEqual(abertas[0]["id"], aberta2["id"])
+        recebidas = db.listar_contas_receber("recebido")
+        self.assertEqual(len(recebidas), 1)
+        self.assertEqual(recebidas[0]["forma_recebimento"], "pix")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 class TestObito(BaseRegras):

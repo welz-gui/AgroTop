@@ -477,11 +477,11 @@ Financeiro antes de Nutrição (a dieta precisa apropriar custo).
 **Escopo resumido:** ~~pedido e compra, documento fiscal, entrada automática~~ 🟢 (ver abaixo,
 2026-08-14) · lotes de fabricação e validade, custo médio ponderado (✅ desde a etapa anterior,
 ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
-· ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · contas a receber, caixa (✅ spec 0021/0034),
-centros de custo, competência × caixa (✅), fluxo realizado e projetado, DRE gerencial, custo
-por kg e por arroba (✅ por animal — falta por lote/piquete) · alimentos e composição, dietas
-multi-ingrediente com vigência, ordem de trato, previsto × realizado, custo por cabeça/dia e
-por arroba produzida (✅ spec 0020/0037 — falta vigência/histórico de dieta).
+· ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · ~~contas a receber~~ 🟢 (2026-08-15) · caixa
+(✅ spec 0021/0034), centros de custo, competência × caixa (✅), fluxo realizado e projetado,
+DRE gerencial, custo por kg e por arroba (✅ por animal — falta por lote/piquete) · alimentos e
+composição, dietas multi-ingrediente com vigência, ordem de trato, previsto × realizado, custo
+por cabeça/dia e por arroba produzida (✅ spec 0020/0037 — falta vigência/histórico de dieta).
 
 🟢 **"Compra com documento fiscal" fechada em 2026-08-14.** Até aqui só existia entrada avulsa
 de estoque (`add_insumo_entry`): 1 insumo por lançamento, sem fornecedor, sem documento, sem
@@ -495,12 +495,26 @@ livre de propósito: `fornecedores` já existia, mas é a origem do **gado** com
 cadastro de fornecedor de insumo — misturar os dois domínios numa FK só mentiria sobre o que
 ela representa.
 
+🟢 **"Contas a receber" fechada em 2026-08-15.** Espelha a compra: até aqui `register_sale`
+tratava toda venda como recebida na hora — a receita ia para `sales.total_value` no dia da
+venda e não havia rastro de QUANDO o dinheiro chegaria. Venda a prazo (comum em pecuária —
+30/60/90 dias) não existia como conceito. `register_sale` ganhou os parâmetros opcionais
+`a_prazo`/`num_parcelas`/`primeiro_vencimento`; quando usados, gera as parcelas em
+`contas_receber` reaproveitando `services.compras.gerar_parcelas` (R8 — mesma conta de
+parcelamento da compra, não duplicada). Venda à vista (o padrão, sempre foi) continua sem
+gerar nenhuma linha — comportamento preservado (ROADMAP §3). Uma tabela nova (`contas_receber`
+— migration 0019), UI em "💵 Registrar Venda" (checkbox "Venda a prazo?") e nova aba
+"📥 Contas a Receber" em Financeiro. `lot_ref` em `contas_receber` é texto livre, não FK —
+espelha `sales.lot_ref`, que também não é chave.
+
 **Cuidados que definem o sucesso**
 - **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —
   docs/adr/0003-custo-medio-ponderado.md: **não-retroativo**, vale só para entradas novas.
 - **Nunca misturar competência, vencimento e data de caixa** — é onde nascem os bugs de DRE.
   `contas_pagar.vencimento` é a data de cobrança, nunca usada como competência; a competência
   de uma compra continua sendo `data_recebimento` em `insumo_transactions`/`lancamentos`.
+  Mesma regra em `contas_receber.vencimento`: é só quando o dinheiro chega, nunca usada como
+  competência — a competência da venda continua sendo `sale_date` em `sales`/`lancamentos`.
 - Saldo de estoque deve ser **reconstruível pelas movimentações**; nenhuma movimentação sem
   origem identificada. *(A entrada de uma compra grava em `insumo_transactions` com
   `reason='compra'` e nota vinculada — mesma trilha de sempre, agora com fornecedor/documento.)*
