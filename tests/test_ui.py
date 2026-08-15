@@ -42,6 +42,7 @@ PROVAS = [
     "tests.ui_gta_prova", # gta_adaptador.montar_contexto() + gta.validar() ligados (spec 0038)
     "tests.ui_compra_de_insumo_prova", # compras.registrar() ligado (Trilha 3: estoque + contas a pagar)
     "tests.ui_contas_a_receber_prova", # register_sale(a_prazo=True) ligado (Trilha 3: venda + contas a receber)
+    "tests.ui_dre_gerencial_prova", # dre.montar_dre() ligado (Trilha 3: DRE gerencial)
 ]
 
 
