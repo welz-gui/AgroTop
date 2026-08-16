@@ -52,6 +52,9 @@ class TestCompraDeInsumoNaTela(unittest.TestCase):
     def setUp(self):
         with db._conn() as con:
             con.execute("DELETE FROM contas_pagar")
+            # insumo_transactions.compra_id (migration 0020) referencia compras —
+            # precisa sair antes, senão o DELETE FROM compras abaixo esbarra na FK.
+            con.execute("DELETE FROM insumo_transactions WHERE compra_id IS NOT NULL")
             con.execute("DELETE FROM compra_itens")
             con.execute("DELETE FROM compras")
         db.clear_cache()

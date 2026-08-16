@@ -187,11 +187,12 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
                 """INSERT INTO sales
                    (animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
                     price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
-                    operator,notes)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    operator,notes,a_prazo)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (a["uuid"], sale_date, sale_type, pricing_mode,
                  a["current_weight"], ppk,
-                 val, buyer or None, lot_ref, custo, lucro, operator, notes),
+                 val, buyer or None, lot_ref, custo, lucro, operator, notes,
+                 1 if a_prazo else 0),
             )
             con.execute("UPDATE animals SET status='vendido' WHERE id=?", (a["id"],))
             # Venda e obito mudam status por SQL direto, sem passar por
@@ -296,7 +297,7 @@ def get_insumo_compras(start_date: Optional[str] = None,
     nunca existiu de fato. Esta função já filtra pelo par certo; quem chama
     não precisa saber da diferença.
     """
-    sql = ("SELECT t.transaction_date, t.quantity, "
+    sql = ("SELECT t.transaction_date, t.quantity, t.compra_id, "
            "i.name AS insumo_nome, i.cost_per_unit AS insumo_cost_per_unit "
            "FROM insumo_transactions t JOIN insumos i ON i.id=t.insumo_id "
            "WHERE t.type='entrada' AND t.reason='compra'")

@@ -478,11 +478,11 @@ Financeiro antes de Nutrição (a dieta precisa apropriar custo).
 2026-08-14) · lotes de fabricação e validade, custo médio ponderado (✅ desde a etapa anterior,
 ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
 · ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · ~~contas a receber~~ 🟢 (2026-08-15) · caixa
-(✅ spec 0021/0034), centros de custo, competência × caixa (✅), fluxo realizado e projetado
-(⬜ ver nota abaixo — `services.caixa.fluxo_de_caixa`/`em_aberto` seguem órfãos), ~~DRE
-gerencial~~ 🟢 (2026-08-15), custo por kg e por arroba (✅ por animal — falta por lote/piquete)
-· alimentos e composição, dietas multi-ingrediente com vigência, ordem de trato, previsto ×
-realizado, custo por cabeça/dia e por arroba produzida (✅ spec 0020/0037 — falta
+(✅ spec 0021/0034), centros de custo, competência × caixa (✅), ~~fluxo realizado e
+projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), custo por kg e por arroba
+(✅ por animal — falta por lote/piquete) · alimentos e composição, dietas multi-ingrediente
+com vigência, ordem de trato, previsto × realizado, custo por cabeça/dia e por arroba
+produzida (✅ spec 0020/0037 — falta
 vigência/histórico de dieta).
 
 🟢 **"Compra com documento fiscal" fechada em 2026-08-14.** Até aqui só existia entrada avulsa
@@ -525,14 +525,25 @@ custos por animal (moram em `insumo_transactions`, nunca em `animal_costs`), ent
 como entrar no CPV; alocar por animal é trabalho futuro, não desta fatia. Nova aba
 "📈 DRE Gerencial" em Financeiro, ao lado de "📒 Resultado".
 
-⬜ **Achado nesta fatia, não fechado:** `services/caixa.py::fluxo_de_caixa` e `em_aberto`
-existem desde a spec 0021 e continuam **órfãos** — nunca chamados. Não tinham como ser: as
-duas funções precisam de `vencimento`/`pagamento` reais para distinguir "a receber/pagar" de
-"já recebido/pago", e `services.lancamentos.normalizar` sempre preencheu os três campos
-(`competencia`/`vencimento`/`pagamento`) com a **mesma data**, porque nenhuma fonte de dado
-carregava um vencimento de verdade até `contas_pagar`/`contas_receber` existirem (as duas
-fatias anteriores desta trilha). Ligar isso é o próximo passo natural de "fluxo realizado e
-projetado" — não fez parte desta fatia porque o pedido foi especificamente a DRE.
+🟢 **"Fluxo realizado e projetado" fechada em 2026-08-16.** `services/caixa.py::fluxo_de_caixa`
+e `em_aberto` (spec 0021) estavam órfãos desde a fatia anterior — precisavam de
+`vencimento`/`pagamento` reais, que só passaram a existir com `contas_pagar`/`contas_receber`.
+Ligar isso expôs um problema novo, não previsto pela spec: uma compra com nota fiscal e
+parcelas aparece em `insumo_transactions` (competência) **e** em `contas_pagar` (cronograma de
+caixa) — mesma economia, duas linhas; o mesmo vale para venda a prazo (`sales` +
+`contas_receber`). Sem distinguir isso, o fluxo de caixa contaria a mesma compra/venda duas
+vezes. Resolvido com duas colunas novas, aditivas (migration 0020): `sales.a_prazo` (1 = caixa
+rastreado via `contas_receber`, não em `sales`) e `insumo_transactions.compra_id` (preenchido
+só quando a entrada vem de `repositories.compras.registrar`; entrada avulsa continua `NULL` —
+caixa imediato, sem parcela). `app.py::_fin_lancamentos_caixa` usa as duas colunas para
+excluir da competência o que já tem cronograma próprio, antes de montar a lista que alimenta
+`fluxo_de_caixa`/`em_aberto`.
+
+Outra peça que a spec 0021 não podia prever (R31): `fluxo_de_caixa` soma `valor` sem olhar o
+sinal de `tipo` (contrato já testado, não alterado) — então a tela chama a função duas vezes,
+uma só com receitas e outra só com despesas, e monta o saldo com sinal certo por conta própria.
+Nova aba "💵 Fluxo de Caixa" em Financeiro: Realizado, Projetado, Saldo, e a lista "Em Aberto"
+(vencidas destacadas) — a primeira tela do sistema a mostrar essa distinção.
 
 **Cuidados que definem o sucesso**
 - **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —

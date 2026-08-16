@@ -85,10 +85,11 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
                 (quantidade, novo_custo, insumo_id))
             con.execute(
                 """INSERT INTO insumo_transactions
-                   (insumo_id, type, quantity, reason, transaction_date, operator, notes)
-                   VALUES (?,?,?,?,?,?,?)""",
+                   (insumo_id, type, quantity, reason, transaction_date, operator,
+                    notes, compra_id)
+                   VALUES (?,?,?,?,?,?,?,?)""",
                 (insumo_id, "entrada", quantidade, "compra", data_recebimento,
-                 operator, f"compra {compra_id}"))
+                 operator, f"compra {compra_id}", compra_id))
 
         rotulo_fornecedor = fornecedor_nome or "fornecedor não informado"
         rotulo_doc = documento_numero or compra_id[:8]

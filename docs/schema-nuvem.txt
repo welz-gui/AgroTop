@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-08-15 por tools/dump_schema_nuvem.py
+# Extraído em 2026-08-16 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -260,6 +260,7 @@ insumo_transactions.notes
 insumo_transactions.created_at
 insumo_transactions.lote_id
 insumo_transactions.animal_uuid
+insumo_transactions.compra_id
 insumos.id
 insumos.name
 insumos.category
@@ -407,6 +408,7 @@ sales.operator
 sales.notes
 sales.created_at
 sales.animal_uuid
+sales.a_prazo
 sessions.token
 sessions.user_id
 sessions.expires_at

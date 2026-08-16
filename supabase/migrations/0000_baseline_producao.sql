@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-15 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-16 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -349,6 +349,7 @@ CREATE TABLE IF NOT EXISTS insumo_transactions (
     created_at timestamp with time zone DEFAULT now(),
     lote_id text,
     animal_uuid text,
+    compra_id text,
     CONSTRAINT insumo_transactions_pkey PRIMARY KEY (id)
 );
 
@@ -544,6 +545,7 @@ CREATE TABLE IF NOT EXISTS sales (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     animal_uuid text NOT NULL,
+    a_prazo integer DEFAULT 0 NOT NULL,
     CONSTRAINT sales_pkey PRIMARY KEY (id)
 );
 
@@ -611,6 +613,7 @@ ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KE
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
 ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
+ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_compra_id_fkey FOREIGN KEY (compra_id) REFERENCES compras(id);
 ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE lotes ADD CONSTRAINT fk_lotes_property FOREIGN KEY (property_id) REFERENCES properties(id);
 ALTER TABLE medications ADD CONSTRAINT fk_medications_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
