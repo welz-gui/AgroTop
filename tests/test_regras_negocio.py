@@ -235,6 +235,44 @@ class TestCustos(BaseRegras):
     def test_custo_de_animal_inexistente_e_zero(self):
         self.assertEqual(db.get_total_cost("NAO_EXISTE"), 0.0)
 
+    def test_custo_por_lote_soma_pelo_piquete_atual_do_animal(self):
+        """Centro de custo (§5, Trilha 3): agrega animal_costs pelo
+        `lote_id` de HOJE — não pelo piquete de quando o custo ocorreu."""
+        a = self.animal("C3", lote="P1")
+        b = self.animal("C4", lote="P1")
+        z = self.animal("C5", lote="P2")
+        self.custo(a, 100.0)
+        self.custo(b, 50.0)
+        self.custo(z, 30.0)
+
+        por_lote = db.get_animal_costs_by_lote()
+        self.assertEqual(por_lote["P1"], 150.0)
+        self.assertEqual(por_lote["P2"], 30.0)
+
+    def test_custo_por_lote_ignora_animal_sem_piquete(self):
+        a = self.animal("C6", lote=None)
+        self.custo(a, 999.0)
+        self.assertEqual(db.get_animal_costs_by_lote(), {})
+
+    def test_custo_fixo_com_lote_id_none_e_geral_da_fazenda(self):
+        con = sqlite3.connect(db.DB_PATH)
+        try:
+            property_id = con.execute(
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()[0]
+            con.execute("INSERT INTO lotes (id,name,property_id) VALUES(?,?,?)",
+                       ("P1", "Piquete 1", property_id))
+            con.commit()
+        finally:
+            con.close()
+
+        db.add_fixed_cost("Salários", "Gerente", 5000.0, HOJE.isoformat())
+        db.add_fixed_cost("Aluguel de pastagem", "Piquete 1", 1000.0,
+                          HOJE.isoformat(), lote_id="P1")
+
+        por_lote = db.get_fixed_costs_by_lote()
+        self.assertEqual(por_lote[None], 5000.0)
+        self.assertEqual(por_lote["P1"], 1000.0)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 class TestCarencia(BaseRegras):

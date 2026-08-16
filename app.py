@@ -50,6 +50,7 @@ from services.reconciliacao_dispositivos import reconciliar as dispositivos_reco
 from services.lancamentos import normalizar as lancamentos_normalizar
 from services.caixa import resultado_por_competencia, fluxo_de_caixa, em_aberto as caixa_em_aberto
 from services.dre import montar_dre
+from services.centros_de_custo import consolidar as consolidar_centros_de_custo
 from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca
 from services.completude_adaptador import normalizar_pesagens, janela_do_mes
@@ -2410,6 +2411,57 @@ def _fin_competencia():
             column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
 
 
+def _fin_centros_de_custo(lotes):
+    """Custo por centro de custo — o piquete (§5, Trilha 3).
+
+    `services.centros_de_custo.consolidar` junta custo fixo alocado
+    (`fixed_costs.lote_id`, aba 🏢 Custos Fixos) com custo por animal
+    (`animal_costs`, pelo piquete ATUAL do animal — mesma limitação já
+    conhecida de `_nutricao_custo_por_piquete`: animal que mudou de piquete
+    no meio do período carrega o custo histórico inteiro para o piquete de
+    hoje).
+    """
+    st.subheader("🏭 Centros de Custo")
+    st.caption("Custo fixo alocado a um piquete (aba 🏢 Custos Fixos) + custo por animal, "
+               "somado pelo piquete onde cada animal está **hoje**. 'Geral da Fazenda' é o "
+               "custo fixo que não foi alocado a nenhum piquete específico.")
+
+    c1, c2 = st.columns(2)
+    with c1: start = st.date_input("De", value=date(date.today().year,1,1), key="cc_start")
+    with c2: end = st.date_input("Até", value=date.today(), key="cc_end")
+    s_iso, e_iso = start.isoformat(), end.isoformat()
+
+    fixos_por_lote = db.get_fixed_costs_by_lote(s_iso, e_iso)
+    animal_por_lote = db.get_animal_costs_by_lote(s_iso, e_iso)
+    if not fixos_por_lote and not animal_por_lote:
+        st.info("Nenhum custo lançado no período selecionado.")
+        return
+
+    cabecas_por_lote = {l["id"]: l["animal_count"] for l in lotes}
+    nomes_lotes = {l["id"]: l["name"] for l in lotes}
+    linhas = consolidar_centros_de_custo(fixos_por_lote, animal_por_lote,
+                                         cabecas_por_lote, nomes_lotes)
+
+    total_geral = round(sum(l["total"] for l in linhas), 2)
+    k1, k2 = st.columns(2)
+    k1.metric("Total no período", f"R$ {total_geral:,.2f}")
+    k2.metric("Centros de custo com lançamento", len(linhas))
+
+    df = pd.DataFrame(linhas)[["nome", "cabecas", "custos_fixos", "custos_animal", "total"]]
+    df.columns = ["Centro de Custo", "Cabeças", "Custos Fixos (R$)", "Custos de Animal (R$)",
+                  "Total (R$)"]
+    st.dataframe(df, use_container_width=True, hide_index=True,
+        column_config={col: st.column_config.NumberColumn(format="R$ %.2f")
+                       for col in ["Custos Fixos (R$)", "Custos de Animal (R$)", "Total (R$)"]})
+
+    fig = px.bar(df, x="Centro de Custo",
+                y=["Custos Fixos (R$)", "Custos de Animal (R$)"],
+                barmode="stack", color_discrete_sequence=[c["perigo"], c["atencao"]])
+    fig.update_layout(**PLOTLY, height=300, xaxis=dict(gridcolor=c["superficie"]),
+                      yaxis=dict(gridcolor=c["superficie"], title="R$"))
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def _fin_contas_a_pagar():
     """Parcelas geradas por compra de insumo com nota fiscal (§5, Trilha 3).
 
@@ -2780,17 +2832,20 @@ def _fin_mortalidade():
 def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
+    lotes=db.get_all_lotes()
 
-    (t_res,t_dre,t_comp,t_fx,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
+    (t_res,t_dre,t_comp,t_fx,t_cc,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,
+     ft6)=st.tabs(
         ["📒 Resultado","📈 DRE Gerencial","📅 Competência","💵 Fluxo de Caixa",
-         "📋 Contas a Pagar","💵 Registrar Venda","📥 Contas a Receber","🏷️ Preços/Categoria",
-         "☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador",
-         "⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
+         "🏭 Centros de Custo","📋 Contas a Pagar","💵 Registrar Venda","📥 Contas a Receber",
+         "🏷️ Preços/Categoria","☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos",
+         "💹 Simulador","⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
 
     with t_res: _fin_resultado()
     with t_dre: _fin_dre()
     with t_comp: _fin_competencia()
     with t_fx: _fin_fluxo_de_caixa()
+    with t_cc: _fin_centros_de_custo(lotes)
     with t_pag: _fin_contas_a_pagar()
     with t_ven: _fin_venda(animals)
     with t_rec: _fin_contas_a_receber()
@@ -2892,13 +2947,19 @@ def page_financeiro():
                 with fx2:
                     fx_date=st.date_input("Data *", value=date.today())
                     fx_recur=st.checkbox("Custo recorrente (mensal)")
+                fx_cc=st.selectbox("Centro de Custo", [None]+[l["id"] for l in lotes],
+                    format_func=lambda lid: "🏭 Geral da Fazenda" if lid is None
+                        else next((f"🌿 {l['id']} — {l['name']}" for l in lotes if l["id"]==lid), lid),
+                    help="Piquete a que este custo pertence. 'Geral da Fazenda' para o que "
+                         "não é de um piquete específico (salário, contabilidade).")
                 fx_desc=st.text_input("Descrição", placeholder="Ex: Aluguel piquete Norte / Salário João")
                 if st.form_submit_button("✅ Lançar Custo Fixo", type="primary", use_container_width=True):
                     if fx_amount<=0:
                         st.error("O valor deve ser maior que zero.")
                     else:
                         db.add_fixed_cost(fx_cat, fx_desc, fx_amount,
-                                          fx_date.strftime("%Y-%m-%d"), fx_recur, "")
+                                          fx_date.strftime("%Y-%m-%d"), fx_recur, "",
+                                          lote_id=fx_cc)
                         st.success(f"✅ {fx_cat}: R$ {fx_amount:,.2f} lançado!")
                         st.rerun()
 
@@ -2915,9 +2976,13 @@ def page_financeiro():
                 fig_fx.update_traces(textposition="inside",textinfo="percent")
                 st.plotly_chart(fig_fx,use_container_width=True)
             with cgb:
-                df_fx=pd.DataFrame(fixed)[["cost_date","category","description","amount","recurring"]].copy()
+                nomes_lote={l["id"]:l["name"] for l in lotes}
+                df_fx=pd.DataFrame(fixed)[["cost_date","category","description","amount",
+                                           "recurring","lote_id"]].copy()
                 df_fx["recurring"]=df_fx["recurring"].map({1:"Mensal",0:"Único"})
-                df_fx.columns=["Data","Categoria","Descrição","Valor (R$)","Tipo"]
+                df_fx["lote_id"]=df_fx["lote_id"].map(
+                    lambda lid: "Geral" if not lid else nomes_lote.get(lid, lid))
+                df_fx.columns=["Data","Categoria","Descrição","Valor (R$)","Tipo","Centro de Custo"]
                 st.dataframe(df_fx,use_container_width=True,hide_index=True,height=260,
                     column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
 

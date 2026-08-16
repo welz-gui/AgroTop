@@ -77,6 +77,7 @@ from repositories.financeiro import (  # noqa: F401
     get_mortality_stats, get_category_prices, set_category_price,
     get_expected_price_kg, expected_sale_value,
     listar_contas_receber, marcar_recebido, cancelar_receber,
+    get_fixed_costs_by_lote, get_animal_costs_by_lote,
 )
 
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
@@ -584,7 +585,9 @@ def init_db() -> None:
                 cost_date   TEXT NOT NULL,
                 recurring   INTEGER DEFAULT 0,
                 notes       TEXT,
-                created_at  TEXT DEFAULT (datetime('now','localtime'))
+                lote_id     TEXT,  -- centro de custo (piquete); NULL = geral da fazenda
+                created_at  TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (lote_id) REFERENCES lotes(id)
             );
 
             -- Programação de trato/ração/mineral por piquete
@@ -746,6 +749,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_contas_pagar_status ON contas_pagar (status, vencimento);
             CREATE INDEX IF NOT EXISTS idx_contas_pagar_compra ON contas_pagar (compra_id);
             CREATE INDEX IF NOT EXISTS idx_contas_receber_status ON contas_receber (status, vencimento);
+            CREATE INDEX IF NOT EXISTS idx_fixed_costs_lote ON fixed_costs (lote_id);
 
             -- Sessões de login persistente (cookie). Definida aqui, e só aqui:
             -- antes era criada sob demanda dentro de create_session/get_session_user/
@@ -1006,6 +1010,11 @@ def _migrate(con) -> None:
         # Migration 0020 — mesma razão: distingue venda cujo caixa é rastreado
         # via contas_receber (a_prazo=1) da venda à vista (caixa imediato).
         con.execute("ALTER TABLE sales ADD COLUMN a_prazo INTEGER NOT NULL DEFAULT 0")
+    fccols = {r["name"] for r in con.execute("PRAGMA table_info(fixed_costs)").fetchall()}
+    if "lote_id" not in fccols:
+        # Migration 0021 — centro de custo (piquete) do custo fixo; NULL
+        # continua válido e significa "geral da fazenda", não "esqueceram".
+        con.execute("ALTER TABLE fixed_costs ADD COLUMN lote_id TEXT")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 

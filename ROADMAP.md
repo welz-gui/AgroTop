@@ -478,11 +478,11 @@ Financeiro antes de Nutrição (a dieta precisa apropriar custo).
 2026-08-14) · lotes de fabricação e validade, custo médio ponderado (✅ desde a etapa anterior,
 ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
 · ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · ~~contas a receber~~ 🟢 (2026-08-15) · caixa
-(✅ spec 0021/0034), centros de custo, competência × caixa (✅), ~~fluxo realizado e
-projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), custo por kg e por arroba
-(✅ por animal — falta por lote/piquete) · alimentos e composição, dietas multi-ingrediente
-com vigência, ordem de trato, previsto × realizado, custo por cabeça/dia e por arroba
-produzida (✅ spec 0020/0037 — falta
+(✅ spec 0021/0034), ~~centros de custo~~ 🟢 (2026-08-16), competência × caixa (✅), ~~fluxo
+realizado e projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), custo por kg e por
+arroba (✅ por animal e por piquete — falta por lote de venda) · alimentos e composição,
+dietas multi-ingrediente com vigência, ordem de trato, previsto × realizado, custo por
+cabeça/dia e por arroba produzida (✅ spec 0020/0037 — falta
 vigência/histórico de dieta).
 
 🟢 **"Compra com documento fiscal" fechada em 2026-08-14.** Até aqui só existia entrada avulsa
@@ -544,6 +544,18 @@ sinal de `tipo` (contrato já testado, não alterado) — então a tela chama a 
 uma só com receitas e outra só com despesas, e monta o saldo com sinal certo por conta própria.
 Nova aba "💵 Fluxo de Caixa" em Financeiro: Realizado, Projetado, Saldo, e a lista "Em Aberto"
 (vencidas destacadas) — a primeira tela do sistema a mostrar essa distinção.
+
+🟢 **"Centros de custo" fechada em 2026-08-16.** `fixed_costs` sempre foi um balde único da
+fazenda inteira — não havia como saber "quanto custou manter o Piquete Norte" separado de
+"quanto custou o Curral". `services/centros_de_custo.py::consolidar` junta custo fixo alocado
+(coluna nova `fixed_costs.lote_id` — migration 0021) com custo por animal (`animal_costs`, já
+existente, agregado pelo piquete **atual** de cada animal — mesma limitação já registrada em
+`_nutricao_custo_por_piquete`: animal que mudou de piquete no meio do período carrega o custo
+histórico inteiro para o piquete de hoje, não tem como ser diferente sem cruzar com
+`animal_movements` por data). `lote_id=NULL` é um valor válido, não "esqueceram de
+preencher": vira "Geral da Fazenda" — custo que não é de nenhum piquete específico (salário do
+gerente, contabilidade, impostos). Nova aba "🏭 Centros de Custo" em Financeiro; o formulário
+de "🏢 Custos Fixos" ganhou o seletor de centro de custo.
 
 **Cuidados que definem o sucesso**
 - **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —
