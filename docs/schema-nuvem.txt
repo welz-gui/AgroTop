@@ -227,6 +227,7 @@ fixed_costs.cost_date
 fixed_costs.recurring
 fixed_costs.notes
 fixed_costs.created_at
+fixed_costs.lote_id
 fornecedores.id
 fornecedores.name
 fornecedores.city

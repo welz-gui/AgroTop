@@ -82,12 +82,18 @@ def add_animal_cost(animal_id, cost_type, description, amount, cost_date, notes=
 
 
 @_writes
-def add_fixed_cost(category, description, amount, cost_date, recurring=0, notes="") -> None:
+def add_fixed_cost(category, description, amount, cost_date, recurring=0, notes="",
+                   lote_id=None) -> None:
+    """`lote_id` é o centro de custo (o piquete a que este custo fixo pertence).
+    `None` é um valor válido — "geral da fazenda", não alocado a um piquete
+    específico (salário do gerente, contabilidade) — não "esqueceram de
+    preencher"."""
     with _conn() as con:
         con.execute(
-            """INSERT INTO fixed_costs (category,description,amount,cost_date,recurring,notes)
-               VALUES(?,?,?,?,?,?)""",
-            (category, description, amount, cost_date, int(recurring), notes),
+            """INSERT INTO fixed_costs
+               (category,description,amount,cost_date,recurring,notes,lote_id)
+               VALUES(?,?,?,?,?,?,?)""",
+            (category, description, amount, cost_date, int(recurring), notes, lote_id),
         )
 
 
@@ -132,6 +138,47 @@ def get_fixed_costs_by_category(start_date: Optional[str] = None,
     sql += " GROUP BY category ORDER BY total DESC"
     with _conn() as con:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
+def get_fixed_costs_by_lote(start_date: Optional[str] = None,
+                            end_date: Optional[str] = None) -> dict:
+    """Custo fixo por centro de custo (piquete). Chave `None` = geral da
+    fazenda (custo fixo sem `lote_id`)."""
+    sql = "SELECT lote_id, COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE 1=1"
+    args: list = []
+    if start_date:
+        sql += " AND cost_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND cost_date <= ?"; args.append(end_date)
+    sql += " GROUP BY lote_id"
+    with _conn() as con:
+        rows = con.execute(sql, args).fetchall()
+    return {r["lote_id"]: round(float(r["total"]), 2) for r in rows}
+
+
+def get_animal_costs_by_lote(start_date: Optional[str] = None,
+                             end_date: Optional[str] = None) -> dict:
+    """Custo por animal (`animal_costs`) agregado pelo piquete ATUAL do
+    animal — não pelo piquete de quando o custo foi lançado.
+
+    Limitação conhecida (mesma de `app.py::_nutricao_custo_por_piquete`):
+    animal que mudou de piquete no meio do período tem todo o custo
+    histórico atribuído ao piquete de hoje, não ao de quando o custo
+    ocorreu. Rastrear isso exigiria cruzar com `animal_movements` por data,
+    fora do escopo desta integração.
+    """
+    sql = ("SELECT a.lote_id, COALESCE(SUM(c.amount),0) as total "
+           "FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid "
+           "WHERE a.lote_id IS NOT NULL")
+    args: list = []
+    if start_date:
+        sql += " AND c.cost_date >= ?"; args.append(start_date)
+    if end_date:
+        sql += " AND c.cost_date <= ?"; args.append(end_date)
+    sql += " GROUP BY a.lote_id"
+    with _conn() as con:
+        rows = con.execute(sql, args).fetchall()
+    return {r["lote_id"]: round(float(r["total"]), 2) for r in rows}
 
 
 @_writes

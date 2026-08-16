@@ -304,6 +304,7 @@ CREATE TABLE IF NOT EXISTS fixed_costs (
     recurring integer DEFAULT 0,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
+    lote_id text,
     CONSTRAINT fixed_costs_pkey PRIMARY KEY (id)
 );
 
@@ -611,6 +612,7 @@ ALTER TABLE evento_sincronizacao ADD CONSTRAINT evento_sincronizacao_evento_id_f
 ALTER TABLE feeding_checks ADD CONSTRAINT feeding_checks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES feeding_plans(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE feeding_plans ADD CONSTRAINT feeding_plans_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
+ALTER TABLE fixed_costs ADD CONSTRAINT fixed_costs_lote_id_fkey FOREIGN KEY (lote_id) REFERENCES lotes(id);
 ALTER TABLE health_protocols ADD CONSTRAINT health_protocols_insumo_id_fkey FOREIGN KEY (insumo_id) REFERENCES insumos(id);
 ALTER TABLE insumo_transactions ADD CONSTRAINT fk_insumo_trans_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES animals(uuid);
 ALTER TABLE insumo_transactions ADD CONSTRAINT insumo_transactions_compra_id_fkey FOREIGN KEY (compra_id) REFERENCES compras(id);
@@ -657,6 +659,7 @@ CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos USING btree (status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_disp_visual_ativo ON dispositivos USING btree (codigo_visual) WHERE ((codigo_visual IS NOT NULL) AND (status <> ALL (ARRAY['inutilizado'::text, 'devolvido'::text, 'cancelado'::text])));
 CREATE INDEX IF NOT EXISTS idx_evsinc_evento ON evento_sincronizacao USING btree (evento_id, sistema, id DESC);
 CREATE INDEX IF NOT EXISTS idx_evsinc_situacao ON evento_sincronizacao USING btree (situacao);
+CREATE INDEX IF NOT EXISTS idx_fixed_costs_lote ON fixed_costs USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
 CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);
