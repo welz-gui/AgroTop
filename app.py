@@ -48,7 +48,7 @@ from services.arquivo_dispositivos import (
 )
 from services.reconciliacao_dispositivos import reconciliar as dispositivos_reconciliar
 from services.lancamentos import normalizar as lancamentos_normalizar
-from services.caixa import resultado_por_competencia
+from services.caixa import resultado_por_competencia, fluxo_de_caixa, em_aberto as caixa_em_aberto
 from services.dre import montar_dre
 from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca
@@ -2252,6 +2252,105 @@ def _fin_lancamentos(start_iso=None, end_iso=None) -> list[dict]:
                                   compras_insumo=compras_insumo)
 
 
+def _fin_lancamentos_caixa() -> list[dict]:
+    """Lançamentos para o fluxo de caixa (§5, Trilha 3) — diferente de
+    `_fin_lancamentos` (competência), que conta TODA venda/compra no dia do
+    fato: aqui o que tem parcela (`contas_pagar`/`contas_receber`) entra só
+    pela parcela, nunca pelo lançamento de origem, senão duplica.
+
+    Por isso venda a prazo é excluída de `vendas` (o caixa dela mora em
+    `contas_receber`) e compra com nota fiscal é excluída de
+    `compras_insumo` (o caixa dela mora em `contas_pagar` — identificada por
+    `compra_id`, que só existe em compra feita via `repositories.compras.
+    registrar`; entrada avulsa sem nota continua contando direto).
+
+    Sem filtro de período aqui de propósito: `fluxo_de_caixa`/`em_aberto` já
+    filtram por vencimento/pagamento, e `em_aberto` precisa enxergar TODA
+    conta ainda aberta, não só as criadas numa janela.
+    """
+    vendas_a_vista = [v for v in db.get_sales() if not v.get("a_prazo")]
+    custos_fixos = db.get_fixed_costs()
+    custos_animal = db.get_all_animal_costs()
+    compras_insumo = [{
+        "transaction_date": c["transaction_date"],
+        "quantity": c["quantity"],
+        "type": "compra",
+        "insumo": {"name": c["insumo_nome"], "cost_per_unit": c["insumo_cost_per_unit"]},
+    } for c in db.get_insumo_compras() if not c.get("compra_id")]
+    contas_pagar = [c for c in db.compras.listar_contas_pagar() if c["status"] != "cancelado"]
+    contas_receber = [c for c in db.listar_contas_receber() if c["status"] != "cancelado"]
+    return lancamentos_normalizar(
+        vendas=vendas_a_vista, custos_fixos=custos_fixos, custos_animal=custos_animal,
+        compras_insumo=compras_insumo, contas_pagar=contas_pagar,
+        contas_receber=contas_receber)
+
+
+def _fin_fluxo_de_caixa():
+    """Fluxo de caixa realizado e projetado (§5, Trilha 3) —
+    `services.caixa.fluxo_de_caixa`/`em_aberto` (spec 0021), órfãos até
+    aqui: só faziam sentido depois de existir vencimento/pagamento de
+    verdade (contas_pagar/contas_receber, PRs anteriores desta trilha).
+
+    `fluxo_de_caixa` soma `valor` sem olhar o sinal de `tipo` (contrato já
+    testado em `tests/test_caixa.py`, não mexido aqui) — por isso é chamada
+    duas vezes, uma por tipo, e o saldo com sinal certo é montado aqui.
+    """
+    st.subheader("💵 Fluxo de Caixa")
+    st.caption("Realizado = já pago/recebido na janela. Projetado = vencimento na "
+               "janela, ainda em aberto. Só o que tem parcela (contas a pagar/"
+               "receber) pode aparecer como projetado — o resto é sempre à vista.")
+
+    c1, c2 = st.columns(2)
+    with c1: start = st.date_input("De", value=date.today().replace(day=1), key="fx_start")
+    with c2: end = st.date_input("Até", value=date.today()+timedelta(days=60), key="fx_end",
+                                 help="Padrão: hoje + 60 dias, para o projetado aparecer sem "
+                                      "precisar ajustar a data — realizado não passa de hoje "
+                                      "de qualquer forma.")
+
+    lancamentos = _fin_lancamentos_caixa()
+    receitas_l = [l for l in lancamentos if l["tipo"] == "receita"]
+    despesas_l = [l for l in lancamentos if l["tipo"] == "despesa"]
+
+    fx_r = fluxo_de_caixa(receitas_l, start.isoformat(), end.isoformat())
+    fx_d = fluxo_de_caixa(despesas_l, start.isoformat(), end.isoformat())
+
+    realizado = round(fx_r["realizado"] - fx_d["realizado"], 2)
+    projetado = round(fx_r["projetado"] - fx_d["projetado"], 2)
+    saldo_projetado = round(realizado + projetado, 2)
+
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Realizado no período", f"R$ {realizado:,.2f}",
+             help=f"Entrou R$ {fx_r['realizado']:,.2f} · Saiu R$ {fx_d['realizado']:,.2f}")
+    k2.metric("Projetado no período", f"R$ {projetado:,.2f}",
+             help=f"A entrar R$ {fx_r['projetado']:,.2f} · A sair R$ {fx_d['projetado']:,.2f}")
+    k3.metric("Saldo (realizado + projetado)", f"R$ {saldo_projetado:,.2f}",
+             delta=f"{saldo_projetado:+,.2f}")
+
+    st.markdown("---")
+    st.markdown("**📋 Em Aberto**")
+    hoje = date.today().isoformat()
+    abertas = caixa_em_aberto(lancamentos, hoje)
+    if not abertas:
+        st.success("✅ Nenhuma conta em aberto.")
+        return
+
+    vencidas = [a for a in abertas if a["dias_atraso"] > 0]
+    if vencidas:
+        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}** "
+                  "entre as em aberto.")
+
+    TIPO_LABEL = {"receita": "📥 A Receber", "despesa": "📤 A Pagar"}
+    rows = [{
+        "Tipo": TIPO_LABEL.get(a["tipo"], a["tipo"]),
+        "Descrição": a["categoria"],
+        "Vencimento": a["vencimento"],
+        "Valor (R$)": a["valor"],
+        "Situação": f"🔴 Vencida há {a['dias_atraso']}d" if a["dias_atraso"] > 0 else "🟡 Em dia",
+    } for a in abertas]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True,
+        column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+
 def _fin_competencia():
     """Resultado por competência (spec 0034 + `services.caixa`), últimos 6 meses.
 
@@ -2682,15 +2781,16 @@ def page_financeiro():
     st.markdown('<div class="page-title">💰 Financeiro & Mercado</div>', unsafe_allow_html=True)
     animals=db.get_all_animals()
 
-    (t_res,t_dre,t_comp,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
-        ["📒 Resultado","📈 DRE Gerencial","📅 Competência","📋 Contas a Pagar",
-         "💵 Registrar Venda","📥 Contas a Receber","🏷️ Preços/Categoria","☠️ Mortalidade",
-         "📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador","⚖️ Breakeven","🏆 Origem",
-         "🐄 Por Raça","➗ Rateio de Lote"])
+    (t_res,t_dre,t_comp,t_fx,t_pag,t_ven,t_rec,t_pre,t_mort,ft1,ft_fix,ft2,ft3,ft4,ft5,ft6)=st.tabs(
+        ["📒 Resultado","📈 DRE Gerencial","📅 Competência","💵 Fluxo de Caixa",
+         "📋 Contas a Pagar","💵 Registrar Venda","📥 Contas a Receber","🏷️ Preços/Categoria",
+         "☠️ Mortalidade","📊 Custos por Animal","🏢 Custos Fixos","💹 Simulador",
+         "⚖️ Breakeven","🏆 Origem","🐄 Por Raça","➗ Rateio de Lote"])
 
     with t_res: _fin_resultado()
     with t_dre: _fin_dre()
     with t_comp: _fin_competencia()
+    with t_fx: _fin_fluxo_de_caixa()
     with t_pag: _fin_contas_a_pagar()
     with t_ven: _fin_venda(animals)
     with t_rec: _fin_contas_a_receber()

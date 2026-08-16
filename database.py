@@ -503,9 +503,11 @@ def init_db() -> None:
                 operator         TEXT,
                 notes            TEXT,
                 lote_id          TEXT,
+                compra_id        TEXT,   -- anulável; preenchido só quando vem de repositories.compras.registrar
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
-                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
+                FOREIGN KEY (compra_id)   REFERENCES compras(id)
             );
 
             -- Compra de insumos (Trilha 3, migration 0018): cabeçalho da nota.
@@ -643,6 +645,7 @@ def init_db() -> None:
                 profit       REAL DEFAULT 0,
                 operator     TEXT,
                 notes        TEXT,
+                a_prazo      INTEGER NOT NULL DEFAULT 0,  -- 1 = receita rastreada via contas_receber, não aqui
                 created_at   TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
@@ -986,6 +989,11 @@ def _migrate(con) -> None:
     tcols = {r["name"] for r in con.execute("PRAGMA table_info(insumo_transactions)").fetchall()}
     if "lote_id" not in tcols:
         con.execute("ALTER TABLE insumo_transactions ADD COLUMN lote_id TEXT")
+    if "compra_id" not in tcols:
+        # Migration 0020 — liga insumo_transactions à compra que a gerou, para o
+        # fluxo de caixa não contar a mesma compra duas vezes (competência via
+        # insumo_transactions, caixa via contas_pagar).
+        con.execute("ALTER TABLE insumo_transactions ADD COLUMN compra_id TEXT")
     mcols = {r["name"] for r in con.execute("PRAGMA table_info(medications)").fetchall()}
     if "protocol_id" not in mcols:
         con.execute("ALTER TABLE medications ADD COLUMN protocol_id INTEGER")
@@ -993,6 +1001,11 @@ def _migrate(con) -> None:
     if "poligono" not in lcols:
         # Migration 0015 — perímetro do piquete, destrava services.lotacao.sobrepostos().
         con.execute("ALTER TABLE lotes ADD COLUMN poligono TEXT")
+    scols = {r["name"] for r in con.execute("PRAGMA table_info(sales)").fetchall()}
+    if "a_prazo" not in scols:
+        # Migration 0020 — mesma razão: distingue venda cujo caixa é rastreado
+        # via contas_receber (a_prazo=1) da venda à vista (caixa imediato).
+        con.execute("ALTER TABLE sales ADD COLUMN a_prazo INTEGER NOT NULL DEFAULT 0")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 

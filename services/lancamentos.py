@@ -28,6 +28,8 @@ def normalizar(
     custos_fixos: Iterable[dict] = (),
     custos_animal: Iterable[dict] = (),
     compras_insumo: Iterable[dict] = (),
+    contas_pagar: Iterable[dict] = (),
+    contas_receber: Iterable[dict] = (),
 ) -> list[dict]:
     """Normaliza lançamentos heterogêneos para a estrutura esperada por `services.caixa`.
 
@@ -37,6 +39,16 @@ def normalizar(
     - `custos_animal`: linhas de `animal_costs` (usa `cost_date`, `amount`, `cost_type`).
     - `compras_insumo`: linhas de `insumo_transactions` com `type == "compra"`.
        Usa `transaction_date`, `quantity` e `insumo.cost_per_unit`.
+    - `contas_pagar`/`contas_receber`: parcelas (`repositories.compras`/
+       `repositories.financeiro`). Usa `valor`, `vencimento`, `data_pagamento`/
+       `data_recebimento` — `competencia` sai `None` de propósito: a receita/
+       despesa já foi reconhecida no lançamento de origem (a venda, a compra);
+       aqui é só o CRONOGRAMA de caixa dela, não um fato novo. Por isso
+       `resultado_por_competencia` nunca conta estas linhas (ela ignora
+       `competencia=None`) — quem monta a lista para
+       `services.caixa.fluxo_de_caixa`/`em_aberto` precisa excluir da fonte
+       original (`vendas`/`compras_insumo`) o que já tem parcela aqui, senão
+       o mesmo evento é contado duas vezes. Ver `app.py::_fin_lancamentos_caixa`.
 
     Retorna uma lista de dicionários no formato:
       {"tipo": "receita" | "despesa", "valor": float, "categoria": str,
@@ -167,6 +179,34 @@ def normalizar(
                 "competencia": dt_str,
                 "vencimento": dt_str,
                 "pagamento": dt_str,
+            })
+
+    # 5. Contas a pagar -> Despesa (cronograma de caixa; sem competência aqui)
+    if contas_pagar:
+        for cp in contas_pagar:
+            if not isinstance(cp, dict):
+                continue
+            resultado.append({
+                "tipo": "despesa",
+                "valor": _safe_float(cp.get("valor")),
+                "categoria": _safe_str(cp.get("descricao"), "conta a pagar"),
+                "competencia": None,
+                "vencimento": _safe_str(cp.get("vencimento"), "") or None,
+                "pagamento": _safe_str(cp.get("data_pagamento"), "") or None,
+            })
+
+    # 6. Contas a receber -> Receita (cronograma de caixa; sem competência aqui)
+    if contas_receber:
+        for cr in contas_receber:
+            if not isinstance(cr, dict):
+                continue
+            resultado.append({
+                "tipo": "receita",
+                "valor": _safe_float(cr.get("valor")),
+                "categoria": _safe_str(cr.get("descricao"), "conta a receber"),
+                "competencia": None,
+                "vencimento": _safe_str(cr.get("vencimento"), "") or None,
+                "pagamento": _safe_str(cr.get("data_recebimento"), "") or None,
             })
 
     return resultado

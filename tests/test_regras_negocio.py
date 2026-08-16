@@ -400,6 +400,20 @@ class TestVenda(BaseRegras):
         with self.assertRaises(ValueError):
             db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0, a_prazo=True)
 
+    def test_a_prazo_fica_marcado_na_propria_venda(self):
+        """A coluna que o fluxo de caixa usa para não contar a venda duas
+        vezes (uma via `sales`, outra via `contas_receber`)."""
+        venc = (HOJE + timedelta(days=30)).isoformat()
+        a_vista = self.animal("V13", peso=400.0)
+        a_prazo = self.animal("V14", peso=400.0)
+        db.register_sale([a_vista], HOJE.isoformat(), "abate", "kg", 10.0)
+        db.register_sale([a_prazo], HOJE.isoformat(), "abate", "kg", 10.0,
+                         a_prazo=True, num_parcelas=1, primeiro_vencimento=venc)
+
+        vendas = {v["animal_id"]: v["a_prazo"] for v in db.get_sales()}
+        self.assertEqual(vendas["V13"], 0)
+        self.assertEqual(vendas["V14"], 1)
+
     def test_marcar_recebido_fecha_a_conta_e_preserva_as_outras(self):
         a = self.animal("V12", peso=400.0)
         venc = (HOJE + timedelta(days=30)).isoformat()
@@ -498,6 +512,27 @@ class TestEstoque(BaseRegras):
         nomes = {i["name"] for i in db.check_low_stock()}
         self.assertIn("Vacina", nomes)
         self.assertNotIn("Ração", nomes)
+
+    def test_compra_id_distingue_entrada_avulsa_de_compra_com_nota(self):
+        """A coluna que o fluxo de caixa usa para não contar a mesma compra
+        duas vezes (uma via insumo_transactions/competência, outra via
+        contas_pagar/caixa)."""
+        iid = self._insumo()
+        db.add_insumo_entry(iid, 10.0, 2.0)  # avulsa, sem nota
+        r = db.compras.registrar(
+            data_emissao=HOJE.isoformat(), data_recebimento=HOJE.isoformat(),
+            itens=[{"insumo_id": iid, "quantidade": 5.0, "custo_unitario": 3.0}],
+            primeiro_vencimento=(HOJE + timedelta(days=10)).isoformat(),
+            num_parcelas=1)
+        self.assertTrue(r["ok"])
+
+        db.clear_cache()
+        compras = db.get_insumo_compras()
+        com_nota = [c for c in compras if c.get("compra_id")]
+        avulsas = [c for c in compras if not c.get("compra_id")]
+        self.assertEqual(len(com_nota), 1)
+        self.assertEqual(com_nota[0]["compra_id"], r["compra_id"])
+        self.assertEqual(len(avulsas), 1)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

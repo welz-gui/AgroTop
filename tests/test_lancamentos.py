@@ -96,6 +96,54 @@ class TestLancamentos(unittest.TestCase):
         res = normalizar(custos_fixos=custos_fixos)
         self.assertEqual(res[0]["categoria"], "")
 
+    def test_conta_a_pagar_vira_despesa_sem_competencia(self):
+        """Cronograma de caixa, não fato novo: competencia sai None de
+        propósito, para `resultado_por_competencia` nunca contar de novo o
+        que já foi reconhecido no lançamento de origem (a compra)."""
+        contas_pagar = [{
+            "valor": 500.0, "descricao": "Compra NF-1 — Fornecedor X",
+            "vencimento": "2026-09-10", "data_pagamento": None,
+        }]
+        res = normalizar(contas_pagar=contas_pagar)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["tipo"], "despesa")
+        self.assertEqual(res[0]["valor"], 500.0)
+        self.assertEqual(res[0]["categoria"], "Compra NF-1 — Fornecedor X")
+        self.assertIsNone(res[0]["competencia"])
+        self.assertEqual(res[0]["vencimento"], "2026-09-10")
+        self.assertIsNone(res[0]["pagamento"])
+
+    def test_conta_a_pagar_paga_traz_a_data_de_pagamento(self):
+        contas_pagar = [{
+            "valor": 500.0, "descricao": "x", "vencimento": "2026-09-10",
+            "data_pagamento": "2026-09-08",
+        }]
+        res = normalizar(contas_pagar=contas_pagar)
+        self.assertEqual(res[0]["pagamento"], "2026-09-08")
+
+    def test_conta_a_receber_vira_receita_sem_competencia(self):
+        contas_receber = [{
+            "valor": 3000.0, "descricao": "Venda — Frigorífico Y",
+            "vencimento": "2026-10-01", "data_recebimento": None,
+        }]
+        res = normalizar(contas_receber=contas_receber)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["tipo"], "receita")
+        self.assertEqual(res[0]["valor"], 3000.0)
+        self.assertIsNone(res[0]["competencia"])
+        self.assertEqual(res[0]["vencimento"], "2026-10-01")
+        self.assertIsNone(res[0]["pagamento"])
+
+    def test_contas_a_pagar_e_receber_nunca_contam_em_resultado_por_competencia(self):
+        """`competencia=None` faz `_competencia_mes` sempre devolver falso —
+        travando que estas linhas não inflam a Competência/DRE."""
+        lancamentos = normalizar(
+            contas_pagar=[{"valor": 500.0, "vencimento": "2026-09-10"}],
+            contas_receber=[{"valor": 3000.0, "vencimento": "2026-10-01"}])
+        resultado = resultado_por_competencia(lancamentos, 2026, 9)
+        self.assertEqual(resultado["receitas"], 0.0)
+        self.assertEqual(resultado["despesas"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
