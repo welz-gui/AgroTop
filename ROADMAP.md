@@ -481,9 +481,9 @@ ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (�
 (✅ spec 0021/0034), ~~centros de custo~~ 🟢 (2026-08-16), competência × caixa (✅), ~~fluxo
 realizado e projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), custo por kg e por
 arroba (✅ por animal e por piquete — falta por lote de venda) · alimentos e composição,
-dietas multi-ingrediente com vigência, ordem de trato, previsto × realizado, custo por
-cabeça/dia e por arroba produzida (✅ spec 0020/0037 — falta
-vigência/histórico de dieta).
+dietas multi-ingrediente (✅ spec 0020/0037), ~~vigência/histórico de dieta~~ 🟢 (2026-08-17),
+ordem de trato, previsto × realizado, custo por cabeça/dia e por arroba produzida (✅ spec
+0020/0037).
 
 🟢 **"Compra com documento fiscal" fechada em 2026-08-14.** Até aqui só existia entrada avulsa
 de estoque (`add_insumo_entry`): 1 insumo por lançamento, sem fornecedor, sem documento, sem
@@ -556,6 +556,26 @@ histórico inteiro para o piquete de hoje, não tem como ser diferente sem cruza
 preencher": vira "Geral da Fazenda" — custo que não é de nenhum piquete específico (salário do
 gerente, contabilidade, impostos). Nova aba "🏭 Centros de Custo" em Financeiro; o formulário
 de "🏢 Custos Fixos" ganhou o seletor de centro de custo.
+
+🟢 **"Vigência/histórico de dieta" fechada em 2026-08-17.** `feeding_plans` só tinha um
+interruptor `active` — mudar a quantidade de um item de trato não tinha nem função própria
+(a única forma real de "mudar a dieta" era pausar/reativar o mesmo valor, ou apagar e
+recriar, perdendo o que valeu antes). Como "💰 Custo por Piquete" e a DRE dependem do plano
+de trato para custo por cabeça/dia, um ajuste de dieta sem vigência podia ser lido como se
+sempre tivesse valido, inflando ou desinflando retroativamente um custo já calculado —
+mesmo defeito de fundo que `regras.nova_versao()` já resolveu para as regras regulatórias, e
+a solução aqui segue o mesmo princípio: **editar no lugar reescreveria o passado.**
+`nova_versao_feeding_plan` encerra a versão corrente (`vigente_ate`) e cria outra
+(`vigente_de=hoje`); `encerrar_feeding_plan` fecha a vigência sem apagar a linha — por isso
+`delete_feeding_plan` saiu da tela (a função continua existindo, só não é mais oferecida ali:
+apagar destruiria justamente o que esta integração existe para preservar). **Pausar/reativar
+continua exatamente como antes** — não é "mudança de dieta", é o mesmo interruptor de sempre,
+reversível, sem tocar na vigência. Duas colunas novas em `feeding_plans`
+(`vigente_de`/`vigente_ate` — migration 0022); backfill honesto: registros antigos ganham
+`vigente_de` da data de criação, e `vigente_ate` fica `NULL` para todos (inclusive os já
+`active=0`) porque não há como saber quando pararam de valer de verdade — inventar a data
+seria pior que admitir a lacuna. Nova aba "🕘 Histórico da Dieta" em Nutrição, com a linha do
+tempo completa por piquete e produto.
 
 **Cuidados que definem o sucesso**
 - **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —

@@ -4856,11 +4856,17 @@ def page_nutricao():
     lotes = db.get_all_lotes()
     insumos = db.get_all_insumos()
 
-    nt1, nt2, nt3, nt4 = st.tabs(["📋 Planos Ativos", "➕ Novo Item de Trato",
-                                  "✅ Histórico de Checagens", "💰 Custo por Piquete"])
+    nt1, nt2, nt3, nt4, nt5 = st.tabs(["📋 Planos Ativos", "➕ Novo Item de Trato",
+                                       "✅ Histórico de Checagens", "💰 Custo por Piquete",
+                                       "🕘 Histórico da Dieta"])
 
     with nt1:
-        plans = db.get_feeding_plans(active_only=False)
+        plans_e_encerrados = db.get_feeding_plans(active_only=False)
+        # "Planos Ativos" mostra a versão CORRENTE de cada item (vigente,
+        # ativa ou pausada) — versão encerrada (vigente_ate preenchido) só
+        # aparece na aba "🕘 Histórico da Dieta", senão as duas telas ficam
+        # mostrando a mesma coisa com nomes diferentes.
+        plans = [p for p in plans_e_encerrados if p.get("vigente_ate") is None]
         if not plans:
             st.info("Nenhum plano de nutrição cadastrado. Use a aba **Novo Item de Trato**.")
         else:
@@ -4872,23 +4878,56 @@ def page_nutricao():
                 st.markdown(f"#### 🌿 {lid} — {lote_nome}")
                 for p in itens:
                     freq = db.FEEDING_FREQUENCIES.get(p["frequency"], p["frequency"])
-                    ativo = "🟢 ativo" if p["active"] else "⚪ inativo"
+                    ativo = "🟢 ativo" if p["active"] else "⚪ pausado"
                     c1, c2, c3 = st.columns([5,1,1])
                     with c1:
                         st.markdown(
                             f'<div class="hist-item">'
                             f'<b>{p["product_name"]}</b> — {p["quantity"]:.0f} {p["unit"]} '
-                            f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo}'
+                            f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo} '
+                            f'· desde {p["vigente_de"]}'
                             f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
                             f'</div>', unsafe_allow_html=True)
                     with c2:
                         novo = 0 if p["active"] else 1
                         if st.button("Ativar" if not p["active"] else "Pausar",
-                                     key=f"tgl_{p['id']}", use_container_width=True):
+                                     key=f"tgl_{p['id']}", use_container_width=True,
+                                     help="Pausa/retoma esta mesma versão — não conta como mudança "
+                                          "de dieta."):
                             db.set_feeding_plan_active(p["id"], novo); st.rerun()
                     with c3:
-                        if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
-                            db.delete_feeding_plan(p["id"]); st.rerun()
+                        if st.button("🔚 Encerrar", key=f"enc_{p['id']}", use_container_width=True,
+                                     help="Fecha a vigência deste item. Diferente de excluir: o "
+                                          "histórico de custo continua reconstruível."):
+                            db.encerrar_feeding_plan(p["id"]); st.rerun()
+
+                    with st.expander(f"✏️ Nova versão — {p['product_name']}"):
+                        st.caption("Muda a quantidade/frequência a partir de **hoje**, sem apagar "
+                                  "o que valeu até ontem — o custo já calculado com a versão "
+                                  "anterior não muda retroativamente.")
+                        with st.form(f"f_versao_{p['id']}"):
+                            nv1, nv2 = st.columns(2)
+                            with nv1:
+                                nv_qtd = st.number_input("Nova quantidade", min_value=0.0,
+                                    value=float(p["quantity"]), step=1.0, format="%.1f",
+                                    key=f"nv_qtd_{p['id']}")
+                            with nv2:
+                                freqs = list(db.FEEDING_FREQUENCIES.keys())
+                                nv_freq = st.selectbox("Nova frequência", freqs,
+                                    index=freqs.index(p["frequency"]) if p["frequency"] in freqs else 0,
+                                    format_func=lambda f: db.FEEDING_FREQUENCIES[f],
+                                    key=f"nv_freq_{p['id']}")
+                            if st.form_submit_button("💾 Salvar nova versão", type="primary"):
+                                if nv_qtd <= 0:
+                                    st.error("A quantidade deve ser maior que zero.")
+                                else:
+                                    r = db.nova_versao_feeding_plan(
+                                        p["id"], quantity=nv_qtd, frequency=nv_freq)
+                                    if r["ok"]:
+                                        st.success("✅ Nova versão salva.")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ {r['erro']}")
 
     with nt2:
         if not lotes:
@@ -4937,6 +4976,43 @@ def page_nutricao():
 
     with nt4:
         _nutricao_custo_por_piquete(lotes, insumos)
+
+    with nt5:
+        _nutricao_historico_da_dieta(lotes)
+
+
+def _nutricao_historico_da_dieta(lotes):
+    """Linha do tempo da dieta de cada piquete (§5, Trilha 3) —
+    `db.get_feeding_plan_historico`: toda versão de todo item, vigente ou
+    encerrada, mais recente primeiro. É o que 'nova versão'/'encerrar' (aba
+    📋 Planos Ativos) constroem, versão a versão."""
+    st.caption("Toda mudança de quantidade ou frequência vira uma versão nova, nunca uma "
+               "edição por cima da anterior — o custo já calculado com a versão antiga não "
+               "muda quando a dieta muda.")
+
+    if not lotes:
+        st.info("Nenhum piquete cadastrado.")
+        return
+
+    lote_sel = st.selectbox("Piquete", lotes, format_func=lambda l: f"{l['id']} — {l['name']}",
+                            key="hist_dieta_lote")
+    historico = db.get_feeding_plan_historico(lote_sel["id"])
+    if not historico:
+        st.info("Nenhum item de trato foi cadastrado para este piquete ainda.")
+        return
+
+    for produto in sorted({h["product_name"] for h in historico}):
+        versoes = [h for h in historico if h["product_name"] == produto]
+        with st.expander(f"🌿 {produto} — {len(versoes)} "
+                         f"{'versão' if len(versoes)==1 else 'versões'}",
+                         expanded=any(v["vigente_ate"] is None for v in versoes)):
+            rows = [{
+                "Vigência": f"{v['vigente_de']} → {v['vigente_ate'] or 'hoje'}",
+                "Quantidade": f"{v['quantity']:.1f} {v['unit']}",
+                "Frequência": db.FEEDING_FREQUENCIES.get(v["frequency"], v["frequency"]),
+                "Situação": "🟢 Vigente" if v["vigente_ate"] is None else "⚪ Encerrada",
+            } for v in versoes]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def _nutricao_custo_por_piquete(lotes, insumos):
