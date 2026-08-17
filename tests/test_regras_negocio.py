@@ -673,6 +673,59 @@ class TestDietaVigencia(BaseRegras):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+class TestTransferenciaDeAnimais(BaseRegras):
+    """`move_animals_bulk` (§5, Trilha 3) — a versão em lote de `move_animal`:
+    mover um piquete inteiro sem abrir a ficha de cada animal."""
+
+    def setUp(self):
+        super().setUp()
+        con = sqlite3.connect(db.DB_PATH)
+        try:
+            property_id = con.execute(
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()[0]
+            for lid in ("P1", "P2"):
+                con.execute("INSERT INTO lotes (id,name,property_id) VALUES(?,?,?)",
+                           (lid, f"Piquete {lid}", property_id))
+            con.commit()
+        finally:
+            con.close()
+
+    def test_move_varios_animais_de_uma_vez(self):
+        a = self.animal("T1", lote="P1")
+        b = self.animal("T2", lote="P1")
+        r = db.move_animals_bulk([a, b], "P2", HOJE.isoformat())
+        self.assertEqual(sorted(r["movidos"]), ["T1", "T2"])
+        self.assertEqual(r["ja_no_destino"], [])
+        self.assertEqual(r["erros"], [])
+        self.assertEqual(db.get_animal(a)["lote_id"], "P2")
+        self.assertEqual(db.get_animal(b)["lote_id"], "P2")
+
+    def test_animal_ja_no_destino_e_pulado_sem_erro(self):
+        a = self.animal("T3", lote="P2")
+        r = db.move_animals_bulk([a], "P2", HOJE.isoformat())
+        self.assertEqual(r["movidos"], [])
+        self.assertEqual(r["ja_no_destino"], ["T3"])
+
+    def test_animal_inexistente_vira_erro_sem_derrubar_o_resto(self):
+        a = self.animal("T4", lote="P1")
+        r = db.move_animals_bulk([a, "NAO_EXISTE"], "P2", HOJE.isoformat())
+        self.assertEqual(r["movidos"], ["T4"])
+        self.assertEqual(r["erros"], ["NAO_EXISTE"])
+        self.assertEqual(db.get_animal(a)["lote_id"], "P2")
+
+    def test_cada_transferencia_grava_animal_movements(self):
+        a = self.animal("T5", lote="P1")
+        b = self.animal("T6", lote="P1")
+        db.move_animals_bulk([a, b], "P2", HOJE.isoformat(), reason="separação",
+                             operator="op1", notes="rodízio de pasto")
+        movs_a = db.get_movements(a)
+        self.assertEqual(len(movs_a), 1)
+        self.assertEqual(movs_a[0]["from_lote_id"], "P1")
+        self.assertEqual(movs_a[0]["to_lote_id"], "P2")
+        self.assertEqual(movs_a[0]["reason"], "separação")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 class TestEstatisticasDoRebanho(BaseRegras):
     def test_stats_consideram_apenas_ativos(self):
         self.animal("S1", peso=400.0, peso_entrada=300.0, sexo="M")
