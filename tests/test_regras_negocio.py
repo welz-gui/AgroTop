@@ -574,6 +574,105 @@ class TestEstoque(BaseRegras):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+class TestDietaVigencia(BaseRegras):
+    """Nova versão de item de trato (§5, Trilha 3) — mesmo princípio de
+    `regras.nova_versao()`: editar no lugar reescreveria o histórico de
+    custo já calculado com a versão anterior."""
+
+    def _lote(self, lid="P1"):
+        con = sqlite3.connect(db.DB_PATH)
+        try:
+            property_id = con.execute(
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()[0]
+            con.execute("INSERT INTO lotes (id,name,property_id) VALUES(?,?,?)",
+                       (lid, f"Piquete {lid}", property_id))
+            con.commit()
+        finally:
+            con.close()
+        return lid
+
+    def test_novo_item_nasce_com_vigencia_aberta_hoje(self):
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario")
+        p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+        self.assertEqual(p["vigente_de"], HOJE.isoformat())
+        self.assertIsNone(p["vigente_ate"])
+
+    def test_nova_versao_encerra_a_antiga_e_cria_outra(self):
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario")
+        antiga = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+
+        r = db.nova_versao_feeding_plan(antiga["id"], quantity=15.0, frequency="semanal")
+        self.assertTrue(r["ok"])
+
+        historico = db.get_feeding_plan_historico(lid)
+        self.assertEqual(len(historico), 2)
+
+        nova = [h for h in historico if h["vigente_ate"] is None][0]
+        fechada = [h for h in historico if h["vigente_ate"] is not None][0]
+        self.assertEqual(nova["quantity"], 15.0)
+        self.assertEqual(nova["frequency"], "semanal")
+        self.assertEqual(fechada["id"], antiga["id"])
+        self.assertEqual(fechada["quantity"], 10.0, "versão antiga não pode mudar de valor")
+        self.assertEqual(fechada["vigente_ate"],
+                         (HOJE - timedelta(days=1)).isoformat())
+        self.assertEqual(fechada["active"], 0)
+
+    def test_nova_versao_herda_campos_nao_informados(self):
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario", notes="obs original")
+        antiga = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+
+        db.nova_versao_feeding_plan(antiga["id"], quantity=20.0)  # só a quantidade muda
+        nova = [h for h in db.get_feeding_plan_historico(lid) if h["vigente_ate"] is None][0]
+        self.assertEqual(nova["quantity"], 20.0)
+        self.assertEqual(nova["frequency"], "diario")
+        self.assertEqual(nova["notes"], "obs original")
+
+    def test_nao_versiona_item_ja_encerrado(self):
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario")
+        p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+        db.encerrar_feeding_plan(p["id"])
+
+        r = db.nova_versao_feeding_plan(p["id"], quantity=99.0)
+        self.assertFalse(r["ok"])
+
+    def test_encerrar_fecha_vigencia_sem_apagar_a_linha(self):
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario")
+        p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+
+        r = db.encerrar_feeding_plan(p["id"])
+        self.assertTrue(r["ok"])
+
+        historico = db.get_feeding_plan_historico(lid)
+        self.assertEqual(len(historico), 1, "encerrar não pode apagar o registro")
+        self.assertEqual(historico[0]["vigente_ate"], HOJE.isoformat())
+        self.assertEqual(historico[0]["active"], 0)
+
+    def test_encerrar_duas_vezes_falha_na_segunda(self):
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario")
+        p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+        self.assertTrue(db.encerrar_feeding_plan(p["id"])["ok"])
+        self.assertFalse(db.encerrar_feeding_plan(p["id"])["ok"])
+
+    def test_pausar_nao_mexe_na_vigencia(self):
+        """Pausar/reativar (aba Planos Ativos) é reversível e não é 'mudança
+        de dieta' — continua sendo a mesma versão, só liga/desliga."""
+        lid = self._lote()
+        db.add_feeding_plan(lid, "Ração", 10.0, "kg", "diario")
+        p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
+
+        db.set_feeding_plan_active(p["id"], 0)
+        depois = db.get_feeding_plan_historico(lid)[0]
+        self.assertEqual(depois["active"], 0)
+        self.assertIsNone(depois["vigente_ate"], "pausar não é encerrar a vigência")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 class TestEstatisticasDoRebanho(BaseRegras):
     def test_stats_consideram_apenas_ativos(self):
         self.animal("S1", peso=400.0, peso_entrada=300.0, sexo="M")

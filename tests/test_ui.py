@@ -45,6 +45,7 @@ PROVAS = [
     "tests.ui_dre_gerencial_prova", # dre.montar_dre() ligado (Trilha 3: DRE gerencial)
     "tests.ui_fluxo_de_caixa_prova", # caixa.fluxo_de_caixa()/em_aberto() ligados (Trilha 3)
     "tests.ui_centros_de_custo_prova", # centros_de_custo.consolidar() ligado (Trilha 3)
+    "tests.ui_dieta_vigencia_prova", # nova_versao_feeding_plan()/encerrar_feeding_plan() (Trilha 3)
 ]
 
 

@@ -601,6 +601,13 @@ def init_db() -> None:
                 frequency    TEXT NOT NULL DEFAULT 'diario',
                 active       INTEGER DEFAULT 1,
                 notes        TEXT,
+                -- Vigência (Trilha 3, ROADMAP §5): "editar" um item de trato
+                -- não sobrescreve — encerra esta versão (vigente_ate) e cria
+                -- outra (nova_versao_feeding_plan), mesmo princípio de
+                -- regras_regulatorias.nova_versao(). vigente_ate=NULL é a
+                -- versão corrente do item.
+                vigente_de   TEXT,
+                vigente_ate  TEXT,
                 created_at   TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (lote_id)   REFERENCES lotes(id),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id)
@@ -1015,6 +1022,17 @@ def _migrate(con) -> None:
         # Migration 0021 — centro de custo (piquete) do custo fixo; NULL
         # continua válido e significa "geral da fazenda", não "esqueceram".
         con.execute("ALTER TABLE fixed_costs ADD COLUMN lote_id TEXT")
+    fpcols = {r["name"] for r in con.execute("PRAGMA table_info(feeding_plans)").fetchall()}
+    if "vigente_de" not in fpcols:
+        # Migration 0022 — vigência do item de trato. Backfill honesto: só
+        # sabemos a data de criação, não quando uma versão antiga terminou
+        # de valer (essa informação nunca existiu) — por isso vigente_ate
+        # fica NULL para todo registro pré-existente, e `active` continua a
+        # única forma de saber se um item pré-migration está em uso hoje.
+        con.execute("ALTER TABLE feeding_plans ADD COLUMN vigente_de TEXT")
+        con.execute("ALTER TABLE feeding_plans ADD COLUMN vigente_ate TEXT")
+        con.execute(
+            "UPDATE feeding_plans SET vigente_de=date(created_at) WHERE vigente_de IS NULL")
 
 # ─── Seeds ────────────────────────────────────────────────────────────────────
 
@@ -1703,10 +1721,88 @@ def add_feeding_plan(lote_id, product_name, quantity, unit, frequency,
     with _conn() as con:
         con.execute(
             """INSERT INTO feeding_plans
-               (lote_id,product_name,insumo_id,quantity,unit,frequency,notes)
-               VALUES(?,?,?,?,?,?,?)""",
-            (lote_id, product_name, insumo_id or None, quantity, unit, frequency, notes),
+               (lote_id,product_name,insumo_id,quantity,unit,frequency,notes,
+                vigente_de,vigente_ate)
+               VALUES(?,?,?,?,?,?,?,?,NULL)""",
+            (lote_id, product_name, insumo_id or None, quantity, unit, frequency, notes,
+             date.today().isoformat()),
         )
+
+
+@_writes
+def nova_versao_feeding_plan(plan_id: int, *, quantity=None, unit=None,
+                             frequency=None, insumo_id=None, notes=None) -> dict:
+    """Altera um item de trato criando OUTRA VERSÃO — nunca sobrescrevendo.
+
+    Mesmo princípio de `regras.nova_versao()`: editar no lugar reescreveria
+    o histórico de custo. `services.dieta`/`_nutricao_custo_por_piquete`
+    olham o plano de HOJE; se um trato reduzido em março passasse a valer
+    também para fevereiro, o custo por cabeça/dia de fevereiro mudaria
+    silenciosamente num relatório que o produtor já usou para decidir algo.
+
+    Campos não informados (`None`) herdam da versão atual. Só é permitido
+    versionar um item ainda vigente (`vigente_ate IS NULL`).
+    """
+    with _conn() as con:
+        atual = con.execute(
+            "SELECT * FROM feeding_plans WHERE id=?", (plan_id,)).fetchone()
+        if atual is None:
+            return {"ok": False, "erro": "Item de trato não encontrado."}
+        if atual["vigente_ate"] is not None:
+            return {"ok": False, "erro": "Esta versão já está encerrada."}
+
+        hoje = date.today()
+        ontem = (hoje - timedelta(days=1)).isoformat()
+
+        con.execute(
+            "UPDATE feeding_plans SET vigente_ate=?, active=0 WHERE id=?",
+            (ontem, plan_id))
+        con.execute(
+            """INSERT INTO feeding_plans
+               (lote_id,product_name,insumo_id,quantity,unit,frequency,notes,
+                active,vigente_de,vigente_ate)
+               VALUES(?,?,?,?,?,?,?,1,?,NULL)""",
+            (atual["lote_id"], atual["product_name"],
+             insumo_id if insumo_id is not None else atual["insumo_id"],
+             quantity if quantity is not None else atual["quantity"],
+             unit or atual["unit"], frequency or atual["frequency"],
+             notes if notes is not None else atual["notes"],
+             hoje.isoformat()))
+    return {"ok": True}
+
+
+@_writes
+def encerrar_feeding_plan(plan_id: int) -> dict:
+    """Encerra a vigência de um item de trato — o piquete parou de receber
+    isso, ponto final. Diferente de `delete_feeding_plan`: a linha continua
+    existindo, então o custo já calculado com base nela permanece
+    reconstruível. É esta função, não a exclusão, que a tela usa para
+    'remover' um item do plano de trato."""
+    with _conn() as con:
+        atual = con.execute(
+            "SELECT vigente_ate FROM feeding_plans WHERE id=?", (plan_id,)).fetchone()
+        if atual is None:
+            return {"ok": False, "erro": "Item de trato não encontrado."}
+        if atual["vigente_ate"] is not None:
+            return {"ok": False, "erro": "Já está encerrado."}
+        con.execute(
+            "UPDATE feeding_plans SET vigente_ate=?, active=0 WHERE id=?",
+            (date.today().isoformat(), plan_id))
+    return {"ok": True}
+
+
+@_cache
+def get_feeding_plan_historico(lote_id: str) -> list[dict]:
+    """Todas as versões (vigentes e encerradas) dos itens de trato de um
+    piquete, mais recentes primeiro — a linha do tempo completa da dieta."""
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT p.*, i.name as insumo_name FROM feeding_plans p
+               LEFT JOIN insumos i ON i.id=p.insumo_id
+               WHERE p.lote_id=?
+               ORDER BY p.product_name, p.vigente_de DESC, p.id DESC""",
+            (lote_id,)).fetchall()
+    return [dict(r) for r in rows]
 
 
 @_cache

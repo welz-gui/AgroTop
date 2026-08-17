@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-08-16 por tools/dump_schema_nuvem.py
+# Extraído em 2026-08-17 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -219,6 +219,8 @@ feeding_plans.frequency
 feeding_plans.active
 feeding_plans.notes
 feeding_plans.created_at
+feeding_plans.vigente_de
+feeding_plans.vigente_ate
 fixed_costs.id
 fixed_costs.category
 fixed_costs.description
