@@ -99,8 +99,13 @@ class TestTransferenciaDeAnimaisNaTela(unittest.TestCase):
         botao = [b for b in at.button if b.label == "✅ Transferir"][0]
         botao.click()
         at.run()
-        self.assertEqual(list(at.exception), [])
-        self.assertTrue(list(at.success), "não confirmou a transferência")
+        self.assertEqual(list(at.exception), [],
+                         f"app levantou exceção ao transferir: {[e.value for e in at.exception]}")
+        # Não checa `at.success` aqui: o handler faz `st.success(...)` seguido
+        # de `st.rerun()` — o `AppTest` persegue o rerun interno e devolve o
+        # estado da execução final, não da que exibiu a mensagem (mesma
+        # pegadinha já documentada em ui_compra_de_insumo_prova.py). A prova
+        # real é o banco, conferido abaixo.
 
         db.clear_cache()
         ativos_destino = db.get_all_animals(status="ativo", lote_id=destino["id"])
