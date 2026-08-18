@@ -1944,7 +1944,7 @@ def page_lotes():
                    "pode ser piquete redesenhado sem apagar o anterior, ou área "
                    "dividida por engano.")
 
-    lt1,lt2=st.tabs(["📋 Visão Geral","➕ Novo Lote"])
+    lt1,lt2,lt3=st.tabs(["📋 Visão Geral","➕ Novo Lote","🔀 Transferir Animais"])
 
     with lt1:
         for l in lotes:
@@ -2093,6 +2093,68 @@ def page_lotes():
                 else:
                     db.add_lote(lid,name,area,cap,notes_l)
                     st.success(f"✅ Lote {lid} criado!"); st.rerun()
+
+    with lt3:
+        _lotes_transferir_animais(lotes)
+
+
+def _lotes_transferir_animais(lotes):
+    """Transferência de animais entre piquetes, em lote (§5, Trilha 3).
+
+    `db.move_animals_bulk` já existia como transferência 1 a 1
+    (`move_animal`, na ficha do animal); mover um piquete inteiro exigia
+    abrir a ficha de cada animal, um de cada vez. Aqui é a mesma operação
+    para vários animais de uma vez, na mesma transação.
+    """
+    st.subheader("🔀 Transferir Animais entre Piquetes")
+    st.caption("Move várias cabeças de um piquete para outro numa operação só. Para mover "
+               "um animal isolado, a ficha dele (aba Movimentação) continua funcionando "
+               "normalmente.")
+
+    if len(lotes) < 2:
+        st.info("Cadastre ao menos 2 piquetes para transferir animais entre eles.")
+        return
+
+    origem = st.selectbox("Piquete de origem", lotes,
+        format_func=lambda l: f"{l['id']} — {l['name']} ({_plural(l['animal_count'],'animal','animais')})",
+        key="transf_origem")
+    animais_origem = db.get_all_animals(status="ativo", lote_id=origem["id"])
+    if not animais_origem:
+        st.info(f"Nenhum animal ativo em {origem['name']} para transferir.")
+        return
+
+    opts = {f"{a['id']} · {a['breed']} · {a['current_weight']:.0f}kg": a["id"]
+            for a in animais_origem}
+    selecionados = st.multiselect("Animais a transferir", list(opts.keys()),
+        key="transf_animais")
+    sel_ids = [opts[s] for s in selecionados]
+
+    destinos_possiveis = [l for l in lotes if l["id"] != origem["id"]]
+    with st.form("f_transferencia", clear_on_submit=True):
+        tc1, tc2 = st.columns(2)
+        with tc1:
+            destino = st.selectbox("Piquete de destino", destinos_possiveis,
+                format_func=lambda l: f"{l['id']} — {l['name']}")
+            mv_date = st.date_input("Data", value=date.today())
+        with tc2:
+            reason = st.selectbox("Motivo",
+                ["manejo", "pesagem", "tratamento", "separação"])
+        notes_t = st.text_area("Obs.", height=60, placeholder="Opcional")
+
+        if st.form_submit_button("✅ Transferir", type="primary", use_container_width=True):
+            if not sel_ids:
+                st.error("Selecione ao menos um animal.")
+            else:
+                r = db.move_animals_bulk(sel_ids, destino["id"], mv_date.strftime("%Y-%m-%d"),
+                    reason, st.session_state.user["name"], notes_t)
+                if r["movidos"]:
+                    st.success(f"✅ {_plural(len(r['movidos']),'animal transferido','animais transferidos')} "
+                              f"para {destino['name']}.")
+                if r["erros"]:
+                    st.error(f"❌ {_plural(len(r['erros']),'animal não encontrado','animais não encontrados')}: "
+                            f"{', '.join(r['erros'])}")
+                if r["movidos"] or r["erros"]:
+                    st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FINANCEIRO

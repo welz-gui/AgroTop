@@ -476,7 +476,9 @@ Financeiro antes de Nutrição (a dieta precisa apropriar custo).
 
 **Escopo resumido:** ~~pedido e compra, documento fiscal, entrada automática~~ 🟢 (ver abaixo,
 2026-08-14) · lotes de fabricação e validade, custo médio ponderado (✅ desde a etapa anterior,
-ADR 0003), transferências, inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
+ADR 0003), ~~transferências~~ 🟢 (2026-08-17 — ver nota abaixo: era transferência de
+**animais** entre piquetes, não estoque de insumo por local — o insumo continua sendo um
+saldo único da fazenda), inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
 · ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · ~~contas a receber~~ 🟢 (2026-08-15) · caixa
 (✅ spec 0021/0034), ~~centros de custo~~ 🟢 (2026-08-16), competência × caixa (✅), ~~fluxo
 realizado e projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), custo por kg e por
@@ -576,6 +578,19 @@ reversível, sem tocar na vigência. Duas colunas novas em `feeding_plans`
 `active=0`) porque não há como saber quando pararam de valer de verdade — inventar a data
 seria pior que admitir a lacuna. Nova aba "🕘 Histórico da Dieta" em Nutrição, com a linha do
 tempo completa por piquete e produto.
+
+🟢 **"Transferências" fechada em 2026-08-17.** Perguntado ao mantenedor antes de construir
+(R31 — a palavra sozinha era ambígua): o estoque de insumo é um saldo único da fazenda, sem
+noção de "quanto tem em cada piquete" — então "transferência" não podia significar mover
+insumo de um piquete para outro sem antes decidir criar estoque por local (fora do escopo
+pedido). A resposta foi **transferência de animais**: `db.move_animal` (na ficha do animal)
+só movia um de cada vez — mover um piquete inteiro (rodízio de pasto, separação de lote)
+exigia abrir a ficha de cada animal, um a um. `move_animals_bulk`
+(`repositories/animais.py`) é a mesma operação (mesmo `_mover_animal_em` interno, sem
+duplicar a regra — R8) para vários animais na mesma transação; animal que já está no
+destino é pulado sem erro, animal inexistente vira erro isolado sem derrubar o resto da
+lista. Nova aba "🔀 Transferir Animais" em Lotes/Pastagem. Nenhuma tabela ou coluna nova —
+`animal_movements`/`animals.lote_id` já existiam.
 
 **Cuidados que definem o sucesso**
 - **Custo médio ponderado altera custo histórico já lançado.** ✅ Decidido e documentado —

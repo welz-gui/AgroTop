@@ -125,41 +125,76 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                              observacoes=f"brinco {animal_id}")
 
 
+def _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes) -> None:
+    """O que `move_animal` faz, mas recebendo a conexão de fora — para
+    `move_animals_bulk` mover várias cabeças na mesma transação, em vez de
+    uma conexão por animal (R8: mesma regra, um lugar só)."""
+    row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
+    if row is None:
+        raise ValueError(f"Animal {animal_id} não encontrado.")
+    from_lote = row["lote_id"]
+    # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
+    # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
+    destino = con.execute(
+        "SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
+    con.execute(
+        "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) "
+        "WHERE id=?",
+        (to_lote_id, destino["property_id"] if destino else None, animal_id)
+    )
+    con.execute(
+        """INSERT INTO animal_movements
+           (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
+            operator,notes)
+           VALUES(?,?,?,?,?,?,?)""",
+        (row["uuid"], from_lote, to_lote_id,
+         movement_date, reason, operator, notes),
+    )
+    eventos.registrar_em(
+        con, row["uuid"], "mudanca_lote", ocorrido_em=movement_date,
+        usuario_registro=operator, local_interno=to_lote_id,
+        observacoes=f"{from_lote or '—'} → {to_lote_id} ({reason})")
+    con.execute(
+        "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)
+    )
+    if from_lote:
+        con.execute(
+            "UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote)
+        )
+
+
 @_writes
 def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator="", notes="") -> None:
     with _conn() as con:
-        row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
-        if row is None:
-            raise ValueError(f"Animal {animal_id} não encontrado.")
-        from_lote = row["lote_id"]
-        # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
-        # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
-        destino = con.execute(
-            "SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
-        con.execute(
-            "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) "
-            "WHERE id=?",
-            (to_lote_id, destino["property_id"] if destino else None, animal_id)
-        )
-        con.execute(
-            """INSERT INTO animal_movements
-               (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
-                operator,notes)
-               VALUES(?,?,?,?,?,?,?)""",
-            (row["uuid"], from_lote, to_lote_id,
-             movement_date, reason, operator, notes),
-        )
-        eventos.registrar_em(
-            con, row["uuid"], "mudanca_lote", ocorrido_em=movement_date,
-            usuario_registro=operator, local_interno=to_lote_id,
-            observacoes=f"{from_lote or '—'} → {to_lote_id} ({reason})")
-        con.execute(
-            "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)
-        )
-        if from_lote:
-            con.execute(
-                "UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote)
-            )
+        _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes)
+
+
+@_writes
+def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manejo",
+                      operator="", notes="") -> dict:
+    """Transfere várias cabeças para o mesmo piquete de destino, na mesma
+    transação — a versão em lote de `move_animal` (transferência entre
+    piquetes, ROADMAP §5, Trilha 3). Sem isso, mover um piquete inteiro
+    exigia abrir a ficha de cada animal, um de cada vez.
+
+    Animal que já está no piquete de destino é pulado (não é erro: apenas
+    não gera um evento de mudança de piquete que não mudou nada).
+    """
+    movidos, ja_no_destino, erros = [], [], []
+    with _conn() as con:
+        for animal_id in animal_ids:
+            row = con.execute(
+                "SELECT lote_id FROM animals WHERE id=?", (animal_id,)).fetchone()
+            if row is None:
+                erros.append(animal_id)
+                continue
+            if row["lote_id"] == to_lote_id:
+                ja_no_destino.append(animal_id)
+                continue
+            _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason,
+                            operator, notes)
+            movidos.append(animal_id)
+    return {"movidos": movidos, "ja_no_destino": ja_no_destino, "erros": erros}
 
 
 def get_movements(animal_id: str, limit: Optional[int] = None) -> list[dict]:
