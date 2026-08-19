@@ -1,4 +1,4 @@
--- Índices de cobertura para chaves estrangeiras + remoção de índice duplicado
+-- Índices de cobertura para chaves estrangeiras
 -- (manutenção de performance — não ligada a nenhuma trilha do ROADMAP)
 --
 -- CONTEXTO
@@ -30,36 +30,44 @@
 --      `idx_animals_status`/`idx_animals_lote` → praticamente todo filtro
 --      de rebanho ativo do sistema). Nenhum candidato a DROP nesta
 --      categoria — dropar por causa da leitura de hoje reintroduziria o
---      mesmo table scan que a Seção 1 está corrigindo, assim que a fazenda
---      crescer (é literalmente o propósito do sistema: crescer).
+--      mesmo table scan que esta migration está corrigindo, assim que a
+--      fazenda crescer (é literalmente o propósito do sistema: crescer).
 --
 --   3. Índice duplicado — `public.animals` tem `animals_pkey` E
 --      `animals_uuid_key`, os dois `UNIQUE INDEX ... USING btree (uuid)`,
 --      byte-idênticos (`pg_indexes` confere). Resíduo da migration que
---      promoveu `uuid` a chave primária (`animals_uuid_vira_pk`, ADR 0004):
---      a promoção criou a PK sobre a coluna, mas a UNIQUE CONSTRAINT
---      antiga que já existia ali não foi removida. As FKs de outras
---      tabelas que apontam para `animals(uuid)` não dependem do NOME do
---      índice — qualquer índice único na coluna serve — então dropar o
---      duplicado não quebra nada; `animals_pkey` sozinho já cobre.
+--      promoveu `uuid` a chave primária (`animals_uuid_vira_pk`, ADR 0004).
+--      **NÃO removido nesta migration** — tentativa real de `ALTER TABLE
+--      animals DROP CONSTRAINT animals_uuid_key` (aplicada e revertida
+--      atomicamente por erro, nenhum índice desta migration chegou a
+--      ficar de pé) mostrou que 14 FKs de outras tabelas (`weighings`,
+--      `medications`, `animal_costs`, `animal_movements`, `animal_photos`,
+--      `deaths`, `sales`, `insumo_transactions`, `animal_events`,
+--      `partos`, `animals.fk_animals_mae`, `animals.fk_animals_pai`,
+--      `movimentacao_animais`, `dispositivos`) foram criadas amarradas ao
+--      índice específico de `animals_uuid_key`, não "a qualquer índice
+--      único na coluna" como o comentário original desta migration
+--      assumia — Postgres liga cada FK ao índice que existia no momento em
+--      que ela foi criada, e não a redireciona sozinho quando um
+--      equivalente mais novo aparece. Removê-lo exigiria recriar as 14
+--      constraints uma a uma para apontarem para `animals_pkey`; numa
+--      tabela de ~14 linhas, o ganho (uma unique index a menos para
+--      manter) não paga o risco de mexer em 14 FKs de uma vez só. Fica
+--      registrado aqui para quem revisitar: não é um "esquecemos", é uma
+--      troca de custo/benefício, e reavaliar exige o passo de recriação
+--      das FKs, não só o DROP.
 --
--- ADITIVA (Seção 1) / SEGURA (Seção 2)
---   Seção 1 só cria índices — nenhuma tabela, coluna ou linha muda.
---   Seção 2 remove só a UNIQUE CONSTRAINT redundante (`animals_uuid_key`),
---   mantendo a PK (`animals_pkey`) intacta — a tabela permanece com
---   exatamente a mesma garantia de unicidade de antes, com um índice a
---   menos para manter em cada escrita.
+-- ADITIVA
+--   Só cria índices — nenhuma tabela, coluna ou linha muda.
 --
 -- ROLLBACK
---   -- Seção 1: derrubar qualquer índice individual não tem custo de
---   -- integridade, só volta a expor o table scan que ele evita:
+--   -- Derrubar qualquer índice individual não tem custo de integridade,
+--   -- só volta a expor o table scan que ele evita:
 --   DROP INDEX IF EXISTS idx_<nome>;
---   -- Seção 2: recriar a constraint removida, se algum dia for preciso:
---   ALTER TABLE animals ADD CONSTRAINT animals_uuid_key UNIQUE (uuid);
 
 BEGIN;
 
--- ── Seção 1 — CREATE INDEX: 25 chaves estrangeiras sem cobertura ───────────
+-- ── CREATE INDEX: 25 chaves estrangeiras sem cobertura ──────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_animal_events_evento_anterior
     ON public.animal_events (evento_anterior_id);
@@ -153,13 +161,5 @@ CREATE INDEX IF NOT EXISTS idx_produtores_organizacao
 CREATE INDEX IF NOT EXISTS idx_sales_animal_uuid
     ON public.sales (animal_uuid);
     -- Rentabilidade por raça/origem já faz JOIN sales↔animals por uuid.
-
--- ── Seção 2 — DROP seguro: índice duplicado ─────────────────────────────────
-
-ALTER TABLE public.animals DROP CONSTRAINT IF EXISTS animals_uuid_key;
-    -- `animals_pkey` (PRIMARY KEY, também sobre `uuid`) já garante a mesma
-    -- unicidade — os dois índices eram byte-idênticos
-    -- (`pg_indexes.indexdef` conferido). Nenhuma FK depende do nome da
-    -- constraint, só de existir um índice único na coluna referenciada.
 
 COMMIT;
