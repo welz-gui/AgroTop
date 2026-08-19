@@ -1,5 +1,5 @@
 -- Baseline do schema de produção do AgroTop
--- Gerado em 2026-08-17 por tools/dump_schema_nuvem.py
+-- Gerado em 2026-08-19 por tools/dump_schema_nuvem.py
 --
 -- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.
 -- NÃO cobre: políticas de RLS, grants, extensões.
@@ -637,46 +637,71 @@ ALTER TABLE weighings ADD CONSTRAINT fk_weighings_animal_uuid FOREIGN KEY (anima
 
 -- Índices (fora das constraints)
 CREATE INDEX IF NOT EXISTS idx_animal_costs_animal ON animal_costs USING btree (animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_animal_events_evento_anterior ON animal_events USING btree (evento_anterior_id);
 CREATE INDEX IF NOT EXISTS idx_eventos_animal ON animal_events USING btree (animal_uuid, ocorrido_em DESC);
 CREATE INDEX IF NOT EXISTS idx_eventos_sincronizacao ON animal_events USING btree (status_sincronizacao) WHERE (status_sincronizacao <> 'sincronizado'::text);
 CREATE INDEX IF NOT EXISTS idx_eventos_tipo ON animal_events USING btree (tipo, ocorrido_em DESC);
 CREATE INDEX IF NOT EXISTS idx_ident_animal ON animal_identifiers USING btree (animal_uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ident_ativo_unico ON animal_identifiers USING btree (tipo, valor) WHERE (status = 'ativo'::text);
+CREATE INDEX IF NOT EXISTS idx_animal_movements_animal_uuid ON animal_movements USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_animal_photos_animal ON animal_photos USING btree (animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_animals_fornecedor ON animals USING btree (fornecedor_id);
 CREATE INDEX IF NOT EXISTS idx_animals_lote ON animals USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_animals_mae ON animals USING btree (mae_uuid);
+CREATE INDEX IF NOT EXISTS idx_animals_pai ON animals USING btree (pai_uuid);
 CREATE INDEX IF NOT EXISTS idx_animals_parto ON animals USING btree (parto_id);
+CREATE INDEX IF NOT EXISTS idx_animals_prop_nascimento ON animals USING btree (propriedade_nascimento_id);
 CREATE INDEX IF NOT EXISTS idx_animals_property ON animals USING btree (property_id);
 CREATE INDEX IF NOT EXISTS idx_animals_status ON animals USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_audit_entidade ON audit_logs USING btree (entidade, entidade_id);
 CREATE INDEX IF NOT EXISTS idx_audit_ocorrido ON audit_logs USING btree (ocorrido_em DESC);
 CREATE INDEX IF NOT EXISTS idx_compra_itens_compra ON compra_itens USING btree (compra_id);
+CREATE INDEX IF NOT EXISTS idx_compra_itens_insumo ON compra_itens USING btree (insumo_id);
+CREATE INDEX IF NOT EXISTS idx_compras_fornecedor ON compras USING btree (fornecedor_id);
 CREATE INDEX IF NOT EXISTS idx_contas_pagar_compra ON contas_pagar USING btree (compra_id);
 CREATE INDEX IF NOT EXISTS idx_contas_pagar_status ON contas_pagar USING btree (status, vencimento);
 CREATE INDEX IF NOT EXISTS idx_contas_receber_status ON contas_receber USING btree (status, vencimento);
+CREATE INDEX IF NOT EXISTS idx_deaths_animal_uuid ON deaths USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_deaths_date ON deaths USING btree (death_date);
 CREATE INDEX IF NOT EXISTS idx_disp_animal ON dispositivos USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_disp_lote ON dispositivos USING btree (lote);
 CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos USING btree (status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_disp_visual_ativo ON dispositivos USING btree (codigo_visual) WHERE ((codigo_visual IS NOT NULL) AND (status <> ALL (ARRAY['inutilizado'::text, 'devolvido'::text, 'cancelado'::text])));
+CREATE INDEX IF NOT EXISTS idx_dispositivos_propriedade_destino ON dispositivos USING btree (propriedade_destino_id);
+CREATE INDEX IF NOT EXISTS idx_dispositivos_proprietario ON dispositivos USING btree (proprietario_id);
 CREATE INDEX IF NOT EXISTS idx_evsinc_evento ON evento_sincronizacao USING btree (evento_id, sistema, id DESC);
 CREATE INDEX IF NOT EXISTS idx_evsinc_situacao ON evento_sincronizacao USING btree (situacao);
+CREATE INDEX IF NOT EXISTS idx_feeding_checks_plan ON feeding_checks USING btree (plan_id);
+CREATE INDEX IF NOT EXISTS idx_feeding_plans_insumo ON feeding_plans USING btree (insumo_id);
+CREATE INDEX IF NOT EXISTS idx_feeding_plans_lote ON feeding_plans USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_fixed_costs_lote ON fixed_costs USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_health_protocols_insumo ON health_protocols USING btree (insumo_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_lote ON insumo_transactions USING btree (lote_id);
 CREATE INDEX IF NOT EXISTS idx_insumo_trans_reason ON insumo_transactions USING btree (reason);
+CREATE INDEX IF NOT EXISTS idx_insumo_transactions_animal_uuid ON insumo_transactions USING btree (animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_insumo_transactions_compra ON insumo_transactions USING btree (compra_id);
+CREATE INDEX IF NOT EXISTS idx_insumo_transactions_insumo ON insumo_transactions USING btree (insumo_id);
+CREATE INDEX IF NOT EXISTS idx_lotes_property ON lotes USING btree (property_id);
 CREATE INDEX IF NOT EXISTS idx_medications_animal ON medications USING btree (animal_uuid);
+CREATE INDEX IF NOT EXISTS idx_medications_insumo ON medications USING btree (insumo_id);
 CREATE INDEX IF NOT EXISTS idx_medications_protocol ON medications USING btree (protocol_id);
 CREATE INDEX IF NOT EXISTS idx_mov_animal ON movimentacao_animais USING btree (animal_uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mov_animal_unico ON movimentacao_animais USING btree (movimentacao_id, animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_mov_origem ON movimentacoes USING btree (propriedade_origem_id, data_prevista DESC);
 CREATE INDEX IF NOT EXISTS idx_mov_status ON movimentacoes USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_propriedade_destino ON movimentacoes USING btree (propriedade_destino_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_titular_destino ON movimentacoes USING btree (titular_destino_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_titular_origem ON movimentacoes USING btree (titular_origem_id);
 CREATE INDEX IF NOT EXISTS idx_partos_mae ON partos USING btree (mae_uuid, data DESC);
+CREATE INDEX IF NOT EXISTS idx_partos_propriedade ON partos USING btree (propriedade_id);
 CREATE INDEX IF NOT EXISTS idx_pluvio_date ON pluviometria USING btree (read_date);
 CREATE INDEX IF NOT EXISTS idx_pluvio_lote ON pluviometria USING btree (lote_id);
+CREATE INDEX IF NOT EXISTS idx_produtores_organizacao ON produtores USING btree (organizacao_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_codigo_oficial ON properties USING btree (codigo_oficial) WHERE (codigo_oficial IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_properties_produtor ON properties USING btree (produtor_id);
 CREATE INDEX IF NOT EXISTS idx_regras_evento ON regras_regulatorias USING btree (evento_aplicacao, uf);
 CREATE INDEX IF NOT EXISTS idx_regras_vigencia ON regras_regulatorias USING btree (ativa, data_inicial, data_final);
+CREATE INDEX IF NOT EXISTS idx_sales_animal_uuid ON sales USING btree (animal_uuid);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales USING btree (sale_date);
 CREATE INDEX IF NOT EXISTS idx_weighings_animal_date ON weighings USING btree (animal_uuid, weigh_date DESC);
 CREATE INDEX IF NOT EXISTS idx_weighings_date ON weighings USING btree (weigh_date DESC);
