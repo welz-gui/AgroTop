@@ -4,10 +4,11 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-14 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Fase B 100% ligada
-à interface (7 de 7) · 29 de 29 services usados** · fila de specs vazia (0) · Trilha 2 (área
-do piquete) e a primeira fatia da Trilha 3 (compra com nota fiscal → contas a pagar) em
-andamento, sem spec — trabalho direto do mantenedor (schema novo em produção)
+Última atualização: 2026-08-21 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilha 3
+(Estoque → Financeiro → Nutrição) CONCLUÍDA · Fase B 100% ligada à interface (7 de 7) ·
+29 de 29 services usados** · fila de specs vazia (0) · Trilha 2 (geometria dos piquetes,
+parcial) em andamento, sem spec — trabalho direto do mantenedor. Próximos: Trilha 1
+(API + mobile) e o restante da Trilha 2 — ver seção 5
 
 ---
 
@@ -463,7 +464,7 @@ importar no mapa — item 1 — e localização por piquete na previsão do temp
 
 ---
 
-### Trilha 3 — Estoque → Financeiro → Nutrição
+### Trilha 3 — Estoque → Financeiro → Nutrição ✅ CONCLUÍDA em 2026-08-21
 
 **A trilha que gera as features dos modelos preditivos.** Não a deixe morrer: sem ela, a
 Trilha 4 nunca se torna possível.
@@ -481,8 +482,9 @@ ADR 0003), ~~transferências~~ 🟢 (2026-08-17 — ver nota abaixo: era transfe
 saldo único da fazenda), inventário e ajuste, previsão de dias restantes (✅ spec 0018/0039)
 · ~~contas a pagar, parcelas~~ 🟢 (2026-08-14) · ~~contas a receber~~ 🟢 (2026-08-15) · caixa
 (✅ spec 0021/0034), ~~centros de custo~~ 🟢 (2026-08-16), competência × caixa (✅), ~~fluxo
-realizado e projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), custo por kg e por
-arroba (✅ por animal e por piquete — falta por lote de venda) · alimentos e composição,
+realizado e projetado~~ 🟢 (2026-08-16), ~~DRE gerencial~~ 🟢 (2026-08-15), ~~custo por kg e
+por arroba~~ 🟢 (por animal, por piquete e — 2026-08-21 — por lote de venda) · alimentos e
+composição,
 dietas multi-ingrediente (✅ spec 0020/0037), ~~vigência/histórico de dieta~~ 🟢 (2026-08-17),
 ordem de trato, previsto × realizado, custo por cabeça/dia e por arroba produzida (✅ spec
 0020/0037).
@@ -605,9 +607,24 @@ lista. Nova aba "🔀 Transferir Animais" em Lotes/Pastagem. Nenhuma tabela ou c
   `reason='compra'` e nota vinculada — mesma trilha de sempre, agora com fornecedor/documento.)*
 - Mudança de dieta **preserva histórico** (vigência, não sobrescrita).
 
+🟢 **"Custo por lote de venda" fechada em 2026-08-21 — último item da trilha.** Custo por kg
+e por arroba já existia por animal (Financeiro → "Custos por Animal") e por piquete
+(Nutrição, `_nutricao_custo_por_piquete`); faltava por **lote de venda** — o agrupamento que
+`register_sale` já grava em `sales.lot_ref` sempre que a venda sai com mais de um animal, ou
+no modo de precificação "lote" (`ROADMAP`: "resultado por lote fecha com a soma dos
+animais"). `services/rentabilidade.py::por_lote_de_venda` agrupa as linhas de `sales` por
+`lot_ref` — venda avulsa de um único animal (sem `lot_ref`) vira seu próprio lote de 1
+cabeça, nunca se mistura com outra venda avulsa só por as duas terem a chave nula. O custo
+do lote usa `cost_at_sale` (o custo do animal já **congelado** no momento da venda, mesma
+razão pela qual a DRE usa esse campo em vez do custo acumulado corrente) e a conversão para
+arroba usa o rendimento de carcaça **médio** dos animais do lote, mesmo critério do custo
+por piquete. Nenhuma tabela ou coluna nova — `sales.lot_ref`/`cost_at_sale` já existiam;
+`get_sales()` só passou a trazer `animals.carcass_yield` no `JOIN`. Nova seção "📦 Custo por
+Lote de Venda" na aba "💵 Registrar Venda" (Financeiro).
+
 **Pronto quando:** ~~compra atualiza estoque e financeiro na mesma operação~~ 🟢 cumprido
-(2026-08-14, ver acima); resultado por lote fecha com a soma dos animais; DRE e fluxo de caixa
-não se contradizem.
+(2026-08-14); ~~resultado por lote fecha com a soma dos animais~~ 🟢 cumprido (2026-08-21,
+ver acima); DRE e fluxo de caixa não se contradizem — sem achado em contrário até aqui.
 
 ---
 

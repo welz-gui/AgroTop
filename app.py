@@ -52,7 +52,7 @@ from services.caixa import resultado_por_competencia, fluxo_de_caixa, em_aberto 
 from services.dre import montar_dre
 from services.centros_de_custo import consolidar as consolidar_centros_de_custo
 from services.rentabilidade_adaptador import montar_ciclos
-from services.rentabilidade import ranking_por_raca
+from services.rentabilidade import ranking_por_raca, por_lote_de_venda
 from services.completude_adaptador import normalizar_pesagens, janela_do_mes
 from services.completude import avaliar_mes
 from services.conformidade_adaptador import montar_rebanho
@@ -2288,6 +2288,38 @@ def _fin_venda(animals):
                            for col in ["Receita (R$)","Custo (R$)","Lucro (R$)"]})
         tot_luc = sum(v["profit"] for v in vendas)
         st.metric("Lucro/Prejuízo acumulado nas vendas", f"R$ {tot_luc:,.2f}")
+    else:
+        st.info("Nenhuma venda registrada ainda.")
+
+    # Custo por lote de venda (ROADMAP §5, Trilha 3 — último item da trilha:
+    # já existia custo/kg e custo/@ por animal (aba "Custos por Animal") e
+    # por piquete (Nutrição, `_nutricao_custo_por_piquete`); faltava por
+    # LOTE DE VENDA, o agrupamento que `register_sale` já grava em `lot_ref`
+    # sempre que a venda sai com mais de um animal.
+    st.markdown("---")
+    st.markdown("**📦 Custo por Lote de Venda**")
+    st.caption("Cada lote agrupa as vendas que saíram juntas (`lot_ref`) — venda "
+               "avulsa de um único animal vira seu próprio lote de 1 cabeça, nunca "
+               "se mistura com outra venda avulsa.")
+    if vendas:
+        lotes_venda = por_lote_de_venda(vendas)
+        df_l = pd.DataFrame([{
+            "Lote": lv["lot_ref"] or "(venda avulsa)",
+            "Data": lv["sale_date"],
+            "Cabeças": lv["animais"],
+            "Peso Total (kg)": lv["peso_total_kg"],
+            "Custo Total (R$)": lv["custo_total"],
+            "Custo/kg (R$)": lv["custo_por_kg"],
+            "Custo/@ (R$)": lv["custo_por_arroba"],
+            "Lucro (R$)": lv["lucro_total"],
+        } for lv in lotes_venda])
+        st.dataframe(df_l, use_container_width=True, hide_index=True,
+            column_config={
+                "Peso Total (kg)": st.column_config.NumberColumn(format="%.1f"),
+                "Custo Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo/kg (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo/@ (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                "Lucro (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
     else:
         st.info("Nenhuma venda registrada ainda.")
 

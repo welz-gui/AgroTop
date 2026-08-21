@@ -271,8 +271,8 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
 
 def get_sales(start_date: Optional[str] = None,
               end_date: Optional[str] = None) -> list[dict]:
-    sql = ("SELECT s.*, a.id AS animal_id, a.breed, a.sex FROM sales s "
-           "LEFT JOIN animals a ON a.uuid=s.animal_uuid WHERE 1=1")
+    sql = ("SELECT s.*, a.id AS animal_id, a.breed, a.sex, a.carcass_yield "
+           "FROM sales s LEFT JOIN animals a ON a.uuid=s.animal_uuid WHERE 1=1")
     args: list = []
     if start_date:
         sql += " AND s.sale_date >= ?"; args.append(start_date)
