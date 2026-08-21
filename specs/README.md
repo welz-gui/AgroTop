@@ -9,6 +9,15 @@ telas). O que resta de novo (0033–0043) não é mais tela: são as funções-p
 para os 11 services que sobraram órfãos depois da Fase B. Ver *"O que não delegar"*, no
 fim desta página.
 
+**Atualização de 2026-08-21:** Trilha 3 (Estoque → Financeiro → Nutrição) fechada por
+inteiro pelo mantenedor — sem specs novas ali, era trabalho de schema/integração. **Duas
+specs novas** para destravar as trilhas prioritárias que faltam: **0044** (API FastAPI de
+produção, Trilha 1 — a Mobile v1 depende dela e não entra na fila antes de a API estar de
+pé) e **0045** (importar perímetro de arquivo GeoJSON/KML, Trilha 2). O restante de cada
+trilha (Mobile v1, "desenhar no mapa", localização por piquete na previsão do tempo) segue
+fora da fila de propósito — ver a nota em cada item da tabela de trilhas do
+[ROADMAP](../ROADMAP.md) §5 e o registro no `QUADRO.md`.
+
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
 ---
@@ -64,6 +73,8 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0041](0041-calcular-dias-no-lote-para-rateio.md) | Dias no lote p/ `rateio.py` | implementação | baixo | 🟢 disponível |
 | [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) | Ciclos encerrados p/ rentabilidade por raça | implementação | baixo | 🟢 disponível |
 | [0043](0043-montar-lotes-para-lotacao.md) | Lotes p/ `lotacao.py` (sem `sobrepostos`) | implementação | baixo | 🟢 disponível |
+| [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | API FastAPI de produção — autenticação e endpoints essenciais (Trilha 1) | implementação | **médio** | 🟢 disponível |
+| [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
