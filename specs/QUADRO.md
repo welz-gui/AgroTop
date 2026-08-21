@@ -6,8 +6,9 @@ baixo** — a ordem é prioridade, não sugestão.
 **Estado em 2026-08-21:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
 [ROADMAP](../ROADMAP.md) concluídas · 669 testes · 37 tabelas em produção, todas com RLS
 (políticas explícitas de negação para `anon`/`authenticated` desde a migration 0024) ·
-**Fase B 100% ligada à interface** (7 de 7 telas) · **2 specs na fila** — 0044 (API
-FastAPI, Trilha 1) e 0045 (importar perímetro de arquivo, Trilha 2), ver abaixo.
+**Fase B 100% ligada à interface** (7 de 7 telas) · **3 specs na fila** — 0044 (API
+FastAPI, Trilha 1), 0045 (importar perímetro de arquivo, Trilha 2) e 0046 (localização
+por propriedade na previsão do tempo, Trilha 2), ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -111,7 +112,7 @@ FastAPI, Trilha 1) e 0045 (importar perímetro de arquivo, Trilha 2), ver abaixo
 >
 > Entre 2026-08-07 e 2026-08-21 a fila ficou vazia de propósito: a Trilha 3
 > (Estoque → Financeiro → Nutrição) foi fechada por inteiro por trabalho direto do
-> mantenedor (schema, integração — não delegável). Com a Trilha 3 encerrada, **duas
+> mantenedor (schema, integração — não delegável). Com a Trilha 3 encerrada, **três
 > specs novas destravam as trilhas prioritárias que faltam** (ROADMAP §5, Trilha 1 e
 > Trilha 2, ambas prioridade alta do usuário):
 
@@ -119,8 +120,9 @@ FastAPI, Trilha 1) e 0045 (importar perímetro de arquivo, Trilha 2), ver abaixo
 |---|---|---|---|---|---|
 | 1 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
 | 2 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
+| 3 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | 🟢 disponível | | 2026-08-21 |
 
-> **Por que só estas duas, e não o resto das duas trilhas:**
+> **Por que só estas três, e não o resto das duas trilhas:**
 >
 > - **Mobile v1** (Trilha 1, etapa 2) depende da 0044 estar pronta e mesclada — ela
 >   consome os endpoints que a 0044 define. Delegar as duas em paralelo arriscaria o
@@ -136,11 +138,13 @@ FastAPI, Trilha 1) e 0045 (importar perímetro de arquivo, Trilha 2), ver abaixo
 >   (`streamlit-folium` + plugin de desenho) direto em `app.py` — cai em "Ligar
 >   módulo à interface", que é sempre do mantenedor (R31), não uma função pura para
 >   delegar.
-> - **Localização por piquete na previsão do tempo** (Trilha 2, item 3) ainda não
->   tem spec porque o próprio ROADMAP registra que a decisão de UX/custo de API
->   (chamar a previsão do tempo uma vez por piquete tem custo) **ainda está em
->   aberto** — escrever uma spec sobre uma decisão não tomada produziria escopo
->   ambíguo, exatamente o que este quadro existe para evitar.
+>
+> **A 0046 fecha a pendência que faltava decisão** (Trilha 2, item 3): a previsão do
+> tempo passa a ser **por propriedade**, não por piquete — não é limite de custo de
+> API (Open-Meteo é gratuito e sem chave), é que piquetes da mesma propriedade ficam
+> perto demais para uma previsão distinta valer a pena, enquanto propriedades
+> diferentes (um produtor pode ter mais de uma, ADR 0004) podem ficar longe de
+> verdade. Decisão e razão completas na própria spec e no ROADMAP §5.
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >

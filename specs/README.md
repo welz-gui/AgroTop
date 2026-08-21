@@ -10,13 +10,14 @@ para os 11 services que sobraram órfãos depois da Fase B. Ver *"O que não del
 fim desta página.
 
 **Atualização de 2026-08-21:** Trilha 3 (Estoque → Financeiro → Nutrição) fechada por
-inteiro pelo mantenedor — sem specs novas ali, era trabalho de schema/integração. **Duas
+inteiro pelo mantenedor — sem specs novas ali, era trabalho de schema/integração. **Três
 specs novas** para destravar as trilhas prioritárias que faltam: **0044** (API FastAPI de
 produção, Trilha 1 — a Mobile v1 depende dela e não entra na fila antes de a API estar de
-pé) e **0045** (importar perímetro de arquivo GeoJSON/KML, Trilha 2). O restante de cada
-trilha (Mobile v1, "desenhar no mapa", localização por piquete na previsão do tempo) segue
-fora da fila de propósito — ver a nota em cada item da tabela de trilhas do
-[ROADMAP](../ROADMAP.md) §5 e o registro no `QUADRO.md`.
+pé), **0045** (importar perímetro de arquivo GeoJSON/KML, Trilha 2) e **0046** (localização
+por propriedade na previsão do tempo, Trilha 2 — a decisão de UX/API que faltava foi
+tomada: por propriedade, não por piquete; ver a spec e o ROADMAP §5). O restante de cada
+trilha (Mobile v1, "desenhar no mapa") segue fora da fila de propósito — ver a nota em cada
+item da tabela de trilhas do [ROADMAP](../ROADMAP.md) §5 e o registro no `QUADRO.md`.
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -75,6 +76,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0043](0043-montar-lotes-para-lotacao.md) | Lotes p/ `lotacao.py` (sem `sobrepostos`) | implementação | baixo | 🟢 disponível |
 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | API FastAPI de produção — autenticação e endpoints essenciais (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | 🟢 disponível |
+| [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
