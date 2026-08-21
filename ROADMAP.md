@@ -384,8 +384,14 @@ Regras gerais para trabalho paralelo:
    sanidade, consulta de carência, foto, confirmação de trato. **Primeira fatia com spec
    ([0047](specs/0047-mobile-v1a-login-animais-e-pesagem.md), 2026-08-21):** login,
    listar/ver animal, registrar pesagem — só o que a 0044 expõe hoje, travada no contrato
-   dela e testada contra um servidor mock (não espera a 0044 mesclar). Movimentação,
-   sanidade, foto e trato ficam para specs de endpoint futuras, uma de cada vez.
+   dela e testada contra um servidor mock (não espera a 0044 mesclar). **Segunda fatia,
+   movimentação entre lotes, com par de specs escrito em 2026-08-21:**
+   [0048](specs/0048-api-movimentacao-entre-lotes.md) (endpoint, estende `backend_api/` —
+   só pode começar depois da 0044 mesclada, não dá pra mockar código que ainda não existe)
+   e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) (tela, estende
+   `mobile/` — só pode começar depois da 0047 mesclada, mas roda em paralelo com a 0048 via
+   contrato travado + mock, mesmo truque da 0047/0044). Sanidade, foto e trato ficam para
+   specs de endpoint futuras, uma de cada vez, no mesmo padrão.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.

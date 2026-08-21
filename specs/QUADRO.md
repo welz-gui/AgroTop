@@ -6,10 +6,12 @@ baixo** — a ordem é prioridade, não sugestão.
 **Estado em 2026-08-21:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
 [ROADMAP](../ROADMAP.md) concluídas · 669 testes · 37 tabelas em produção, todas com RLS
 (políticas explícitas de negação para `anon`/`authenticated` desde a migration 0024) ·
-**Fase B 100% ligada à interface** (7 de 7 telas) · **4 specs na fila** — 0044 (API
-FastAPI, Trilha 1), 0045 (importar perímetro de arquivo, Trilha 2), 0046 (localização
-por propriedade na previsão do tempo, Trilha 2) e 0047 (Mobile v1a, Trilha 1 — em
-paralelo com a 0044, travada no contrato dela), ver abaixo.
+**Fase B 100% ligada à interface** (7 de 7 telas) · **6 specs na fila, 4 pegáveis agora
+e 2 bloqueadas por sequenciamento** — 0044 (API FastAPI, Trilha 1), 0045 (importar
+perímetro de arquivo, Trilha 2), 0046 (localização por propriedade na previsão do tempo,
+Trilha 2) e 0047 (Mobile v1a, Trilha 1 — em paralelo com a 0044, travada no contrato
+dela) disponíveis já; 0048 (API de movimentação) espera a 0044 mesclar, 0049 (mobile de
+movimentação) espera a 0047 mesclar — ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -123,6 +125,22 @@ paralelo com a 0044, travada no contrato dela), ver abaixo.
 | 2 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
 | 3 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | 🟢 disponível | | 2026-08-21 |
 | 4 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
+
+**Bloqueadas por sequenciamento — não pegue ainda, confira o pré-requisito na própria spec
+antes de reivindicar:**
+
+| Ordem | Spec | Branch | Estado | Quem | Desde |
+|---|---|---|---|---|---|
+| 5 | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
+| 6 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+
+> **Por que 0048/0049 não são mais uma exceção como a 0047 foi:** a 0047 pôde ignorar a
+> ordem porque ela só precisava do **contrato escrito** da 0044, nunca do código dela — as
+> duas vivem em pastas diferentes (`backend_api/` × `mobile/`). A 0048 e a 0049 **estendem
+> código que ainda não existe** (rotas novas no mesmo app FastAPI da 0044; tela nova no
+> mesmo app Flutter da 0047) — não têm como começar antes de esse código existir de
+> verdade. A 0049, uma vez que a 0047 esteja mesclada, volta a poder rodar em paralelo com
+> a 0048 pelo mesmo truque de contrato travado + servidor mock.
 
 > **A 0047 é a exceção à regra "espera a 0044 mesclar" que este quadro registrava antes.**
 > Reconsiderado a pedido do mantenedor (2026-08-21): a 0044 já **define o contrato por
