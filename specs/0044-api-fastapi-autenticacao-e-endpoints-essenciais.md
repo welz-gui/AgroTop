@@ -1,10 +1,39 @@
-# Spec 0044 — API FastAPI de produção: autenticação e endpoints essenciais
+# Spec 0044 — API FastAPI de produção: autenticação e endpoints essenciais (v2)
 
 - **Tipo:** implementação · **Risco:** médio · **Esforço:** 3–5 dias
-- **Branch:** `feat/api-fastapi-producao`
+- **Branch:** `feat/api-fastapi-producao-v2`
 - **Crie:** `backend_api/` (pasta nova) e `tests/test_backend_api.py` — **arquivos novos**
 
 ---
+
+## ⚠️ O defeito da 1ª tentativa (leia antes de começar)
+
+A [PR #169](https://github.com/welz-gui/AgroTop/pull/169) implementou a v1 desta spec e
+foi **fechada sem merge** — o CI encontrou dois defeitos reais, nenhum deles culpa de quem
+implementou: a própria spec tinha lacunas. O trabalho da v1 não foi perdido — está
+preservado na tag `retrabalho/0044-api-fastapi-producao-v1-pr169`, reaproveitável como
+referência.
+
+**Defeito 1 — CI não instala as dependências novas.** `tests/test_backend_api.py` importa
+`fastapi`/`jwt`/etc., mas `.github/workflows/ci.yml` só roda `pip install -r
+requirements.txt` (a raiz) antes da suíte — `backend_api/requirements.txt` nunca é
+instalado, então o teste quebra na importação (`ModuleNotFoundError: No module named
+'jwt'`) antes mesmo de rodar. **Corrigido nesta v2:** você tem autorização explícita para
+adicionar **um passo novo** em `.github/workflows/ci.yml`, logo depois do passo "Instalar
+dependências" existente, instalando também `backend_api/requirements.txt` — e só isso, não
+toque no resto do workflow (a etapa de Postgres, a suíte SQLite/Postgres em si, os nomes de
+step existentes).
+
+**Defeito 2 — tabela nova sem RLS+REVOKE na mesma migration.** `tests/test_rls_nas_migrations.py`
+exige, desde a migration 0013, que toda tabela criada a partir dali ganhe `ENABLE ROW LEVEL
+SECURITY` **e** `REVOKE ALL ... FROM anon, authenticated` **na mesma migration** que a cria
+— não em uma migration separada depois. A v1 criou `api_refresh_tokens` sem o `REVOKE`,
+quebrando o teste. **Modelo a seguir**, olhe
+`supabase/migrations/0018_compras_e_contas_a_pagar.sql`: `ALTER TABLE ... ENABLE ROW LEVEL
+SECURITY;` seguido de um bloco `DO $$ ... EXECUTE 'REVOKE ALL ON ... FROM anon,
+authenticated'; ... END $$;` guardado por `IF EXISTS (SELECT 1 FROM pg_roles WHERE
+rolname = 'anon')` (mesmo guard de portabilidade que a migration 0014 já usa) — copie
+exatamente essa estrutura para a tabela de refresh tokens, se você criar uma.
 
 ## Regra de ouro desta spec
 
@@ -78,6 +107,9 @@ SQL novo.
 - `backend_api/requirements.txt` próprio (FastAPI, `pyjwt`, `slowapi` ou equivalente para
   rate limit, `uvicorn`) — **nunca** no `requirements.txt` da raiz, que alimenta o deploy do
   Streamlit Cloud.
+- **Um passo novo em `.github/workflows/ci.yml`** instalando
+  `backend_api/requirements.txt` (Defeito 1 da v1, ver acima) — só isso, nenhuma outra
+  linha do workflow.
 
 ## Critério de aceite
 
@@ -124,13 +156,23 @@ Use `unittest` + `httpx`/`fastapi.testclient.TestClient` (mesmo padrão de `poc/
 — este projeto usa um único executor de testes (R16), não introduza `pytest`.
 
 O `-t .` não é opcional (R16). No `git diff --stat`, só `backend_api/`,
-`tests/test_backend_api.py`, e — se você criou a tabela de refresh tokens —
-`database.py` (só o `CREATE TABLE`) e o arquivo de migration novo em `supabase/migrations/`.
+`tests/test_backend_api.py`, `.github/workflows/ci.yml` (só a linha nova de instalação), e
+— se você criou a tabela de refresh tokens — `database.py` (só o `CREATE TABLE`) e o
+arquivo de migration novo em `supabase/migrations/`.
+
+**Confirme que o próprio CI da sua PR roda `tests.test_backend_api` de verdade** — abra o
+log do job e confira que os testes da API aparecem na lista, não só que a suíte inteira
+passou. Suíte verde com o arquivo pulado silenciosamente (por `ImportError`, por exemplo)
+não é a mesma coisa que suíte verde com o arquivo executado — foi exatamente essa diferença
+que a v1 não pegou a tempo.
 
 ## Entrega
 
 PR para `main`, pronto para revisão. No corpo:
 - Confirme que os 6 critérios de aceite passam, com a saída colada.
-- Se criou a tabela de refresh tokens, aponte o número da migration e confirme que ela **não
-  foi aplicada** em nenhum banco além do SQLite do worktree.
+- Se criou a tabela de refresh tokens, aponte o número da migration, confirme que ela **não
+  foi aplicada** em nenhum banco além do SQLite do worktree, e cole o trecho da migration
+  com `ENABLE ROW LEVEL SECURITY` + `REVOKE` (Defeito 2 da v1).
+- Cole o link do run de CI da sua própria PR e confirme que `tests.test_backend_api`
+  aparece executado no log, não pulado (Defeito 1 da v1).
 - Diga qual biblioteca de rate limiting escolheu e por quê.

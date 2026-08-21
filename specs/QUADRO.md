@@ -122,7 +122,7 @@ abaixo.
 
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
-| 1 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
+| 1 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🔁v2 ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
 | 2 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
 | 3 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | 🟢 disponível | | 2026-08-21 |
 | 4 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
@@ -356,7 +356,7 @@ referência (golden), ou uma extração dos hex de `app.py` comparada token a to
 
 ### 🔁 O que significa "retrabalho"
 
-Cinco specs passaram por isto até 2026-08-06: a PR foi **fechada com defeito
+Seis specs passaram por isto até agora (a mais recente em 2026-08-21): a PR foi **fechada com defeito
 confirmado**, e a spec voltou à fila com o defeito escrito dentro dela — em vez de
 simplesmente reabrir a tarefa como se fosse nova.
 
@@ -367,6 +367,7 @@ simplesmente reabrir a tarefa como se fosse nova.
 | [0032](0032-mapa-de-conformidade.md) | #89, fechada | §6 marcado ✅ sem ter tela | 🔁 v2 **travou sem commitar nada** (ver abaixo) → retomada → [#96](https://github.com/welz-gui/AgroTop/pull/96), que corrigiu §6 **e achou um segundo erro do mesmo tipo em §11** antes do merge |
 | [0007](0007-hex-para-tokens.md) | #97, fechada | teste media "todo hex tem token", não "hex virou token" — 136 de 198 hex ficaram literais | ✅ [#100](https://github.com/welz-gui/AgroTop/pull/100), corrigido e verificado (33 restantes, todos no bloco CSS estático) |
 | [0039](0039-montar-insumos-para-previsao-de-estoque.md) | #101, fechada | frequência de trato desconhecida (`"quinzenal"`) virava 1×/dia — 14 kg quinzenais lidos como 14 kg/dia | ✅ [#105](https://github.com/welz-gui/AgroTop/pull/105), corrigido e verificado (reprodução exata do defeito testada e confirmada corrigida antes do merge) |
+| [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | #169, fechada | dois defeitos: CI não instalava `backend_api/requirements.txt` (`tests.test_backend_api` quebrava na importação, `ModuleNotFoundError: jwt`); tabela `api_refresh_tokens` sem `REVOKE ... FROM anon` na mesma migration (quebra `test_rls_nas_migrations`) | 🟢 v2 disponível — trabalho da v1 preservado na tag `retrabalho/0044-api-fastapi-producao-v1-pr169` |
 
 **A 0039 tem uma nuance:** parte do defeito era da própria spec — o docstring do contrato
 citava a regra certa, mas nenhum critério de aceite cobrava um teste para ela. Corrigido
