@@ -1,7 +1,7 @@
 import inspect
 import unittest
 
-from services.rentabilidade import ranking_por_raca
+from services.rentabilidade import por_lote_de_venda, ranking_por_raca
 
 
 def _ciclo(
@@ -140,3 +140,79 @@ class TestMargemNegativa(unittest.TestCase):
     def test_lucro_por_arroba_tambem_pode_ser_negativo(self):
         r = ranking_por_raca([self._ciclo("Angus", 8000.0, 6000.0)])
         self.assertLess(r[0]["lucro_por_arroba_produzida"], 0.0)
+
+
+def _venda(id, lot_ref=None, sale_date="2026-01-10", weight_kg=300.0,
+           cost_at_sale=900.0, total_value=1500.0, profit=600.0,
+           carcass_yield=0.52):
+    return {"id": id, "lot_ref": lot_ref, "sale_date": sale_date,
+            "weight_kg": weight_kg, "cost_at_sale": cost_at_sale,
+            "total_value": total_value, "profit": profit,
+            "carcass_yield": carcass_yield}
+
+
+class TestPorLoteDeVenda(unittest.TestCase):
+    def test_assinatura_do_contrato(self):
+        parametros = list(inspect.signature(por_lote_de_venda).parameters)
+
+        self.assertEqual(parametros, ["vendas"])
+
+    def test_lista_vazia(self):
+        self.assertEqual(por_lote_de_venda([]), [])
+
+    def test_agrupa_por_lot_ref_somando_peso_e_custo(self):
+        resultado = por_lote_de_venda([
+            _venda(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0),
+            _venda(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0),
+        ])
+
+        self.assertEqual(len(resultado), 1, "duas vendas do mesmo lote viraram dois lotes")
+        lote = resultado[0]
+        self.assertEqual(lote["lot_ref"], "L1")
+        self.assertEqual(lote["animais"], 2)
+        self.assertEqual(lote["peso_total_kg"], 600.0)
+        self.assertEqual(lote["custo_total"], 1800.0)
+
+    def test_custo_por_kg_e_por_arroba_batem_com_a_conta_manual(self):
+        # peso 600 kg, rendimento 52% -> 312 kg de carcaça -> 20.8 @
+        resultado = por_lote_de_venda([
+            _venda(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0,
+                  carcass_yield=0.52),
+            _venda(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0,
+                  carcass_yield=0.52),
+        ])
+
+        lote = resultado[0]
+        self.assertEqual(lote["custo_por_kg"], 3.0)          # 1800 / 600
+        self.assertAlmostEqual(lote["custo_por_arroba"], 86.54, places=2)  # 1800 / 20.8
+
+    def test_venda_sem_lot_ref_vira_lote_proprio_de_uma_cabeca(self):
+        """Duas vendas avulsas (lot_ref=None) não podem se misturar só por
+        terem a mesma chave nula — cada uma é o seu próprio lote de 1."""
+        resultado = por_lote_de_venda([
+            _venda(1, lot_ref=None, weight_kg=300.0),
+            _venda(2, lot_ref=None, weight_kg=350.0),
+        ])
+
+        self.assertEqual(len(resultado), 2)
+        self.assertTrue(all(r["animais"] == 1 for r in resultado))
+        self.assertTrue(all(r["lot_ref"] is None for r in resultado))
+
+    def test_peso_zero_nao_divide_por_zero(self):
+        resultado = por_lote_de_venda([_venda(1, weight_kg=0.0)])
+
+        lote = resultado[0]
+        self.assertIsNone(lote["custo_por_kg"])
+        self.assertIsNone(lote["custo_por_arroba"])
+
+    def test_rendimento_ausente_usa_o_padrao_do_rebanho(self):
+        """`carcass_yield=None` (join vazio com `animals`) não pode quebrar —
+        cai no padrão de 52% como o resto do sistema (CARCASS_YIELD)."""
+        resultado = por_lote_de_venda([
+            _venda(1, weight_kg=300.0, cost_at_sale=900.0, carcass_yield=None),
+        ])
+
+        lote = resultado[0]
+        self.assertIsNotNone(lote["custo_por_arroba"])
+        # 300 kg * 52% / 15 = 10.4 @ ; 900 / 10.4 = 86.54
+        self.assertAlmostEqual(lote["custo_por_arroba"], 86.54, places=2)
