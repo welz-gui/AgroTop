@@ -3,10 +3,11 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-07:** Fases A e B do [ROADMAP](../ROADMAP.md) concluídas · 595 testes ·
-33 tabelas em produção, todas com RLS · **Fase B 100% ligada à interface** (7 de 7 telas,
-2026-08-04 a 2026-08-05) · **fila vazia** — as 13 specs de adaptador (0033–0043)
-fecharam entre 2026-08-06 e 2026-08-07.
+**Estado em 2026-08-21:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
+[ROADMAP](../ROADMAP.md) concluídas · 669 testes · 37 tabelas em produção, todas com RLS
+(políticas explícitas de negação para `anon`/`authenticated` desde a migration 0024) ·
+**Fase B 100% ligada à interface** (7 de 7 telas) · **2 specs na fila** — 0044 (API
+FastAPI, Trilha 1) e 0045 (importar perímetro de arquivo, Trilha 2), ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -102,13 +103,44 @@ fecharam entre 2026-08-06 e 2026-08-07.
 | — | [0040](0040-agrupar-chuva-e-gmd-por-periodo.md) — correlação chuva × GMD ⚙️ | — | ✅ [#117](https://github.com/welz-gui/AgroTop/pull/117) | | 2026-08-07 |
 | — | [0041](0041-calcular-dias-no-lote-para-rateio.md) — dias no lote p/ rateio de custo ⚙️ | — | ✅ [#118](https://github.com/welz-gui/AgroTop/pull/118) | | 2026-08-07 |
 
-> ### 🎉 Fila zerada em 2026-08-07
+> ### 🎉 Fila zerada em 2026-08-07 — reaberta em 2026-08-21
 >
 > As 13 specs de adaptador (0033–0043) fecharam todas. Os 11 services órfãos do
 > ROADMAP ganharam ponte de entrada — falta só o mantenedor ligar cada um à
 > interface (R31: a spec entrega o módulo puro, a integração é trabalho à parte).
-> Nenhuma tarefa nova está pronta para delegação neste momento; ver ROADMAP §5
-> (trilhas) para o que vem a seguir.
+>
+> Entre 2026-08-07 e 2026-08-21 a fila ficou vazia de propósito: a Trilha 3
+> (Estoque → Financeiro → Nutrição) foi fechada por inteiro por trabalho direto do
+> mantenedor (schema, integração — não delegável). Com a Trilha 3 encerrada, **duas
+> specs novas destravam as trilhas prioritárias que faltam** (ROADMAP §5, Trilha 1 e
+> Trilha 2, ambas prioridade alta do usuário):
+
+| Ordem | Spec | Branch | Estado | Quem | Desde |
+|---|---|---|---|---|---|
+| 1 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
+| 2 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
+
+> **Por que só estas duas, e não o resto das duas trilhas:**
+>
+> - **Mobile v1** (Trilha 1, etapa 2) depende da 0044 estar pronta e mesclada — ela
+>   consome os endpoints que a 0044 define. Delegar as duas em paralelo arriscaria o
+>   agente da mobile inventar um contrato de API que a 0044 depois contradiz. Fica
+>   para depois que a 0044 fechar.
+> - **Bluetooth** (Trilha 1, etapa 4) só é possível com o equipamento físico em
+>   mãos — não delegável por definição.
+> - **Mobile v2 offline** (Trilha 1, etapa 5) é deixada para o fim de propósito
+>   (ROADMAP): idempotência e resolução de conflito são a parte mais cara, e não
+>   deve bloquear o resto.
+> - **"Desenhar no mapa"** (Trilha 2, item 1 — a outra metade do item que a 0045
+>   cobre só a metade "importar arquivo") é integração de componente de UI
+>   (`streamlit-folium` + plugin de desenho) direto em `app.py` — cai em "Ligar
+>   módulo à interface", que é sempre do mantenedor (R31), não uma função pura para
+>   delegar.
+> - **Localização por piquete na previsão do tempo** (Trilha 2, item 3) ainda não
+>   tem spec porque o próprio ROADMAP registra que a decisão de UX/custo de API
+>   (chamar a previsão do tempo uma vez por piquete tem custo) **ainda está em
+>   aberto** — escrever uma spec sobre uma decisão não tomada produziria escopo
+>   ambíguo, exatamente o que este quadro existe para evitar.
 
 > ## 🛑 ANTES DE COMEÇAR: confirme que a tarefa não está feita
 >
