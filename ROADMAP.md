@@ -440,12 +440,16 @@ autoria e horário registrados, e o resultado aparece no web.
    Agora `set_lote_poligono` deriva e grava `area_ha` na mesma escrita quando o polígono é
    válido; apagar o polígono preserva o último valor calculado como fallback manual (regra
    abaixo, intacta).
-3. ⬜ Localização do piquete (centroide) — útil também para a previsão do tempo, hoje presa a
-   uma coordenada única da fazenda (`farm_lat`/`farm_lon`, `page_clima`).
-   `services/geometria.py::centroide` já existe e já é usado para a propriedade
-   (`properties.longitude`/`latitude`); falta usá-lo por piquete e decidir como isso entra
-   na previsão (chamar a API de tempo uma vez por piquete tem custo — decisão de UX/API
-   ainda em aberto, não é só "chamar de novo").
+3. ⬜ **Decidido em 2026-08-21, spec [0046](specs/0046-localizacao-por-propriedade-na-previsao-do-tempo.md)
+   escrita:** a previsão passa a ser por **PROPRIEDADE**, não por piquete. Não é limite de
+   custo de API — `_fetch_forecast` usa Open-Meteo, gratuito e sem chave — é que piquetes da
+   mesma propriedade ficam perto demais para uma previsão distinta valer a pena (ruído, não
+   informação), enquanto propriedades diferentes (ADR 0004: um produtor pode ter mais de
+   uma) podem ficar longe de verdade. `properties.longitude`/`latitude` já são preenchidos
+   por `services/geometria.py::centroide` desde a spec 0015 — falta só usar isso na
+   previsão em vez da única coordenada `farm_lat`/`farm_lon` (`page_clima`, hoje "a mesma
+   previsão vale para todos os piquetes da fazenda"), com fallback para quem ainda não tem
+   coordenada própria de propriedade.
 4. ⬜ Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1, etapa 2).
 
 **Técnico:** **PostGIS 3.3.7 está disponível** no projeto (não instalado, **e não foi
