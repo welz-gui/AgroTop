@@ -390,8 +390,16 @@ Regras gerais para trabalho paralelo:
    só pode começar depois da 0044 mesclada, não dá pra mockar código que ainda não existe)
    e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) (tela, estende
    `mobile/` — só pode começar depois da 0047 mesclada, mas roda em paralelo com a 0048 via
-   contrato travado + mock, mesmo truque da 0047/0044). Sanidade, foto e trato ficam para
-   specs de endpoint futuras, uma de cada vez, no mesmo padrão.
+   contrato travado + mock, mesmo truque da 0047/0044). **Terceira e quarta fatias, também
+   com par de specs escrito em 2026-08-21:** sanidade —
+   [0050](specs/0050-api-sanidade-medicamentos-e-carencia.md) (registrar medicamento e
+   consultar carência; sem baixa de estoque nesta fatia, decisão registrada na spec) e
+   [0051](specs/0051-mobile-tela-de-sanidade.md) — e foto —
+   [0052](specs/0052-api-foto-do-animal.md) (mantém a regra de fotos em `bytea`, sem
+   storage externo) e [0053](specs/0053-mobile-tela-de-foto.md) (a compressão da imagem
+   fica no app, não na API, porque `_compress_image` mora em `app.py`, intocável). As
+   quatro seguem o mesmo padrão de sequenciamento da 0048/0049. Confirmação de trato fica
+   para uma spec de endpoint futura.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.
