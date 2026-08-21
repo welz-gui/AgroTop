@@ -19,6 +19,14 @@ tomada: por propriedade, não por piquete; ver a spec e o ROADMAP §5). O restan
 trilha (Mobile v1, "desenhar no mapa") segue fora da fila de propósito — ver a nota em cada
 item da tabela de trilhas do [ROADMAP](../ROADMAP.md) §5 e o registro no `QUADRO.md`.
 
+**Atualização de 2026-08-21 (mais recente):** fila expandida para 10 specs (0044–0053,
+Trilha 1 e Trilha 2 — detalhe completo no `QUADRO.md`). **0044 teve retrabalho**: a
+[PR #169](https://github.com/welz-gui/AgroTop/pull/169) foi fechada com dois defeitos reais
+(CI não instalava `backend_api/requirements.txt`; tabela nova sem `REVOKE` na mesma
+migration) — corrigidos na spec (agora v2), trabalho da v1 preservado na tag
+`retrabalho/0044-api-fastapi-producao-v1-pr169`. Ver a seção "🔁 O que significa retrabalho"
+no `QUADRO.md`.
+
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
 ---
