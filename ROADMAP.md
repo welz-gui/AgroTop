@@ -373,12 +373,19 @@ Regras gerais para trabalho paralelo:
 **Pré-requisito:** Fase A completa (a API é uma casca sobre `services/`).
 
 **Etapas**
-1. **API (FastAPI)** sobre os `services/`. Aproveitar a *estrutura* de
-   `backend_api/` do branch arquivado: `git show archive/app-mobile-obsoleto:backend_api/main.py`.
-   **Não aproveitar a lógica** — o `terminacao_service.py` de lá duplica regra (R8).
+1. **API (FastAPI)** sobre os `services/`. **Spec [0044](specs/0044-api-fastapi-autenticacao-e-endpoints-essenciais.md)
+   escrita em 2026-08-21** — reaproveita a arquitetura já provada pela PoC 0005
+   (`poc/api/`: Flutter → FastAPI → `services/`/`repositories/`, sem lógica duplicada, R8),
+   fechando as dívidas de produção que a PoC deixou registradas (rate limiting, refresh
+   token revogável). Não confundir com a referência mais antiga a um `backend_api/` de
+   branch arquivado — superada pela PoC 0005.
 2. **Mobile v1 — online.** Flutter. Escopo limitado ao que o web **já faz**: consulta e
    busca de animais, leitura de brinco (QR/câmera nativa), pesagem, movimentação entre lotes,
-   sanidade, consulta de carência, foto, confirmação de trato.
+   sanidade, consulta de carência, foto, confirmação de trato. **Primeira fatia com spec
+   ([0047](specs/0047-mobile-v1a-login-animais-e-pesagem.md), 2026-08-21):** login,
+   listar/ver animal, registrar pesagem — só o que a 0044 expõe hoje, travada no contrato
+   dela e testada contra um servidor mock (não espera a 0044 mesclar). Movimentação,
+   sanidade, foto e trato ficam para specs de endpoint futuras, uma de cada vez.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.

@@ -77,6 +77,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | API FastAPI de produção — autenticação e endpoints essenciais (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | 🟢 disponível |
 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | 🟢 disponível |
+| [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
