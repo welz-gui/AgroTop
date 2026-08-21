@@ -6,12 +6,13 @@ baixo** — a ordem é prioridade, não sugestão.
 **Estado em 2026-08-21:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
 [ROADMAP](../ROADMAP.md) concluídas · 669 testes · 37 tabelas em produção, todas com RLS
 (políticas explícitas de negação para `anon`/`authenticated` desde a migration 0024) ·
-**Fase B 100% ligada à interface** (7 de 7 telas) · **6 specs na fila, 4 pegáveis agora
-e 2 bloqueadas por sequenciamento** — 0044 (API FastAPI, Trilha 1), 0045 (importar
+**Fase B 100% ligada à interface** (7 de 7 telas) · **10 specs na fila, 4 pegáveis agora
+e 6 bloqueadas por sequenciamento** — 0044 (API FastAPI, Trilha 1), 0045 (importar
 perímetro de arquivo, Trilha 2), 0046 (localização por propriedade na previsão do tempo,
 Trilha 2) e 0047 (Mobile v1a, Trilha 1 — em paralelo com a 0044, travada no contrato
-dela) disponíveis já; 0048 (API de movimentação) espera a 0044 mesclar, 0049 (mobile de
-movimentação) espera a 0047 mesclar — ver abaixo.
+dela) disponíveis já; 0048/0050/0052 (endpoints de movimentação, sanidade e foto) esperam
+a 0044 mesclar, 0049/0051/0053 (telas correspondentes) esperam a 0047 mesclar — ver
+abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -133,6 +134,17 @@ antes de reivindicar:**
 |---|---|---|---|---|---|
 | 5 | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
 | 6 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+| 7 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
+| 8 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+| 9 | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
+| 10 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+
+> **0050/0051 e 0052/0053 seguem exatamente o mesmo par de motivos que 0048/0049** —
+> cada endpoint estende o mesmo app FastAPI da 0044, cada tela estende o mesmo app Flutter
+> da 0047. Uma vez a 0044 mesclada, 0048/0050/0052 podem correr em paralelo entre si (são
+> rotas independentes, arquivos diferentes dentro de `backend_api/` — confira
+> `git diff --stat origin/main` antes de abrir o PR pra não pegar rota de outra spec por
+> engano). O mesmo vale para 0049/0051/0053 depois da 0047 mesclar.
 
 > **Por que 0048/0049 não são mais uma exceção como a 0047 foi:** a 0047 pôde ignorar a
 > ordem porque ela só precisava do **contrato escrito** da 0044, nunca do código dela — as
@@ -149,10 +161,11 @@ antes de reivindicar:**
 > local, não contra a 0044 real — os dois lados podem avançar em paralelo sem colidir.
 > Se um agente notar que precisa de algo que a 0044 não define, a spec manda **parar e
 > reportar**, nunca inventar um contrato por conta própria. Continua valendo: a 0047 só
-> cobre o que a 0044 expõe (login + animais + pesagem) — movimentação, sanidade, foto e
-> trato esperam suas próprias specs de endpoint antes de virar tela.
+> cobre o que a 0044 expõe (login + animais + pesagem) — movimentação (0048/0049),
+> sanidade (0050/0051) e foto (0052/0053) já ganharam suas próprias specs de endpoint +
+> tela, no mesmo padrão. Confirmação de trato continua sem spec.
 
-> **Por que só estas quatro, e não o resto das duas trilhas:**
+> **Por que só estas dez, e não o resto das duas trilhas:**
 >
 > - **Bluetooth** (Trilha 1, etapa 4) só é possível com o equipamento físico em
 >   mãos — não delegável por definição.

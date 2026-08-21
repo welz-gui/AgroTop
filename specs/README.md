@@ -80,6 +80,10 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | 🔴 bloqueada (espera 0044 mesclar) |
 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
+| [0050](0050-api-sanidade-medicamentos-e-carencia.md) | API: registrar medicamento e consultar carência (Trilha 1) | implementação | **médio** | 🔴 bloqueada (espera 0044 mesclar) |
+| [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
+| [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | 🔴 bloqueada (espera 0044 mesclar) |
+| [0053](0053-mobile-tela-de-foto.md) | Mobile: tela de foto do animal (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
