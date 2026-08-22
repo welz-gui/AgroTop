@@ -117,8 +117,6 @@ def list_animais(
     return [
         {
             "id": a["id"],
-            "tag": a.get("tag") or a.get("id"),
-            "name": a.get("name"),
             "breed": a.get("breed"),
             "sex": a.get("sex"),
             "birth_date": a.get("birth_date"),
@@ -139,9 +137,14 @@ def get_animal_detail(
     animal_id: str,
     _user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> dict[str, Any]:
-    """Obtém detalhes do animal com métricas zootécnicas calculadas."""
+    """Obtém detalhes do animal com métricas zootécnicas calculadas.
+
+    Não filtra por status: um animal vendido/morto continua tendo ficha
+    consultável (mesmo comportamento do `get_animal()` que o web usa) — só
+    `GET /animais` (a listagem) filtra por status ativo por padrão.
+    """
     item = get_animal(animal_id)
-    if item is None or item.get("status") != "ativo":
+    if item is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Animal não encontrado.",
@@ -152,8 +155,6 @@ def get_animal_detail(
 
     return {
         "id": item["id"],
-        "tag": item.get("tag") or item.get("id"),
-        "name": item.get("name"),
         "breed": item.get("breed"),
         "sex": item.get("sex"),
         "birth_date": item.get("birth_date"),

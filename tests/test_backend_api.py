@@ -214,6 +214,37 @@ class TestProtectedDataEndpoints(BackendApiTestCase):
         res = self.client.get("/animais/999999", headers=headers)
         self.assertEqual(res.status_code, 404)
 
+    def test_get_animal_inativo_continua_consultavel(self):
+        """Animal vendido/morto NÃO pode virar 404 — a ficha continua existindo
+        (mesmo comportamento de `get_animal()`, que o web usa sem filtrar por
+        status). Só a LISTAGEM filtra por ativo por padrão, não a ficha."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animais = get_all_animals()
+        animal_id = animais[0]["id"]
+        with _conn() as con:
+            con.execute("UPDATE animals SET status='vendido' WHERE id=?", (animal_id,))
+
+        res = self.client.get(f"/animais/{animal_id}", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["status"], "vendido")
+
+    def test_campos_de_animal_nao_incluem_tag_nem_name(self):
+        """`animals` não tem coluna `tag` nem `name` — expor esses campos
+        sempre nulos é contrato enganoso. Regressão do que a v2 corrigiu."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        animal_id = get_all_animals()[0]["id"]
+
+        detalhe = self.client.get(f"/animais/{animal_id}", headers=headers).json()
+        lista = self.client.get("/animais", headers=headers).json()[0]
+
+        self.assertNotIn("tag", detalhe)
+        self.assertNotIn("name", detalhe)
+        self.assertNotIn("tag", lista)
+        self.assertNotIn("name", lista)
+
 
 class TestPesagensEndpoint(BackendApiTestCase):
     def test_post_pesagem_cria_registro_atualiza_peso_e_evento(self):

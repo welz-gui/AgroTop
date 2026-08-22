@@ -47,9 +47,10 @@ class LogoutInput(BaseModel):
 class AnimalSummary(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
+    # `animals` não tem coluna `tag` nem `name` (o brinco já É o `id`) — não
+    # exponha campo que sempre vem nulo, é contrato enganoso pra quem
+    # implementar o mobile depois.
     id: Union[str, int]
-    tag: Optional[str] = None
-    name: Optional[str] = None
     breed: Optional[str] = None
     sex: Optional[str] = None
     birth_date: Optional[str] = None
