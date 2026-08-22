@@ -4,16 +4,20 @@ Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de ci
 baixo** — a ordem é prioridade, não sugestão.
 
 **Estado em 2026-08-22:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
-[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045, 0046 e 0048 concluídas** (Trilha 1/2 —
+[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045, 0046, 0047, 0048, 0050 e 0052
+concluídas** (Trilha 1/2 —
 [#174](https://github.com/welz-gui/AgroTop/pull/174),
 [#170](https://github.com/welz-gui/AgroTop/pull/170),
 [#171](https://github.com/welz-gui/AgroTop/pull/171),
-[#177](https://github.com/welz-gui/AgroTop/pull/177)) · 704 testes · 37 tabelas em
-produção, todas com RLS (políticas explícitas de negação para `anon`/`authenticated`
-desde a migration 0024) · **Fase B 100% ligada à interface** (7 de 7 telas) · **6 specs
-na fila, 2 pegáveis agora, 1 em revisão (0047, PR #178) e 3 bloqueadas por
-sequenciamento** — 0050/0052 disponíveis já; 0049/0051/0053 (telas de
-movimentação/sanidade/foto) esperam a 0047 mesclar — ver abaixo.
+[#178](https://github.com/welz-gui/AgroTop/pull/178),
+[#177](https://github.com/welz-gui/AgroTop/pull/177),
+[#181](https://github.com/welz-gui/AgroTop/pull/181),
+[#180](https://github.com/welz-gui/AgroTop/pull/180)) · 716 testes · CI agora cobre
+Flutter também (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da
+0047 abaixo) · 37 tabelas em produção, todas com RLS (políticas explícitas de negação
+para `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
+(7 de 7 telas) · **3 specs na fila, todas pegáveis agora** — 0049, 0051, 0053 (telas de
+movimentação/sanidade/foto), destravadas porque a 0047 já mesclou — ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -126,31 +130,18 @@ movimentação/sanidade/foto) esperam a 0047 mesclar — ver abaixo.
 | — | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🔁v2 ⚠️médio | — | ✅ [#174](https://github.com/welz-gui/AgroTop/pull/174) | | 2026-08-22 |
 | — | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | ✅ [#170](https://github.com/welz-gui/AgroTop/pull/170) | | 2026-08-21 |
 | — | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | ✅ [#171](https://github.com/welz-gui/AgroTop/pull/171) | | 2026-08-21 |
-| — | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | `feat/mobile-v1a-login-animais-pesagem` | 🟡 em revisão — [PR #178](https://github.com/welz-gui/AgroTop/pull/178) aberta | | 2026-08-22 |
+| — | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | ✅ [#178](https://github.com/welz-gui/AgroTop/pull/178) | | 2026-08-22 |
 | — | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | ✅ [#177](https://github.com/welz-gui/AgroTop/pull/177) | | 2026-08-22 |
-| 1 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
-| 2 | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+| — | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | ✅ [#181](https://github.com/welz-gui/AgroTop/pull/181) | | 2026-08-22 |
+| — | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) | | 2026-08-22 |
+| 1 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
+| 2 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
+| 3 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
 
-> **0048/0050/0052 destravadas em 2026-08-22** — a 0044 mesclou (PR #174). São rotas
-> independentes, em arquivos diferentes dentro de `backend_api/`: podem ser pegas em
-> paralelo por agentes diferentes sem colidir — só confira `git diff --stat origin/main`
-> antes de abrir cada PR, pra não incluir arquivo de outra rota por engano. **A 0048 já
-> fechou** ([#177](https://github.com/welz-gui/AgroTop/pull/177)) — 0050/0052 seguem de pé.
-
-**Bloqueadas por sequenciamento — não pegue ainda, confira o pré-requisito na própria spec
-antes de reivindicar:**
-
-| Ordem | Spec | Branch | Estado | Quem | Desde |
-|---|---|---|---|---|---|
-| 3 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-| 4 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-| 5 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-
-> **0049/0051/0053 continuam bloqueadas** — cada uma estende o mesmo app Flutter que a
-> 0047 cria, código que ainda não existe em `main`. Assim que a 0047 mesclar, as três
-> voltam a poder rodar em paralelo entre si pelo mesmo truque de contrato travado +
-> servidor mock (contra 0048/0050/0052 — já mescladas ou já disponíveis, não precisa mais
-> nem de mock pra elas se preferir testar contra a API real).
+> **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
+> mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
+> colidir (telas diferentes) — só confira `git diff --stat origin/main` antes de abrir
+> cada PR.
 
 > **Histórico da 0044 (fechado em 2026-08-22, ✅ PR #174):** teve retrabalho (v1 → v2,
 > ver a tabela "🔁 O que significa retrabalho" abaixo) e, já na v2, um agente tentando a
@@ -159,16 +150,26 @@ antes de reivindicar:**
 > tipos exatos de cada payload antes do merge da PR #174, e a própria revisão da PR achou
 > mais dois problemas reais no código (campos "tag"/"name" fantasmas nunca preenchidos;
 > `GET /animais/{id}` devolvendo 404 pra animal vendido/morto em vez da ficha) — corrigidos
-> no mesmo PR, com testes de regressão. Está tudo em `main` agora; a 0047 pode trocar de
-> testar contra mock para testar contra a API real se preferir, embora não seja obrigada.
+> no mesmo PR, com testes de regressão.
 
-> **Por que 0048/0050/0052 não precisaram da mesma exceção que a 0047 teve:** a 0047 pôde
-> ignorar a ordem porque só precisava do **contrato escrito** da 0044, nunca do código dela
-> — as duas vivem em pastas diferentes (`backend_api/` × `mobile/`). A 0048/0050/0052
-> **estendem código que precisa existir de verdade** (rotas novas no mesmo app FastAPI da
-> 0044) — não tinham como começar antes do merge da PR #174. Agora que ele aconteceu,
-> estão livres. O mesmo raciocínio vale para 0049/0051/0053 e a 0047: seguem bloqueadas
-> até ela mesclar.
+> **A 0047 (PR #178) também expôs um gap de infraestrutura, corrigido antes do merge:**
+> `mobile/build_apk.yml` já existia, bem configurado (Flutter 3.44.8, Java 17, analyze +
+> test + build), mas estava **fora de `.github/workflows/`** — o GitHub Actions nunca o
+> executava — e só disparava em `push`, nunca em `pull_request`. Efeito prático: "CI verde"
+> em toda spec de mobile até aqui provava só que o lado Python não quebrou; nenhum
+> `flutter analyze`/`test`/`build` rodou de verdade em PR nenhuma. Movido para
+> `.github/workflows/mobile-ci.yml`, com `pull_request:` adicionado (path-filtrado em
+> `mobile/**`) e validado dentro da própria PR #178 antes do merge — a partir de agora
+> cobre 0049/0051/0053 automaticamente.
+
+> **0050 (PR #181) teve conflito real de merge com a 0052 (PR #180)** — as duas tocaram os
+> mesmos arquivos (`backend_api/main.py`, `schemas.py`, `tests/test_backend_api.py`), perto
+> uma da outra, por serem rotas irmãs no mesmo módulo. Resolvido por união (as duas eram
+> aditivas, sem sobreposição de lógica), com a suíte completa rodada de novo depois da
+> resolução antes do merge. **Lição para quem pegar specs de endpoint em paralelo depois
+> desta rodada:** duas specs que mexem no mesmo arquivo vão colidir no merge mesmo sem
+> colidir de verdade no código — é esperado, não é sinal de erro; quem mesclar por último
+> precisa rebasear e resolver, união simples na maioria dos casos.
 
 > **Por que só estas dez, e não o resto das duas trilhas:**
 >

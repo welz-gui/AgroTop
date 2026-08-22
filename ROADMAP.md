@@ -382,28 +382,29 @@ Regras gerais para trabalho paralelo:
    limiting, refresh
    token revogável). Não confundir com a referência mais antiga a um `backend_api/` de
    branch arquivado — superada pela PoC 0005.
-2. **Mobile v1 — online.** Flutter. Escopo limitado ao que o web **já faz**: consulta e
+2. 🟡 **Mobile v1 — online.** Flutter. Escopo limitado ao que o web **já faz**: consulta e
    busca de animais, leitura de brinco (QR/câmera nativa), pesagem, movimentação entre lotes,
-   sanidade, consulta de carência, foto, confirmação de trato. **Primeira fatia com spec
-   ([0047](specs/0047-mobile-v1a-login-animais-e-pesagem.md), 2026-08-21):** login,
-   listar/ver animal, registrar pesagem — só o que a 0044 expõe hoje, travada no contrato
-   dela e testada contra um servidor mock (não espera a 0044 mesclar). **Segunda fatia,
-   movimentação entre lotes, com par de specs escrito em 2026-08-21:**
-   [0048](specs/0048-api-movimentacao-entre-lotes.md) (endpoint, estende `backend_api/` —
-   ✅ concluída em 2026-08-22, [PR #177](https://github.com/welz-gui/AgroTop/pull/177):
-   `GET /lotes` + `POST /animais/movimentar`, expondo `move_animals_bulk` sem lógica nova)
-   e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) (tela, estende
-   `mobile/` — só pode começar depois da 0047 mesclada, mas roda em paralelo com a 0048 via
-   contrato travado + mock, mesmo truque da 0047/0044). **Terceira e quarta fatias, também
-   com par de specs escrito em 2026-08-21:** sanidade —
-   [0050](specs/0050-api-sanidade-medicamentos-e-carencia.md) (registrar medicamento e
-   consultar carência; sem baixa de estoque nesta fatia, decisão registrada na spec) e
-   [0051](specs/0051-mobile-tela-de-sanidade.md) — e foto —
-   [0052](specs/0052-api-foto-do-animal.md) (mantém a regra de fotos em `bytea`, sem
-   storage externo) e [0053](specs/0053-mobile-tela-de-foto.md) (a compressão da imagem
-   fica no app, não na API, porque `_compress_image` mora em `app.py`, intocável). As
-   quatro seguem o mesmo padrão de sequenciamento da 0048/0049. Confirmação de trato fica
-   para uma spec de endpoint futura.
+   sanidade, consulta de carência, foto, confirmação de trato. **Primeira fatia — ✅
+   concluída em 2026-08-22, [spec 0047](specs/0047-mobile-v1a-login-animais-e-pesagem.md)/
+   [PR #178](https://github.com/welz-gui/AgroTop/pull/178):** login, listar/buscar animal,
+   ficha, registrar pesagem, refresh automático de token, tema escuro/claro/sistema
+   (`app_colors.dart` gerado de `ui/tema.py`). Testado contra servidor mock, contrato
+   idêntico ao que a 0044 acabou definindo. A revisão desta PR também achou que
+   `mobile/build_apk.yml` nunca tinha rodado de verdade (fora de
+   `.github/workflows/`, sem gatilho de PR) — corrigido antes do merge, ver
+   `specs/QUADRO.md`. **Segunda fatia — ✅ concluída em 2026-08-22:**
+   [0048](specs/0048-api-movimentacao-entre-lotes.md)/[PR #177](https://github.com/welz-gui/AgroTop/pull/177)
+   (`GET /lotes` + `POST /animais/movimentar`, expondo `move_animals_bulk` sem lógica nova)
+   e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) — **disponível para
+   implementar** (a API já existe; a tela ainda não). **Terceira fatia (sanidade) — API ✅
+   concluída** ([0050](specs/0050-api-sanidade-medicamentos-e-carencia.md)/[PR #181](https://github.com/welz-gui/AgroTop/pull/181),
+   sem baixa de estoque nesta fatia, decisão registrada na spec), tela
+   ([0051](specs/0051-mobile-tela-de-sanidade.md)) **disponível**. **Quarta fatia (foto) —
+   API ✅ concluída** ([0052](specs/0052-api-foto-do-animal.md)/[PR #180](https://github.com/welz-gui/AgroTop/pull/180),
+   mantém fotos em `bytea`, sem storage externo), tela
+   ([0053](specs/0053-mobile-tela-de-foto.md), compressão no app porque
+   `_compress_image` mora em `app.py`, intocável) **disponível**. Confirmação de trato
+   fica para uma spec de endpoint futura.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.
