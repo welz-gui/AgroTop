@@ -373,10 +373,13 @@ Regras gerais para trabalho paralelo:
 **Pré-requisito:** Fase A completa (a API é uma casca sobre `services/`).
 
 **Etapas**
-1. **API (FastAPI)** sobre os `services/`. **Spec [0044](specs/0044-api-fastapi-autenticacao-e-endpoints-essenciais.md)
-   escrita em 2026-08-21** — reaproveita a arquitetura já provada pela PoC 0005
-   (`poc/api/`: Flutter → FastAPI → `services/`/`repositories/`, sem lógica duplicada, R8),
-   fechando as dívidas de produção que a PoC deixou registradas (rate limiting, refresh
+1. ✅ **API (FastAPI) sobre os `services/` — concluída em 2026-08-22.**
+   [Spec 0044](specs/0044-api-fastapi-autenticacao-e-endpoints-essenciais.md)
+   ([PR #174](https://github.com/welz-gui/AgroTop/pull/174), retrabalho: v1 fechada sem
+   merge por dois defeitos de CI/RLS, corrigidos na v2) — reaproveita a arquitetura já
+   provada pela PoC 0005 (`poc/api/`: Flutter → FastAPI → `services/`/`repositories/`, sem
+   lógica duplicada, R8), fechando as dívidas de produção que a PoC deixou registradas (rate
+   limiting, refresh
    token revogável). Não confundir com a referência mais antiga a um `backend_api/` de
    branch arquivado — superada pela PoC 0005.
 2. **Mobile v1 — online.** Flutter. Escopo limitado ao que o web **já faz**: consulta e
@@ -387,7 +390,7 @@ Regras gerais para trabalho paralelo:
    dela e testada contra um servidor mock (não espera a 0044 mesclar). **Segunda fatia,
    movimentação entre lotes, com par de specs escrito em 2026-08-21:**
    [0048](specs/0048-api-movimentacao-entre-lotes.md) (endpoint, estende `backend_api/` —
-   só pode começar depois da 0044 mesclada, não dá pra mockar código que ainda não existe)
+   destravada em 2026-08-22, a 0044 já mesclou)
    e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) (tela, estende
    `mobile/` — só pode começar depois da 0047 mesclada, mas roda em paralelo com a 0048 via
    contrato travado + mock, mesmo truque da 0047/0044). **Terceira e quarta fatias, também
