@@ -67,7 +67,7 @@ from repositories.sanidade import (
     get_withdrawal_end_batch,  # noqa: F401
     _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
     get_protocols, add_protocol, set_protocol_active, delete_protocol,
-    _protocol_pending, get_protocol_plan, apply_protocol_campaign, _dose_for_animal,
+    _protocol_pending, get_protocol_plan, apply_protocol_campaign, dose_for_animal,
 )
 from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,

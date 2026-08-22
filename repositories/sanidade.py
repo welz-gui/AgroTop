@@ -201,7 +201,7 @@ def get_protocol_plan(protocol: dict, ref_date: Optional[date] = None) -> dict:
         elegiveis.append(a)
         if _protocol_pending(protocol, a, ref):
             pendentes.append(a)
-    doses = round(sum(_dose_for_animal(protocol, a) for a in pendentes), 2)
+    doses = round(sum(dose_for_animal(protocol, a) for a in pendentes), 2)
     stock = float(protocol.get("current_stock") or 0)
     return {
         "n_eligible": len(elegiveis),
@@ -227,7 +227,7 @@ def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "")
     plan = get_protocol_plan(prot, ref)
     n = 0
     for a in plan["pending"]:
-        dose = _dose_for_animal(prot, a)
+        dose = dose_for_animal(prot, a)
         add_medication(a["id"], prot["name"], dose, prot["dose_unit"],
                        prot.get("route", "Subcutânea"), prot.get("withdrawal_days", 0),
                        med_date, applied_by=operator, insumo_id=prot.get("insumo_id"),
@@ -236,7 +236,7 @@ def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "")
     return {"n": n, "doses": plan["doses_needed"]}
 
 
-def _dose_for_animal(protocol: dict, animal: dict) -> float:
+def dose_for_animal(protocol: dict, animal: dict) -> float:
     """Dose para um animal: fixa, ou proporcional ao peso (dose_ref_kg > 0)."""
     ref = protocol.get("dose_ref_kg") or 0
     if ref > 0:
