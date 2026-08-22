@@ -1,10 +1,11 @@
-"""Testes da API Backend em FastAPI (Spec 0044 v2 + Spec 0048).
+"""Testes da API Backend em FastAPI (Spec 0044 v2 + Spec 0048 + Spec 0052).
 
 Valida autenticação JWT, rate limiting, refresh tokens revogáveis,
-endpoints essenciais de dados, registro de pesagens e movimentação entre piquetes.
+endpoints essenciais de dados, registro de pesagens, movimentação entre piquetes e fotos dos animais.
 """
 
 import inspect
+import io
 import os
 import tempfile
 import unittest
@@ -464,6 +465,148 @@ class TestMovimentacaoEndpoint(BackendApiTestCase):
             self.assertNotEqual(movement["operator"], "hacker_fake_operator")
 
 
+class TestFotosEndpoint(BackendApiTestCase):
+    def test_post_foto_sem_authorization_retorna_401(self):
+        """Critério 1 (Spec 0052): POST /animais/{id}/fotos sem Authorization devolve 401."""
+        res = self.client.post(
+            "/animais/1/fotos",
+            files={"arquivo": ("foto.jpg", b"fake-jpg-content", "image/jpeg")},
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_upload_foto_valida_grava_e_retorna_bytes_iguais(self):
+        """Critério 2 (Spec 0052): Upload de imagem válida grava na tabela animal_photos e
+        GET /fotos/{id} devolve exatamente os mesmos bytes enviados."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animal_id = get_all_animals()[0]["id"]
+        foto_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00test-image-content"
+
+        res = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("boi.jpg", foto_bytes, "image/jpeg")},
+            data={"taken_date": "2026-08-22"},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 201)
+        data = res.json()
+        self.assertIn("id", data)
+        photo_id = data["id"]
+
+        # 1. Verifica no banco que foi gravado
+        with _conn() as con:
+            row = con.execute("SELECT * FROM animal_photos WHERE id=?", (photo_id,)).fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(bytes(row["image"]), foto_bytes)
+            self.assertEqual(row["mime"], "image/jpeg")
+            self.assertEqual(row["taken_date"], "2026-08-22")
+            self.assertEqual(row["operator"], "testuser")
+
+        # 2. Verifica que GET /fotos/{id} devolve os mesmos bytes byte-a-byte
+        get_res = self.client.get(f"/fotos/{photo_id}", headers=headers)
+        self.assertEqual(get_res.status_code, 200)
+        self.assertEqual(get_res.headers["content-type"], "image/jpeg")
+        self.assertEqual(get_res.content, foto_bytes)
+
+    def test_upload_foto_acima_5mb_retorna_413_sem_orfaos(self):
+        """Critério 3 (Spec 0052): Upload acima de 5 MB devolve 413 antes de gravar qualquer coisa."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animal_id = get_all_animals()[0]["id"]
+        grande_bytes = b"X" * (5 * 1024 * 1024 + 10)  # > 5 MB
+
+        with _conn() as con:
+            qtd_antes = con.execute("SELECT COUNT(*) FROM animal_photos").fetchone()[0]
+
+        res = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("foto_grande.jpg", grande_bytes, "image/jpeg")},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 413)
+
+        with _conn() as con:
+            qtd_depois = con.execute("SELECT COUNT(*) FROM animal_photos").fetchone()[0]
+        self.assertEqual(qtd_depois, qtd_antes, "Não pode gravar linha órfã no banco.")
+
+    def test_upload_tipo_nao_aceito_retorna_415(self):
+        """Critério 4 (Spec 0052): Upload de tipo não aceito devolve 415."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animal_id = get_all_animals()[0]["id"]
+        pdf_bytes = b"%PDF-1.4..."
+
+        res = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("documento.pdf", pdf_bytes, "application/pdf")},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 415)
+
+    def test_get_animais_fotos_nao_inclui_bytes_no_json(self):
+        """Critério 5 (Spec 0052): GET /animais/{id}/fotos nunca inclui os bytes da imagem no JSON."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animal_id = get_all_animals()[0]["id"]
+        foto_bytes = b"imagem_teste_bytes_12345"
+
+        # Cadastra foto
+        post_res = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("foto.png", foto_bytes, "image/png")},
+            headers=headers,
+        )
+        self.assertEqual(post_res.status_code, 201)
+
+        # Consulta lista de fotos
+        res = self.client.get(f"/animais/{animal_id}/fotos", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        items = res.json()
+        self.assertIsInstance(items, list)
+        self.assertTrue(len(items) > 0)
+
+        for item in items:
+            self.assertIn("id", item)
+            self.assertIn("taken_date", item)
+            self.assertIn("mime", item)
+            self.assertNotIn("image", item)
+            self.assertNotIn("bytes", item)
+
+    def test_get_foto_outro_animal_e_inexistente(self):
+        """Critério 6 (Spec 0052): GET /fotos/{id} inexistente devolve 404, nunca 500."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        res = self.client.get("/fotos/999999", headers=headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_operator_gravado_vem_do_token(self):
+        """Critério 7 (Spec 0052): operator gravado em animal_photos é o usuário do token."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animal_id = get_all_animals()[0]["id"]
+        foto_bytes = b"foto_valida"
+
+        res = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("teste.jpg", foto_bytes, "image/jpeg")},
+            data={"operator": "hacker_fake"},  # Se tentar injetar operator, deve ser ignorado
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 201)
+        photo_id = res.json()["id"]
+
+        with _conn() as con:
+            row = con.execute("SELECT operator FROM animal_photos WHERE id=?", (photo_id,)).fetchone()
+            self.assertEqual(row["operator"], "testuser")
+            self.assertNotEqual(row["operator"], "hacker_fake")
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
@@ -472,9 +615,16 @@ class TestSecurityAndIsolation(unittest.TestCase):
                 get_secret_key()
 
     def test_sem_duplicacao_de_logica_de_negocio(self):
-        """Critério 6 (0044) e Critério 7 (0048): Nenhum cálculo de negócio ou SQL duplicado dentro de backend_api/."""
+        """Critério 6 (0044), Critério 7 (0048), Critério 8 (0052): Nenhum cálculo de negócio ou SQL duplicado dentro de backend_api/."""
         # backend_api reutiliza por import, não define novas fórmulas de zootecnia
-        forbidden_funcs = ["calculate_gmd", "calculate_gmd_total", "estimate_weight_by_measurement", "register_sale", "move_animals_bulk"]
+        forbidden_funcs = [
+            "calculate_gmd",
+            "calculate_gmd_total",
+            "estimate_weight_by_measurement",
+            "register_sale",
+            "move_animals_bulk",
+            "add_photo",
+        ]
         defined_funcs = [name for name, _ in inspect.getmembers(main_mod, inspect.isfunction)
                          if inspect.getmodule(_) == main_mod]
 
