@@ -123,3 +123,43 @@ class PhotoSummary(BaseModel):
 
 class PhotoUploadOutput(BaseModel):
     id: int
+
+
+class ProtocoloOutput(BaseModel):
+    id: int
+    nome: str
+    via: str
+    carencia_dias: int
+    unidade_dose: str
+
+
+class MedicamentoInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    medicamento: str
+    dose: float
+    unidade: str
+    via: str
+    carencia_dias: int
+    data: str
+    protocolo_id: Optional[int] = None
+    notas: Optional[str] = None
+
+
+class AplicacaoMedicamentoOutput(BaseModel):
+    medicamento: str
+    dose: float
+    unidade: str
+    via: str
+    carencia_dias: int
+    data: str
+    protocolo_id: Optional[int] = None
+
+
+class MedicamentosOutput(BaseModel):
+    carencia_ate: Optional[str] = None
+    aplicacoes: list[AplicacaoMedicamentoOutput]
+
+
+class CarenciaOutput(BaseModel):
+    carencia_ate: Optional[str] = None

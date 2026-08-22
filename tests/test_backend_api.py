@@ -1,7 +1,8 @@
-"""Testes da API Backend em FastAPI (Spec 0044 v2 + Spec 0048 + Spec 0052).
+"""Testes da API Backend em FastAPI (Spec 0044 v2 + Spec 0048 + Spec 0050 + Spec 0052).
 
 Valida autenticação JWT, rate limiting, refresh tokens revogáveis,
-endpoints essenciais de dados, registro de pesagens, movimentação entre piquetes e fotos dos animais.
+endpoints essenciais de dados, registro de pesagens, movimentação entre piquetes,
+sanidade/carência e fotos dos animais.
 """
 
 import inspect
@@ -31,6 +32,7 @@ from backend_api.main import app, limiter
 from repositories.animais import get_all_animals, get_animal
 from repositories.conexao import _conn, configurar_sqlite
 from repositories.pesagens import get_weighings
+from repositories.sanidade import add_medication, get_withdrawal_end
 
 
 class BackendApiTestCase(unittest.TestCase):
@@ -607,6 +609,167 @@ class TestFotosEndpoint(BackendApiTestCase):
             self.assertNotEqual(row["operator"], "hacker_fake")
 
 
+class TestSanidadeEndpoint(BackendApiTestCase):
+    def test_get_protocolos_sem_authorization_retorna_401(self):
+        """Critério 1 (Spec 0050): GET /protocolos sem Authorization devolve 401."""
+        res = self.client.get("/protocolos")
+        self.assertEqual(res.status_code, 401)
+
+    def test_get_protocolos_devolve_somente_ativos(self):
+        """Critério 2 (Spec 0050): protocolos inativos não aparecem na API."""
+        with _conn() as con:
+            ativo_id = con.execute(
+                """INSERT INTO health_protocols
+                   (name, dose_unit, withdrawal_days, route, active)
+                   VALUES (?, ?, ?, ?, ?)""",
+                ("Protocolo API ativo", "mL", 14, "Subcutânea", 1),
+            ).lastrowid
+            con.execute(
+                """INSERT INTO health_protocols
+                   (name, dose_unit, withdrawal_days, route, active)
+                   VALUES (?, ?, ?, ?, ?)""",
+                ("Protocolo API inativo", "dose", 30, "Intramuscular", 0),
+            )
+
+        token = self._get_access_token()
+        res = self.client.get(
+            "/protocolos",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(res.status_code, 200)
+        items = res.json()
+        nomes = {item["nome"] for item in items}
+        self.assertIn("Protocolo API ativo", nomes)
+        self.assertNotIn("Protocolo API inativo", nomes)
+        self.assertEqual(
+            next(item for item in items if item["id"] == ativo_id),
+            {
+                "id": ativo_id,
+                "nome": "Protocolo API ativo",
+                "via": "Subcutânea",
+                "carencia_dias": 14,
+                "unidade_dose": "mL",
+            },
+        )
+
+    def test_get_medicamentos_usa_carencia_calculada_pelo_repositorio(self):
+        """Critério 3 (Spec 0050): a API expõe a carência calculada pelo repositório."""
+        animal_id = get_all_animals()[0]["id"]
+        hoje = datetime.now().date().isoformat()
+        add_medication(
+            animal_id,
+            "Medicamento de comparação",
+            2.5,
+            "mL",
+            "Subcutânea",
+            9,
+            hoje,
+            applied_by="preparo_teste",
+            protocol_id=None,
+        )
+        esperado = get_withdrawal_end(animal_id)
+        self.assertIsNotNone(esperado)
+
+        token = self._get_access_token()
+        res = self.client.get(
+            f"/animais/{animal_id}/medicamentos",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["carencia_ate"], esperado.isoformat())
+        self.assertIn(
+            {
+                "medicamento": "Medicamento de comparação",
+                "dose": 2.5,
+                "unidade": "mL",
+                "via": "Subcutânea",
+                "carencia_dias": 9,
+                "data": hoje,
+                "protocolo_id": None,
+            },
+            data["aplicacoes"],
+        )
+
+    def test_post_medicamento_persiste_usuario_carencia_e_nao_baixa_estoque(self):
+        """Critérios 4–7 (Spec 0050): persiste, usa o token e não movimenta estoque."""
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        hoje = datetime.now().date().isoformat()
+        with _conn() as con:
+            insumo_id = con.execute(
+                "INSERT INTO insumos (name, current_stock) VALUES (?, ?)",
+                ("Insumo que não deve baixar", 73.0),
+            ).lastrowid
+
+        token = self._get_access_token()
+        payload = {
+            "medicamento": "Medicamento via API",
+            "dose": 3.0,
+            "unidade": "mL",
+            "via": "Intramuscular",
+            "carencia_dias": 12,
+            "data": hoje,
+            "protocolo_id": None,
+            "notas": "Aplicação individual",
+            "applied_by": "usuario_falso",
+            "operator": "operador_falso",
+            "insumo_id": insumo_id,
+        }
+        headers = {"Authorization": f"Bearer {token}"}
+
+        post_res = self.client.post(
+            f"/animais/{animal_id}/medicamentos",
+            json=payload,
+            headers=headers,
+        )
+
+        self.assertEqual(post_res.status_code, 201)
+        carencia_repositorio = get_withdrawal_end(animal_id)
+        self.assertIsNotNone(carencia_repositorio)
+        self.assertEqual(post_res.json(), {"carencia_ate": carencia_repositorio.isoformat()})
+
+        with _conn() as con:
+            row = con.execute(
+                """SELECT * FROM medications
+                   WHERE animal_uuid = ? AND medication_name = ?
+                   ORDER BY id DESC LIMIT 1""",
+                (animal["uuid"], "Medicamento via API"),
+            ).fetchone()
+            estoque = con.execute(
+                "SELECT current_stock FROM insumos WHERE id = ?",
+                (insumo_id,),
+            ).fetchone()[0]
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row["applied_by"], "testuser")
+        self.assertNotEqual(row["applied_by"], "usuario_falso")
+        self.assertIsNone(row["insumo_id"])
+        self.assertEqual(estoque, 73.0)
+
+        get_res = self.client.get(
+            f"/animais/{animal_id}/medicamentos",
+            headers=headers,
+        )
+        self.assertEqual(get_res.status_code, 200)
+        self.assertEqual(get_res.json()["carencia_ate"], carencia_repositorio.isoformat())
+        self.assertGreater(carencia_repositorio, datetime.now().date())
+        self.assertTrue(
+            any(
+                item["medicamento"] == "Medicamento via API"
+                for item in get_res.json()["aplicacoes"]
+            )
+        )
+
+    def test_backend_api_nao_duplica_sql_de_sanidade(self):
+        """Critério 8 (Spec 0050): a rota delega persistência ao repositório."""
+        source = inspect.getsource(main_mod)
+        self.assertNotIn("INSERT INTO medications", source)
+        self.assertNotIn("UPDATE animals SET status='carencia'", source)
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
@@ -615,7 +778,7 @@ class TestSecurityAndIsolation(unittest.TestCase):
                 get_secret_key()
 
     def test_sem_duplicacao_de_logica_de_negocio(self):
-        """Critério 6 (0044), Critério 7 (0048), Critério 8 (0052): Nenhum cálculo de negócio ou SQL duplicado dentro de backend_api/."""
+        """Critério 6 (0044), Critério 7 (0048), Critério 8 (0050/0052): Nenhum cálculo de negócio ou SQL duplicado dentro de backend_api/."""
         # backend_api reutiliza por import, não define novas fórmulas de zootecnia
         forbidden_funcs = [
             "calculate_gmd",

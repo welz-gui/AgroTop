@@ -1,4 +1,4 @@
-"""API FastAPI de Produção do AgroTop (Spec 0044 + Spec 0048 + Spec 0052).
+"""API FastAPI de Produção do AgroTop (Spec 0044 + Spec 0048 + Spec 0050 + Spec 0052).
 
 Expõe autenticação JWT com refresh tokens revogáveis e endpoints essenciais de dados,
 reaproveitando a camada de serviços e repositórios existente.
@@ -26,15 +26,19 @@ from backend_api.config import ACCESS_TOKEN_EXPIRE_SECONDS
 from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
+    CarenciaOutput,
     LoginInput,
     LogoutInput,
     LoteSummary,
+    MedicamentoInput,
+    MedicamentosOutput,
     MovimentarInput,
     MovimentarOutput,
     PesagemInput,
     PesagemOutput,
     PhotoSummary,
     PhotoUploadOutput,
+    ProtocoloOutput,
     RefreshInput,
     RefreshOutput,
     TokenOutput,
@@ -43,6 +47,7 @@ from backend_api.schemas import (
 from database import add_photo, get_all_lotes, get_photo_image, get_photos
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
 from repositories.pesagens import add_weighing, calculate_gmd
+from repositories.sanidade import add_medication, get_medications, get_protocols, get_withdrawal_end
 from services.zootecnia import calculate_gmd_total
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -336,3 +341,80 @@ def get_photo_file(
 
     image_bytes, mime = result
     return Response(content=image_bytes, media_type=mime)
+
+
+@app.get("/protocolos", response_model=list[ProtocoloOutput])
+def list_protocolos(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Lista os protocolos sanitários ativos."""
+    return [
+        {
+            "id": protocolo["id"],
+            "nome": protocolo["name"],
+            "via": protocolo.get("route") or "",
+            "carencia_dias": int(protocolo.get("withdrawal_days") or 0),
+            "unidade_dose": protocolo.get("dose_unit") or "",
+        }
+        for protocolo in get_protocols(active_only=True)
+    ]
+
+
+@app.get("/animais/{animal_id}/medicamentos", response_model=MedicamentosOutput)
+def list_medicamentos(
+    animal_id: str,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Lista aplicações e a maior data de carência ativa do animal."""
+    carencia_ate = get_withdrawal_end(animal_id)
+    aplicacoes = get_medications(animal_id)
+    return {
+        "carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None,
+        "aplicacoes": [
+            {
+                "medicamento": aplicacao["medication_name"],
+                "dose": float(aplicacao.get("dose") or 0),
+                "unidade": aplicacao.get("unit") or "",
+                "via": aplicacao.get("application_route") or "",
+                "carencia_dias": int(aplicacao.get("withdrawal_days") or 0),
+                "data": aplicacao["med_date"],
+                "protocolo_id": aplicacao.get("protocol_id"),
+            }
+            for aplicacao in aplicacoes
+        ],
+    }
+
+
+@app.post(
+    "/animais/{animal_id}/medicamentos",
+    response_model=CarenciaOutput,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_medicamento(
+    animal_id: str,
+    data: MedicamentoInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Optional[str]]:
+    """Registra uma aplicação individual sem movimentar estoque."""
+    try:
+        add_medication(
+            animal_id=animal_id,
+            medication_name=data.medicamento,
+            dose=data.dose,
+            unit=data.unidade,
+            application_route=data.via,
+            withdrawal_days=data.carencia_dias,
+            med_date=data.data,
+            applied_by=user.get("username", ""),
+            insumo_id=None,
+            notes=data.notas or "",
+            protocol_id=data.protocolo_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+    carencia_ate = get_withdrawal_end(animal_id)
+    return {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
