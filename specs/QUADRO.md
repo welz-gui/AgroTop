@@ -3,16 +3,14 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-21:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
-[ROADMAP](../ROADMAP.md) concluídas · 669 testes · 37 tabelas em produção, todas com RLS
-(políticas explícitas de negação para `anon`/`authenticated` desde a migration 0024) ·
-**Fase B 100% ligada à interface** (7 de 7 telas) · **10 specs na fila, 4 pegáveis agora
-e 6 bloqueadas por sequenciamento** — 0044 (API FastAPI, Trilha 1), 0045 (importar
-perímetro de arquivo, Trilha 2), 0046 (localização por propriedade na previsão do tempo,
-Trilha 2) e 0047 (Mobile v1a, Trilha 1 — em paralelo com a 0044, travada no contrato
-dela) disponíveis já; 0048/0050/0052 (endpoints de movimentação, sanidade e foto) esperam
-a 0044 mesclar, 0049/0051/0053 (telas correspondentes) esperam a 0047 mesclar — ver
-abaixo.
+**Estado em 2026-08-22:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
+[ROADMAP](../ROADMAP.md) concluídas · **0044 (API FastAPI de produção, Trilha 1)
+concluída** ([#174](https://github.com/welz-gui/AgroTop/pull/174), `backend_api/` em
+`main`) · 698 testes · 37 tabelas em produção, todas com RLS (políticas explícitas de
+negação para `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à
+interface** (7 de 7 telas) · **9 specs na fila, 6 pegáveis agora e 3 bloqueadas por
+sequenciamento** — 0045, 0046, 0047, 0048, 0050, 0052 disponíveis já; 0049/0051/0053
+(telas de movimentação/sanidade/foto) esperam a 0047 mesclar — ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -122,48 +120,51 @@ abaixo.
 
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
-| 1 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🔁v2 ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
-| 2 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
-| 3 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | 🟢 disponível | | 2026-08-21 |
-| 4 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
+| — | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🔁v2 ⚠️médio | — | ✅ [#174](https://github.com/welz-gui/AgroTop/pull/174) | | 2026-08-22 |
+| 1 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
+| 2 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | 🟢 disponível | | 2026-08-21 |
+| 3 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
+| 4 | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+| 5 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+| 6 | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+
+> **0048/0050/0052 destravadas em 2026-08-22** — a 0044 mesclou (PR #174). São rotas
+> independentes, em arquivos diferentes dentro de `backend_api/`: podem ser pegas em
+> paralelo por agentes diferentes sem colidir — só confira `git diff --stat origin/main`
+> antes de abrir cada PR, pra não incluir arquivo de outra rota por engano.
 
 **Bloqueadas por sequenciamento — não pegue ainda, confira o pré-requisito na própria spec
 antes de reivindicar:**
 
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
-| 5 | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
-| 6 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-| 7 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
+| 7 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
 | 8 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-| 9 | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | 🔴 bloqueada — espera **0044 mesclada** | | 2026-08-21 |
-| 10 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+| 9 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
 
-> **0050/0051 e 0052/0053 seguem exatamente o mesmo par de motivos que 0048/0049** —
-> cada endpoint estende o mesmo app FastAPI da 0044, cada tela estende o mesmo app Flutter
-> da 0047. Uma vez a 0044 mesclada, 0048/0050/0052 podem correr em paralelo entre si (são
-> rotas independentes, arquivos diferentes dentro de `backend_api/` — confira
-> `git diff --stat origin/main` antes de abrir o PR pra não pegar rota de outra spec por
-> engano). O mesmo vale para 0049/0051/0053 depois da 0047 mesclar.
+> **0049/0051/0053 continuam bloqueadas** — cada uma estende o mesmo app Flutter que a
+> 0047 cria, código que ainda não existe em `main`. Assim que a 0047 mesclar, as três
+> voltam a poder rodar em paralelo entre si pelo mesmo truque de contrato travado +
+> servidor mock (contra 0048/0050/0052 — já mescladas ou já disponíveis, não precisa mais
+> nem de mock pra elas se preferir testar contra a API real).
 
-> **Por que 0048/0049 não são mais uma exceção como a 0047 foi:** a 0047 pôde ignorar a
-> ordem porque ela só precisava do **contrato escrito** da 0044, nunca do código dela — as
-> duas vivem em pastas diferentes (`backend_api/` × `mobile/`). A 0048 e a 0049 **estendem
-> código que ainda não existe** (rotas novas no mesmo app FastAPI da 0044; tela nova no
-> mesmo app Flutter da 0047) — não têm como começar antes de esse código existir de
-> verdade. A 0049, uma vez que a 0047 esteja mesclada, volta a poder rodar em paralelo com
-> a 0048 pelo mesmo truque de contrato travado + servidor mock.
+> **Histórico da 0044 (fechado em 2026-08-22, ✅ PR #174):** teve retrabalho (v1 → v2,
+> ver a tabela "🔁 O que significa retrabalho" abaixo) e, já na v2, um agente tentando a
+> 0047 achou o contrato ainda insuficientemente descrito para montar o mock sem inventar
+> payload — parou e reportou (comportamento certo). A spec foi corrigida com os campos e
+> tipos exatos de cada payload antes do merge da PR #174, e a própria revisão da PR achou
+> mais dois problemas reais no código (campos "tag"/"name" fantasmas nunca preenchidos;
+> `GET /animais/{id}` devolvendo 404 pra animal vendido/morto em vez da ficha) — corrigidos
+> no mesmo PR, com testes de regressão. Está tudo em `main` agora; a 0047 pode trocar de
+> testar contra mock para testar contra a API real se preferir, embora não seja obrigada.
 
-> **A 0047 é a exceção à regra "espera a 0044 mesclar" que este quadro registrava antes.**
-> Reconsiderado a pedido do mantenedor (2026-08-21): a 0044 já **define o contrato por
-> escrito** (endpoints, payloads) — o que faltava não era o contrato, era a implementação
-> dos dois lados. A 0047 trava nesse contrato escrito e testa contra um **servidor mock**
-> local, não contra a 0044 real — os dois lados podem avançar em paralelo sem colidir.
-> Se um agente notar que precisa de algo que a 0044 não define, a spec manda **parar e
-> reportar**, nunca inventar um contrato por conta própria. Continua valendo: a 0047 só
-> cobre o que a 0044 expõe (login + animais + pesagem) — movimentação (0048/0049),
-> sanidade (0050/0051) e foto (0052/0053) já ganharam suas próprias specs de endpoint +
-> tela, no mesmo padrão. Confirmação de trato continua sem spec.
+> **Por que 0048/0050/0052 não precisaram da mesma exceção que a 0047 teve:** a 0047 pôde
+> ignorar a ordem porque só precisava do **contrato escrito** da 0044, nunca do código dela
+> — as duas vivem em pastas diferentes (`backend_api/` × `mobile/`). A 0048/0050/0052
+> **estendem código que precisa existir de verdade** (rotas novas no mesmo app FastAPI da
+> 0044) — não tinham como começar antes do merge da PR #174. Agora que ele aconteceu,
+> estão livres. O mesmo raciocínio vale para 0049/0051/0053 e a 0047: seguem bloqueadas
+> até ela mesclar.
 
 > **Por que só estas dez, e não o resto das duas trilhas:**
 >
@@ -367,7 +368,7 @@ simplesmente reabrir a tarefa como se fosse nova.
 | [0032](0032-mapa-de-conformidade.md) | #89, fechada | §6 marcado ✅ sem ter tela | 🔁 v2 **travou sem commitar nada** (ver abaixo) → retomada → [#96](https://github.com/welz-gui/AgroTop/pull/96), que corrigiu §6 **e achou um segundo erro do mesmo tipo em §11** antes do merge |
 | [0007](0007-hex-para-tokens.md) | #97, fechada | teste media "todo hex tem token", não "hex virou token" — 136 de 198 hex ficaram literais | ✅ [#100](https://github.com/welz-gui/AgroTop/pull/100), corrigido e verificado (33 restantes, todos no bloco CSS estático) |
 | [0039](0039-montar-insumos-para-previsao-de-estoque.md) | #101, fechada | frequência de trato desconhecida (`"quinzenal"`) virava 1×/dia — 14 kg quinzenais lidos como 14 kg/dia | ✅ [#105](https://github.com/welz-gui/AgroTop/pull/105), corrigido e verificado (reprodução exata do defeito testada e confirmada corrigida antes do merge) |
-| [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | #169, fechada | dois defeitos: CI não instalava `backend_api/requirements.txt` (`tests.test_backend_api` quebrava na importação, `ModuleNotFoundError: jwt`); tabela `api_refresh_tokens` sem `REVOKE ... FROM anon` na mesma migration (quebra `test_rls_nas_migrations`) | 🟢 v2 disponível — trabalho da v1 preservado na tag `retrabalho/0044-api-fastapi-producao-v1-pr169` |
+| [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | #169, fechada | dois defeitos: CI não instalava `backend_api/requirements.txt` (`tests.test_backend_api` quebrava na importação, `ModuleNotFoundError: jwt`); tabela `api_refresh_tokens` sem `REVOKE ... FROM anon` na mesma migration (quebra `test_rls_nas_migrations`) | ✅ [#174](https://github.com/welz-gui/AgroTop/pull/174), corrigido e verificado — trabalho da v1 preservado na tag `retrabalho/0044-api-fastapi-producao-v1-pr169`. A revisão da PR #174 ainda achou mais dois problemas (campos "tag"/"name" fantasmas; 404 indevido em animal inativo), corrigidos no mesmo PR antes do merge |
 
 **A 0039 tem uma nuance:** parte do defeito era da própria spec — o docstring do contrato
 citava a regra certa, mas nenhum critério de aceite cobrava um teste para ela. Corrigido
