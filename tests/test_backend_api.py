@@ -1,7 +1,7 @@
-"""Testes da API Backend em FastAPI (Spec 0044 v2).
+"""Testes da API Backend em FastAPI (Spec 0044 v2 + Spec 0048).
 
 Valida autenticação JWT, rate limiting, refresh tokens revogáveis,
-endpoints essenciais de dados e registro de pesagens.
+endpoints essenciais de dados, registro de pesagens e movimentação entre piquetes.
 """
 
 import inspect
@@ -302,6 +302,168 @@ class TestPesagensEndpoint(BackendApiTestCase):
         self.assertEqual(res.status_code, 404)
 
 
+class TestMovimentacaoEndpoint(BackendApiTestCase):
+    def test_get_lotes_sem_authorization_retorna_401(self):
+        """Critério 1 (Spec 0048): GET /lotes sem Authorization devolve 401."""
+        res = self.client.get("/lotes")
+        self.assertEqual(res.status_code, 401)
+
+    def test_get_lotes_autenticado_retorna_piquetes_do_banco(self):
+        """Critério 2 (Spec 0048): GET /lotes com token válido devolve exatamente os piquetes que
+        database.get_all_lotes() devolve no mesmo banco."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        res = self.client.get("/lotes", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        items = res.json()
+
+        db_lotes = db.get_all_lotes()
+        self.assertEqual(len(items), len(db_lotes))
+
+        for api_item, db_item in zip(items, db_lotes):
+            self.assertEqual(api_item["id"], str(db_item["id"]))
+            self.assertEqual(api_item["nome"], db_item.get("name") or "")
+            self.assertEqual(api_item["capacidade_ua"], db_item.get("capacity_ua"))
+            self.assertEqual(api_item["animais_ativos"], int(db_item.get("animal_count") or 0))
+
+    def test_post_movimentar_move_de_fato_no_banco(self):
+        """Critério 3 (Spec 0048): POST /animais/movimentar move de fato: compare animals.lote_id
+        no banco antes e depois da chamada."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animais = get_all_animals()
+        self.assertTrue(len(animais) >= 2, "Necessário ao menos 2 animais.")
+        lotes = db.get_all_lotes()
+        self.assertTrue(len(lotes) >= 2, "Necessário ao menos 2 lotes.")
+
+        destino_id = str(lotes[1]["id"])
+        # Garante que os animais selecionados estejam em lote diferente do destino
+        a1_id = animais[0]["id"]
+        a2_id = animais[1]["id"]
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id IN (?, ?)", (lotes[0]["id"], a1_id, a2_id))
+
+        payload = {
+            "animal_ids": [a1_id, a2_id],
+            "to_lote_id": destino_id,
+            "movement_date": "2026-08-22",
+            "reason": "manejo",
+            "notes": "Movimentação em lote via API",
+        }
+
+        res = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn(a1_id, data["movidos"])
+        self.assertIn(a2_id, data["movidos"])
+        self.assertEqual(data["ja_no_destino"], [])
+        self.assertEqual(data["erros"], [])
+
+        # Verifica persistência no banco
+        animal1 = get_animal(a1_id)
+        animal2 = get_animal(a2_id)
+        self.assertEqual(str(animal1["lote_id"]), destino_id)
+        self.assertEqual(str(animal2["lote_id"]), destino_id)
+
+    def test_post_movimentar_animal_inexistente_vai_para_erros(self):
+        """Critério 4 (Spec 0048): Um animal_id inexistente na lista aparece em 'erros', e os outros
+        animais válidos da mesma chamada são movidos mesmo assim."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animais = get_all_animals()
+        lotes = db.get_all_lotes()
+        destino_id = str(lotes[1]["id"])
+        a_valido = animais[0]["id"]
+
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id = ?", (lotes[0]["id"], a_valido))
+
+        payload = {
+            "animal_ids": [a_valido, "ANIMAL_INEXISTENTE_999"],
+            "to_lote_id": destino_id,
+            "movement_date": "2026-08-22",
+        }
+
+        res = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        self.assertIn(a_valido, data["movidos"])
+        self.assertIn("ANIMAL_INEXISTENTE_999", data["erros"])
+
+        # O animal válido foi movido mesmo com erro no outro
+        self.assertEqual(str(get_animal(a_valido)["lote_id"]), destino_id)
+
+    def test_post_movimentar_animal_ja_no_destino(self):
+        """Critério 5 (Spec 0048): Um animal já no piquete de destino aparece em 'ja_no_destino'
+        e não gera linha nova em animal_movements para ele."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animais = get_all_animals()
+        lotes = db.get_all_lotes()
+        destino_id = str(lotes[0]["id"])
+        animal_id = animais[0]["id"]
+
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id = ?", (destino_id, animal_id))
+            qtd_movements_antes = con.execute("SELECT COUNT(*) FROM animal_movements").fetchone()[0]
+
+        payload = {
+            "animal_ids": [animal_id],
+            "to_lote_id": destino_id,
+            "movement_date": "2026-08-22",
+        }
+
+        res = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        self.assertEqual(data["movidos"], [])
+        self.assertIn(animal_id, data["ja_no_destino"])
+
+        with _conn() as con:
+            qtd_movements_depois = con.execute("SELECT COUNT(*) FROM animal_movements").fetchone()[0]
+        self.assertEqual(qtd_movements_depois, qtd_movements_antes, "Não deve gerar movimento quando já no destino.")
+
+    def test_post_movimentar_operator_vem_do_token(self):
+        """Critério 6 (Spec 0048): operator gravado em animal_movements é o usuário do token, mesmo
+        que o corpo da requisição tente mandar outro nome."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        animais = get_all_animals()
+        lotes = db.get_all_lotes()
+        destino_id = str(lotes[1]["id"])
+        animal_id = animais[0]["id"]
+
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id = ?", (lotes[0]["id"], animal_id))
+
+        payload = {
+            "animal_ids": [animal_id],
+            "to_lote_id": destino_id,
+            "movement_date": "2026-08-22",
+            "operator": "hacker_fake_operator",
+        }
+
+        res = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 200)
+
+        animal = get_animal(animal_id)
+        with _conn() as con:
+            movement = con.execute(
+                "SELECT * FROM animal_movements WHERE animal_uuid = ? ORDER BY id DESC LIMIT 1",
+                (animal["uuid"],),
+            ).fetchone()
+            self.assertIsNotNone(movement)
+            self.assertEqual(movement["operator"], "testuser")
+            self.assertNotEqual(movement["operator"], "hacker_fake_operator")
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
@@ -310,9 +472,9 @@ class TestSecurityAndIsolation(unittest.TestCase):
                 get_secret_key()
 
     def test_sem_duplicacao_de_logica_de_negocio(self):
-        """Critério 6: Nenhum cálculo de negócio ou SQL duplicado dentro de backend_api/."""
+        """Critério 6 (0044) e Critério 7 (0048): Nenhum cálculo de negócio ou SQL duplicado dentro de backend_api/."""
         # backend_api reutiliza por import, não define novas fórmulas de zootecnia
-        forbidden_funcs = ["calculate_gmd", "calculate_gmd_total", "estimate_weight_by_measurement", "register_sale"]
+        forbidden_funcs = ["calculate_gmd", "calculate_gmd_total", "estimate_weight_by_measurement", "register_sale", "move_animals_bulk"]
         defined_funcs = [name for name, _ in inspect.getmembers(main_mod, inspect.isfunction)
                          if inspect.getmodule(_) == main_mod]
 
