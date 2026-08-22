@@ -390,7 +390,8 @@ Regras gerais para trabalho paralelo:
    dela e testada contra um servidor mock (não espera a 0044 mesclar). **Segunda fatia,
    movimentação entre lotes, com par de specs escrito em 2026-08-21:**
    [0048](specs/0048-api-movimentacao-entre-lotes.md) (endpoint, estende `backend_api/` —
-   destravada em 2026-08-22, a 0044 já mesclou)
+   ✅ concluída em 2026-08-22, [PR #177](https://github.com/welz-gui/AgroTop/pull/177):
+   `GET /lotes` + `POST /animais/movimentar`, expondo `move_animals_bulk` sem lógica nova)
    e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) (tela, estende
    `mobile/` — só pode começar depois da 0047 mesclada, mas roda em paralelo com a 0048 via
    contrato travado + mock, mesmo truque da 0047/0044). **Terceira e quarta fatias, também
