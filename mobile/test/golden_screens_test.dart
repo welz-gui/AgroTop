@@ -81,15 +81,42 @@ MockClient _client() => MockClient((request) async {
       'gmd_total_kg_day': 0.513,
     });
   }
+  if (request.method == 'GET' && request.url.path == '/lotes') {
+    return _json([
+      {
+        'id': 'P01',
+        'nome': 'Piquete Central',
+        'capacidade_ua': 30.0,
+        'animais_ativos': 18,
+      },
+      {
+        'id': 'P02',
+        'nome': 'Piquete Norte',
+        'capacidade_ua': 24.5,
+        'animais_ativos': 12,
+      },
+      {
+        'id': 'P03',
+        'nome': 'Piquete da Baixada',
+        'capacidade_ua': null,
+        'animais_ativos': 7,
+      },
+    ]);
+  }
+  if (request.method == 'POST' && request.url.path == '/animais/movimentar') {
+    return _json({
+      'movidos': ['BR0001'],
+      'ja_no_destino': ['BR0002'],
+      'erros': ['BR0003: animal bloqueado'],
+    });
+  }
   return _json({'detail': 'Não encontrado'}, status: 404);
 });
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('quatro telas são cobertas nos três modos de tema', (
-    tester,
-  ) async {
+  testWidgets('seis telas são cobertas nos três modos de tema', (tester) async {
     final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
     if (captureGoldens) await loadAppFonts();
     tester.view.physicalSize = const Size(390, 844);
@@ -157,6 +184,41 @@ void main() {
         await expectLater(
           find.byType(MaterialApp),
           matchesGoldenFile('goldens/${mode.name}-04-pesagem.png'),
+        );
+      }
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final movementButton = find.byKey(const ValueKey('open-movement'));
+      await tester.scrollUntilVisible(
+        movementButton,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(movementButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Piquete de destino'), findsOneWidget);
+      if (captureGoldens) {
+        await expectLater(
+          find.byType(MaterialApp),
+          matchesGoldenFile('goldens/${mode.name}-05-destino.png'),
+        );
+      }
+
+      await tester.tap(find.byKey(const ValueKey('movement-lote-P02')));
+      final confirmButton = find.byKey(const ValueKey('confirm-movement'));
+      await tester.scrollUntilVisible(
+        confirmButton,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(confirmButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Resultado da movimentação'), findsOneWidget);
+      if (captureGoldens) {
+        await expectLater(
+          find.byType(MaterialApp),
+          matchesGoldenFile('goldens/${mode.name}-06-resultado.png'),
         );
       }
 

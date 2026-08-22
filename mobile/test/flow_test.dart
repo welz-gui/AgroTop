@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app.dart';
+import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -41,6 +42,8 @@ void main() {
     var currentWeight = 382.4;
     var refreshRequests = 0;
     var weighingRequests = 0;
+    var movementRequests = 0;
+    var currentLote = 'P01';
     final client = MockClient((request) async {
       if (request.method == 'POST' && request.url.path == '/auth/login') {
         expect(jsonDecode(request.body), {
@@ -81,8 +84,8 @@ void main() {
         'current_weight': currentWeight,
         'target_weight': 500.0,
         'status': 'ativo',
-        'lote_id': 'P01',
-        'lot_name': 'Piquete Central',
+        'lote_id': currentLote,
+        'lot_name': currentLote == 'P01' ? 'Piquete Central' : 'Piquete Norte',
         'animal_uuid': '123e4567-e89b-12d3-a456-426614174000',
       };
       if (request.method == 'GET' && request.url.path == '/animais') {
@@ -120,6 +123,39 @@ void main() {
           'peso': currentWeight,
           'data': '2026-08-22',
         }, status: 201);
+      }
+      if (request.method == 'GET' && request.url.path == '/lotes') {
+        return _json([
+          {
+            'id': 'P01',
+            'nome': 'Piquete Central',
+            'capacidade_ua': 30.0,
+            'animais_ativos': currentLote == 'P01' ? 1 : 0,
+          },
+          {
+            'id': 'P02',
+            'nome': 'Piquete Norte',
+            'capacidade_ua': 24.5,
+            'animais_ativos': currentLote == 'P02' ? 1 : 0,
+          },
+        ]);
+      }
+      if (request.method == 'POST' &&
+          request.url.path == '/animais/movimentar') {
+        movementRequests++;
+        expect(jsonDecode(request.body), {
+          'animal_ids': ['BR0001'],
+          'to_lote_id': 'P02',
+          'movement_date': '2026-08-22',
+          'reason': 'manejo',
+          'notes': null,
+        });
+        currentLote = 'P02';
+        return _json({
+          'movidos': ['BR0001'],
+          'ja_no_destino': <String>[],
+          'erros': <String>[],
+        });
       }
       return _json({'detail': 'Não encontrado'}, status: 404);
     });
@@ -178,6 +214,38 @@ void main() {
     expect(weighingRequests, 1);
     expect(find.text('Pesagem registrada com sucesso.'), findsOneWidget);
     expect(find.text('401.2 kg'), findsOneWidget);
+
+    final movementButton = find.byKey(const ValueKey('open-movement'));
+    await tester.scrollUntilVisible(
+      movementButton,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -120));
+    await tester.pumpAndSettle();
+    await tester.tap(movementButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Mover de piquete'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('movement-lote-P02')));
+    await tester.enterText(
+      find.byKey(const ValueKey('movement-date')),
+      '2026-08-22',
+    );
+    await tester.tap(find.byKey(const ValueKey('confirm-movement')));
+    await tester.pumpAndSettle();
+
+    expect(movementRequests, 1);
+    expect(find.text('Movidos (1)'), findsOneWidget);
+    expect(find.text('Já estavam no destino (0)'), findsOneWidget);
+    expect(find.text('Erros (0)'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('finish-movement')));
+    await tester.pumpAndSettle();
+    expect(find.text('Piquete: Piquete Norte'), findsOneWidget);
+
+    Navigator.of(tester.element(find.byType(Scaffold))).pop();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('P02'), findsOneWidget);
   });
 
   testWidgets('servidor indisponível produz erro visível', (tester) async {
@@ -204,6 +272,142 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('seleção múltipla envia um POST e separa o resultado parcial', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var movementRequests = 0;
+    final sentIds = <String>[];
+    final animals = ['BR0001', 'BR0002', 'BR0003']
+        .map(
+          (id) => {
+            'id': id,
+            'breed': 'Nelore',
+            'sex': 'M',
+            'current_weight': 360.0,
+            'status': 'ativo',
+            'lote_id': id == 'BR0002' ? 'P02' : 'P01',
+            'lot_name': id == 'BR0002' ? 'Piquete Norte' : 'Piquete Central',
+          },
+        )
+        .toList(growable: false);
+    final api = ApiClient(
+      tokenStore: MemoryTokenStore()
+        ..tokens = const StoredTokens(
+          accessToken: 'access-live',
+          refreshToken: 'refresh-valid',
+        ),
+      baseUrl: 'http://mock.local',
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/animais') {
+          return _json(animals);
+        }
+        if (request.method == 'GET' && request.url.path == '/lotes') {
+          return _json([
+            {
+              'id': 'P02',
+              'nome': 'Piquete Norte',
+              'capacidade_ua': 24.5,
+              'animais_ativos': 1,
+            },
+          ]);
+        }
+        if (request.method == 'POST' &&
+            request.url.path == '/animais/movimentar') {
+          movementRequests++;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          sentIds.addAll(List<String>.from(body['animal_ids'] as List));
+          return _json({
+            'movidos': ['BR0001'],
+            'ja_no_destino': ['BR0002'],
+            'erros': ['BR0003: animal bloqueado'],
+          });
+        }
+        return _json({'detail': 'Não encontrado'}, status: 404);
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorSchemeSeed: Colors.green),
+        home: AnimalsPage(
+          api: api,
+          themeMode: ThemeMode.light,
+          onThemeChanged: (_) {},
+          onUnauthorized: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('start-animal-selection')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'BR0001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'BR0002'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'BR0003'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-selected-animals')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('movement-lote-P02')));
+    await tester.enterText(
+      find.byKey(const ValueKey('movement-date')),
+      '2026-08-22',
+    );
+    await tester.tap(find.byKey(const ValueKey('confirm-movement')));
+    await tester.pumpAndSettle();
+
+    expect(movementRequests, 1);
+    expect(sentIds, ['BR0001', 'BR0002', 'BR0003']);
+    expect(find.text('Movidos (1)'), findsOneWidget);
+    expect(find.text('• BR0001'), findsOneWidget);
+    expect(find.text('Já estavam no destino (1)'), findsOneWidget);
+    expect(find.text('• BR0002'), findsOneWidget);
+    expect(find.text('Erros (1)'), findsOneWidget);
+    expect(find.text('• BR0003: animal bloqueado'), findsOneWidget);
+
+    final alreadySection = find.byKey(
+      const ValueKey('movement-result-already'),
+    );
+    final errorSection = find.byKey(const ValueKey('movement-result-errors'));
+    final context = tester.element(errorSection);
+    expect(
+      tester
+          .widget<Card>(
+            find.descendant(of: alreadySection, matching: find.byType(Card)),
+          )
+          .color,
+      Theme.of(context).colorScheme.tertiaryContainer,
+    );
+    expect(
+      tester
+          .widget<Card>(
+            find.descendant(of: errorSection, matching: find.byType(Card)),
+          )
+          .color,
+      Theme.of(context).colorScheme.errorContainer,
+    );
+    expect(
+      find.descendant(
+        of: alreadySection,
+        matching: find.byIcon(Icons.info_outline),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: errorSection,
+        matching: find.byIcon(Icons.error_outline),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('refresh recusado limpa tokens e volta ao login', (tester) async {

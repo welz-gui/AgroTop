@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../app.dart';
 import '../models.dart';
+import 'movement_page.dart';
 import 'weighing_page.dart';
 
 class AnimalsPage extends StatefulWidget {
@@ -32,6 +33,8 @@ class _AnimalsPageState extends State<AnimalsPage> {
   bool _hasMore = true;
   String? _error;
   String _query = '';
+  bool _selecting = false;
+  final _selectedIds = <String>{};
 
   @override
   void initState() {
@@ -95,6 +98,36 @@ class _AnimalsPageState extends State<AnimalsPage> {
   String _weight(double? value) =>
       value == null ? 'Peso não informado' : '${value.toStringAsFixed(1)} kg';
 
+  void _startSelecting([String? animalId]) => setState(() {
+    _selecting = true;
+    if (animalId != null) _selectedIds.add(animalId);
+  });
+
+  void _stopSelecting() => setState(() {
+    _selecting = false;
+    _selectedIds.clear();
+  });
+
+  void _toggleSelection(String animalId) => setState(() {
+    if (!_selectedIds.remove(animalId)) _selectedIds.add(animalId);
+  });
+
+  Future<void> _openMovement(List<String> animalIds) async {
+    final moved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MovementPage(
+          api: widget.api,
+          animalIds: animalIds,
+          onUnauthorized: widget.onUnauthorized,
+        ),
+      ),
+    );
+    if (moved == true && mounted) {
+      _stopSelecting();
+      await _load(reset: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -109,6 +142,19 @@ class _AnimalsPageState extends State<AnimalsPage> {
       ],
     ),
     body: _buildBody(),
+    bottomNavigationBar: _selecting
+        ? SafeArea(
+            minimum: const EdgeInsets.all(16),
+            child: FilledButton.icon(
+              key: const ValueKey('move-selected-animals'),
+              onPressed: _selectedIds.isEmpty
+                  ? null
+                  : () => _openMovement(_selectedIds.toList(growable: false)),
+              icon: const Icon(Icons.swap_horiz),
+              label: Text('Mover ${_selectedIds.length} selecionado(s)'),
+            ),
+          )
+        : null,
   );
 
   Widget _buildBody() {
@@ -138,6 +184,28 @@ class _AnimalsPageState extends State<AnimalsPage> {
             ),
             onChanged: (value) => setState(() => _query = value),
           ),
+          const SizedBox(height: 12),
+          if (_selecting)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.checklist),
+                title: Text('${_selectedIds.length} selecionado(s)'),
+                subtitle: const Text(
+                  'Toque nos animais para marcar ou desmarcar.',
+                ),
+                trailing: TextButton(
+                  onPressed: _stopSelecting,
+                  child: const Text('Cancelar'),
+                ),
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              key: const ValueKey('start-animal-selection'),
+              onPressed: _startSelecting,
+              icon: const Icon(Icons.checklist),
+              label: const Text('Selecionar vários animais'),
+            ),
           const SizedBox(height: 16),
           if (_error != null) ...[
             Card(
@@ -166,27 +234,43 @@ class _AnimalsPageState extends State<AnimalsPage> {
                 child: ListTile(
                   minVerticalPadding: 14,
                   leading: CircleAvatar(
-                    child: Text(
-                      animal.id.length > 4
-                          ? animal.id.substring(animal.id.length - 4)
-                          : animal.id,
-                    ),
+                    child: _selecting
+                        ? Icon(
+                            _selectedIds.contains(animal.id)
+                                ? Icons.check
+                                : Icons.circle_outlined,
+                          )
+                        : Text(
+                            animal.id.length > 4
+                                ? animal.id.substring(animal.id.length - 4)
+                                : animal.id,
+                          ),
                   ),
                   title: Text(animal.id),
                   subtitle: Text(
                     '${animal.breed ?? 'Raça não informada'} · ${_weight(animal.currentWeight)}'
                     '${animal.loteId == null ? '' : ' · ${animal.loteId}'}',
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => AnimalDetailPage(
-                        api: widget.api,
-                        id: animal.id,
-                        onUnauthorized: widget.onUnauthorized,
-                      ),
-                    ),
+                  trailing: Icon(
+                    _selecting
+                        ? (_selectedIds.contains(animal.id)
+                              ? Icons.check_box
+                              : Icons.check_box_outline_blank)
+                        : Icons.chevron_right,
                   ),
+                  onLongPress: () => _startSelecting(animal.id),
+                  onTap: _selecting
+                      ? () => _toggleSelection(animal.id)
+                      : () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => AnimalDetailPage(
+                              api: widget.api,
+                              id: animal.id,
+                              onUnauthorized: widget.onUnauthorized,
+                              onMovementCompleted: () => _load(reset: true),
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -217,11 +301,13 @@ class AnimalDetailPage extends StatefulWidget {
     required this.api,
     required this.id,
     required this.onUnauthorized,
+    required this.onMovementCompleted,
   });
 
   final ApiClient api;
   final String id;
   final VoidCallback onUnauthorized;
+  final VoidCallback onMovementCompleted;
 
   @override
   State<AnimalDetailPage> createState() => _AnimalDetailPageState();
@@ -262,6 +348,21 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
+  Future<void> _openMovement() async {
+    final moved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MovementPage(
+          api: widget.api,
+          animalIds: [widget.id],
+          onUnauthorized: widget.onUnauthorized,
+        ),
+      ),
+    );
+    if (moved != true || !mounted) return;
+    _reload();
+    widget.onMovementCompleted();
   }
 
   @override
@@ -390,6 +491,13 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
               onPressed: _openWeighing,
               icon: const Icon(Icons.monitor_weight_outlined),
               label: const Text('Registrar pesagem'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey('open-movement'),
+              onPressed: _openMovement,
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('Mover de piquete'),
             ),
             const SizedBox(height: 12),
             const ListTile(

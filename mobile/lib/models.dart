@@ -130,3 +130,42 @@ class WeighingResult {
     data: json['data'] as String,
   );
 }
+
+class LoteSummary {
+  const LoteSummary({
+    required this.id,
+    required this.nome,
+    required this.animaisAtivos,
+    this.capacidadeUa,
+  });
+
+  final String id;
+  final String nome;
+  final double? capacidadeUa;
+  final int animaisAtivos;
+
+  factory LoteSummary.fromJson(Map<String, dynamic> json) => LoteSummary(
+    id: json['id'] as String,
+    nome: json['nome'] as String,
+    capacidadeUa: (json['capacidade_ua'] as num?)?.toDouble(),
+    animaisAtivos: json['animais_ativos'] as int,
+  );
+}
+
+class MovementResult {
+  const MovementResult({
+    required this.movidos,
+    required this.jaNoDestino,
+    required this.erros,
+  });
+
+  final List<String> movidos;
+  final List<String> jaNoDestino;
+  final List<String> erros;
+
+  factory MovementResult.fromJson(Map<String, dynamic> json) => MovementResult(
+    movidos: List<String>.from(json['movidos'] as List<dynamic>),
+    jaNoDestino: List<String>.from(json['ja_no_destino'] as List<dynamic>),
+    erros: List<String>.from(json['erros'] as List<dynamic>),
+  );
+}
