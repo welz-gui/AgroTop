@@ -149,6 +149,52 @@ class ApiClient {
     return WeighingResult.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<List<LoteSummary>> listLotes() async {
+    final response = await _authorized(
+      (headers) => _http.get(Uri.parse('$baseUrl/lotes'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar os piquetes.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((item) => LoteSummary.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<MovementResult> moveAnimals({
+    required List<String> animalIds,
+    required String toLoteId,
+    required String movementDate,
+    String? reason = 'manejo',
+    String? notes,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl/animais/movimentar'),
+        headers: {...headers, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'animal_ids': animalIds,
+          'to_lote_id': toLoteId,
+          'movement_date': movementDate,
+          'reason': reason,
+          'notes': notes,
+        }),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível movimentar os animais.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return MovementResult.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<void> logout() async {
     final tokens = _tokens ?? await tokenStore.read();
     try {

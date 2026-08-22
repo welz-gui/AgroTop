@@ -12,6 +12,13 @@ class MockApiServer {
   int listRequests = 0;
   int detailRequests = 0;
   int weighingRequests = 0;
+  int movementRequests = 0;
+  Map<String, dynamic>? lastMovementBody;
+  final Map<String, String> _animalLotes = {
+    'BR0001': 'P01',
+    'BR0002': 'P02',
+    'BR0003': 'P01',
+  };
 
   String get baseUrl => 'http://${_server.address.address}:${_server.port}';
 
@@ -90,18 +97,78 @@ class MockApiServer {
           });
           return;
         }
-        await _json(request, 200, [_animal()]);
+        await _json(
+          request,
+          200,
+          _animalLotes.keys.map(_animal).toList(growable: false),
+        );
         return;
       }
-      if (request.method == 'GET' && path == '/animais/BR0001') {
+      if (request.method == 'GET' && path.startsWith('/animais/')) {
+        final id = Uri.decodeComponent(path.substring('/animais/'.length));
+        if (!_animalLotes.containsKey(id)) {
+          await _json(request, 404, {'detail': 'Animal não encontrado'});
+          return;
+        }
         detailRequests++;
         await _json(request, 200, {
-          ..._animal(),
+          ..._animal(id),
           'entry_date': '2026-01-10',
           'fornecedor_id': 7,
           'fornecedor_name': 'Fazenda Boa Vista',
           'gmd_recent_kg_day': 0.742,
           'gmd_total_kg_day': 0.513,
+        });
+        return;
+      }
+      if (request.method == 'GET' && path == '/lotes') {
+        await _json(request, 200, [
+          {
+            'id': 'P01',
+            'nome': 'Piquete Central',
+            'capacidade_ua': 30.0,
+            'animais_ativos': _countAnimals('P01'),
+          },
+          {
+            'id': 'P02',
+            'nome': 'Piquete Norte',
+            'capacidade_ua': 24.5,
+            'animais_ativos': _countAnimals('P02'),
+          },
+          {
+            'id': 'P03',
+            'nome': 'Piquete da Baixada',
+            'capacidade_ua': null,
+            'animais_ativos': _countAnimals('P03'),
+          },
+        ]);
+        return;
+      }
+      if (request.method == 'POST' && path == '/animais/movimentar') {
+        movementRequests++;
+        final body = await _body(request);
+        lastMovementBody = body;
+        final destination = body['to_lote_id'] as String;
+        final movidos = <String>[];
+        final jaNoDestino = <String>[];
+        final erros = <String>[];
+        for (final id in List<String>.from(
+          body['animal_ids'] as List<dynamic>,
+        )) {
+          final currentLote = _animalLotes[id];
+          if (currentLote == null) {
+            erros.add('$id: animal não encontrado');
+          } else if (currentLote == destination) {
+            jaNoDestino.add(id);
+          } else {
+            _animalLotes[id] = destination;
+            movidos.add(id);
+          }
+        }
+        await _json(request, 200, {
+          'movidos': movidos,
+          'ja_no_destino': jaNoDestino,
+          'erros': erros,
         });
         return;
       }
@@ -142,18 +209,27 @@ class MockApiServer {
     }
   }
 
-  Map<String, dynamic> _animal() => {
-    'id': 'BR0001',
+  int _countAnimals(String loteId) =>
+      _animalLotes.values.where((value) => value == loteId).length;
+
+  Map<String, dynamic> _animal(String id) => {
+    'id': id,
     'breed': 'Nelore',
     'sex': 'M',
     'birth_date': '2024-03-10',
     'entry_weight': 278.2,
-    'current_weight': currentWeight,
+    'current_weight': id == 'BR0001' ? currentWeight : 360.0,
     'target_weight': 500.0,
     'status': 'ativo',
-    'lote_id': 'P01',
-    'lot_name': 'Piquete Central',
-    'animal_uuid': '123e4567-e89b-12d3-a456-426614174000',
+    'lote_id': _animalLotes[id],
+    'lot_name': switch (_animalLotes[id]) {
+      'P01' => 'Piquete Central',
+      'P02' => 'Piquete Norte',
+      'P03' => 'Piquete da Baixada',
+      _ => null,
+    },
+    'animal_uuid':
+        '123e4567-e89b-12d3-a456-42661417400${id.substring(id.length - 1)}',
   };
 
   Future<Map<String, dynamic>> _body(HttpRequest request) async {
