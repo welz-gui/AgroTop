@@ -94,8 +94,8 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0042](0042-montar-ciclos-para-rentabilidade-por-raca.md) | Ciclos encerrados p/ rentabilidade por raça | implementação | baixo | 🟢 disponível |
 | [0043](0043-montar-lotes-para-lotacao.md) | Lotes p/ `lotacao.py` (sem `sobrepostos`) | implementação | baixo | 🟢 disponível |
 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | API FastAPI de produção — autenticação e endpoints essenciais (Trilha 1) | implementação | **médio** | ✅ [#174](https://github.com/welz-gui/AgroTop/pull/174) |
-| [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | 🟢 disponível |
-| [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | 🟢 disponível |
+| [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | ✅ [#170](https://github.com/welz-gui/AgroTop/pull/170) |
+| [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | ✅ [#171](https://github.com/welz-gui/AgroTop/pull/171) |
 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
