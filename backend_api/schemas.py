@@ -111,3 +111,15 @@ class MovimentarOutput(BaseModel):
     movidos: list[str]
     ja_no_destino: list[str]
     erros: list[str]
+
+
+class PhotoSummary(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    taken_date: str
+    mime: str
+
+
+class PhotoUploadOutput(BaseModel):
+    id: int

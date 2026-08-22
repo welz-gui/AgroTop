@@ -1,4 +1,4 @@
-"""API FastAPI de Produção do AgroTop (Spec 0044 + Spec 0048).
+"""API FastAPI de Produção do AgroTop (Spec 0044 + Spec 0048 + Spec 0052).
 
 Expõe autenticação JWT com refresh tokens revogáveis e endpoints essenciais de dados,
 reaproveitando a camada de serviços e repositórios existente.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -33,15 +33,20 @@ from backend_api.schemas import (
     MovimentarOutput,
     PesagemInput,
     PesagemOutput,
+    PhotoSummary,
+    PhotoUploadOutput,
     RefreshInput,
     RefreshOutput,
     TokenOutput,
     UserSummary,
 )
-from database import get_all_lotes
+from database import add_photo, get_all_lotes, get_photo_image, get_photos
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
 from repositories.pesagens import add_weighing, calculate_gmd
 from services.zootecnia import calculate_gmd_total
+
+MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
+ALLOWED_PHOTO_MIMES = {"image/jpeg", "image/png", "image/jpg"}
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -244,3 +249,90 @@ def movimentar_animais(
         notes=observacoes,
     )
     return resultado
+
+
+@app.post("/animais/{animal_id}/fotos", response_model=PhotoUploadOutput, status_code=status.HTTP_201_CREATED)
+def upload_animal_photo(
+    animal_id: str,
+    arquivo: UploadFile = File(...),
+    taken_date: Optional[str] = Form(None),
+    user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
+) -> dict[str, int]:
+    """Envia uma foto do animal (JPEG ou PNG, até 5 MB)."""
+    content_type = (arquivo.content_type or "").lower().strip()
+    if content_type not in ALLOWED_PHOTO_MIMES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Tipo de arquivo não suportado. Aceitos: image/jpeg, image/png.",
+        )
+
+    content = arquivo.file.read()
+    if len(content) > MAX_PHOTO_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE if hasattr(status, "HTTP_413_CONTENT_TOO_LARGE") else 413,
+            detail="Arquivo excede o limite de 5 MB.",
+        )
+
+    mime = "image/jpeg" if content_type in ("image/jpeg", "image/jpg") else "image/png"
+    operator = user.get("username", "") if user else ""
+
+    try:
+        add_photo(
+            animal_id=animal_id,
+            image_bytes=content,
+            mime=mime,
+            taken_date=taken_date,
+            operator=operator,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+    photos = get_photos(animal_id)
+    if not photos:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao recuperar foto salva.")
+
+    return {"id": photos[0]["id"]}
+
+
+@app.get("/animais/{animal_id}/fotos", response_model=list[PhotoSummary])
+def list_animal_photos(
+    animal_id: str,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Lista metadados das fotos do animal (sem os bytes da imagem)."""
+    animal = get_animal(animal_id)
+    if animal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Animal não encontrado.",
+        )
+
+    photos = get_photos(animal_id)
+    return [
+        {
+            "id": p["id"],
+            "taken_date": str(p["taken_date"]),
+            "mime": p["mime"],
+        }
+        for p in photos
+    ]
+
+
+@app.get("/fotos/{photo_id}")
+def get_photo_file(
+    photo_id: int,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> Response:
+    """Devolve a imagem binária da foto com Content-Type apropriado."""
+    result = get_photo_image(photo_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Foto não encontrada.",
+        )
+
+    image_bytes, mime = result
+    return Response(content=image_bytes, media_type=mime)
