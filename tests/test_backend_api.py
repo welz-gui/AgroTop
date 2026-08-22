@@ -42,6 +42,12 @@ class BackendApiTestCase(unittest.TestCase):
         self.db_path = os.path.join(self.tmp_dir, "test_backend_api.db")
         configurar_sqlite(self.db_path)
         db.init_db()
+        # Cada teste troca de banco SQLite (novo tmp_dir), mas os bulk loaders
+        # cacheados (@_cache / st.cache_data, ex.: get_all_animals) não sabem
+        # disso — sem isto, um teste pode ler um animal com o `uuid` do banco
+        # temporário do teste ANTERIOR (o `id` é o mesmo por seed determinístico,
+        # o `uuid` não), e uma escrita nova não aparece na consulta seguinte.
+        db.clear_cache()
 
         # Cria usuário de teste com senha conhecida
         with _conn() as con:
@@ -650,8 +656,53 @@ class TestSanidadeEndpoint(BackendApiTestCase):
                 "via": "Subcutânea",
                 "carencia_dias": 14,
                 "unidade_dose": "mL",
+                "dose_sugerida": None,
             },
         )
+
+    def test_get_protocolos_com_animal_id_inclui_dose_sugerida(self):
+        """Achado da spec 0051 (mobile): a 0050 original não expunha dose nenhuma em
+        GET /protocolos, então não havia como a tela preencher a dose ao escolher um
+        protocolo sem duplicar a fórmula de `dose_for_animal` em Dart (proibido —
+        ROADMAP: nenhuma fórmula de negócio no mobile). Corrigido: `?animal_id=` faz
+        a API calcular a dose sugerida, fixa ou proporcional ao peso conforme o
+        protocolo, igual ao que `repositories.sanidade.dose_for_animal` já faz."""
+        animal_id = get_all_animals()[0]["id"]
+        animal = get_animal(animal_id)
+
+        with _conn() as con:
+            fixo_id = con.execute(
+                """INSERT INTO health_protocols
+                   (name, dose_value, dose_ref_kg, dose_unit, withdrawal_days, route, active)
+                   VALUES (?, ?, ?, ?, ?, ?, 1)""",
+                ("Dose fixa", 5.0, 0, "mL", 0, "Subcutânea"),
+            ).lastrowid
+            proporcional_id = con.execute(
+                """INSERT INTO health_protocols
+                   (name, dose_value, dose_ref_kg, dose_unit, withdrawal_days, route, active)
+                   VALUES (?, ?, ?, ?, ?, ?, 1)""",
+                ("Dose por peso", 1.0, 100.0, "mL/100kg", 0, "Intramuscular"),
+            ).lastrowid
+
+        token = self._get_access_token()
+        res = self.client.get(
+            f"/protocolos?animal_id={animal_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(res.status_code, 200)
+        items = {item["id"]: item for item in res.json()}
+
+        self.assertEqual(items[fixo_id]["dose_sugerida"], 5.0)
+        esperado_proporcional = round(animal["current_weight"] / 100.0 * 1.0, 2)
+        self.assertEqual(items[proporcional_id]["dose_sugerida"], esperado_proporcional)
+
+    def test_get_protocolos_com_animal_id_inexistente_retorna_404(self):
+        token = self._get_access_token()
+        res = self.client.get(
+            "/protocolos?animal_id=NAO_EXISTE_999",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(res.status_code, 404)
 
     def test_get_medicamentos_usa_carencia_calculada_pelo_repositorio(self):
         """Critério 3 (Spec 0050): a API expõe a carência calculada pelo repositório."""

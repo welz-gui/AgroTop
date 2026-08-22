@@ -47,7 +47,13 @@ from backend_api.schemas import (
 from database import add_photo, get_all_lotes, get_photo_image, get_photos
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
 from repositories.pesagens import add_weighing, calculate_gmd
-from repositories.sanidade import add_medication, get_medications, get_protocols, get_withdrawal_end
+from repositories.sanidade import (
+    add_medication,
+    dose_for_animal,
+    get_medications,
+    get_protocols,
+    get_withdrawal_end,
+)
 from services.zootecnia import calculate_gmd_total
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -346,8 +352,28 @@ def get_photo_file(
 @app.get("/protocolos", response_model=list[ProtocoloOutput])
 def list_protocolos(
     _user: Annotated[dict[str, Any], Depends(get_current_user)],
+    animal_id: Optional[str] = Query(
+        None,
+        description="Se informado, inclui dose_sugerida calculada para este animal "
+                    "(services/sanidade.py::dose_for_animal — fixa ou proporcional ao "
+                    "peso corrente, conforme o protocolo)",
+    ),
 ) -> list[dict[str, Any]]:
-    """Lista os protocolos sanitários ativos."""
+    """Lista os protocolos sanitários ativos.
+
+    Sem `animal_id`, `dose_sugerida` vem `null` em todos os itens — o cálculo depende
+    do peso do animal (protocolos com `dose_ref_kg` são proporcionais ao peso, não uma
+    dose fixa), então não há valor único a mostrar sem saber de quem.
+    """
+    animal = None
+    if animal_id is not None:
+        animal = get_animal(animal_id)
+        if animal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Animal não encontrado.",
+            )
+
     return [
         {
             "id": protocolo["id"],
@@ -355,6 +381,7 @@ def list_protocolos(
             "via": protocolo.get("route") or "",
             "carencia_dias": int(protocolo.get("withdrawal_days") or 0),
             "unidade_dose": protocolo.get("dose_unit") or "",
+            "dose_sugerida": dose_for_animal(protocolo, animal) if animal is not None else None,
         }
         for protocolo in get_protocols(active_only=True)
     ]

@@ -1,5 +1,17 @@
 # Spec 0050 — API: registrar medicamento e consultar carência
 
+> ✅ **Concluída** ([PR #181](https://github.com/welz-gui/AgroTop/pull/181)) — este
+> arquivo já não é uma tarefa para pegar, é o registro do que foi entregue. **Atualização
+> de 2026-08-22:** a revisão da spec 0051 (mobile) achou uma contradição real — 0051 exige
+> preencher a dose automaticamente ao escolher um protocolo, mas `GET /protocolos` não
+> devolvia dose nenhuma, e a fórmula que calcula a dose por animal
+> (`repositories/sanidade.py::dose_for_animal`, fixa ou proporcional ao peso conforme o
+> protocolo) não podia ser duplicada no mobile (ROADMAP: nenhuma fórmula de negócio em
+> Dart). Corrigido pelo mantenedor: `GET /protocolos` ganhou o parâmetro opcional
+> `?animal_id=` e o campo `dose_sugerida` (ver contrato abaixo, já atualizado). A função
+> interna que fazia o cálculo perdeu o `_` do nome (`_dose_for_animal` →
+> `dose_for_animal`) por ganhar um consumidor fora de `repositories/sanidade.py`.
+
 - **Tipo:** implementação · **Risco:** médio · **Esforço:** 2 dias
 - **Branch:** `feat/api-sanidade-medicamentos`
 - **Altere:** `backend_api/` (adiciona rotas e testes ao que a spec 0044 entregou)
@@ -54,10 +66,16 @@ selecionar insumo.
 ## Contrato obrigatório
 
 ```
-GET  /protocolos
+GET  /protocolos?animal_id=<opcional>
      -> 200 [{ "id": int, "nome": str, "via": str, "carencia_dias": int,
-                "unidade_dose": str }, ...]
+                "unidade_dose": str, "dose_sugerida": float | null }, ...]
      (protocolos ATIVOS — active_only=True, sempre)
+
+     Sem `animal_id`: "dose_sugerida" vem `null` em todos os itens — a dose de um
+     protocolo com `dose_ref_kg` é proporcional ao peso do animal, não existe um valor
+     único sem saber de quem. Com `animal_id` válido: "dose_sugerida" é
+     `dose_for_animal(protocolo, animal)` (fixa ou proporcional, a mesma conta que
+     `apply_protocol_campaign` já usa). `animal_id` inexistente devolve `404`.
 
 GET  /animais/{id}/medicamentos
      -> 200 { "carencia_ate": str | null,       # "AAAA-MM-DD", de get_withdrawal_end
@@ -92,6 +110,12 @@ POST /animais/{id}/medicamentos
    baixa estoque, não é só documentação).
 8. `git grep -n "INSERT INTO medications\|UPDATE animals SET status='carencia'" backend_api/`
    não acha nada — prova de que a rota só chama `add_medication`.
+9. **(Adicionado 2026-08-22)** `GET /protocolos?animal_id=<id>` devolve `dose_sugerida`
+   igual ao que `repositories.sanidade.dose_for_animal(protocolo, animal)` calcula no
+   mesmo banco, para um protocolo de dose fixa e para um de dose proporcional ao peso
+   (`dose_ref_kg > 0`) — os dois casos, não só um.
+10. **(Adicionado 2026-08-22)** `GET /protocolos` sem `animal_id` devolve `dose_sugerida:
+    null` em todos os itens; com `animal_id` inexistente, `404`.
 
 ## Proibições
 

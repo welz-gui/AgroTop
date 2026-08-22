@@ -131,6 +131,7 @@ class ProtocoloOutput(BaseModel):
     via: str
     carencia_dias: int
     unidade_dose: str
+    dose_sugerida: Optional[float] = None
 
 
 class MedicamentoInput(BaseModel):
