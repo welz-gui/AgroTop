@@ -97,7 +97,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | ✅ [#170](https://github.com/welz-gui/AgroTop/pull/170) |
 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | ✅ [#171](https://github.com/welz-gui/AgroTop/pull/171) |
 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | 🟢 disponível |
-| [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | 🟢 disponível |
+| [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | ✅ [#177](https://github.com/welz-gui/AgroTop/pull/177) |
 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) | API: registrar medicamento e consultar carência (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
