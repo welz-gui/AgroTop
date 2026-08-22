@@ -27,16 +27,33 @@ migration) — corrigidos na spec (agora v2), trabalho da v1 preservado na tag
 `retrabalho/0044-api-fastapi-producao-v1-pr169`. Ver a seção "🔁 O que significa retrabalho"
 no `QUADRO.md`.
 
-**Atualização de 2026-08-22 (mais recente):** **0044 concluída** —
+**Atualização de 2026-08-22:** **0044 concluída** —
 [PR #174](https://github.com/welz-gui/AgroTop/pull/174) mesclada, `backend_api/` em
 produção com autenticação JWT (rate limiting, refresh token revogável), `GET /animais`,
 `GET /animais/{id}` e `POST /animais/{id}/pesagens`. Antes do merge, a revisão achou mais
 dois defeitos reais (campos `tag`/`name` que não existem em `animals`, sempre nulos;
 `GET /animais/{id}` devolvendo 404 pra animal vendido/morto em vez da ficha) e um agente
 tentando a 0047 tinha achado o contrato da v2 insuficientemente descrito — os três
-corrigidos antes do merge, com o contrato exato agora fixado na própria spec. **0048,
-0050 e 0052 (endpoints de movimentação/sanidade/foto) destravadas** — podem ser pegas em
-paralelo, cada uma numa rota independente de `backend_api/`.
+corrigidos antes do merge, com o contrato exato agora fixado na própria spec.
+
+**Atualização de 2026-08-22 (mais recente): a Trilha 1 e a Trilha 2 fecharam por
+completo.** 0045–0053 concluídas — [#170](https://github.com/welz-gui/AgroTop/pull/170),
+[#171](https://github.com/welz-gui/AgroTop/pull/171),
+[#178](https://github.com/welz-gui/AgroTop/pull/178) (mobile v1a — login, lista de
+animais, ficha, pesagem),
+[#177](https://github.com/welz-gui/AgroTop/pull/177) (movimentação entre piquetes),
+[#181](https://github.com/welz-gui/AgroTop/pull/181) (sanidade e carência),
+[#180](https://github.com/welz-gui/AgroTop/pull/180) (fotos). O CI passou a cobrir
+Flutter também: `mobile/build_apk.yml` existia mas ficava fora de
+`.github/workflows/` (nunca rodava) e só disparava em `push`, nunca `pull_request` — a
+revisão da PR #178 corrigiu isso antes do merge (`.github/workflows/mobile-ci.yml`),
+então "CI verde" volta a significar `flutter analyze`/`test`/`build` executados de
+verdade, não só o lado Python. A PR #181 teve conflito real de merge com a #180 (mesmos
+arquivos de `backend_api/`, rotas irmãs) — resolvido por união, suíte completa
+reconferida antes do merge. **Restam só as três telas mobile da última leva —
+0049/0051/0053, disponíveis agora que a 0047 mesclou** — ver `QUADRO.md`. O que falta do
+ROADMAP §5 além delas ainda não tem spec (confirmação de trato, "desenhar no mapa",
+Bluetooth, mobile offline).
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -96,13 +113,13 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) | API FastAPI de produção — autenticação e endpoints essenciais (Trilha 1) | implementação | **médio** | ✅ [#174](https://github.com/welz-gui/AgroTop/pull/174) |
 | [0045](0045-importar-perimetro-de-arquivo.md) | Importar perímetro de piquete de arquivo GeoJSON/KML (Trilha 2) | implementação | baixo | ✅ [#170](https://github.com/welz-gui/AgroTop/pull/170) |
 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | ✅ [#171](https://github.com/welz-gui/AgroTop/pull/171) |
-| [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | 🟢 disponível |
+| [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | ✅ [#178](https://github.com/welz-gui/AgroTop/pull/178) |
 | [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | ✅ [#177](https://github.com/welz-gui/AgroTop/pull/177) |
-| [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
-| [0050](0050-api-sanidade-medicamentos-e-carencia.md) | API: registrar medicamento e consultar carência (Trilha 1) | implementação | **médio** | 🟢 disponível |
-| [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
-| [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | 🟢 disponível |
-| [0053](0053-mobile-tela-de-foto.md) | Mobile: tela de foto do animal (Trilha 1) | implementação | baixo | 🔴 bloqueada (espera 0047 mesclar) |
+| [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | 🟢 disponível |
+| [0050](0050-api-sanidade-medicamentos-e-carencia.md) | API: registrar medicamento e consultar carência (Trilha 1) | implementação | **médio** | ✅ [#181](https://github.com/welz-gui/AgroTop/pull/181) |
+| [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | 🟢 disponível |
+| [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) |
+| [0053](0053-mobile-tela-de-foto.md) | Mobile: tela de foto do animal (Trilha 1) | implementação | baixo | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
