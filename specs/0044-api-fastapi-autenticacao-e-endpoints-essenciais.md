@@ -68,34 +68,95 @@ exatamente a lista de critérios de aceite abaixo.
 
 ## Contrato obrigatório
 
+⚠️ **Os formatos exatos abaixo são normativos — não são um esboço.** Um agente
+implementando a spec 0047 (mobile) contra esta spec, sem ver o código desta, achou o
+esboço da v2 insuficiente para montar o mock sem inventar payload — parou e reportou
+corretamente (é o comportamento certo, ROADMAP: "não invente contrato"). O texto abaixo
+foi reescrito para eliminar essa ambiguidade, e é a mesma forma exata que já foi
+implementada e revisada na [PR #174](https://github.com/welz-gui/AgroTop/pull/174).
+**Implemente exatamente estes campos, com estes nomes** — nenhum outro, nenhum a menos.
+
 ### Autenticação (o que a PoC deixou como dívida — fechar aqui é o objetivo principal)
 
 ```
-POST /auth/login      {username, password} -> {access_token, refresh_token, expires_in, user}
-POST /auth/refresh     {refresh_token} -> {access_token, expires_in}
-POST /auth/logout      {refresh_token} -> 204, revoga o refresh token
+POST /auth/login
+     body: {"username": str, "password": str}
+     -> 200 {"access_token": str, "token_type": "bearer", "expires_in": int,
+              "refresh_token": str,
+              "user": {"id": int, "username": str, "name": str, "role": str}}
+     -> 401 se credenciais inválidas (mensagem não distingue usuário inexistente de senha errada)
+     -> 429 se rate limit excedido
+
+POST /auth/refresh
+     body: {"refresh_token": str}
+     -> 200 {"access_token": str, "token_type": "bearer", "expires_in": int}
+     -> 401 se o refresh token for inválido, expirado ou revogado
+
+POST /auth/logout
+     body: {"refresh_token": str}
+     -> 204 (corpo vazio), revoga o refresh token
 ```
 
-- **Rate limiting no login**: limite por IP e por `username` (ex.: 5 tentativas / 5 min);
-  passar do limite devolve `429`, nunca `401` (não vaze se o usuário existe).
-- **Access token de vida curta** (ex.: 15 min) + **refresh token de vida mais longa**
-  (ex.: 7 dias), refresh token **revogável** — guarde os tokens ativos numa tabela nova
-  (ver "O que você PODE criar" abaixo) para permitir revogação real, não só expiração.
-- Falha de login não distingue "usuário não existe" de "senha errada" na mensagem.
+- **Rate limiting no login**: limite por IP (ex.: 5 tentativas / 5 min); passar do limite
+  devolve `429`, nunca `401`.
+- **Access token de vida curta** (15 min) + **refresh token de vida mais longa** (7 dias),
+  persistido numa tabela própria e **revogável de verdade** (ver "O que você PODE criar").
+- `expires_in` é sempre em **segundos**, não milissegundos nem minutos.
 
 ### Endpoints de dados (mínimo para destravar o Mobile v1 depois — não é a lista completa
 do ROADMAP, é o suficiente para provar o padrão com autorização de verdade)
 
 ```
-GET  /animais                    -> lista (rebanho ativo, paginada)
-GET  /animais/{id}               -> ficha de um animal
-POST /animais/{id}/pesagens      {peso, data, method} -> registra pesagem
+GET  /animais?skip=0&limit=50&status=ativo
+     -> 200, ARRAY simples (sem envelope, sem "total"):
+        [{"id": str, "breed": str|null, "sex": str|null, "birth_date": str|null,
+          "entry_weight": float|null, "current_weight": float|null,
+          "target_weight": float|null, "status": str|null,
+          "lote_id": str|int|null, "lot_name": str|null,
+          "animal_uuid": str|null}, ...]
+
+     `skip` (padrão 0, >= 0), `limit` (padrão 50, entre 1 e 500),
+     `status` (padrão "ativo" — mesmo default de `get_all_animals`). Paginação é em
+     memória, sobre o resultado já filtrado — não precisa de LIMIT/OFFSET em SQL, o
+     rebanho real (150–200 cabeças) não justifica isso ainda.
+
+GET  /animais/{id}
+     -> 200, os mesmos campos do item da lista acima, MAIS:
+        {"entry_date": str|null, "fornecedor_id": int|null,
+         "fornecedor_name": str|null,
+         "gmd_recent_kg_day": float|null, "gmd_total_kg_day": float|null}
+     -> 404 só se o animal não existir. **Não filtre por status aqui** — um animal
+        vendido/morto continua com ficha consultável, exatamente como `get_animal()`
+        já se comporta no web. Filtrar por status é só da listagem (`GET /animais`,
+        que já filtra por `status=ativo` por padrão).
+
+POST /animais/{id}/pesagens
+     body: {"peso": float (> 0), "data": str "AAAA-MM-DD",
+             "method": str (opcional, default "pesado"),
+             "notes": str (opcional, default "")}
+     -> 201 {"status": "success", "message": str, "animal_id": str,
+              "peso": float, "data": str}
+     -> 404 se o animal não existir (a mesma exceção que `add_weighing` já levanta)
+     -> 422 (formato automático do FastAPI/Pydantic) se o corpo não validar
 ```
 
-Todos exigem `Authorization: Bearer <access_token>` válido. Nenhuma lógica de negócio nova:
-`POST /animais/{id}/pesagens` chama a mesma função que o web usa para registrar pesagem —
-ache-a em `repositories/pesagens.py` ou `database.py` (fachada) antes de escrever qualquer
-SQL novo.
+**Não inclua `tag` nem `name` no objeto do animal.** `animals` não tem essas colunas — o
+brinco já É o `id`. Expor um campo que é sempre `null` é contrato enganoso; a v2 inicial
+cometeu esse erro e foi corrigida na revisão da PR #174.
+
+Todos os três endpoints de dados exigem `Authorization: Bearer <access_token>` válido.
+Nenhuma lógica de negócio nova: `POST /animais/{id}/pesagens` chama a mesma função que o
+web usa para registrar pesagem — ache-a em `repositories/pesagens.py` antes de escrever
+qualquer SQL novo.
+
+### Formato de erro (todos os endpoints, sem exceção)
+
+Use o padrão automático do FastAPI/`HTTPException` — **não invente um envelope de erro
+customizado**:
+```
+{"detail": "mensagem em texto"}                                    // 401, 404, 429 etc.
+{"detail": [{"loc": [...], "msg": "...", "type": "..."}]}          // 422 (validação Pydantic, automático)
+```
 
 ## O que você PODE criar
 
