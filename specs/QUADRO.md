@@ -4,20 +4,21 @@ Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de ci
 baixo** — a ordem é prioridade, não sugestão.
 
 **Estado em 2026-08-22:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
-[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045, 0046, 0047, 0048, 0050 e 0052
+[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045, 0046, 0047, 0048, 0049, 0050 e 0052
 concluídas** (Trilha 1/2 —
 [#174](https://github.com/welz-gui/AgroTop/pull/174),
 [#170](https://github.com/welz-gui/AgroTop/pull/170),
 [#171](https://github.com/welz-gui/AgroTop/pull/171),
 [#178](https://github.com/welz-gui/AgroTop/pull/178),
 [#177](https://github.com/welz-gui/AgroTop/pull/177),
+[#183](https://github.com/welz-gui/AgroTop/pull/183),
 [#181](https://github.com/welz-gui/AgroTop/pull/181),
-[#180](https://github.com/welz-gui/AgroTop/pull/180)) · 716 testes · CI agora cobre
+[#180](https://github.com/welz-gui/AgroTop/pull/180)) · 718 testes · CI agora cobre
 Flutter também (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da
 0047 abaixo) · 37 tabelas em produção, todas com RLS (políticas explícitas de negação
 para `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **3 specs na fila, todas pegáveis agora** — 0049, 0051, 0053 (telas de
-movimentação/sanidade/foto), destravadas porque a 0047 já mesclou — ver abaixo.
+(7 de 7 telas) · **2 specs na fila, ambas pegáveis agora** — 0051 (sanidade, com o
+adendo de `dose_sugerida` já aplicado — ver abaixo) e 0053 (foto) — ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -134,14 +135,28 @@ movimentação/sanidade/foto), destravadas porque a 0047 já mesclou — ver aba
 | — | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | ✅ [#177](https://github.com/welz-gui/AgroTop/pull/177) | | 2026-08-22 |
 | — | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | ✅ [#181](https://github.com/welz-gui/AgroTop/pull/181) | | 2026-08-22 |
 | — | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) | | 2026-08-22 |
-| 1 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
-| 2 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
-| 3 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
+| — | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) | | 2026-08-22 |
+| 1 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
+| 2 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
 > colidir (telas diferentes) — só confira `git diff --stat origin/main` antes de abrir
-> cada PR.
+> cada PR. **A 0049 já fechou** ([#183](https://github.com/welz-gui/AgroTop/pull/183)) —
+> confirmou os dois critérios mais delicados com teste real: uma única chamada HTTP para
+> N animais selecionados, e as três categorias do resultado (movidos/já no destino/erros)
+> sempre visíveis, mesmo quando vazias — nunca um "sucesso" genérico escondendo as outras.
+
+> **A 0050/0051 tiveram um adendo em 2026-08-22, antes de qualquer código da 0051 ser
+> escrito** ([PR #184](https://github.com/welz-gui/AgroTop/pull/184)): um agente
+> reivindicou a 0051, notou que `GET /protocolos` (contrato já em produção da 0050) não
+> devolvia dose nenhuma — e implementar o preenchimento automático da dose exigiria
+> reproduzir `dose_for_animal` (fixa ou proporcional ao peso) em Dart, duplicação de
+> fórmula proibida — **parou e reportou sem escrever uma linha, exatamente o protocolo
+> certo.** Corrigido pelo mantenedor no backend (`?animal_id=` + campo `dose_sugerida` em
+> `GET /protocolos`, calculados no servidor); as duas specs foram atualizadas para
+> refletir o contrato real. O branch da reivindicação (`feat/mobile-sanidade`) continua de
+> pé — quem pegou pode retomar de onde parou.
 
 > **Histórico da 0044 (fechado em 2026-08-22, ✅ PR #174):** teve retrabalho (v1 → v2,
 > ver a tabela "🔁 O que significa retrabalho" abaixo) e, já na v2, um agente tentando a

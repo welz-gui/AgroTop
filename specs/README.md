@@ -50,10 +50,17 @@ revisão da PR #178 corrigiu isso antes do merge (`.github/workflows/mobile-ci.y
 então "CI verde" volta a significar `flutter analyze`/`test`/`build` executados de
 verdade, não só o lado Python. A PR #181 teve conflito real de merge com a #180 (mesmos
 arquivos de `backend_api/`, rotas irmãs) — resolvido por união, suíte completa
-reconferida antes do merge. **Restam só as três telas mobile da última leva —
-0049/0051/0053, disponíveis agora que a 0047 mesclou** — ver `QUADRO.md`. O que falta do
-ROADMAP §5 além delas ainda não tem spec (confirmação de trato, "desenhar no mapa",
-Bluetooth, mobile offline).
+reconferida antes do merge.
+
+**Atualização de 2026-08-22 (a mais recente):** **0049 concluída**
+([#183](https://github.com/welz-gui/AgroTop/pull/183) — movimentação entre piquetes, com
+seleção múltipla numa única chamada HTTP e as três categorias do resultado sempre
+visíveis). **Adendo na 0050/0051** ([#184](https://github.com/welz-gui/AgroTop/pull/184)):
+um agente reivindicando a 0051 achou que `GET /protocolos` não devolvia dose nenhuma,
+parou sem escrever código — corrigido no backend (`?animal_id=` + `dose_sugerida`). Restam
+só duas specs — **0051 (sanidade) e 0053 (foto), disponíveis** — ver `QUADRO.md`. O que
+falta do ROADMAP §5 além delas ainda não tem spec (confirmação de trato, "desenhar no
+mapa", Bluetooth, mobile offline).
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -115,7 +122,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) | Localização por propriedade na previsão do tempo (Trilha 2) | implementação | baixo | ✅ [#171](https://github.com/welz-gui/AgroTop/pull/171) |
 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) | Mobile v1a: login, animais e pesagem, contra o contrato da 0044 (Trilha 1) | implementação | **médio** | ✅ [#178](https://github.com/welz-gui/AgroTop/pull/178) |
 | [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | ✅ [#177](https://github.com/welz-gui/AgroTop/pull/177) |
-| [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | 🟢 disponível |
+| [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) |
 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) | API: registrar medicamento e consultar carência (Trilha 1) | implementação | **médio** | ✅ [#181](https://github.com/welz-gui/AgroTop/pull/181) |
 | [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | 🟢 disponível |
 | [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) |

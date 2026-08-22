@@ -395,16 +395,23 @@ Regras gerais para trabalho paralelo:
    `specs/QUADRO.md`. **Segunda fatia — ✅ concluída em 2026-08-22:**
    [0048](specs/0048-api-movimentacao-entre-lotes.md)/[PR #177](https://github.com/welz-gui/AgroTop/pull/177)
    (`GET /lotes` + `POST /animais/movimentar`, expondo `move_animals_bulk` sem lógica nova)
-   e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md) — **disponível para
-   implementar** (a API já existe; a tela ainda não). **Terceira fatia (sanidade) — API ✅
-   concluída** ([0050](specs/0050-api-sanidade-medicamentos-e-carencia.md)/[PR #181](https://github.com/welz-gui/AgroTop/pull/181),
-   sem baixa de estoque nesta fatia, decisão registrada na spec), tela
-   ([0051](specs/0051-mobile-tela-de-sanidade.md)) **disponível**. **Quarta fatia (foto) —
-   API ✅ concluída** ([0052](specs/0052-api-foto-do-animal.md)/[PR #180](https://github.com/welz-gui/AgroTop/pull/180),
-   mantém fotos em `bytea`, sem storage externo), tela
-   ([0053](specs/0053-mobile-tela-de-foto.md), compressão no app porque
-   `_compress_image` mora em `app.py`, intocável) **disponível**. Confirmação de trato
-   fica para uma spec de endpoint futura.
+   e [0049](specs/0049-mobile-tela-de-movimentacao-entre-lotes.md)/[PR #183](https://github.com/welz-gui/AgroTop/pull/183)
+   (seleção múltipla numa única chamada HTTP; resultado com as três categorias sempre
+   visíveis — movidos, já no destino, erros). **Terceira fatia (sanidade) — API ✅
+   concluída, tela disponível:**
+   [0050](specs/0050-api-sanidade-medicamentos-e-carencia.md)/[PR #181](https://github.com/welz-gui/AgroTop/pull/181)
+   (sem baixa de estoque nesta fatia, decisão registrada na spec) — **adendo em
+   2026-08-22** ([PR #184](https://github.com/welz-gui/AgroTop/pull/184)): `GET
+   /protocolos` ganhou `?animal_id=` + `dose_sugerida` calculada no servidor, porque a
+   [0051](specs/0051-mobile-tela-de-sanidade.md) não podia preencher dose automática sem
+   duplicar a fórmula de `dose_for_animal` no Dart — um agente reivindicando a 0051 achou
+   essa contradição e parou antes de escrever código, protocolo certo. **Quarta fatia
+   (foto) — API ✅ concluída, tela disponível:**
+   [0052](specs/0052-api-foto-do-animal.md)/[PR #180](https://github.com/welz-gui/AgroTop/pull/180)
+   (mantém fotos em `bytea`, sem storage externo) e
+   [0053](specs/0053-mobile-tela-de-foto.md) (compressão no app porque
+   `_compress_image` mora em `app.py`, intocável). Confirmação de trato fica para uma
+   spec de endpoint futura.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.
