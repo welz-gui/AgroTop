@@ -35,6 +35,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Instalar dependências da API
+        run: pip install -r backend_api/requirements.txt
+
       - name: Verificação de compilação
         run: python -m compileall app.py database.py repositories services ui tests tools
 
