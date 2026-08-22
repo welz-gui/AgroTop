@@ -1,8 +1,19 @@
-name: Build AgroTop Mobile APK
+name: Mobile CI (Flutter)
 
+# Existia como mobile/build_apk.yml — fora de .github/workflows/, o GitHub Actions
+# nunca o executava, e o gatilho original só disparava em `push`, nunca em
+# `pull_request`. Efeito prático: nenhuma PR que tocasse mobile/ teve
+# flutter analyze/test/build verificados de verdade antes do merge — "CI verde"
+# em specs 0047/0049/0051/0053 provava só que o lado Python não quebrou (mesmo
+# gap de fundo do Defeito 1 da spec 0044, agora do lado Flutter). Movido para
+# aqui e com `pull_request:` adicionado corrige isso.
 on:
   workflow_dispatch:
   push:
+    branches: [ main ]
+    paths:
+      - "mobile/**"
+  pull_request:
     paths:
       - "mobile/**"
 
@@ -41,6 +52,11 @@ jobs:
 
       - name: Testes
         run: flutter test
+
+      - name: app_colors.dart não diverge de ui/tema.py
+        run: |
+          python3 tool/generate_app_colors.py
+          git diff --exit-code -- lib/app_colors.dart
 
       - name: APK de depuração
         run: flutter build apk --debug --dart-define=AGROTOP_API_URL=https://api.example.invalid
