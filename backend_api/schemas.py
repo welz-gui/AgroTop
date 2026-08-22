@@ -86,3 +86,28 @@ class PesagemOutput(BaseModel):
     animal_id: Union[str, int]
     peso: float
     data: str
+
+
+class LoteSummary(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    nome: str
+    capacidade_ua: Optional[float] = None
+    animais_ativos: int
+
+
+class MovimentarInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    animal_ids: list[str] = Field(..., min_length=1, description="Lista de IDs dos animais a movimentar")
+    to_lote_id: str = Field(..., min_length=1, description="ID do piquete de destino")
+    movement_date: str = Field(..., description="Data da movimentação no formato AAAA-MM-DD")
+    reason: Optional[str] = Field(default="manejo", description="Motivo da movimentação (default: manejo)")
+    notes: Optional[str] = Field(default="", description="Observações opcionais")
+
+
+class MovimentarOutput(BaseModel):
+    movidos: list[str]
+    ja_no_destino: list[str]
+    erros: list[str]

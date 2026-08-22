@@ -1,4 +1,4 @@
-"""API FastAPI de Produção do AgroTop (Spec 0044).
+"""API FastAPI de Produção do AgroTop (Spec 0044 + Spec 0048).
 
 Expõe autenticação JWT com refresh tokens revogáveis e endpoints essenciais de dados,
 reaproveitando a camada de serviços e repositórios existente.
@@ -28,6 +28,9 @@ from backend_api.schemas import (
     AnimalSummary,
     LoginInput,
     LogoutInput,
+    LoteSummary,
+    MovimentarInput,
+    MovimentarOutput,
     PesagemInput,
     PesagemOutput,
     RefreshInput,
@@ -35,7 +38,8 @@ from backend_api.schemas import (
     TokenOutput,
     UserSummary,
 )
-from repositories.animais import get_all_animals, get_animal
+from database import get_all_lotes
+from repositories.animais import get_all_animals, get_animal, move_animals_bulk
 from repositories.pesagens import add_weighing, calculate_gmd
 from services.zootecnia import calculate_gmd_total
 
@@ -202,3 +206,41 @@ def register_pesagem(
         peso=data.peso,
         data=data.data,
     )
+
+
+@app.get("/lotes", response_model=list[LoteSummary])
+def list_lotes(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Lista piquetes/lotes cadastrados com capacidade e quantidade de animais ativos."""
+    all_lotes = get_all_lotes()
+    return [
+        {
+            "id": str(l["id"]),
+            "nome": l.get("name") or "",
+            "capacidade_ua": float(l["capacity_ua"]) if l.get("capacity_ua") is not None else None,
+            "animais_ativos": int(l.get("animal_count") or 0),
+        }
+        for l in all_lotes
+    ]
+
+
+@app.post("/animais/movimentar", response_model=MovimentarOutput)
+def movimentar_animais(
+    data: MovimentarInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, list[str]]:
+    """Transfere um ou mais animais para outro piquete (em lote)."""
+    motivo = data.reason or "manejo"
+    observacoes = data.notes or ""
+    operador = user.get("username", "")
+
+    resultado = move_animals_bulk(
+        animal_ids=data.animal_ids,
+        to_lote_id=data.to_lote_id,
+        movement_date=data.movement_date,
+        reason=motivo,
+        operator=operador,
+        notes=observacoes,
+    )
+    return resultado
