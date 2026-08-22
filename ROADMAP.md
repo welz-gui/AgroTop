@@ -452,9 +452,15 @@ autoria e horário registrados, e o resultado aparece no web.
 1. 🟡 **Guardar a geometria de cada piquete e da propriedade** — feito, mas parcial: o
    perímetro entra **digitando vértices** (`longitude, latitude`, um por linha, formato
    GeoJSON), em `page_lotes` (por piquete, migration 0015) e na edição de propriedade
-   (`properties.poligono`). **Não tem "desenhar no mapa" nem "importar arquivo"** — quem
-   tem um KML/shapefile do piquete precisa converter os vértices à mão. Isso é uma
-   limitação real, não uma etapa concluída.
+   (`properties.poligono`). **Não tem "desenhar no mapa"** ainda — isso é integração de UI
+   (`streamlit-folium` + plugin de desenho), trabalho do mantenedor (R31), não delegado.
+   **"Importar arquivo" tem o parser pronto** desde 2026-08-21 —
+   [spec 0045](specs/0045-importar-perimetro-de-arquivo.md)/[PR #170](https://github.com/welz-gui/AgroTop/pull/170)
+   entregou `services/importacao_geometria.py::ler_geojson`/`ler_kml`, testado, compatível
+   com `services/geometria.py` sem conversão — mas **ainda não está ligado a nenhuma
+   tela** (upload de arquivo em `page_lotes`/propriedade), de propósito: a spec só cobria a
+   função pura, a integração é do mantenedor. Continua sendo limitação real de uso até essa
+   ligação acontecer.
 2. ~~**Área calculada a partir do polígono**, não digitada.~~ 🟢 **Fechado em 2026-08-14.**
    `services/geometria.py::area_hectares` existia desde a etapa B (spec 0015/PR #46), e a
    tela já **mostrava** a área calculada lado a lado com a digitada — mas
@@ -464,16 +470,19 @@ autoria e horário registrados, e o resultado aparece no web.
    Agora `set_lote_poligono` deriva e grava `area_ha` na mesma escrita quando o polígono é
    válido; apagar o polígono preserva o último valor calculado como fallback manual (regra
    abaixo, intacta).
-3. ⬜ **Decidido em 2026-08-21, spec [0046](specs/0046-localizacao-por-propriedade-na-previsao-do-tempo.md)
-   escrita:** a previsão passa a ser por **PROPRIEDADE**, não por piquete. Não é limite de
-   custo de API — `_fetch_forecast` usa Open-Meteo, gratuito e sem chave — é que piquetes da
-   mesma propriedade ficam perto demais para uma previsão distinta valer a pena (ruído, não
-   informação), enquanto propriedades diferentes (ADR 0004: um produtor pode ter mais de
-   uma) podem ficar longe de verdade. `properties.longitude`/`latitude` já são preenchidos
-   por `services/geometria.py::centroide` desde a spec 0015 — falta só usar isso na
-   previsão em vez da única coordenada `farm_lat`/`farm_lon` (`page_clima`, hoje "a mesma
-   previsão vale para todos os piquetes da fazenda"), com fallback para quem ainda não tem
-   coordenada própria de propriedade.
+3. 🟡 **Decidido em 2026-08-21: a previsão passa a ser por PROPRIEDADE, não por piquete.**
+   Não é limite de custo de API — `_fetch_forecast` usa Open-Meteo, gratuito e sem chave —
+   é que piquetes da mesma propriedade ficam perto demais para uma previsão distinta valer
+   a pena (ruído, não informação), enquanto propriedades diferentes (ADR 0004: um produtor
+   pode ter mais de uma) podem ficar longe de verdade. `properties.longitude`/`latitude`
+   já são preenchidos por `services/geometria.py::centroide` desde a spec 0015.
+   [Spec 0046](specs/0046-localizacao-por-propriedade-na-previsao-do-tempo.md)/[PR #171](https://github.com/welz-gui/AgroTop/pull/171)
+   entregou `services/clima_adaptador.py::localizacoes_para_previsao`, testado — resolve a
+   coordenada de cada propriedade com fallback para `farm_lat`/`farm_lon` e agrupa
+   propriedades que caem na mesma coordenada, sem chamada duplicada. **Ainda não está
+   ligado a `page_clima`** (a tela continua mostrando "a mesma previsão vale para todos os
+   piquetes da fazenda") — a integração é do mantenedor, de propósito, não fazia parte do
+   escopo da spec.
 4. ⬜ Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1, etapa 2).
 
 **Técnico:** **PostGIS 3.3.7 está disponível** no projeto (não instalado, **e não foi

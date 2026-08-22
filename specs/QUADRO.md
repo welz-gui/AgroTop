@@ -4,13 +4,15 @@ Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de ci
 baixo** — a ordem é prioridade, não sugestão.
 
 **Estado em 2026-08-22:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
-[ROADMAP](../ROADMAP.md) concluídas · **0044 (API FastAPI de produção, Trilha 1)
-concluída** ([#174](https://github.com/welz-gui/AgroTop/pull/174), `backend_api/` em
-`main`) · 698 testes · 37 tabelas em produção, todas com RLS (políticas explícitas de
-negação para `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à
-interface** (7 de 7 telas) · **9 specs na fila, 6 pegáveis agora e 3 bloqueadas por
-sequenciamento** — 0045, 0046, 0047, 0048, 0050, 0052 disponíveis já; 0049/0051/0053
-(telas de movimentação/sanidade/foto) esperam a 0047 mesclar — ver abaixo.
+[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045 e 0046 concluídas** (Trilha 1/2 —
+[#174](https://github.com/welz-gui/AgroTop/pull/174),
+[#170](https://github.com/welz-gui/AgroTop/pull/170),
+[#171](https://github.com/welz-gui/AgroTop/pull/171)) · 698 testes · 37 tabelas em
+produção, todas com RLS (políticas explícitas de negação para `anon`/`authenticated`
+desde a migration 0024) · **Fase B 100% ligada à interface** (7 de 7 telas) · **7 specs
+na fila, 4 pegáveis agora e 3 bloqueadas por sequenciamento** — 0047, 0048, 0050, 0052
+disponíveis já; 0049/0051/0053 (telas de movimentação/sanidade/foto) esperam a 0047
+mesclar — ver abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -121,12 +123,12 @@ sequenciamento** — 0045, 0046, 0047, 0048, 0050, 0052 disponíveis já; 0049/0
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
 | — | [0044](0044-api-fastapi-autenticacao-e-endpoints-essenciais.md) — API FastAPI de produção: autenticação e endpoints essenciais 🔁v2 ⚠️médio | — | ✅ [#174](https://github.com/welz-gui/AgroTop/pull/174) | | 2026-08-22 |
-| 1 | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | 🟢 disponível | | 2026-08-21 |
-| 2 | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | 🟢 disponível | | 2026-08-21 |
-| 3 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
-| 4 | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
-| 5 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
-| 6 | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+| — | [0045](0045-importar-perimetro-de-arquivo.md) — importar perímetro de piquete de arquivo GeoJSON/KML 🏗️ | — | ✅ [#170](https://github.com/welz-gui/AgroTop/pull/170) | | 2026-08-21 |
+| — | [0046](0046-localizacao-por-propriedade-na-previsao-do-tempo.md) — localização por propriedade na previsão do tempo 🏗️ | — | ✅ [#171](https://github.com/welz-gui/AgroTop/pull/171) | | 2026-08-21 |
+| 1 | [0047](0047-mobile-v1a-login-animais-e-pesagem.md) — Mobile v1a: login, animais e pesagem 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-21 |
+| 2 | [0048](0048-api-movimentacao-entre-lotes.md) — API: movimentação de animais entre piquetes 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+| 3 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
+| 4 | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | 🟢 disponível — **0044 já mesclada** | | 2026-08-21 |
 
 > **0048/0050/0052 destravadas em 2026-08-22** — a 0044 mesclou (PR #174). São rotas
 > independentes, em arquivos diferentes dentro de `backend_api/`: podem ser pegas em
@@ -138,9 +140,9 @@ antes de reivindicar:**
 
 | Ordem | Spec | Branch | Estado | Quem | Desde |
 |---|---|---|---|---|---|
-| 7 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-| 8 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
-| 9 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+| 5 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+| 6 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
+| 7 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🔴 bloqueada — espera **0047 mesclada** | | 2026-08-21 |
 
 > **0049/0051/0053 continuam bloqueadas** — cada uma estende o mesmo app Flutter que a
 > 0047 cria, código que ainda não existe em `main`. Assim que a 0047 mesclar, as três
