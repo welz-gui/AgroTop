@@ -48,6 +48,27 @@ class TestGeometriaPiquete(unittest.TestCase):
             perimetro_metros(self.quadrado_100m), 400.0, delta=2.0
         )
 
+    def test_perimetro_metros_triangulo_conhecido(self):
+        para_utm = Transformer.from_crs("EPSG:4326", "EPSG:32721", always_xy=True)
+        para_gps = Transformer.from_crs("EPSG:32721", "EPSG:4326", always_xy=True)
+        centro_x, centro_y = para_utm.transform(*self.centro_esperado)
+
+        triangulo_30_40_50 = [
+            para_gps.transform(centro_x, centro_y),
+            para_gps.transform(centro_x + 30.0, centro_y),
+            para_gps.transform(centro_x, centro_y + 40.0),
+        ]
+
+        self.assertAlmostEqual(
+            perimetro_metros(triangulo_30_40_50), 120.0, delta=1.0
+        )
+
+    def test_perimetro_metros_rejeita_poligono_invalido(self):
+        invalido = [(-55.9, -13.3), (-55.8, -13.3)]
+
+        with self.assertRaisesRegex(ValueError, "O polígono precisa ter pelo menos 3 vértices."):
+            perimetro_metros(invalido)
+
     def test_centroide_volta_em_longitude_latitude(self):
         lon, lat = centroide(self.quadrado_100m)
 
