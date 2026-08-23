@@ -19,7 +19,7 @@ from typing import Optional
 from services.compras import gerar_parcelas, total_compra
 from services.estoque import custo_medio_ponderado
 
-from .conexao import _cache, _conn, _writes
+from .conexao import _conn, _writes
 
 
 def _novo_id() -> str:
