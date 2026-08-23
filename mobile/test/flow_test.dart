@@ -1,12 +1,15 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app.dart';
+import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image/image.dart' as image_lib;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MemoryTokenStore implements TokenStore {
@@ -27,6 +30,31 @@ http.Response _json(Object body, {int status = 200}) => http.Response(
   status,
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
+
+Uint8List _testPhoto() {
+  final photo = image_lib.Image(width: 1200, height: 800);
+  for (var y = 0; y < photo.height; y++) {
+    for (var x = 0; x < photo.width; x++) {
+      photo.setPixelRgb(x, y, x % 256, y % 256, (x + y) % 256);
+    }
+  }
+  return Uint8List.fromList(image_lib.encodePng(photo, level: 0));
+}
+
+Uint8List _jpegFromMultipart(Uint8List body) {
+  var start = -1;
+  var end = -1;
+  for (var index = 0; index < body.length - 1; index++) {
+    if (start < 0 && body[index] == 0xff && body[index + 1] == 0xd8) {
+      start = index;
+    }
+    if (body[index] == 0xff && body[index + 1] == 0xd9) {
+      end = index + 2;
+    }
+  }
+  if (start < 0 || end <= start) throw StateError('JPEG ausente no multipart');
+  return Uint8List.fromList(body.sublist(start, end));
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +133,10 @@ void main() {
           'gmd_recent_kg_day': 0.742,
           'gmd_total_kg_day': 0.513,
         });
+      }
+      if (request.method == 'GET' &&
+          request.url.path == '/animais/BR0001/fotos') {
+        return _json([]);
       }
       if (request.method == 'POST' &&
           request.url.path == '/animais/BR0001/pesagens') {
@@ -272,6 +304,151 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('foto é comprimida, enviada por multipart e aparece na galeria', (
+    tester,
+  ) async {
+    final original = _testPhoto();
+    Uint8List? uploaded;
+    final api = ApiClient(
+      tokenStore: MemoryTokenStore()
+        ..tokens = const StoredTokens(
+          accessToken: 'access-live',
+          refreshToken: 'refresh-valid',
+        ),
+      baseUrl: 'http://mock.local',
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.path == '/animais/BR0001/fotos') {
+          return _json(
+            uploaded == null
+                ? []
+                : [
+                    {'id': 1, 'taken_date': '2026-08-23', 'mime': 'image/jpeg'},
+                  ],
+          );
+        }
+        if (request.method == 'POST' &&
+            request.url.path == '/animais/BR0001/fotos') {
+          expect(
+            request.headers['content-type'],
+            startsWith('multipart/form-data; boundary='),
+          );
+          uploaded = _jpegFromMultipart(request.bodyBytes);
+          return _json({'id': 1}, status: 201);
+        }
+        if (request.method == 'GET' && request.url.path == '/fotos/1') {
+          return http.Response.bytes(
+            uploaded!,
+            200,
+            headers: {'content-type': 'image/jpeg'},
+          );
+        }
+        return _json({'detail': 'Não encontrado'}, status: 404);
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: AnimalPhotoSection(
+              api: api,
+              animalId: 'BR0001',
+              onUnauthorized: () {},
+              capturePhoto: () async => original,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhuma foto enviada'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('take-animal-photo')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pending-animal-photo')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('send-animal-photo')));
+    await tester.pumpAndSettle();
+
+    expect(uploaded, isNotNull);
+    expect(uploaded!.length, lessThan(original.length));
+    expect(find.text('Foto enviada com sucesso.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('animal-photo-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pending-animal-photo')), findsNothing);
+  });
+
+  testWidgets('erro de envio mantém a foto pronta para reenviar', (
+    tester,
+  ) async {
+    final original = _testPhoto();
+    var captureCalls = 0;
+    var uploadCalls = 0;
+    final api = ApiClient(
+      tokenStore: MemoryTokenStore()
+        ..tokens = const StoredTokens(
+          accessToken: 'access-live',
+          refreshToken: 'refresh-valid',
+        ),
+      baseUrl: 'http://mock.local',
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.path == '/animais/BR0001/fotos') {
+          return _json([]);
+        }
+        if (request.method == 'POST' &&
+            request.url.path == '/animais/BR0001/fotos') {
+          uploadCalls++;
+          if (uploadCalls == 1) {
+            throw http.ClientException('sem conexão');
+          }
+          return _json({'id': 1}, status: 201);
+        }
+        return _json({'detail': 'Não encontrado'}, status: 404);
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: AnimalPhotoSection(
+              api: api,
+              animalId: 'BR0001',
+              onUnauthorized: () {},
+              capturePhoto: () async {
+                captureCalls++;
+                return original;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('take-animal-photo')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('send-animal-photo')));
+    await tester.pumpAndSettle();
+
+    expect(uploadCalls, 1);
+    expect(captureCalls, 1);
+    expect(
+      find.text(
+        'Falha de rede. A foto foi mantida para você tentar enviar novamente.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('pending-animal-photo')), findsOneWidget);
+    expect(find.byKey(const ValueKey('send-animal-photo')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('send-animal-photo')));
+    await tester.pumpAndSettle();
+    expect(uploadCalls, 2);
+    expect(captureCalls, 1);
+    expect(find.text('Foto enviada com sucesso.'), findsOneWidget);
   });
 
   testWidgets('seleção múltipla envia um POST e separa o resultado parcial', (

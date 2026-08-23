@@ -169,3 +169,21 @@ class MovementResult {
     erros: List<String>.from(json['erros'] as List<dynamic>),
   );
 }
+
+class AnimalPhoto {
+  const AnimalPhoto({
+    required this.id,
+    required this.takenDate,
+    required this.mime,
+  });
+
+  final int id;
+  final String takenDate;
+  final String mime;
+
+  factory AnimalPhoto.fromJson(Map<String, dynamic> json) => AnimalPhoto(
+    id: json['id'] as int,
+    takenDate: json['taken_date'] as String,
+    mime: json['mime'] as String,
+  );
+}

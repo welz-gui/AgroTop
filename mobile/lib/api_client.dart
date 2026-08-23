@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'models.dart';
 
@@ -193,6 +195,77 @@ class ApiClient {
       );
     }
     return MovementResult.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<List<AnimalPhoto>> listAnimalPhotos(String animalId) async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse('$baseUrl/animais/${Uri.encodeComponent(animalId)}/fotos'),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar as fotos.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((item) => AnimalPhoto.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<Uint8List> getAnimalPhoto(int photoId) async {
+    final response = await _authorized(
+      (headers) =>
+          _http.get(Uri.parse('$baseUrl/fotos/$photoId'), headers: headers),
+    );
+    if (response.statusCode != 200) {
+      dynamic body;
+      try {
+        body = _decode(response);
+      } on ApiException {
+        body = null;
+      }
+      throw ApiException(
+        _message(body, 'Não foi possível carregar a foto.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return response.bodyBytes;
+  }
+
+  Future<int> uploadAnimalPhoto(
+    String animalId, {
+    required Uint8List bytes,
+    String? takenDate,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/animais/${Uri.encodeComponent(animalId)}/fotos',
+    );
+    final response = await _authorized((headers) async {
+      final request = http.MultipartRequest('POST', uri)
+        ..headers.addAll(headers)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'arquivo',
+            bytes,
+            filename: 'animal.jpg',
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      if (takenDate != null) request.fields['taken_date'] = takenDate;
+      return http.Response.fromStream(await _http.send(request));
+    });
+    final body = _decode(response);
+    if (response.statusCode != 201) {
+      throw ApiException(
+        _message(body, 'Não foi possível enviar a foto.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as Map<String, dynamic>)['id'] as int;
   }
 
   Future<void> logout() async {
