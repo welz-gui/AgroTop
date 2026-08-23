@@ -993,6 +993,218 @@ def _teclado_numerico():
                         st.rerun(scope="fragment")
 
 
+def _tab_pesagem(animal):
+    # Comparação com estimativa anterior pendente
+    pend = db.get_last_estimate(animal["id"])
+    if pend:
+        met_lbl = db.WEIGH_METHODS.get(pend.get("method"),"estimativa")
+        st.info(f"📋 Última pesagem foi **{met_lbl.lower()}**: "
+                f"**{pend['weight']:.1f} kg** em {pend['weigh_date']}. "
+                f"Se pesar agora na balança, o app mostra a diferença.")
+
+    # Método fora do form para reagir à escolha
+    metodo_peso = st.radio("Método da pesagem",
+        list(db.WEIGH_METHODS.keys()),
+        format_func=lambda m: db.WEIGH_METHODS[m],
+        horizontal=True, key=f"peso_metodo_{animal['id']}")
+
+    nw = float(animal["current_weight"])
+    if metodo_peso == "medicao":
+        st.caption("Informe as medidas do animal — o peso é estimado pela fórmula "
+                   "de Schaeffer (perímetro torácico e comprimento corporal).")
+        mm1, mm2 = st.columns(2)
+        with mm1:
+            pt = st.number_input("Perímetro torácico (cm)", min_value=0.0,
+                max_value=350.0, value=180.0, step=1.0, key=f"pt_{animal['id']}")
+        with mm2:
+            comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
+                max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
+        nw = db.estimate_weight_by_measurement(pt, comp)
+        st.success(f"⚖️ Peso estimado por medição: **{nw:.1f} kg**")
+        medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
+    else:
+        medida_nota = ""
+
+    _pend_alerta = st.session_state.get(f"alerta_peso_{animal['id']}")
+    if _pend_alerta:
+        st.error("⚠️ **Confira antes de salvar** — o peso informado parece fora do padrão:")
+        for _a in _pend_alerta["alertas"]:
+            _ic = "🔴" if _a["severidade"] == "alta" else "🟡"
+            st.markdown(f"{_ic} {_a['mensagem']}")
+        _cc1, _cc2 = st.columns(2)
+        if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
+                       use_container_width=True):
+            db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
+                st.session_state.user["name"], _pend_alerta["notas"],
+                method=_pend_alerta["metodo"])
+            st.session_state.pop(f"alerta_peso_{animal['id']}", None)
+            st.success(f"✅ {_pend_alerta['peso']:.1f} kg salvo."); st.rerun()
+        if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
+                       use_container_width=True):
+            st.session_state.pop(f"alerta_peso_{animal['id']}", None); st.rerun()
+
+    with st.form("f_peso",clear_on_submit=True):
+        pc1,pc2=st.columns(2)
+        with pc1:
+            if metodo_peso == "medicao":
+                st.number_input("Peso estimado (kg)", value=float(nw),
+                    disabled=True, key=f"pesomed_{animal['id']}")
+                nw_final = nw
+            else:
+                lbl = "Peso (kg) — balança" if metodo_peso=="pesado" else "Peso estimado (kg)"
+                nw_final = st.number_input(lbl, min_value=1.0, max_value=2000.0,
+                    value=float(animal["current_weight"]), step=0.5, format="%.1f")
+        with pc2:
+            wd_=st.date_input("Data",value=date.today())
+        notes_p=st.text_area("Obs.",height=60,placeholder="Opcional",
+            value=medida_nota)
+        if st.form_submit_button("✅ Salvar Pesagem",type="primary",use_container_width=True):
+            # Confere indícios de erro ANTES de gravar. Não bloqueia: se houver
+            # alerta de severidade alta, pede uma confirmação — peso errado
+            # contamina GMD, projeção de abate, custo por arroba e ranking.
+            _hist = [{"peso": w["weight"], "data": w["weigh_date"]}
+                     for w in db.get_weighings(animal["id"])]
+            _alertas = avaliar_pesagem(nw_final, wd_.strftime("%Y-%m-%d"), _hist)
+            _graves = [a for a in _alertas if a["severidade"] == "alta"]
+            _ja_confirmado = st.session_state.pop(f"conf_peso_{animal['id']}", False)
+
+            if _graves and not _ja_confirmado:
+                st.session_state[f"alerta_peso_{animal['id']}"] = {
+                    "alertas": _alertas, "peso": nw_final,
+                    "data": wd_.strftime("%Y-%m-%d"), "notas": notes_p,
+                    "metodo": metodo_peso}
+                st.rerun()
+
+            db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
+                st.session_state.user["name"], notes_p, method=metodo_peso)
+            for _a in _alertas:
+                st.warning(f"⚠️ {_a['mensagem']}")
+            msg = f"✅ {nw_final:.1f} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
+            # Comparação estimativa × pesagem real
+            if metodo_peso == "pesado" and pend:
+                err = nw_final - pend["weight"]
+                pct = (err/pend["weight"]*100) if pend["weight"] else 0
+                msg += (f" · Diferença para a estimativa anterior "
+                        f"({pend['weight']:.1f} kg): {err:+.1f} kg ({pct:+.1f}%)")
+            st.success(msg)
+            st.rerun()
+
+
+def _tab_medicamento(animal):
+    ROUTES = ["Subcutânea (SC)","Intramuscular (IM)","Intravenosa (IV)","Oral (PO)","Tópica (Pour-on)","Intramamária"]
+    insumos=[i for i in db.get_all_insumos() if i["category"] in ("medicamento","vacina")]
+    with st.form("f_med",clear_on_submit=True):
+        use_stock=st.toggle("Usar do Estoque",value=bool(insumos))
+        if use_stock and insumos:
+            ins_sel=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.0f} {x['unit']} em estoque)")
+            med_name=ins_sel["name"]; unit_def=ins_sel["unit"]; insumo_id=ins_sel["id"]
+        else:
+            med_name=st.text_input("Medicamento *",placeholder="Ex: Ivermectina 1%")
+            unit_def="ml"; insumo_id=None
+            ins_sel=None
+        mc1,mc2,mc3=st.columns(3)
+        with mc1: dose=st.number_input("Dose",min_value=0.0,step=0.5,format="%.1f")
+        with mc2: unit=st.selectbox("Unidade",["ml","mg","g","dose","comprimido"],
+                        index=["ml","mg","g","dose","comprimido"].index(unit_def) if unit_def in ["ml","mg","g","dose","comprimido"] else 0)
+        with mc3: route=st.selectbox("Via",ROUTES)
+        wd_c=st.number_input("Carência (dias)",min_value=0,max_value=180,value=0,step=1)
+        md_=st.date_input("Data Aplicação",value=date.today())
+        notes_m=st.text_area("Obs.",height=60,placeholder="Opcional")
+        if st.form_submit_button("✅ Salvar Medicamento",type="primary",use_container_width=True):
+            if not med_name:
+                st.error("Informe o medicamento.")
+            else:
+                db.add_medication(animal["id"],med_name,dose,unit,route,
+                    int(wd_c),md_.strftime("%Y-%m-%d"),
+                    st.session_state.user["name"],insumo_id,notes_m)
+                st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
+                st.rerun()
+
+
+def _tab_movimentacao(animal):
+    lotes=db.get_all_lotes()
+    with st.form("f_mov",clear_on_submit=True):
+        dest=st.selectbox("Destino (Lote)",lotes,
+            format_func=lambda x:f"{x['id']} — {x['name']} ({_plural(x['animal_count'],'animal','animais')} | {x['area_ha']} ha)")
+        mv_date=st.date_input("Data",value=date.today())
+        reason=st.selectbox("Motivo",["manejo","pesagem","tratamento","separação","venda","óbito"])
+        notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
+        if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
+            if dest:
+                db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
+                    reason,st.session_state.user["name"],notes_mv)
+                st.success(f"✅ {animal['id']} movido para {dest['name']}")
+                st.rerun()
+
+
+def _tab_obito(animal):
+    if animal["status"] == "morto":
+        st.info("Este animal já está registrado como morto.")
+    else:
+        st.warning("Registrar óbito é **irreversível** e muda o status do animal para 'morto'.")
+        with st.form("f_obito", clear_on_submit=True):
+            causa = st.selectbox("Causa do óbito *", db.DEATH_CAUSES)
+            od1, od2 = st.columns(2)
+            with od1:
+                obito_data = st.date_input("Data do óbito", value=date.today())
+            with od2:
+                st.metric("Perda estimada", f"R$ {db.get_total_cost(animal['id']):,.2f}",
+                          help="Custo investido no animal até agora")
+            obs_ob = st.text_area("Observações", height=60,
+                placeholder="Ex: encontrado no piquete norte, suspeita de cobra")
+            confirmar = st.checkbox("Confirmo o registro do óbito deste animal")
+            if st.form_submit_button("☠️ Registrar Óbito", type="primary", use_container_width=True):
+                if not confirmar:
+                    st.error("Marque a confirmação para registrar.")
+                else:
+                    r = db.register_death(animal["id"], obito_data.strftime("%Y-%m-%d"),
+                        causa, operator=st.session_state.user["name"], notes=obs_ob)
+                    st.success(f"Óbito registrado. Perda contabilizada: R$ {r.get('perda',0):,.2f}")
+                    st.rerun()
+
+
+def _tab_historico(animal):
+    c = cores()
+    h1,h2=st.columns(2)
+    with h1:
+        st.markdown("**⚖️ Pesagens**")
+        ws=db.get_weighings(animal["id"])
+        if len(ws)>=2:
+            df_hw=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
+            df_hw.columns=["Data","Peso (kg)"]; df_hw["Data"]=pd.to_datetime(df_hw["Data"])
+            fig_hw=px.line(df_hw,x="Data",y="Peso (kg)",markers=True,
+                color_discrete_sequence=[c["primaria"]])
+            fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=c["superficie"]),
+                yaxis=dict(gridcolor=c["superficie"]))
+            st.plotly_chart(fig_hw,use_container_width=True)
+        for w in ws[:5]:
+            met = w.get("method") or "pesado"
+            mbadge = {"pesado":'<span class="badge-green">balança</span>',
+                      "estimado":'<span class="badge-yellow">estimado</span>',
+                      "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
+            st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
+                f'<span style="color:{c["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
+                f'<span style="color:{c["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
+                unsafe_allow_html=True)
+    with h2:
+        st.markdown("**💉 Medicamentos**")
+        for m in db.get_medications(animal["id"], limit=5):
+            end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
+            badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
+            st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
+                f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
+                f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
+                f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
+                f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
+                f'</span></div>',unsafe_allow_html=True)
+        st.markdown("**🚚 Movimentações**")
+        for mv in db.get_movements(animal["id"], limit=4):
+            st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
+                f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
+                f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
+                f'</div>',unsafe_allow_html=True)
+
+
 def _campo_animal():
     # ── Passo 1: Localizar animal ─────────────────────────────────────────────
     tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
@@ -1085,209 +1297,19 @@ def _campo_animal():
         _photo_section(animal["id"], key_prefix="campo_")
 
     with t5:  # ÓBITO
-        if animal["status"] == "morto":
-            st.info("Este animal já está registrado como morto.")
-        else:
-            st.warning("Registrar óbito é **irreversível** e muda o status do animal para 'morto'.")
-            with st.form("f_obito", clear_on_submit=True):
-                causa = st.selectbox("Causa do óbito *", db.DEATH_CAUSES)
-                od1, od2 = st.columns(2)
-                with od1:
-                    obito_data = st.date_input("Data do óbito", value=date.today())
-                with od2:
-                    st.metric("Perda estimada", f"R$ {db.get_total_cost(animal['id']):,.2f}",
-                              help="Custo investido no animal até agora")
-                obs_ob = st.text_area("Observações", height=60,
-                    placeholder="Ex: encontrado no piquete norte, suspeita de cobra")
-                confirmar = st.checkbox("Confirmo o registro do óbito deste animal")
-                if st.form_submit_button("☠️ Registrar Óbito", type="primary", use_container_width=True):
-                    if not confirmar:
-                        st.error("Marque a confirmação para registrar.")
-                    else:
-                        r = db.register_death(animal["id"], obito_data.strftime("%Y-%m-%d"),
-                            causa, operator=st.session_state.user["name"], notes=obs_ob)
-                        st.success(f"Óbito registrado. Perda contabilizada: R$ {r.get('perda',0):,.2f}")
-                        st.rerun()
+        _tab_obito(animal)
 
     with t1:  # PESAGEM
-        # Comparação com estimativa anterior pendente
-        pend = db.get_last_estimate(animal["id"])
-        if pend:
-            met_lbl = db.WEIGH_METHODS.get(pend.get("method"),"estimativa")
-            st.info(f"📋 Última pesagem foi **{met_lbl.lower()}**: "
-                    f"**{pend['weight']:.1f} kg** em {pend['weigh_date']}. "
-                    f"Se pesar agora na balança, o app mostra a diferença.")
-
-        # Método fora do form para reagir à escolha
-        metodo_peso = st.radio("Método da pesagem",
-            list(db.WEIGH_METHODS.keys()),
-            format_func=lambda m: db.WEIGH_METHODS[m],
-            horizontal=True, key=f"peso_metodo_{animal['id']}")
-
-        nw = float(animal["current_weight"])
-        if metodo_peso == "medicao":
-            st.caption("Informe as medidas do animal — o peso é estimado pela fórmula "
-                       "de Schaeffer (perímetro torácico e comprimento corporal).")
-            mm1, mm2 = st.columns(2)
-            with mm1:
-                pt = st.number_input("Perímetro torácico (cm)", min_value=0.0,
-                    max_value=350.0, value=180.0, step=1.0, key=f"pt_{animal['id']}")
-            with mm2:
-                comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
-                    max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
-            nw = db.estimate_weight_by_measurement(pt, comp)
-            st.success(f"⚖️ Peso estimado por medição: **{nw:.1f} kg**")
-            medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
-        else:
-            medida_nota = ""
-
-        _pend_alerta = st.session_state.get(f"alerta_peso_{animal['id']}")
-        if _pend_alerta:
-            st.error("⚠️ **Confira antes de salvar** — o peso informado parece fora do padrão:")
-            for _a in _pend_alerta["alertas"]:
-                _ic = "🔴" if _a["severidade"] == "alta" else "🟡"
-                st.markdown(f"{_ic} {_a['mensagem']}")
-            _cc1, _cc2 = st.columns(2)
-            if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
-                           use_container_width=True):
-                db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
-                    st.session_state.user["name"], _pend_alerta["notas"],
-                    method=_pend_alerta["metodo"])
-                st.session_state.pop(f"alerta_peso_{animal['id']}", None)
-                st.success(f"✅ {_pend_alerta['peso']:.1f} kg salvo."); st.rerun()
-            if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
-                           use_container_width=True):
-                st.session_state.pop(f"alerta_peso_{animal['id']}", None); st.rerun()
-
-        with st.form("f_peso",clear_on_submit=True):
-            pc1,pc2=st.columns(2)
-            with pc1:
-                if metodo_peso == "medicao":
-                    st.number_input("Peso estimado (kg)", value=float(nw),
-                        disabled=True, key=f"pesomed_{animal['id']}")
-                    nw_final = nw
-                else:
-                    lbl = "Peso (kg) — balança" if metodo_peso=="pesado" else "Peso estimado (kg)"
-                    nw_final = st.number_input(lbl, min_value=1.0, max_value=2000.0,
-                        value=float(animal["current_weight"]), step=0.5, format="%.1f")
-            with pc2:
-                wd_=st.date_input("Data",value=date.today())
-            notes_p=st.text_area("Obs.",height=60,placeholder="Opcional",
-                value=medida_nota)
-            if st.form_submit_button("✅ Salvar Pesagem",type="primary",use_container_width=True):
-                # Confere indícios de erro ANTES de gravar. Não bloqueia: se houver
-                # alerta de severidade alta, pede uma confirmação — peso errado
-                # contamina GMD, projeção de abate, custo por arroba e ranking.
-                _hist = [{"peso": w["weight"], "data": w["weigh_date"]}
-                         for w in db.get_weighings(animal["id"])]
-                _alertas = avaliar_pesagem(nw_final, wd_.strftime("%Y-%m-%d"), _hist)
-                _graves = [a for a in _alertas if a["severidade"] == "alta"]
-                _ja_confirmado = st.session_state.pop(f"conf_peso_{animal['id']}", False)
-
-                if _graves and not _ja_confirmado:
-                    st.session_state[f"alerta_peso_{animal['id']}"] = {
-                        "alertas": _alertas, "peso": nw_final,
-                        "data": wd_.strftime("%Y-%m-%d"), "notas": notes_p,
-                        "metodo": metodo_peso}
-                    st.rerun()
-
-                db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
-                    st.session_state.user["name"], notes_p, method=metodo_peso)
-                for _a in _alertas:
-                    st.warning(f"⚠️ {_a['mensagem']}")
-                msg = f"✅ {nw_final:.1f} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
-                # Comparação estimativa × pesagem real
-                if metodo_peso == "pesado" and pend:
-                    err = nw_final - pend["weight"]
-                    pct = (err/pend["weight"]*100) if pend["weight"] else 0
-                    msg += (f" · Diferença para a estimativa anterior "
-                            f"({pend['weight']:.1f} kg): {err:+.1f} kg ({pct:+.1f}%)")
-                st.success(msg)
-                st.rerun()
+        _tab_pesagem(animal)
 
     with t2:  # MEDICAMENTO
-        insumos=[i for i in db.get_all_insumos() if i["category"] in ("medicamento","vacina")]
-        with st.form("f_med",clear_on_submit=True):
-            use_stock=st.toggle("Usar do Estoque",value=bool(insumos))
-            if use_stock and insumos:
-                ins_sel=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.0f} {x['unit']} em estoque)")
-                med_name=ins_sel["name"]; unit_def=ins_sel["unit"]; insumo_id=ins_sel["id"]
-            else:
-                med_name=st.text_input("Medicamento *",placeholder="Ex: Ivermectina 1%")
-                unit_def="ml"; insumo_id=None
-                ins_sel=None
-            mc1,mc2,mc3=st.columns(3)
-            with mc1: dose=st.number_input("Dose",min_value=0.0,step=0.5,format="%.1f")
-            with mc2: unit=st.selectbox("Unidade",["ml","mg","g","dose","comprimido"],
-                            index=["ml","mg","g","dose","comprimido"].index(unit_def) if unit_def in ["ml","mg","g","dose","comprimido"] else 0)
-            with mc3: route=st.selectbox("Via",ROUTES)
-            wd_c=st.number_input("Carência (dias)",min_value=0,max_value=180,value=0,step=1)
-            md_=st.date_input("Data Aplicação",value=date.today())
-            notes_m=st.text_area("Obs.",height=60,placeholder="Opcional")
-            if st.form_submit_button("✅ Salvar Medicamento",type="primary",use_container_width=True):
-                if not med_name:
-                    st.error("Informe o medicamento.")
-                else:
-                    db.add_medication(animal["id"],med_name,dose,unit,route,
-                        int(wd_c),md_.strftime("%Y-%m-%d"),
-                        st.session_state.user["name"],insumo_id,notes_m)
-                    st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
-                    st.rerun()
+        _tab_medicamento(animal)
 
     with t3:  # MOVIMENTAÇÃO
-        lotes=db.get_all_lotes()
-        with st.form("f_mov",clear_on_submit=True):
-            dest=st.selectbox("Destino (Lote)",lotes,
-                format_func=lambda x:f"{x['id']} — {x['name']} ({_plural(x['animal_count'],'animal','animais')} | {x['area_ha']} ha)")
-            mv_date=st.date_input("Data",value=date.today())
-            reason=st.selectbox("Motivo",["manejo","pesagem","tratamento","separação","venda","óbito"])
-            notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
-            if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
-                if dest:
-                    db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
-                        reason,st.session_state.user["name"],notes_mv)
-                    st.success(f"✅ {animal['id']} movido para {dest['name']}")
-                    st.rerun()
+        _tab_movimentacao(animal)
 
     with t4:  # HISTÓRICO
-        h1,h2=st.columns(2)
-        with h1:
-            st.markdown("**⚖️ Pesagens**")
-            ws=db.get_weighings(animal["id"])
-            if len(ws)>=2:
-                df_hw=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
-                df_hw.columns=["Data","Peso (kg)"]; df_hw["Data"]=pd.to_datetime(df_hw["Data"])
-                fig_hw=px.line(df_hw,x="Data",y="Peso (kg)",markers=True,
-                    color_discrete_sequence=[c["primaria"]])
-                fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=c["superficie"]),
-                    yaxis=dict(gridcolor=c["superficie"]))
-                st.plotly_chart(fig_hw,use_container_width=True)
-            for w in ws[:5]:
-                met = w.get("method") or "pesado"
-                mbadge = {"pesado":'<span class="badge-green">balança</span>',
-                          "estimado":'<span class="badge-yellow">estimado</span>',
-                          "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
-                st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
-                    f'<span style="color:{c["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
-                    f'<span style="color:{c["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
-                    unsafe_allow_html=True)
-        with h2:
-            st.markdown("**💉 Medicamentos**")
-            for m in db.get_medications(animal["id"], limit=5):
-                end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
-                badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
-                st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
-                    f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
-                    f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
-                    f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
-                    f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
-                    f'</span></div>',unsafe_allow_html=True)
-            st.markdown("**🚚 Movimentações**")
-            for mv in db.get_movements(animal["id"], limit=4):
-                st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
-                    f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
-                    f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
-                    f'</div>',unsafe_allow_html=True)
+        _tab_historico(animal)
 
 
 def _campo_importar():
