@@ -155,8 +155,10 @@ adendo de `dose_sugerida` já aplicado — ver abaixo) e 0053 (foto) — ver aba
 > fórmula proibida — **parou e reportou sem escrever uma linha, exatamente o protocolo
 > certo.** Corrigido pelo mantenedor no backend (`?animal_id=` + campo `dose_sugerida` em
 > `GET /protocolos`, calculados no servidor); as duas specs foram atualizadas para
-> refletir o contrato real. O branch da reivindicação (`feat/mobile-sanidade`) continua de
-> pé — quem pegou pode retomar de onde parou.
+> refletir o contrato real. **O branch da reivindicação (`feat/mobile-sanidade`) ficou
+> parado sem retomada e foi apagado em 2026-08-22** — estava vazio (zero commits próprios,
+> mesmo ponto que a `main` tinha antes da correção), então nada foi perdido. A 0051 está
+> livre de novo para qualquer agente reivindicar, já com o contrato corrigido.
 
 > **Histórico da 0044 (fechado em 2026-08-22, ✅ PR #174):** teve retrabalho (v1 → v2,
 > ver a tabela "🔁 O que significa retrabalho" abaixo) e, já na v2, um agente tentando a
