@@ -405,13 +405,15 @@ Regras gerais para trabalho paralelo:
    /protocolos` ganhou `?animal_id=` + `dose_sugerida` calculada no servidor, porque a
    [0051](specs/0051-mobile-tela-de-sanidade.md) não podia preencher dose automática sem
    duplicar a fórmula de `dose_for_animal` no Dart — um agente reivindicando a 0051 achou
-   essa contradição e parou antes de escrever código, protocolo certo. **Quarta fatia
-   (foto) — API ✅ concluída, tela disponível:**
+   essa contradição e parou antes de escrever código, protocolo certo. Tela em revisão:
+   [PR #188](https://github.com/welz-gui/AgroTop/pull/188) tem funcionalidade e contrato
+   corretos, mas falta o golden visual do critério 5 (com/sem carência, três temas) — ver
+   `specs/QUADRO.md`. **Quarta fatia (foto) — ✅ concluída em 2026-08-23:**
    [0052](specs/0052-api-foto-do-animal.md)/[PR #180](https://github.com/welz-gui/AgroTop/pull/180)
    (mantém fotos em `bytea`, sem storage externo) e
-   [0053](specs/0053-mobile-tela-de-foto.md) (compressão no app porque
-   `_compress_image` mora em `app.py`, intocável). Confirmação de trato fica para uma
-   spec de endpoint futura.
+   [0053](specs/0053-mobile-tela-de-foto.md)/[PR #187](https://github.com/welz-gui/AgroTop/pull/187)
+   (compressão no app porque `_compress_image` mora em `app.py`, intocável). Confirmação
+   de trato fica para uma spec de endpoint futura.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.
