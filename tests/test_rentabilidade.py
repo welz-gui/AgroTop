@@ -90,6 +90,26 @@ class TestRankingPorRaca(unittest.TestCase):
 
         self.assertEqual(resultado[0]["margem"], 0.0)
 
+    def test_arrobas_produzidas_negativas_ou_zero_retorna_zero_para_lucro(self):
+        resultado_zero = ranking_por_raca([
+            _ciclo("Nelore", peso_entrada=400.0, peso_saida=400.0, custo_total=1000.0, receita=1500.0)
+        ])
+        self.assertEqual(resultado_zero[0]["lucro_por_arroba_produzida"], 0.0)
+
+        resultado_negativo = ranking_por_raca([
+            _ciclo("Angus", peso_entrada=450.0, peso_saida=400.0, custo_total=1000.0, receita=1500.0)
+        ])
+        self.assertEqual(resultado_negativo[0]["lucro_por_arroba_produzida"], 0.0)
+
+    def test_gmd_medio_ignora_ciclos_sem_gmd_valido(self):
+        resultado = ranking_por_raca([
+            _ciclo("Nelore", peso_entrada=300.0, peso_saida=450.0, dias=150),  # GMD = 1.0
+            _ciclo("Nelore", dias=0),  # GMD None
+        ])
+
+        self.assertEqual(resultado[0]["gmd_medio"], 1.0)
+        self.assertEqual(resultado[0]["animais"], 2)
+
     def test_agrega_animais_da_mesma_raca(self):
         resultado = ranking_por_raca([
             _ciclo("Nelore", custo_total=900.0, receita=1800.0),
@@ -122,6 +142,10 @@ class TestMargemNegativa(unittest.TestCase):
     def _ciclo(self, raca, custo, receita):
         return {"raca": raca, "peso_entrada": 300.0, "peso_saida": 450.0,
                 "dias": 200, "custo_total": custo, "receita": receita}
+
+    def test_receita_total_negativa_produz_margem_zero(self):
+        r = ranking_por_raca([self._ciclo("Angus", 100.0, -50.0)])
+        self.assertEqual(r[0]["margem"], 0.0)
 
     def test_prejuizo_produz_margem_negativa(self):
         r = ranking_por_raca([self._ciclo("Angus", 8000.0, 6000.0)])
