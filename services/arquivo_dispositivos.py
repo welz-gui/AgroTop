@@ -47,6 +47,115 @@ def _eh_rodape(conteudo: str) -> bool:
     return bool(re.match(r"^\s*total\s*:", conteudo, flags=re.IGNORECASE))
 
 
+def _criar_resultado_vazio() -> dict:
+    return {
+        "aceitos": [],
+        "rejeitados": [],
+        "duplicados_no_arquivo": [],
+        "total_linhas": 0,
+        "colunas_detectadas": [],
+    }
+
+
+def _rejeitar(resultado: dict, numero: int, conteudo: str, motivo: str) -> None:
+    resultado["rejeitados"].append(
+        {"linha": numero, "conteudo": conteudo, "motivo": motivo}
+    )
+
+
+def _rejeitar_todas(linhas: list[str], resultado: dict) -> None:
+    for numero, conteudo in enumerate(linhas, start=1):
+        resultado["total_linhas"] += 1
+        motivo = (
+            "linha vazia"
+            if not conteudo.strip()
+            else "rodapé de totais não é um dispositivo"
+            if _eh_rodape(conteudo)
+            else "CSV inválido"
+        )
+        _rejeitar(resultado, numero, conteudo, motivo)
+
+
+def _configurar_colunas(primeira: list[str] | None) -> tuple[bool, dict, int, list[str]]:
+    nomes_cabecalho = (
+        [_normalizar_coluna(valor) for valor in primeira]
+        if primeira is not None
+        else []
+    )
+    tem_cabecalho = any(nome in _COLUNAS for nome in nomes_cabecalho)
+
+    if tem_cabecalho:
+        indices = {
+            nome: indice
+            for indice, nome in enumerate(nomes_cabecalho)
+            if nome in _COLUNAS and nome not in nomes_cabecalho[:indice]
+        }
+        colunas_detectadas = [nome for nome in nomes_cabecalho if nome in indices]
+        quantidade_esperada = len(primeira) if primeira else 0
+    else:
+        quantidade_esperada = len(primeira or [])
+        colunas_detectadas = list(_COLUNAS[:quantidade_esperada])
+        indices = {nome: indice for indice, nome in enumerate(colunas_detectadas)}
+
+    return tem_cabecalho, indices, quantidade_esperada, colunas_detectadas
+
+
+def _processar_linha(
+    conteudo: str,
+    numero: int,
+    separador: str,
+    quantidade_esperada: int,
+    tem_cabecalho: bool,
+    indices: dict,
+    vistos: set[str],
+    duplicados: set[str],
+    resultado: dict,
+) -> None:
+    if not conteudo.strip():
+        _rejeitar(resultado, numero, conteudo, "linha vazia")
+        return
+    if _eh_rodape(conteudo):
+        _rejeitar(resultado, numero, conteudo, "rodapé de totais não é um dispositivo")
+        return
+
+    valores = _ler_colunas(conteudo, separador)
+    if valores is None:
+        _rejeitar(resultado, numero, conteudo, "CSV inválido")
+        return
+    if len(valores) != quantidade_esperada:
+        motivo = f"esperado {quantidade_esperada} colunas, encontrado {len(valores)}"
+        _rejeitar(resultado, numero, conteudo, motivo)
+        return
+    if not tem_cabecalho and quantidade_esperada > len(_COLUNAS):
+        _rejeitar(resultado, numero, conteudo, f"máximo de {len(_COLUNAS)} colunas reconhecidas")
+        return
+
+    item = {nome: "" for nome in _COLUNAS}
+    for nome, indice in indices.items():
+        item[nome] = valores[indice].strip()
+
+    codigo_visual = item["codigo_visual"]
+    if not codigo_visual:
+        _rejeitar(resultado, numero, conteudo, "código visual vazio")
+        return
+
+    chave = codigo_visual.casefold()
+    if chave in vistos:
+        if chave not in duplicados:
+            resultado["duplicados_no_arquivo"].append(codigo_visual)
+            duplicados.add(chave)
+        _rejeitar(
+            resultado,
+            numero,
+            conteudo,
+            f"código visual duplicado no arquivo: {codigo_visual}"
+        )
+        return
+
+    vistos.add(chave)
+    resultado["aceitos"].append(item)
+
+
 def ler(texto: str) -> dict:
     """Interpreta um arquivo de lote de dispositivos.
 
@@ -63,13 +172,7 @@ def ler(texto: str) -> dict:
       "colunas_detectadas": [str, ...],
     }
     """
-    resultado = {
-        "aceitos": [],
-        "rejeitados": [],
-        "duplicados_no_arquivo": [],
-        "total_linhas": 0,
-        "colunas_detectadas": [],
-    }
+    resultado = _criar_resultado_vazio()
     linhas = texto.splitlines()
     if not linhas:
         return resultado
@@ -85,129 +188,36 @@ def ler(texto: str) -> dict:
         ),
         None,
     )
+
     if indice_modelo is None:
-        for numero, conteudo in enumerate(linhas, start=1):
-            resultado["total_linhas"] += 1
-            motivo = (
-                "linha vazia"
-                if not conteudo.strip()
-                else "rodapé de totais não é um dispositivo"
-                if _eh_rodape(conteudo)
-                else "CSV inválido"
-            )
-            resultado["rejeitados"].append(
-                {"linha": numero, "conteudo": conteudo, "motivo": motivo}
-            )
+        _rejeitar_todas(linhas, resultado)
         return resultado
 
     primeira = _ler_colunas(linhas[indice_modelo], separador)
-    nomes_cabecalho = (
-        [_normalizar_coluna(valor) for valor in primeira]
-        if primeira is not None
-        else []
-    )
-    tem_cabecalho = any(nome in _COLUNAS for nome in nomes_cabecalho)
-
-    if tem_cabecalho:
-        indices = {
-            nome: indice
-            for indice, nome in enumerate(nomes_cabecalho)
-            if nome in _COLUNAS and nome not in nomes_cabecalho[:indice]
-        }
-        resultado["colunas_detectadas"] = [
-            nome for nome in nomes_cabecalho if nome in indices
-        ]
-        quantidade_esperada = len(primeira)
-    else:
-        quantidade_esperada = len(primeira or [])
-        detectadas = list(_COLUNAS[:quantidade_esperada])
-        indices = {nome: indice for indice, nome in enumerate(detectadas)}
-        resultado["colunas_detectadas"] = detectadas
+    tem_cabecalho, indices, quantidade_esperada, col_detectadas = _configurar_colunas(primeira)
+    resultado["colunas_detectadas"] = col_detectadas
 
     vistos: set[str] = set()
     duplicados: set[str] = set()
 
-    for indice_linha in range(len(linhas)):
+    for indice_linha, conteudo in enumerate(linhas):
         if tem_cabecalho and indice_linha == indice_modelo:
             continue
+
         numero = indice_linha + 1
-        conteudo = linhas[indice_linha]
         resultado["total_linhas"] += 1
 
-        if not conteudo.strip():
-            resultado["rejeitados"].append(
-                {"linha": numero, "conteudo": conteudo, "motivo": "linha vazia"}
-            )
-            continue
-        if _eh_rodape(conteudo):
-            resultado["rejeitados"].append(
-                {
-                    "linha": numero,
-                    "conteudo": conteudo,
-                    "motivo": "rodapé de totais não é um dispositivo",
-                }
-            )
-            continue
-
-        valores = _ler_colunas(conteudo, separador)
-        if valores is None:
-            resultado["rejeitados"].append(
-                {"linha": numero, "conteudo": conteudo, "motivo": "CSV inválido"}
-            )
-            continue
-        if len(valores) != quantidade_esperada:
-            resultado["rejeitados"].append(
-                {
-                    "linha": numero,
-                    "conteudo": conteudo,
-                    "motivo": (
-                        f"esperado {quantidade_esperada} colunas, "
-                        f"encontrado {len(valores)}"
-                    ),
-                }
-            )
-            continue
-        if not tem_cabecalho and quantidade_esperada > len(_COLUNAS):
-            resultado["rejeitados"].append(
-                {
-                    "linha": numero,
-                    "conteudo": conteudo,
-                    "motivo": f"máximo de {len(_COLUNAS)} colunas reconhecidas",
-                }
-            )
-            continue
-
-        item = {nome: "" for nome in _COLUNAS}
-        for nome, indice in indices.items():
-            item[nome] = valores[indice].strip()
-
-        codigo_visual = item["codigo_visual"]
-        if not codigo_visual:
-            resultado["rejeitados"].append(
-                {
-                    "linha": numero,
-                    "conteudo": conteudo,
-                    "motivo": "código visual vazio",
-                }
-            )
-            continue
-
-        chave = codigo_visual.casefold()
-        if chave in vistos:
-            if chave not in duplicados:
-                resultado["duplicados_no_arquivo"].append(codigo_visual)
-                duplicados.add(chave)
-            resultado["rejeitados"].append(
-                {
-                    "linha": numero,
-                    "conteudo": conteudo,
-                    "motivo": f"código visual duplicado no arquivo: {codigo_visual}",
-                }
-            )
-            continue
-
-        vistos.add(chave)
-        resultado["aceitos"].append(item)
+        _processar_linha(
+            conteudo,
+            numero,
+            separador,
+            quantidade_esperada,
+            tem_cabecalho,
+            indices,
+            vistos,
+            duplicados,
+            resultado,
+        )
 
     return resultado
 
