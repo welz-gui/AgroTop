@@ -3377,9 +3377,11 @@ def _fin_rateio_de_lote(animals):
     animais_para_ratear = [{"id": a["id"], "peso": a["current_weight"]}
                            for a in animais_lote]
     if criterio == "peso_dia":
+        animal_ids = [a["id"] for a in animais_lote]
+        last_movements = db.get_last_movements_bulk(animal_ids)
         for item, a in zip(animais_para_ratear, animais_lote):
-            movs = db.get_movements(a["id"], limit=1)
-            item["entrada_no_lote"] = movs[0]["movement_date"] if movs else a["entry_date"]
+            mov_date = last_movements.get(a["id"])
+            item["entrada_no_lote"] = mov_date if mov_date else a["entry_date"]
         animais_para_ratear = com_dias_no_lote(animais_para_ratear, referencia)
 
     if not valor_total:

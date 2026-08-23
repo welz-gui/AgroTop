@@ -55,7 +55,7 @@ from repositories import regras as regras  # noqa: F401
 from repositories import compras as compras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
-    get_all_animals, get_animal, add_animal, move_animal, move_animals_bulk, get_movements,
+    get_all_animals, get_animal, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
     _seed_animals,
 )
 from repositories.pesagens import (
