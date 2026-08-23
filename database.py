@@ -88,6 +88,12 @@ from repositories.conexao import (  # noqa: F401
 )
 import repositories.conexao as _conexao
 
+def _quote_ident(ident: str) -> str:
+    """Escapa identificadores SQL (nomes de tabelas e colunas) para evitar SQL Injection."""
+    return '"' + str(ident).replace('"', '""') + '"'
+
+
+
 
 def __getattr__(name):
     """Encaminha a configuração mutável para `repositories.conexao`.
@@ -985,9 +991,9 @@ def _migrate(con) -> None:
     # ADR 0004 etapa B1.2 — espelho do uuid nas tabelas filhas.
     for _t in ("weighings", "medications", "animal_costs", "animal_movements",
                "animal_photos", "deaths", "sales", "insumo_transactions"):
-        _c = {r["name"] for r in con.execute(f"PRAGMA table_info({_t})").fetchall()}
+        _c = {r["name"] for r in con.execute(f"PRAGMA table_info({_quote_ident(_t)})").fetchall()}
         if "animal_uuid" not in _c:
-            con.execute(f"ALTER TABLE {_t} ADD COLUMN animal_uuid TEXT")
+            con.execute(f"ALTER TABLE {_quote_ident(_t)} ADD COLUMN animal_uuid TEXT")
 
     if "uuid" not in cols:
         # ADR 0004 etapa 1. Sem UNIQUE aqui: o ALTER do SQLite não aceita, e a
@@ -1076,7 +1082,7 @@ def _colunas(con, tabela: str) -> set:
             "WHERE table_schema='public' AND table_name=?", (tabela,)
         ).fetchall()
     else:
-        rows = con.execute(f"PRAGMA table_info({tabela})").fetchall()
+        rows = con.execute(f"PRAGMA table_info({_quote_ident(tabela)})").fetchall()
     return {r["name"] for r in rows}
 
 
@@ -2014,7 +2020,7 @@ def admin_table_info(table: str) -> tuple[list[str], str]:
                 "WHERE i.indrelid = (?::regclass) AND i.indisprimary", (table,)).fetchall()
             pk = pkrows[0]["name"] if pkrows else (cols[0] if cols else "id")
         else:
-            info = con.execute(f"PRAGMA table_info({table})").fetchall()
+            info = con.execute(f"PRAGMA table_info({_quote_ident(table)})").fetchall()
             cols = [r["name"] for r in info]
             pk = next((r["name"] for r in info if r["pk"]), cols[0])
     return cols, pk
@@ -2025,7 +2031,7 @@ def admin_get_rows(table: str) -> list[dict]:
         raise ValueError(f"Tabela não permitida: {table}")
     _, pk = admin_table_info(table)
     with _conn() as con:
-        rows = con.execute(f"SELECT * FROM {table} ORDER BY {pk}").fetchall()
+        rows = con.execute(f"SELECT * FROM {_quote_ident(table)} ORDER BY {_quote_ident(pk)}").fetchall()
     return [dict(r) for r in rows]
 
 
@@ -2042,7 +2048,7 @@ def admin_apply_changes(table: str, updates: list[dict],
     with _conn() as con:
         # Exclusões
         for pkv in delete_pks:
-            con.execute(f"DELETE FROM {table} WHERE {pk}=?", (pkv,))
+            con.execute(f"DELETE FROM {_quote_ident(table)} WHERE {_quote_ident(pk)}=?", (pkv,))
             n_del += 1
         # Atualizações
         for row in updates:
@@ -2050,8 +2056,8 @@ def admin_apply_changes(table: str, updates: list[dict],
             fields = {k: v for k, v in row.items() if k in valid and k != pk}
             if not fields:
                 continue
-            sets = ", ".join(f"{k}=?" for k in fields)
-            con.execute(f"UPDATE {table} SET {sets} WHERE {pk}=?",
+            sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
+            con.execute(f"UPDATE {_quote_ident(table)} SET {sets} WHERE {_quote_ident(pk)}=?",
                         (*fields.values(), pkv))
             n_upd += 1
         # Inserções
@@ -2061,8 +2067,9 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             placeholders = ", ".join("?" for _ in fields)
+            q_fields = ", ".join(_quote_ident(k) for k in fields)
             con.execute(
-                f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({placeholders})",
+                f"INSERT INTO {_quote_ident(table)} ({q_fields}) VALUES ({placeholders})",
                 tuple(fields.values()))
             n_ins += 1
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
