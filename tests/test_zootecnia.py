@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from services.zootecnia import get_age_display
+from services.zootecnia import get_age_display, get_age_months
 
 
 class TestZootecniaGetAgeDisplay(unittest.TestCase):
@@ -69,3 +69,14 @@ class TestZootecniaGetAgeDisplay(unittest.TestCase):
         animal = {"birth_date": "2022-01-01", "birth_estimated": True}
         result = get_age_display(animal)
         self.assertEqual(result, "1a 3m (est.)")
+
+
+class TestZootecniaGetAgeMonths(unittest.TestCase):
+    def test_invalid_date_format_returns_none(self):
+        self.assertIsNone(get_age_months("invalid-date"))
+        self.assertIsNone(get_age_months("2023/01/01"))
+        self.assertIsNone(get_age_months("01-01-2023"))
+
+    def test_none_or_empty_returns_none(self):
+        self.assertIsNone(get_age_months(None))
+        self.assertIsNone(get_age_months(""))
