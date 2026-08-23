@@ -60,7 +60,7 @@ from repositories.animais import (  # noqa: F401
 )
 from repositories.pesagens import (
     calculate_gmd_bulk,  # noqa: F401
-    _weighings_by_animal, get_weighings, add_weighing, get_all_weighings,
+    _weighings_by_animal, get_weighings, get_weighings_batch, add_weighing, get_all_weighings,
     calculate_gmd, get_last_estimate,
 )
 from repositories.sanidade import (
