@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch
 
-from services.zootecnia import get_age_display
+from datetime import date
+
+from services.zootecnia import get_age_display, get_age_months
 
 
 class TestZootecniaGetAgeDisplay(unittest.TestCase):
@@ -69,3 +71,35 @@ class TestZootecniaGetAgeDisplay(unittest.TestCase):
         animal = {"birth_date": "2022-01-01", "birth_estimated": True}
         result = get_age_display(animal)
         self.assertEqual(result, "1a 3m (est.)")
+
+
+class TestZootecniaGetAgeMonths(unittest.TestCase):
+    def test_no_birth_date_returns_none(self):
+        self.assertIsNone(get_age_months(None))
+        self.assertIsNone(get_age_months(""))
+
+    def test_invalid_date_format_returns_none(self):
+        self.assertIsNone(get_age_months("invalid-date"))
+        self.assertIsNone(get_age_months("01/01/2021"))
+        self.assertIsNone(get_age_months("2021-13-45"))
+
+    @patch("services.zootecnia.date")
+    def test_age_months_calculation(self, mock_date):
+        # Set today's date to a fixed value for deterministic testing
+        mock_date.today.return_value = date(2023, 4, 15)
+        # Mock side_effect for datetime.date so it works normally for strptime inside get_age_months
+        # actually, zootecnia imports datetime directly so this mock shouldn't break strptime
+
+        # Exact months
+        self.assertEqual(get_age_months("2023-04-10"), 0)
+        self.assertEqual(get_age_months("2023-03-15"), 1)
+        self.assertEqual(get_age_months("2023-03-16"), 0)
+
+        # Exact years
+        self.assertEqual(get_age_months("2022-04-15"), 12)
+
+        # Years and months
+        self.assertEqual(get_age_months("2021-01-15"), 27)
+
+        # Date in the future (months_between should return 0)
+        self.assertEqual(get_age_months("2023-05-15"), 0)
