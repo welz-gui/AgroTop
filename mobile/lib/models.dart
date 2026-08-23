@@ -169,3 +169,85 @@ class MovementResult {
     erros: List<String>.from(json['erros'] as List<dynamic>),
   );
 }
+
+class ProtocoloSummary {
+  const ProtocoloSummary({
+    required this.id,
+    required this.nome,
+    required this.via,
+    required this.carenciaDias,
+    required this.unidadeDose,
+    this.doseSugerida,
+  });
+
+  final int id;
+  final String nome;
+  final String via;
+  final int carenciaDias;
+  final String unidadeDose;
+  final double? doseSugerida;
+
+  factory ProtocoloSummary.fromJson(Map<String, dynamic> json) =>
+      ProtocoloSummary(
+        id: json['id'] as int,
+        nome: json['nome'] as String,
+        via: (json['via'] as String?) ?? '',
+        carenciaDias: (json['carencia_dias'] as num?)?.toInt() ?? 0,
+        unidadeDose: (json['unidade_dose'] as String?) ?? '',
+        doseSugerida: (json['dose_sugerida'] as num?)?.toDouble(),
+      );
+}
+
+class MedicationApplication {
+  const MedicationApplication({
+    required this.medicamento,
+    required this.dose,
+    required this.unidade,
+    required this.via,
+    required this.carenciaDias,
+    required this.data,
+    this.protocoloId,
+  });
+
+  final String medicamento;
+  final double dose;
+  final String unidade;
+  final String via;
+  final int carenciaDias;
+  final String data;
+  final int? protocoloId;
+
+  factory MedicationApplication.fromJson(Map<String, dynamic> json) =>
+      MedicationApplication(
+        medicamento: json['medicamento'] as String,
+        dose: (json['dose'] as num).toDouble(),
+        unidade: (json['unidade'] as String?) ?? '',
+        via: (json['via'] as String?) ?? '',
+        carenciaDias: (json['carencia_dias'] as num?)?.toInt() ?? 0,
+        data: json['data'] as String,
+        protocoloId: json['protocolo_id'] as int?,
+      );
+}
+
+class AnimalMedications {
+  const AnimalMedications({
+    this.carenciaAte,
+    required this.aplicacoes,
+  });
+
+  final String? carenciaAte;
+  final List<MedicationApplication> aplicacoes;
+
+  factory AnimalMedications.fromJson(Map<String, dynamic> json) =>
+      AnimalMedications(
+        carenciaAte: json['carencia_ate'] as String?,
+        aplicacoes:
+            (json['aplicacoes'] as List<dynamic>?)
+                ?.map(
+                  (e) =>
+                      MedicationApplication.fromJson(e as Map<String, dynamic>),
+                )
+                .toList(growable: false) ??
+            const [],
+      );
+}

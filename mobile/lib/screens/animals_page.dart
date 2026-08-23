@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../app.dart';
 import '../models.dart';
+import 'medication_page.dart';
 import 'movement_page.dart';
 import 'weighing_page.dart';
 
@@ -315,15 +316,18 @@ class AnimalDetailPage extends StatefulWidget {
 
 class _AnimalDetailPageState extends State<AnimalDetailPage> {
   late Future<AnimalDetail> _detail;
+  late Future<AnimalMedications> _medications;
 
   @override
   void initState() {
     super.initState();
     _detail = widget.api.getAnimal(widget.id);
+    _medications = widget.api.getAnimalMedications(widget.id);
   }
 
   void _reload() => setState(() {
     _detail = widget.api.getAnimal(widget.id);
+    _medications = widget.api.getAnimalMedications(widget.id);
   });
 
   String _metric(double? value, String suffix, {int decimals = 1}) =>
@@ -345,9 +349,9 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     );
     if (result == null || !mounted) return;
     _reload();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(result.message)));
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(result.message)));
   }
 
   Future<void> _openMovement() async {
@@ -365,11 +369,30 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     widget.onMovementCompleted();
   }
 
+  Future<void> _openMedication() async {
+    final result = await Navigator.of(context).push<String?>(
+      MaterialPageRoute(
+        builder: (_) => MedicationPage(
+          api: widget.api,
+          animalId: widget.id,
+          onUnauthorized: widget.onUnauthorized,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    _reload();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Medicamento registrado com sucesso.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('Ficha ${widget.id}')),
-    body: FutureBuilder<AnimalDetail>(
-      future: _detail,
+    body: FutureBuilder<List<dynamic>>(
+      future: Future.wait([_detail, _medications]),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
@@ -389,12 +412,16 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
             onRetry: _reload,
           );
         }
-        final animal = snapshot.data!;
+        final animal = snapshot.data![0] as AnimalDetail;
+        final medications = snapshot.data![1] as AnimalMedications;
         final sex = switch (animal.sex) {
           'M' => 'Macho',
           'F' => 'Fêmea',
           _ => 'Não informado',
         };
+
+        final inWithdrawal = medications.carenciaAte != null;
+
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -425,6 +452,48 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
               ),
             ),
             const SizedBox(height: 12),
+
+            // Card de Carência (com ícone e texto claro, sem depender apenas de cor)
+            Card(
+              key: const ValueKey('carencia-status-card'),
+              color: inWithdrawal
+                  ? Theme.of(context).colorScheme.errorContainer
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: ListTile(
+                leading: Icon(
+                  inWithdrawal
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline,
+                  color: inWithdrawal
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.primary,
+                  size: 32,
+                ),
+                title: Text(
+                  inWithdrawal
+                      ? 'Em carência até ${medications.carenciaAte}'
+                      : 'Sem restrição de carência',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: inWithdrawal
+                        ? Theme.of(context).colorScheme.onErrorContainer
+                        : null,
+                  ),
+                ),
+                subtitle: Text(
+                  inWithdrawal
+                      ? 'Abate e comercialização restritos durante este período.'
+                      : 'Animal liberado para comercialização/abate.',
+                  style: TextStyle(
+                    color: inWithdrawal
+                        ? Theme.of(context).colorScheme.onErrorContainer
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -457,6 +526,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
               ],
             ),
             const SizedBox(height: 12),
+
             Card(
               child: Column(
                 children: [
@@ -485,8 +555,55 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+
+            // Card de Histórico de Sanidade
+            Card(
+              key: const ValueKey('medications-history-card'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'Histórico de aplicações (${medications.aplicacoes.length})',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    if (medications.aplicacoes.isEmpty)
+                      const ListTile(
+                        leading: Icon(Icons.info_outline),
+                        title: Text('Nenhuma aplicação registrada.'),
+                      )
+                    else
+                      for (final app in medications.aplicacoes)
+                        ListTile(
+                          leading: const Icon(Icons.medication_outlined),
+                          title: Text('${app.medicamento} · ${app.dose} ${app.unidade}'),
+                          subtitle: Text(
+                            '${app.data} · Via ${app.via}'
+                            '${app.carenciaDias > 0 ? ' · Carência: ${app.carenciaDias}d' : ''}',
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
+
             FilledButton.icon(
+              key: const ValueKey('open-medication'),
+              onPressed: _openMedication,
+              icon: const Icon(Icons.medication_outlined),
+              label: const Text('Registrar medicamento'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
               key: const ValueKey('open-weighing'),
               onPressed: _openWeighing,
               icon: const Icon(Icons.monitor_weight_outlined),

@@ -31,7 +31,7 @@ http.Response _json(Object body, {int status = 200}) => http.Response(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('fluxo de telas cobre login, refresh, lista, ficha e pesagem', (
+  testWidgets('fluxo de telas cobre login, refresh, lista, ficha, pesagem e sanidade', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -43,7 +43,12 @@ void main() {
     var refreshRequests = 0;
     var weighingRequests = 0;
     var movementRequests = 0;
+    var medicationRequests = 0;
+    var protocolosRequests = 0;
+    String? carenciaAte;
+    final aplicacoes = <Map<String, dynamic>>[];
     var currentLote = 'P01';
+
     final client = MockClient((request) async {
       if (request.method == 'POST' && request.url.path == '/auth/login') {
         expect(jsonDecode(request.body), {
@@ -105,6 +110,58 @@ void main() {
           'gmd_recent_kg_day': 0.742,
           'gmd_total_kg_day': 0.513,
         });
+      }
+      if (request.method == 'GET' &&
+          request.url.path == '/animais/BR0001/medicamentos') {
+        return _json({
+          'carencia_ate': carenciaAte,
+          'aplicacoes': aplicacoes,
+        });
+      }
+      if (request.method == 'GET' && request.url.path == '/protocolos') {
+        protocolosRequests++;
+        expect(request.url.queryParameters['animal_id'], 'BR0001');
+        return _json([
+          {
+            'id': 1,
+            'nome': 'Ivermectina 1%',
+            'via': 'Subcutânea',
+            'carencia_dias': 28,
+            'unidade_dose': 'ml',
+            'dose_sugerida': 7.6,
+          },
+          {
+            'id': 2,
+            'nome': 'Vacina Aftosa',
+            'via': 'Subcutânea',
+            'carencia_dias': 0,
+            'unidade_dose': 'ml',
+            'dose_sugerida': 2.0,
+          },
+        ]);
+      }
+      if (request.method == 'POST' &&
+          request.url.path == '/animais/BR0001/medicamentos') {
+        medicationRequests++;
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['medicamento'], 'Ivermectina 1%');
+        expect(body['dose'], 8.0);
+        expect(body['unidade'], 'ml');
+        expect(body['via'], 'Subcutânea');
+        expect(body['carencia_dias'], 28);
+        expect(body['data'], '2026-08-22');
+        expect(body['protocolo_id'], 1);
+        carenciaAte = '2026-09-19';
+        aplicacoes.insert(0, {
+          'medicamento': body['medicamento'],
+          'dose': body['dose'],
+          'unidade': body['unidade'],
+          'via': body['via'],
+          'carencia_dias': body['carencia_dias'],
+          'data': body['data'],
+          'protocolo_id': body['protocolo_id'],
+        });
+        return _json({'carencia_ate': carenciaAte}, status: 201);
       }
       if (request.method == 'POST' &&
           request.url.path == '/animais/BR0001/pesagens') {
@@ -190,12 +247,73 @@ void main() {
     expect(find.text('382.4 kg'), findsOneWidget);
     expect(find.text('0.742 kg/dia'), findsOneWidget);
 
+    // Verifica exibição inicial de carência e histórico vazio
+    expect(find.text('Sem restrição de carência'), findsOneWidget);
+    expect(find.text('Animal liberado para comercialização/abate.'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+
+    final historyCard = find.byKey(const ValueKey('medications-history-card'));
+    await tester.scrollUntilVisible(
+      historyCard,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Nenhuma aplicação registrada.'), findsOneWidget);
+
+    // Fluxo de sanidade: abrir tela de medicamento
+    final medicationButton = find.byKey(const ValueKey('open-medication'));
+    await tester.scrollUntilVisible(
+      medicationButton,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(medicationButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Sanidade BR0001'), findsOneWidget);
+    expect(protocolosRequests, 1);
+
+    // Selecionar protocolo
+    await tester.tap(find.byKey(const ValueKey('protocol-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ivermectina 1% (7.6 ml)').last);
+    await tester.pumpAndSettle();
+
+    // Conferir campos preenchidos a partir do protocolo (dose_sugerida 7.6)
+    expect(find.widgetWithText(TextFormField, 'Ivermectina 1%'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, '7.6'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Subcutânea'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, '28'), findsOneWidget);
+
+    // Editar dose para 8.0 (provando que tudo é editável)
+    await tester.enterText(find.byKey(const ValueKey('medication-dose')), '8.0');
+    await tester.enterText(find.byKey(const ValueKey('medication-date')), '2026-08-22');
+    await tester.tap(find.byKey(const ValueKey('save-medication')));
+    await tester.pumpAndSettle();
+
+    expect(medicationRequests, 1);
+    expect(find.text('Medicamento registrado com sucesso.'), findsOneWidget);
+
+    // Conferir que a carência agora está ativa com ícone e texto
+    expect(find.text('Em carência até 2026-09-19'), findsOneWidget);
+    expect(find.text('Abate e comercialização restritos durante este período.'), findsOneWidget);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      historyCard,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Histórico de aplicações (1)'), findsOneWidget);
+    expect(find.textContaining('Ivermectina 1% · 8.0 ml'), findsOneWidget);
+
     final weighingButton = find.byKey(const ValueKey('open-weighing'));
     await tester.scrollUntilVisible(
       weighingButton,
       300,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -120));
+    await tester.pumpAndSettle();
     await tester.tap(weighingButton);
     await tester.pumpAndSettle();
     expect(find.text('Pesagem BR0001'), findsOneWidget);
@@ -225,7 +343,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(movementButton);
     await tester.pumpAndSettle();
-    expect(find.text('Mover de piquete'), findsOneWidget);
+    expect(find.text('Piquete de destino'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('movement-lote-P02')));
     await tester.enterText(

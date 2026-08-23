@@ -49,6 +49,38 @@ void main() {
       expect(server.refreshRequests, 1);
       final before = await api.getAnimal('BR0001');
       expect(before.currentWeight, 382.4);
+
+      // Sanidade: carregar protocolos com dose_sugerida calculada no servidor
+      final protocolos = await api.listProtocolos(animalId: 'BR0001');
+      expect(server.protocolosRequests, 1);
+      expect(protocolos.first.nome, 'Ivermectina 1%');
+      expect(protocolos.first.doseSugerida, 7.6);
+
+      // Sanidade: verificar carência inicial e histórico vazio
+      final initialMeds = await api.getAnimalMedications('BR0001');
+      expect(server.medicationsRequests, 1);
+      expect(initialMeds.carenciaAte, isNull);
+      expect(initialMeds.aplicacoes, isEmpty);
+
+      // Sanidade: registrar medicamento
+      final carenciaAte = await api.registerMedication(
+        'BR0001',
+        medicamento: 'Ivermectina 1%',
+        dose: 8.0,
+        unidade: 'ml',
+        via: 'Subcutânea',
+        carenciaDias: 28,
+        data: '2026-08-22',
+        protocoloId: 1,
+      );
+      expect(server.postMedicationRequests, 1);
+      expect(carenciaAte, '2026-09-19');
+
+      final afterMeds = await api.getAnimalMedications('BR0001');
+      expect(afterMeds.carenciaAte, '2026-09-19');
+      expect(afterMeds.aplicacoes.length, 1);
+      expect(afterMeds.aplicacoes.first.medicamento, 'Ivermectina 1%');
+
       final lotes = await api.listLotes();
       expect(lotes.map((lote) => lote.id), containsAll(['P01', 'P02', 'P03']));
       final movement = await api.moveAnimals(
