@@ -78,7 +78,7 @@ def _colunas(caminho):
             for (t,) in con.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-            for r in con.execute(f"PRAGMA table_info({t})")
+            for r in con.execute(f"PRAGMA table_info(\"{t}\")")
         }
     finally:
         con.close()
