@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app.dart';
+import 'package:agrotop_mobile/app_colors.dart';
+import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
@@ -80,6 +82,9 @@ MockClient _client() => MockClient((request) async {
       'gmd_recent_kg_day': 0.742,
       'gmd_total_kg_day': 0.513,
     });
+  }
+  if (request.method == 'GET' && request.url.path == '/animais/BR0001/fotos') {
+    return _json([]);
   }
   if (request.method == 'GET' && request.url.path == '/lotes') {
     return _json([
@@ -224,6 +229,108 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('galeria vazia e com foto são cobertas nos três temas', (
+    tester,
+  ) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final image = File(
+      'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
+    ).readAsBytesSync();
+
+    for (final mode in ThemeMode.values) {
+      for (final withPhoto in [false, true]) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/animais/BR0001/fotos') {
+              return _json(
+                withPhoto
+                    ? [
+                        {
+                          'id': 1,
+                          'taken_date': '2026-08-23',
+                          'mime': 'image/jpeg',
+                        },
+                      ]
+                    : [],
+              );
+            }
+            if (request.url.path == '/fotos/1') {
+              return http.Response.bytes(
+                image,
+                200,
+                headers: {'content-type': 'image/jpeg'},
+              );
+            }
+            return _json({'detail': 'Não encontrado'}, status: 404);
+          }),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: Scaffold(
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: AnimalPhotoSection(
+                    api: api,
+                    animalId: 'BR0001',
+                    onUnauthorized: () {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (withPhoto) {
+          final photoFinder = find.byKey(const ValueKey('animal-photo-1'));
+          final imageWidget = tester.widget<Image>(photoFinder);
+          await tester.runAsync(
+            () => precacheImage(imageWidget.image, tester.element(photoFinder)),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(
+          find.byKey(
+            ValueKey(
+              withPhoto ? 'animal-photo-gallery' : 'empty-photo-gallery',
+            ),
+          ),
+          findsOneWidget,
+        );
+        if (withPhoto) {
+          expect(find.byKey(const ValueKey('animal-photo-1')), findsOneWidget);
+        }
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${withPhoto ? '08-fotos' : '07-fotos-vazia'}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
     }
   });
 }
