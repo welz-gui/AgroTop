@@ -2042,7 +2042,7 @@ def admin_apply_changes(table: str, updates: list[dict],
     with _conn() as con:
         # Exclusões
         for pkv in delete_pks:
-            con.execute(f"DELETE FROM {table} WHERE {pk}=?", (pkv,))
+            con.execute(f'DELETE FROM "{table}" WHERE "{pk}"=?', (pkv,))
             n_del += 1
         # Atualizações
         for row in updates:
@@ -2050,8 +2050,8 @@ def admin_apply_changes(table: str, updates: list[dict],
             fields = {k: v for k, v in row.items() if k in valid and k != pk}
             if not fields:
                 continue
-            sets = ", ".join(f"{k}=?" for k in fields)
-            con.execute(f"UPDATE {table} SET {sets} WHERE {pk}=?",
+            sets = ", ".join(f'"{k}"=?' for k in fields)
+            con.execute(f'UPDATE "{table}" SET {sets} WHERE "{pk}"=?',
                         (*fields.values(), pkv))
             n_upd += 1
         # Inserções
@@ -2061,8 +2061,9 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             placeholders = ", ".join("?" for _ in fields)
+            cols = ", ".join(f'"{k}"' for k in fields)
             con.execute(
-                f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({placeholders})",
+                f'INSERT INTO "{table}" ({cols}) VALUES ({placeholders})',
                 tuple(fields.values()))
             n_ins += 1
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
