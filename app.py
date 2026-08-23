@@ -6422,7 +6422,6 @@ def page_admin():
                        "Em tabelas com ID automático, deixe a chave vazia.")
 
         if do_save:
-            import math
             def _pyval(v):
                 if v is None: return None
                 try:
