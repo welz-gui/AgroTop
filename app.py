@@ -4659,6 +4659,273 @@ def page_sanitario():
                     st.rerun()
 
 
+def _render_tab_projecao_abate(animals):
+    st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
+               "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
+    rows = []
+    bulk_data = db.projecao_abate_bulk(animals)
+    _SITUACAO_ROTULO = {
+        "perdendo_peso": "⚠️ Perdendo peso",
+        "sem_ganho": "— (sem GMD)",
+    }
+    for a in animals:
+        data = bulk_data[a["id"]]
+        p = data["projecao"]
+        g_total = data["gmd_total"]
+        data_estimada = p["data"] or _SITUACAO_ROTULO.get(p["situacao"], "— (sem GMD)")
+        rows.append({"ID":a["id"],"Raça":a["breed"],
+            "Peso Atual (kg)":a["current_weight"],
+            "Peso-Alvo (kg)":a.get("target_weight") or 500,
+            "Falta (kg)":p["falta"],
+            "GMD recente":round(p["gmd"],3) if p["gmd"] else None,
+            "GMD total":round(g_total,3) if g_total else None,
+            "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
+            "Data estimada":data_estimada})
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True, height=420,
+        column_config={
+            "Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
+            "Peso-Alvo (kg)":st.column_config.NumberColumn(format="%.0f"),
+            "Falta (kg)":st.column_config.NumberColumn(format="%.1f"),
+            "GMD recente":st.column_config.NumberColumn(format="%.3f"),
+            "GMD total":st.column_config.NumberColumn(format="%.3f")})
+    prontos = [r for r in rows if r["Dias p/ abate"] == 0]
+    if prontos:
+        st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "
+                   f"(peso-alvo atingido).")
+    perdendo = [r for r in rows if r["Data estimada"] == "⚠️ Perdendo peso"]
+    if perdendo:
+        st.warning(f"⚠️ {_plural(len(perdendo),'animal está','animais estão')} perdendo peso — "
+                   f"diferente de faltar dado, é sinal de saúde/pasto/verminose a investigar.")
+
+
+def _render_tab_comparativo_piquete():
+    st.caption("GMD médio × investimento em nutrição de cada piquete. Um pasto com muito "
+               "trato tende a ter **GMD maior**, mas também **custo por GMD maior** — "
+               "aqui você compara a eficiência.")
+    perf = db.get_performance_by_lote()
+    if not perf:
+        st.info("Sem dados por piquete ainda.")
+    else:
+        rows = [{"Piquete":f"{p['lote_id']} — {p['lote_name']}","Animais":p["n"],
+                 "GMD médio (kg/dia)":p["gmd_medio"],
+                 "Nutrição/animal (R$)":p["custo_nut_por_animal"],
+                 "Custo por GMD (R$)":p["custo_por_gmd"]} for p in perf]
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={
+                "GMD médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
+                "Nutrição/animal (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo por GMD (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+        fig = go.Figure()
+        fig.add_bar(x=[p["lote_name"] for p in perf], y=[p["gmd_medio"] for p in perf],
+            name="GMD médio", marker_color=c["primaria"], yaxis="y")
+        fig.add_trace(go.Scatter(x=[p["lote_name"] for p in perf],
+            y=[p["custo_nut_por_animal"] for p in perf], name="Nutrição/animal (R$)",
+            mode="lines+markers", line=dict(color=c["atencao"],width=3), yaxis="y2"))
+        fig.update_layout(**_layout(height=320,
+            legend=dict(orientation="h",y=1.1),
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(title="GMD (kg/dia)",gridcolor=c["superficie"]),
+            yaxis2=dict(title="R$/animal",overlaying="y",side="right",showgrid=False)))
+        st.plotly_chart(fig, use_container_width=True)
+        if all(p["custo_nutricao"]==0 for p in perf):
+            st.info("💡 O custo de nutrição por piquete começa a ser contabilizado a partir "
+                    "das próximas confirmações de trato (na aba Trato do Modo Campo).")
+
+
+def _render_tab_simulador_terminacao(animals):
+    st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
+               "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
+               "de cada estratégia — os valores são **editáveis** e salvos para as "
+               "próximas simulações.")
+
+    pesos = sorted(a["current_weight"] for a in animals)
+    peso_medio = round(pesos[len(pesos)//2], 0) if pesos else 380.0
+    metas = [a.get("target_weight") for a in animals if a.get("target_weight")]
+    meta_pad = round(sum(metas)/len(metas), 0) if metas else 500.0
+    try:
+        arroba_pad = float(db.get_setting("preco_arroba", "300"))
+    except (TypeError, ValueError):
+        arroba_pad = 300.0
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        peso_atual = st.number_input("Peso atual (kg)", min_value=50.0, max_value=900.0,
+            value=float(peso_medio), step=10.0,
+            help="Padrão: peso mediano do rebanho ativo")
+    with c2:
+        peso_meta = st.number_input("Peso de abate (kg)", min_value=100.0, max_value=1000.0,
+            value=float(meta_pad), step=10.0)
+    with c3:
+        preco_arroba = st.number_input("Preço da @ (R$)", min_value=0.0, max_value=2000.0,
+            value=float(arroba_pad), step=5.0, format="%.2f",
+            help="Preço do boi gordo por arroba na venda")
+    with c4:
+        custo_boi = st.number_input("Custo do boi magro (R$)", min_value=0.0,
+            max_value=100000.0, value=0.0, step=50.0, format="%.2f",
+            help="Opcional — aquisição/valor do animal hoje. Igual para todos os "
+                 "cenários; deixe 0 para analisar só a etapa de terminação.")
+
+    st.markdown("**Cenários** — edite GMD (kg/dia), custo/dia (R$) e rendimento de carcaça (%)")
+    cen = db.get_terminacao_cenarios()
+    df_cen = pd.DataFrame(cen)[["nome", "gmd", "custo_dia", "rendimento"]]
+    edited = st.data_editor(df_cen, use_container_width=True, hide_index=True,
+        num_rows="dynamic", key="term_editor",
+        column_config={
+            "nome": st.column_config.TextColumn("Estratégia"),
+            "gmd": st.column_config.NumberColumn("GMD (kg/dia)", min_value=0.0,
+                max_value=3.0, step=0.05, format="%.3f"),
+            "custo_dia": st.column_config.NumberColumn("Custo/dia (R$)", min_value=0.0,
+                step=0.5, format="R$ %.2f"),
+            "rendimento": st.column_config.NumberColumn("Rendimento (%)", min_value=0.30,
+                max_value=0.70, step=0.01, format="%.2f")})
+
+    cA, cB = st.columns([1, 3])
+    with cA:
+        if st.button("💾 Salvar cenários", use_container_width=True):
+            db.set_terminacao_cenarios(edited.to_dict("records"))
+            db.set_setting("preco_arroba", round(preco_arroba, 2))
+            st.success("Cenários e preço da @ salvos!"); st.rerun()
+
+    cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
+    sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+
+    if peso_meta - peso_atual <= 0:
+        st.warning("O peso de abate precisa ser maior que o peso atual.")
+    elif not any(s["dias"] for s in sim):
+        st.info("Informe um GMD maior que zero em pelo menos um cenário.")
+    else:
+        ganho = round(peso_meta - peso_atual, 1)
+        st.markdown(f"Ganho necessário: **{ganho:.0f} kg** por cabeça.")
+        rows = [{"Estratégia":s["nome"],"Dias no trato":s["dias"],
+                 "@ produzidas":s["arrobas_produzidas"],
+                 "Custo alimentar (R$)":s["custo_alimentar"],
+                 "Custo/@ produzida (R$)":s["custo_por_arroba"],
+                 "Receita (R$)":s["receita"],"Lucro (R$)":s["lucro"],
+                 "Lucro/dia (R$)":s["lucro_por_dia"],
+                 "Margem (%)":s["margem"]} for s in sim]
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={
+                "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
+                "Custo alimentar (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Lucro/dia (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Margem (%)":st.column_config.NumberColumn(format="%.1f%%")})
+
+        validos = [s for s in sim if s["lucro"] is not None]
+        best = validos[0] if validos else None
+        if best and best["viavel"]:
+            st.success(f"🏆 Estratégia mais rentável: **{best['nome']}** — "
+                       f"lucro de **R\\$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
+                       f"(R\\$ {best['lucro_por_dia']:,.2f}/dia).")
+        elif best:
+            st.warning(f"⚠️ Nenhuma estratégia dá lucro positivo com estes parâmetros. "
+                       f"A menos ruim é **{best['nome']}** (R\\$ {best['lucro']:,.2f}).")
+
+        fig = go.Figure()
+        nomes = [s["nome"] for s in validos]
+        fig.add_bar(x=nomes, y=[s["lucro"] for s in validos], name="Lucro (R$)",
+            marker_color=[c["primaria"] if s["viavel"] else c["perigo"] for s in validos],
+            yaxis="y")
+        fig.add_trace(go.Scatter(x=nomes, y=[s["dias"] for s in validos],
+            name="Dias no trato", mode="lines+markers",
+            line=dict(color=c["atencao"], width=3), yaxis="y2"))
+        fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(title="Lucro (R$)", gridcolor=c["superficie"], zeroline=True,
+                zerolinecolor=c["borda_suave"]),
+            yaxis2=dict(title="Dias", overlaying="y", side="right", showgrid=False)))
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Receita = peso de abate × rendimento ÷ 15 × preço da @. "
+                   "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
+                   "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
+                   "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
+
+
+def _render_tab_correlacao_chuva_gmd():
+    st.caption("Associação entre a chuva do mês e o GMD médio do rebanho no mesmo "
+               "mês — usa todo o histórico de leituras de chuva e pesagens. "
+               "Correlação não demonstra causalidade.")
+
+    leituras = db.get_rain()
+    pesagens = db.get_all_weighings()
+    series = series_mensais(leituras, pesagens)
+
+    if not series:
+        st.info("Ainda não há mês com leitura de chuva **e** GMD calculável ao "
+               "mesmo tempo — registre chuva (Clima) e pesagens no mesmo período.")
+    else:
+        resultado = correlacao_chuva_gmd(series)
+        k1, k2 = st.columns(2)
+        k1.metric("Coeficiente de correlação",
+                 f"{resultado['coeficiente']:.2f}"
+                 if resultado["coeficiente"] is not None else "—")
+        k2.metric("Períodos avaliados", resultado["n"])
+        st.info(f"ℹ️ {resultado['interpretacao']}")
+
+        df_s = pd.DataFrame(series).sort_values("periodo")
+        fig = go.Figure()
+        fig.add_bar(x=df_s["periodo"], y=df_s["chuva_mm"], name="Chuva (mm)",
+                   marker_color=c["primaria"], yaxis="y")
+        fig.add_trace(go.Scatter(x=df_s["periodo"], y=df_s["gmd_medio"],
+            name="GMD médio (kg/dia)", mode="lines+markers",
+            line=dict(color=c["atencao"], width=3), yaxis="y2"))
+        fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
+            xaxis=dict(gridcolor=c["superficie"], title="Mês"),
+            yaxis=dict(title="Chuva (mm)", gridcolor=c["superficie"]),
+            yaxis2=dict(title="GMD médio (kg/dia)", overlaying="y", side="right",
+                       showgrid=False)))
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(df_s.rename(columns={
+            "periodo": "Mês", "chuva_mm": "Chuva (mm)",
+            "gmd_medio": "GMD médio (kg/dia)"}),
+            use_container_width=True, hide_index=True)
+
+
+def _render_tab_meta_gmd():
+    meta_atual = db.get_gmd_target()
+    c1, c2 = st.columns([1,2])
+    with c1:
+        nova = st.number_input("Meta de GMD (kg/dia)", min_value=0.0, max_value=3.0,
+            value=float(meta_atual), step=0.05, format="%.3f",
+            help="Ganho médio diário mínimo esperado")
+        if st.button("💾 Salvar meta", use_container_width=True):
+            db.set_setting("gmd_meta", round(nova, 3))
+            st.success("Meta salva!"); st.rerun()
+    with c2:
+        st.caption("Animais com GMD **abaixo da meta** são candidatos a investigação "
+                   "(saúde, verminose, pasto ruim) ou descarte. A meta também aparece "
+                   "como alerta na página **Alertas**.")
+
+    low = db.get_low_performance(meta_atual)
+    st.markdown(f"**{_plural(len(low),'animal','animais')} abaixo da meta "
+                f"({meta_atual:.3f} kg/dia)**")
+    if low:
+        rows = [{"ID":a["id"],"Raça":a["breed"],
+                 "Categoria":db.get_age_category(a.get("birth_date")),
+                 "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
+                 "GMD (kg/dia)":round(a["gmd"],3)} for a in low]
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+        fig = px.bar(df.sort_values("GMD (kg/dia)"), x="GMD (kg/dia)", y="ID",
+            orientation="h", color="GMD (kg/dia)",
+            color_continuous_scale=ESCALA_RUIM_BOM)
+        fig.add_vline(x=meta_atual, line_dash="dash", line_color=c["primaria"],
+            annotation_text="Meta", annotation_position="top")
+        fig.update_layout(**PLOTLY, height=max(180,len(df)*30), coloraxis_showscale=False,
+            xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"],title=""))
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.success("✅ Todos os animais estão na meta ou acima!")
+
+
 def page_desempenho():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -4673,270 +4940,23 @@ def page_desempenho():
 
     # ── Meta de GMD e baixo desempenho ────────────────────────────────────────
     with dt1:
-        meta_atual = db.get_gmd_target()
-        c1, c2 = st.columns([1,2])
-        with c1:
-            nova = st.number_input("Meta de GMD (kg/dia)", min_value=0.0, max_value=3.0,
-                value=float(meta_atual), step=0.05, format="%.3f",
-                help="Ganho médio diário mínimo esperado")
-            if st.button("💾 Salvar meta", use_container_width=True):
-                db.set_setting("gmd_meta", round(nova, 3))
-                st.success("Meta salva!"); st.rerun()
-        with c2:
-            st.caption("Animais com GMD **abaixo da meta** são candidatos a investigação "
-                       "(saúde, verminose, pasto ruim) ou descarte. A meta também aparece "
-                       "como alerta na página **Alertas**.")
-
-        low = db.get_low_performance(meta_atual)
-        st.markdown(f"**{_plural(len(low),'animal','animais')} abaixo da meta "
-                    f"({meta_atual:.3f} kg/dia)**")
-        if low:
-            rows = [{"ID":a["id"],"Raça":a["breed"],
-                     "Categoria":db.get_age_category(a.get("birth_date")),
-                     "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
-                     "GMD (kg/dia)":round(a["gmd"],3)} for a in low]
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True,
-                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                    "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
-            fig = px.bar(df.sort_values("GMD (kg/dia)"), x="GMD (kg/dia)", y="ID",
-                orientation="h", color="GMD (kg/dia)",
-                color_continuous_scale=ESCALA_RUIM_BOM)
-            fig.add_vline(x=meta_atual, line_dash="dash", line_color=c["primaria"],
-                annotation_text="Meta", annotation_position="top")
-            fig.update_layout(**PLOTLY, height=max(180,len(df)*30), coloraxis_showscale=False,
-                xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"],title=""))
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.success("✅ Todos os animais estão na meta ou acima!")
+        _render_tab_meta_gmd()
 
     # ── Projeção de abate ─────────────────────────────────────────────────────
     with dt2:
-        st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
-                   "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
-        rows = []
-        bulk_data = db.projecao_abate_bulk(animals)
-        _SITUACAO_ROTULO = {
-            "perdendo_peso": "⚠️ Perdendo peso",
-            "sem_ganho": "— (sem GMD)",
-        }
-        for a in animals:
-            data = bulk_data[a["id"]]
-            p = data["projecao"]
-            g_total = data["gmd_total"]
-            data_estimada = p["data"] or _SITUACAO_ROTULO.get(p["situacao"], "— (sem GMD)")
-            rows.append({"ID":a["id"],"Raça":a["breed"],
-                "Peso Atual (kg)":a["current_weight"],
-                "Peso-Alvo (kg)":a.get("target_weight") or 500,
-                "Falta (kg)":p["falta"],
-                "GMD recente":round(p["gmd"],3) if p["gmd"] else None,
-                "GMD total":round(g_total,3) if g_total else None,
-                "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
-                "Data estimada":data_estimada})
-        df = pd.DataFrame(rows)
-        st.dataframe(df, use_container_width=True, hide_index=True, height=420,
-            column_config={
-                "Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
-                "Peso-Alvo (kg)":st.column_config.NumberColumn(format="%.0f"),
-                "Falta (kg)":st.column_config.NumberColumn(format="%.1f"),
-                "GMD recente":st.column_config.NumberColumn(format="%.3f"),
-                "GMD total":st.column_config.NumberColumn(format="%.3f")})
-        prontos = [r for r in rows if r["Dias p/ abate"] == 0]
-        if prontos:
-            st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "
-                       f"(peso-alvo atingido).")
-        perdendo = [r for r in rows if r["Data estimada"] == "⚠️ Perdendo peso"]
-        if perdendo:
-            st.warning(f"⚠️ {_plural(len(perdendo),'animal está','animais estão')} perdendo peso — "
-                       f"diferente de faltar dado, é sinal de saúde/pasto/verminose a investigar.")
+        _render_tab_projecao_abate(animals)
 
     # ── Comparativo por piquete ───────────────────────────────────────────────
     with dt3:
-        st.caption("GMD médio × investimento em nutrição de cada piquete. Um pasto com muito "
-                   "trato tende a ter **GMD maior**, mas também **custo por GMD maior** — "
-                   "aqui você compara a eficiência.")
-        perf = db.get_performance_by_lote()
-        if not perf:
-            st.info("Sem dados por piquete ainda.")
-        else:
-            rows = [{"Piquete":f"{p['lote_id']} — {p['lote_name']}","Animais":p["n"],
-                     "GMD médio (kg/dia)":p["gmd_medio"],
-                     "Nutrição/animal (R$)":p["custo_nut_por_animal"],
-                     "Custo por GMD (R$)":p["custo_por_gmd"]} for p in perf]
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True,
-                column_config={
-                    "GMD médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
-                    "Nutrição/animal (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Custo por GMD (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-            fig = go.Figure()
-            fig.add_bar(x=[p["lote_name"] for p in perf], y=[p["gmd_medio"] for p in perf],
-                name="GMD médio", marker_color=c["primaria"], yaxis="y")
-            fig.add_trace(go.Scatter(x=[p["lote_name"] for p in perf],
-                y=[p["custo_nut_por_animal"] for p in perf], name="Nutrição/animal (R$)",
-                mode="lines+markers", line=dict(color=c["atencao"],width=3), yaxis="y2"))
-            fig.update_layout(**_layout(height=320,
-                legend=dict(orientation="h",y=1.1),
-                xaxis=dict(gridcolor=c["superficie"]),
-                yaxis=dict(title="GMD (kg/dia)",gridcolor=c["superficie"]),
-                yaxis2=dict(title="R$/animal",overlaying="y",side="right",showgrid=False)))
-            st.plotly_chart(fig, use_container_width=True)
-            if all(p["custo_nutricao"]==0 for p in perf):
-                st.info("💡 O custo de nutrição por piquete começa a ser contabilizado a partir "
-                        "das próximas confirmações de trato (na aba Trato do Modo Campo).")
+        _render_tab_comparativo_piquete()
 
     # ── Simulador de terminação ───────────────────────────────────────────────
     with dt4:
-        st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
-                   "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
-                   "de cada estratégia — os valores são **editáveis** e salvos para as "
-                   "próximas simulações.")
-
-        pesos = sorted(a["current_weight"] for a in animals)
-        peso_medio = round(pesos[len(pesos)//2], 0) if pesos else 380.0
-        metas = [a.get("target_weight") for a in animals if a.get("target_weight")]
-        meta_pad = round(sum(metas)/len(metas), 0) if metas else 500.0
-        try:
-            arroba_pad = float(db.get_setting("preco_arroba", "300"))
-        except (TypeError, ValueError):
-            arroba_pad = 300.0
-
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            peso_atual = st.number_input("Peso atual (kg)", min_value=50.0, max_value=900.0,
-                value=float(peso_medio), step=10.0,
-                help="Padrão: peso mediano do rebanho ativo")
-        with c2:
-            peso_meta = st.number_input("Peso de abate (kg)", min_value=100.0, max_value=1000.0,
-                value=float(meta_pad), step=10.0)
-        with c3:
-            preco_arroba = st.number_input("Preço da @ (R$)", min_value=0.0, max_value=2000.0,
-                value=float(arroba_pad), step=5.0, format="%.2f",
-                help="Preço do boi gordo por arroba na venda")
-        with c4:
-            custo_boi = st.number_input("Custo do boi magro (R$)", min_value=0.0,
-                max_value=100000.0, value=0.0, step=50.0, format="%.2f",
-                help="Opcional — aquisição/valor do animal hoje. Igual para todos os "
-                     "cenários; deixe 0 para analisar só a etapa de terminação.")
-
-        st.markdown("**Cenários** — edite GMD (kg/dia), custo/dia (R$) e rendimento de carcaça (%)")
-        cen = db.get_terminacao_cenarios()
-        df_cen = pd.DataFrame(cen)[["nome", "gmd", "custo_dia", "rendimento"]]
-        edited = st.data_editor(df_cen, use_container_width=True, hide_index=True,
-            num_rows="dynamic", key="term_editor",
-            column_config={
-                "nome": st.column_config.TextColumn("Estratégia"),
-                "gmd": st.column_config.NumberColumn("GMD (kg/dia)", min_value=0.0,
-                    max_value=3.0, step=0.05, format="%.3f"),
-                "custo_dia": st.column_config.NumberColumn("Custo/dia (R$)", min_value=0.0,
-                    step=0.5, format="R$ %.2f"),
-                "rendimento": st.column_config.NumberColumn("Rendimento (%)", min_value=0.30,
-                    max_value=0.70, step=0.01, format="%.2f")})
-
-        cA, cB = st.columns([1, 3])
-        with cA:
-            if st.button("💾 Salvar cenários", use_container_width=True):
-                db.set_terminacao_cenarios(edited.to_dict("records"))
-                db.set_setting("preco_arroba", round(preco_arroba, 2))
-                st.success("Cenários e preço da @ salvos!"); st.rerun()
-
-        cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
-        sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
-
-        if peso_meta - peso_atual <= 0:
-            st.warning("O peso de abate precisa ser maior que o peso atual.")
-        elif not any(s["dias"] for s in sim):
-            st.info("Informe um GMD maior que zero em pelo menos um cenário.")
-        else:
-            ganho = round(peso_meta - peso_atual, 1)
-            st.markdown(f"Ganho necessário: **{ganho:.0f} kg** por cabeça.")
-            rows = [{"Estratégia":s["nome"],"Dias no trato":s["dias"],
-                     "@ produzidas":s["arrobas_produzidas"],
-                     "Custo alimentar (R$)":s["custo_alimentar"],
-                     "Custo/@ produzida (R$)":s["custo_por_arroba"],
-                     "Receita (R$)":s["receita"],"Lucro (R$)":s["lucro"],
-                     "Lucro/dia (R$)":s["lucro_por_dia"],
-                     "Margem (%)":s["margem"]} for s in sim]
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True,
-                column_config={
-                    "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
-                    "Custo alimentar (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Lucro/dia (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Margem (%)":st.column_config.NumberColumn(format="%.1f%%")})
-
-            validos = [s for s in sim if s["lucro"] is not None]
-            best = validos[0] if validos else None
-            if best and best["viavel"]:
-                st.success(f"🏆 Estratégia mais rentável: **{best['nome']}** — "
-                           f"lucro de **R\\$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
-                           f"(R\\$ {best['lucro_por_dia']:,.2f}/dia).")
-            elif best:
-                st.warning(f"⚠️ Nenhuma estratégia dá lucro positivo com estes parâmetros. "
-                           f"A menos ruim é **{best['nome']}** (R\\$ {best['lucro']:,.2f}).")
-
-            fig = go.Figure()
-            nomes = [s["nome"] for s in validos]
-            fig.add_bar(x=nomes, y=[s["lucro"] for s in validos], name="Lucro (R$)",
-                marker_color=[c["primaria"] if s["viavel"] else c["perigo"] for s in validos],
-                yaxis="y")
-            fig.add_trace(go.Scatter(x=nomes, y=[s["dias"] for s in validos],
-                name="Dias no trato", mode="lines+markers",
-                line=dict(color=c["atencao"], width=3), yaxis="y2"))
-            fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
-                xaxis=dict(gridcolor=c["superficie"]),
-                yaxis=dict(title="Lucro (R$)", gridcolor=c["superficie"], zeroline=True,
-                    zerolinecolor=c["borda_suave"]),
-                yaxis2=dict(title="Dias", overlaying="y", side="right", showgrid=False)))
-            st.plotly_chart(fig, use_container_width=True)
-            st.caption("Receita = peso de abate × rendimento ÷ 15 × preço da @. "
-                       "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
-                       "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
-                       "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
+        _render_tab_simulador_terminacao(animals)
 
     # ── Correlação chuva × GMD ────────────────────────────────────────────────
     with dt5:
-        st.caption("Associação entre a chuva do mês e o GMD médio do rebanho no mesmo "
-                   "mês — usa todo o histórico de leituras de chuva e pesagens. "
-                   "Correlação não demonstra causalidade.")
-
-        leituras = db.get_rain()
-        pesagens = db.get_all_weighings()
-        series = series_mensais(leituras, pesagens)
-
-        if not series:
-            st.info("Ainda não há mês com leitura de chuva **e** GMD calculável ao "
-                   "mesmo tempo — registre chuva (Clima) e pesagens no mesmo período.")
-        else:
-            resultado = correlacao_chuva_gmd(series)
-            k1, k2 = st.columns(2)
-            k1.metric("Coeficiente de correlação",
-                     f"{resultado['coeficiente']:.2f}"
-                     if resultado["coeficiente"] is not None else "—")
-            k2.metric("Períodos avaliados", resultado["n"])
-            st.info(f"ℹ️ {resultado['interpretacao']}")
-
-            df_s = pd.DataFrame(series).sort_values("periodo")
-            fig = go.Figure()
-            fig.add_bar(x=df_s["periodo"], y=df_s["chuva_mm"], name="Chuva (mm)",
-                       marker_color=c["primaria"], yaxis="y")
-            fig.add_trace(go.Scatter(x=df_s["periodo"], y=df_s["gmd_medio"],
-                name="GMD médio (kg/dia)", mode="lines+markers",
-                line=dict(color=c["atencao"], width=3), yaxis="y2"))
-            fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
-                xaxis=dict(gridcolor=c["superficie"], title="Mês"),
-                yaxis=dict(title="Chuva (mm)", gridcolor=c["superficie"]),
-                yaxis2=dict(title="GMD médio (kg/dia)", overlaying="y", side="right",
-                           showgrid=False)))
-            st.plotly_chart(fig, use_container_width=True)
-
-            st.dataframe(df_s.rename(columns={
-                "periodo": "Mês", "chuva_mm": "Chuva (mm)",
-                "gmd_medio": "GMD médio (kg/dia)"}),
-                use_container_width=True, hide_index=True)
+        _render_tab_correlacao_chuva_gmd()
 
 
 def page_nutricao():
