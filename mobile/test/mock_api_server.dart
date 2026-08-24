@@ -20,6 +20,9 @@ class MockApiServer {
   final List<Map<String, dynamic>> _medications = [];
   Map<String, dynamic>? lastMovementBody;
   Map<String, dynamic>? lastMedicationBody;
+  int photoUploadRequests = 0;
+  int? lastPhotoUploadSize;
+  final Map<int, List<int>> _photos = {};
   final Map<String, String> _animalLotes = {
     'BR0001': 'P01',
     'BR0002': 'P02',
@@ -184,6 +187,61 @@ class MockApiServer {
         ]);
         return;
       }
+      if (request.method == 'GET' && path == '/animais/BR0001/fotos') {
+        await _json(
+          request,
+          200,
+          _photos.keys
+              .toList(growable: false)
+              .reversed
+              .map(
+                (id) => {
+                  'id': id,
+                  'taken_date': '2026-08-23',
+                  'mime': 'image/jpeg',
+                },
+              )
+              .toList(growable: false),
+        );
+        return;
+      }
+      if (request.method == 'POST' && path == '/animais/BR0001/fotos') {
+        photoUploadRequests++;
+        final contentType = request.headers.contentType;
+        final boundary = contentType?.parameters['boundary'];
+        if (contentType?.mimeType != 'multipart/form-data' ||
+            boundary == null) {
+          await _json(request, 422, {'detail': 'Multipart inválido'});
+          return;
+        }
+        final raw = await request.fold<List<int>>(
+          <int>[],
+          (bytes, chunk) => bytes..addAll(chunk),
+        );
+        final photo = _multipartFile(raw, boundary);
+        if (photo == null) {
+          await _json(request, 422, {'detail': 'Campo arquivo ausente'});
+          return;
+        }
+        final id = _photos.length + 1;
+        _photos[id] = photo;
+        lastPhotoUploadSize = photo.length;
+        await _json(request, 201, {'id': id});
+        return;
+      }
+      if (request.method == 'GET' && path.startsWith('/fotos/')) {
+        final id = int.tryParse(path.substring('/fotos/'.length));
+        final bytes = _photos[id];
+        if (bytes == null) {
+          await _json(request, 404, {'detail': 'Foto não encontrada'});
+          return;
+        }
+        request.response.statusCode = 200;
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.add(bytes);
+        await request.response.close();
+        return;
+      }
       if (request.method == 'GET' && path.startsWith('/animais/')) {
         final id = Uri.decodeComponent(path.substring('/animais/'.length));
         if (!_animalLotes.containsKey(id)) {
@@ -291,6 +349,18 @@ class MockApiServer {
 
   int _countAnimals(String loteId) =>
       _animalLotes.values.where((value) => value == loteId).length;
+
+  List<int>? _multipartFile(List<int> raw, String boundary) {
+    final body = latin1.decode(raw);
+    const marker = 'name="arquivo"';
+    final markerIndex = body.indexOf(marker);
+    if (markerIndex < 0) return null;
+    final dataStart = body.indexOf('\r\n\r\n', markerIndex);
+    if (dataStart < 0) return null;
+    final dataEnd = body.indexOf('\r\n--$boundary', dataStart + 4);
+    if (dataEnd < 0) return null;
+    return latin1.encode(body.substring(dataStart + 4, dataEnd));
+  }
 
   Map<String, dynamic> _animal(String id) => {
     'id': id,

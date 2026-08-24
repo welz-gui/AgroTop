@@ -118,14 +118,16 @@ class TestEspelhoNasFilhas(BaseSurrogate):
     def test_todas_as_filhas_tem_a_coluna(self):
         for t in self.TABELAS:
             with self.subTest(tabela=t):
-                cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({t})")}
+                qt = f'"{t}"'
+                cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({qt})")}
                 self.assertIn("animal_uuid", cols)
 
     def test_animal_id_foi_removido(self):
         """A coluna legada não pode voltar por descuido num CREATE TABLE."""
         for t in self.TABELAS:
             with self.subTest(tabela=t):
-                cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({t})")}
+                qt = f'"{t}"'
+                cols = {r["name"] for r in self._linhas(f"PRAGMA table_info({qt})")}
                 self.assertNotIn("animal_id", cols,
                                  f"{t}: coluna legada reapareceu (etapa B1.6)")
 

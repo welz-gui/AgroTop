@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, timedelta
 
-from services.qualidade import avaliar_pesagem, _percentage_change
+from services.qualidade import avaliar_pesagem, _percentage_change, _parse_date
 
 HOJE = date.today()
 
@@ -66,6 +66,22 @@ class TestQualidadePesagem(unittest.TestCase):
         self.assertIn("data_futura", tipos)
         self.assertIn("variacao_absurda", tipos)
         self.assertIn("gmd_implausivel", tipos)
+
+
+class TestParseDate(unittest.TestCase):
+    def test_parse_date_valid(self):
+        self.assertEqual(_parse_date("2023-01-15"), date(2023, 1, 15))
+
+    def test_parse_date_invalid_format(self):
+        self.assertIsNone(_parse_date("15/01/2023"))
+        self.assertIsNone(_parse_date("not a date"))
+        self.assertIsNone(_parse_date(""))
+
+    def test_parse_date_invalid_type(self):
+        self.assertIsNone(_parse_date(None))
+        self.assertIsNone(_parse_date(20230115))
+        self.assertIsNone(_parse_date([]))
+        self.assertIsNone(_parse_date({}))
 
 
 class TestPercentageChange(unittest.TestCase):

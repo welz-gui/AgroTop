@@ -8,7 +8,7 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
-from datetime import datetime, date
+from datetime import date
 from typing import Optional
 
 from . import eventos
@@ -37,6 +37,34 @@ def _weighings_by_animal() -> dict:
 
 def get_weighings(animal_id: str) -> list[dict]:
     return list(_weighings_by_animal().get(animal_id, []))
+
+
+def get_weighings_batch(animal_ids: set[str]) -> dict[str, list[dict]]:
+    """Busca pesagens apenas para os animais especificados numa única consulta."""
+    if not animal_ids:
+        return {}
+
+    out: dict[str, list[dict]] = {}
+
+    # Processa em lotes de 900 para evitar o limite de variáveis do SQLite
+    animal_ids_list = list(animal_ids)
+    batch_size = 900
+
+    with _conn() as con:
+        for i in range(0, len(animal_ids_list), batch_size):
+            chunk = animal_ids_list[i:i + batch_size]
+            placeholders = ",".join("?" * len(chunk))
+            rows = con.execute(
+                f"""SELECT w.*, a.id AS animal_id
+                   FROM weighings w JOIN animals a ON a.uuid=w.animal_uuid
+                   WHERE a.id IN ({placeholders})
+                   ORDER BY w.weigh_date DESC, w.id DESC""", tuple(chunk)
+            ).fetchall()
+
+            for r in rows:
+                out.setdefault(r["animal_id"], []).append(dict(r))
+
+    return out
 
 
 @_writes

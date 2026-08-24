@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../app.dart';
 import '../models.dart';
+import 'animal_photo_section.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
 import 'weighing_page.dart';
@@ -595,7 +596,12 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-
+            AnimalPhotoSection(
+              api: widget.api,
+              animalId: widget.id,
+              onUnauthorized: widget.onUnauthorized,
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
               key: const ValueKey('open-medication'),
               onPressed: _openMedication,

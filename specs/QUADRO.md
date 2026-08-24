@@ -3,9 +3,9 @@
 Fila de tarefas disponíveis para agentes. **Pegue sempre a primeira livre de cima para
 baixo** — a ordem é prioridade, não sugestão.
 
-**Estado em 2026-08-22:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
-[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045, 0046, 0047, 0048, 0049, 0050 e 0052
-concluídas** (Trilha 1/2 —
+**Estado em 2026-08-23:** Fases A e B **e** Trilha 3 (Estoque → Financeiro → Nutrição) do
+[ROADMAP](../ROADMAP.md) concluídas · **0044, 0045, 0046, 0047, 0048, 0049, 0050, 0052 e
+0053 concluídas** (Trilha 1/2 —
 [#174](https://github.com/welz-gui/AgroTop/pull/174),
 [#170](https://github.com/welz-gui/AgroTop/pull/170),
 [#171](https://github.com/welz-gui/AgroTop/pull/171),
@@ -13,12 +13,15 @@ concluídas** (Trilha 1/2 —
 [#177](https://github.com/welz-gui/AgroTop/pull/177),
 [#183](https://github.com/welz-gui/AgroTop/pull/183),
 [#181](https://github.com/welz-gui/AgroTop/pull/181),
-[#180](https://github.com/welz-gui/AgroTop/pull/180)) · 718 testes · CI agora cobre
-Flutter também (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da
-0047 abaixo) · 37 tabelas em produção, todas com RLS (políticas explícitas de negação
-para `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **2 specs na fila, ambas pegáveis agora** — 0051 (sanidade, com o
-adendo de `dose_sugerida` já aplicado — ver abaixo) e 0053 (foto) — ver abaixo.
+[#180](https://github.com/welz-gui/AgroTop/pull/180),
+[#187](https://github.com/welz-gui/AgroTop/pull/187)) · CI agora cobre Flutter também
+(`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
+37 tabelas em produção, todas com RLS (políticas explícitas de negação para
+`anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
+(7 de 7 telas) · **1 spec restante, em revisão** — 0051 (sanidade, com o adendo de
+`dose_sugerida` já aplicado): [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
+aberta, funcionalidade e contrato corretos, mas falta o golden visual do critério 5 — ver
+abaixo.
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -136,8 +139,8 @@ adendo de `dose_sugerida` já aplicado — ver abaixo) e 0053 (foto) — ver aba
 | — | [0050](0050-api-sanidade-medicamentos-e-carencia.md) — API: registrar medicamento e consultar carência 🏗️ ⚠️médio | — | ✅ [#181](https://github.com/welz-gui/AgroTop/pull/181) | | 2026-08-22 |
 | — | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) | | 2026-08-22 |
 | — | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) | | 2026-08-22 |
-| 1 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
-| 2 | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | 🟢 disponível — **0047 já mesclada** | | 2026-08-21 |
+| — | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) | | 2026-08-23 |
+| 1 | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | `feat/mobile-sanidade` | 🟡 em revisão — [PR #188](https://github.com/welz-gui/AgroTop/pull/188) aberta, falta o golden do critério 5 (ver abaixo) | | 2026-08-23 |
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
@@ -159,6 +162,22 @@ adendo de `dose_sugerida` já aplicado — ver abaixo) e 0053 (foto) — ver aba
 > parado sem retomada e foi apagado em 2026-08-22** — estava vazio (zero commits próprios,
 > mesmo ponto que a `main` tinha antes da correção), então nada foi perdido. A 0051 está
 > livre de novo para qualquer agente reivindicar, já com o contrato corrigido.
+
+> **PR #188 (spec 0051) em revisão em 2026-08-23 — falta o golden do critério 5.** A
+> funcionalidade está correta: `GET /protocolos?animal_id=` com `dose_sugerida` usado sem
+> recálculo no Dart, carência visível com ícone **e** texto, histórico de aplicações,
+> `flutter analyze`/`test`/`build` verdes (CI Flutter e Python ambos passando). Mas o
+> critério de aceite 5 ("Testes visuais (golden) cobrem a seção de sanidade da ficha com e
+> sem carência ativa, nos três temas") **não foi atendido**: o novo teste
+> `'seção de sanidade com e sem carência ativa nos três temas'` em
+> `mobile/test/golden_screens_test.dart` não chama `matchesGoldenFile(...)` nenhuma vez —
+> só faz `expect(find.text(...))`/`expect(find.byIcon(...))` — e nenhum `.png` novo aparece
+> em `mobile/test/goldens/` no diff da PR. Também só exercita o caso **com** carência
+> ativa, apesar do nome do teste prometer os dois casos. Comentado na PR
+> ([comentário](https://github.com/welz-gui/AgroTop/pull/188#issuecomment-5388809084)),
+> pedindo os dois blocos (`com`/`sem carência`) com `matchesGoldenFile` de verdade — não
+> corrigido diretamente pelo mantenedor porque exige rodar `flutter test --update-goldens`
+> para gerar os PNGs, e este ambiente não tem toolchain Flutter.
 
 > **Histórico da 0044 (fechado em 2026-08-22, ✅ PR #174):** teve retrabalho (v1 → v2,
 > ver a tabela "🔁 O que significa retrabalho" abaixo) e, já na v2, um agente tentando a

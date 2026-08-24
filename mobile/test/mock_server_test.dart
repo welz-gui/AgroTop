@@ -1,10 +1,13 @@
 // ignore_for_file: unnecessary_overrides
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:agrotop_mobile/api_client.dart';
+import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/io_client.dart';
+import 'package:image/image.dart' as image_lib;
 
 import 'mock_api_server.dart';
 
@@ -81,6 +84,23 @@ void main() {
       expect(afterMeds.aplicacoes.length, 1);
       expect(afterMeds.aplicacoes.first.medicamento, 'Ivermectina 1%');
 
+      final originalPhoto = _testPhoto();
+      final compressedPhoto = compressAnimalPhoto(originalPhoto);
+      expect(compressedPhoto.length, lessThan(originalPhoto.length));
+      final decodedPhoto = image_lib.decodeImage(compressedPhoto)!;
+      expect(decodedPhoto.width, 1000);
+      expect(decodedPhoto.height, 667);
+      final photoId = await api.uploadAnimalPhoto(
+        'BR0001',
+        bytes: compressedPhoto,
+        takenDate: '2026-08-23',
+      );
+      expect(server.photoUploadRequests, 1);
+      expect(server.lastPhotoUploadSize, compressedPhoto.length);
+      expect(server.lastPhotoUploadSize, lessThan(originalPhoto.length));
+      final photos = await api.listAnimalPhotos('BR0001');
+      expect(photos.single.id, photoId);
+      expect(await api.getAnimalPhoto(photoId), compressedPhoto);
       final lotes = await api.listLotes();
       expect(lotes.map((lote) => lote.id), containsAll(['P01', 'P02', 'P03']));
       final movement = await api.moveAnimals(
@@ -112,4 +132,14 @@ void main() {
       await api.logout();
     }, PassthroughHttpOverrides());
   });
+}
+
+Uint8List _testPhoto() {
+  final photo = image_lib.Image(width: 1200, height: 800);
+  for (var y = 0; y < photo.height; y++) {
+    for (var x = 0; x < photo.width; x++) {
+      photo.setPixelRgb(x, y, x % 256, y % 256, (x + y) % 256);
+    }
+  }
+  return Uint8List.fromList(image_lib.encodePng(photo, level: 0));
 }

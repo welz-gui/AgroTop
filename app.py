@@ -4,7 +4,6 @@ PWA responsivo: Streamlit + SQLite + Plotly
 """
 
 import io
-import csv
 import html
 import streamlit as st
 import pandas as pd
@@ -65,7 +64,7 @@ from services.rateio_adaptador import com_dias_no_lote
 from services.rateio import ratear
 from services.gta_adaptador import montar_contexto as gta_montar_contexto
 from services.gta import validar as gta_validar
-from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
+from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -993,6 +992,218 @@ def _teclado_numerico():
                         st.rerun(scope="fragment")
 
 
+def _tab_pesagem(animal):
+    # Comparação com estimativa anterior pendente
+    pend = db.get_last_estimate(animal["id"])
+    if pend:
+        met_lbl = db.WEIGH_METHODS.get(pend.get("method"),"estimativa")
+        st.info(f"📋 Última pesagem foi **{met_lbl.lower()}**: "
+                f"**{pend['weight']:.1f} kg** em {pend['weigh_date']}. "
+                f"Se pesar agora na balança, o app mostra a diferença.")
+
+    # Método fora do form para reagir à escolha
+    metodo_peso = st.radio("Método da pesagem",
+        list(db.WEIGH_METHODS.keys()),
+        format_func=lambda m: db.WEIGH_METHODS[m],
+        horizontal=True, key=f"peso_metodo_{animal['id']}")
+
+    nw = float(animal["current_weight"])
+    if metodo_peso == "medicao":
+        st.caption("Informe as medidas do animal — o peso é estimado pela fórmula "
+                   "de Schaeffer (perímetro torácico e comprimento corporal).")
+        mm1, mm2 = st.columns(2)
+        with mm1:
+            pt = st.number_input("Perímetro torácico (cm)", min_value=0.0,
+                max_value=350.0, value=180.0, step=1.0, key=f"pt_{animal['id']}")
+        with mm2:
+            comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
+                max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
+        nw = db.estimate_weight_by_measurement(pt, comp)
+        st.success(f"⚖️ Peso estimado por medição: **{nw:.1f} kg**")
+        medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
+    else:
+        medida_nota = ""
+
+    _pend_alerta = st.session_state.get(f"alerta_peso_{animal['id']}")
+    if _pend_alerta:
+        st.error("⚠️ **Confira antes de salvar** — o peso informado parece fora do padrão:")
+        for _a in _pend_alerta["alertas"]:
+            _ic = "🔴" if _a["severidade"] == "alta" else "🟡"
+            st.markdown(f"{_ic} {_a['mensagem']}")
+        _cc1, _cc2 = st.columns(2)
+        if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
+                       use_container_width=True):
+            db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
+                st.session_state.user["name"], _pend_alerta["notas"],
+                method=_pend_alerta["metodo"])
+            st.session_state.pop(f"alerta_peso_{animal['id']}", None)
+            st.success(f"✅ {_pend_alerta['peso']:.1f} kg salvo."); st.rerun()
+        if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
+                       use_container_width=True):
+            st.session_state.pop(f"alerta_peso_{animal['id']}", None); st.rerun()
+
+    with st.form("f_peso",clear_on_submit=True):
+        pc1,pc2=st.columns(2)
+        with pc1:
+            if metodo_peso == "medicao":
+                st.number_input("Peso estimado (kg)", value=float(nw),
+                    disabled=True, key=f"pesomed_{animal['id']}")
+                nw_final = nw
+            else:
+                lbl = "Peso (kg) — balança" if metodo_peso=="pesado" else "Peso estimado (kg)"
+                nw_final = st.number_input(lbl, min_value=1.0, max_value=2000.0,
+                    value=float(animal["current_weight"]), step=0.5, format="%.1f")
+        with pc2:
+            wd_=st.date_input("Data",value=date.today())
+        notes_p=st.text_area("Obs.",height=60,placeholder="Opcional",
+            value=medida_nota)
+        if st.form_submit_button("✅ Salvar Pesagem",type="primary",use_container_width=True):
+            # Confere indícios de erro ANTES de gravar. Não bloqueia: se houver
+            # alerta de severidade alta, pede uma confirmação — peso errado
+            # contamina GMD, projeção de abate, custo por arroba e ranking.
+            _hist = [{"peso": w["weight"], "data": w["weigh_date"]}
+                     for w in db.get_weighings(animal["id"])]
+            _alertas = avaliar_pesagem(nw_final, wd_.strftime("%Y-%m-%d"), _hist)
+            _graves = [a for a in _alertas if a["severidade"] == "alta"]
+            _ja_confirmado = st.session_state.pop(f"conf_peso_{animal['id']}", False)
+
+            if _graves and not _ja_confirmado:
+                st.session_state[f"alerta_peso_{animal['id']}"] = {
+                    "alertas": _alertas, "peso": nw_final,
+                    "data": wd_.strftime("%Y-%m-%d"), "notas": notes_p,
+                    "metodo": metodo_peso}
+                st.rerun()
+
+            db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
+                st.session_state.user["name"], notes_p, method=metodo_peso)
+            for _a in _alertas:
+                st.warning(f"⚠️ {_a['mensagem']}")
+            msg = f"✅ {nw_final:.1f} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
+            # Comparação estimativa × pesagem real
+            if metodo_peso == "pesado" and pend:
+                err = nw_final - pend["weight"]
+                pct = (err/pend["weight"]*100) if pend["weight"] else 0
+                msg += (f" · Diferença para a estimativa anterior "
+                        f"({pend['weight']:.1f} kg): {err:+.1f} kg ({pct:+.1f}%)")
+            st.success(msg)
+            st.rerun()
+
+
+def _tab_medicamento(animal):
+    ROUTES = ["Subcutânea (SC)","Intramuscular (IM)","Intravenosa (IV)","Oral (PO)","Tópica (Pour-on)","Intramamária"]
+    insumos=[i for i in db.get_all_insumos() if i["category"] in ("medicamento","vacina")]
+    with st.form("f_med",clear_on_submit=True):
+        use_stock=st.toggle("Usar do Estoque",value=bool(insumos))
+        if use_stock and insumos:
+            ins_sel=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.0f} {x['unit']} em estoque)")
+            med_name=ins_sel["name"]; unit_def=ins_sel["unit"]; insumo_id=ins_sel["id"]
+        else:
+            med_name=st.text_input("Medicamento *",placeholder="Ex: Ivermectina 1%")
+            unit_def="ml"; insumo_id=None
+            ins_sel=None
+        mc1,mc2,mc3=st.columns(3)
+        with mc1: dose=st.number_input("Dose",min_value=0.0,step=0.5,format="%.1f")
+        with mc2: unit=st.selectbox("Unidade",["ml","mg","g","dose","comprimido"],
+                        index=["ml","mg","g","dose","comprimido"].index(unit_def) if unit_def in ["ml","mg","g","dose","comprimido"] else 0)
+        with mc3: route=st.selectbox("Via",ROUTES)
+        wd_c=st.number_input("Carência (dias)",min_value=0,max_value=180,value=0,step=1)
+        md_=st.date_input("Data Aplicação",value=date.today())
+        notes_m=st.text_area("Obs.",height=60,placeholder="Opcional")
+        if st.form_submit_button("✅ Salvar Medicamento",type="primary",use_container_width=True):
+            if not med_name:
+                st.error("Informe o medicamento.")
+            else:
+                db.add_medication(animal["id"],med_name,dose,unit,route,
+                    int(wd_c),md_.strftime("%Y-%m-%d"),
+                    st.session_state.user["name"],insumo_id,notes_m)
+                st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
+                st.rerun()
+
+
+def _tab_movimentacao(animal):
+    lotes=db.get_all_lotes()
+    with st.form("f_mov",clear_on_submit=True):
+        dest=st.selectbox("Destino (Lote)",lotes,
+            format_func=lambda x:f"{x['id']} — {x['name']} ({_plural(x['animal_count'],'animal','animais')} | {x['area_ha']} ha)")
+        mv_date=st.date_input("Data",value=date.today())
+        reason=st.selectbox("Motivo",["manejo","pesagem","tratamento","separação","venda","óbito"])
+        notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
+        if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
+            if dest:
+                db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
+                    reason,st.session_state.user["name"],notes_mv)
+                st.success(f"✅ {animal['id']} movido para {dest['name']}")
+                st.rerun()
+
+
+def _tab_obito(animal):
+    if animal["status"] == "morto":
+        st.info("Este animal já está registrado como morto.")
+    else:
+        st.warning("Registrar óbito é **irreversível** e muda o status do animal para 'morto'.")
+        with st.form("f_obito", clear_on_submit=True):
+            causa = st.selectbox("Causa do óbito *", db.DEATH_CAUSES)
+            od1, od2 = st.columns(2)
+            with od1:
+                obito_data = st.date_input("Data do óbito", value=date.today())
+            with od2:
+                st.metric("Perda estimada", f"R$ {db.get_total_cost(animal['id']):,.2f}",
+                          help="Custo investido no animal até agora")
+            obs_ob = st.text_area("Observações", height=60,
+                placeholder="Ex: encontrado no piquete norte, suspeita de cobra")
+            confirmar = st.checkbox("Confirmo o registro do óbito deste animal")
+            if st.form_submit_button("☠️ Registrar Óbito", type="primary", use_container_width=True):
+                if not confirmar:
+                    st.error("Marque a confirmação para registrar.")
+                else:
+                    r = db.register_death(animal["id"], obito_data.strftime("%Y-%m-%d"),
+                        causa, operator=st.session_state.user["name"], notes=obs_ob)
+                    st.success(f"Óbito registrado. Perda contabilizada: R$ {r.get('perda',0):,.2f}")
+                    st.rerun()
+
+
+def _tab_historico(animal):
+    c = cores()
+    h1,h2=st.columns(2)
+    with h1:
+        st.markdown("**⚖️ Pesagens**")
+        ws=db.get_weighings(animal["id"])
+        if len(ws)>=2:
+            df_hw=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
+            df_hw.columns=["Data","Peso (kg)"]; df_hw["Data"]=pd.to_datetime(df_hw["Data"])
+            fig_hw=px.line(df_hw,x="Data",y="Peso (kg)",markers=True,
+                color_discrete_sequence=[c["primaria"]])
+            fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=c["superficie"]),
+                yaxis=dict(gridcolor=c["superficie"]))
+            st.plotly_chart(fig_hw,use_container_width=True)
+        for w in ws[:5]:
+            met = w.get("method") or "pesado"
+            mbadge = {"pesado":'<span class="badge-green">balança</span>',
+                      "estimado":'<span class="badge-yellow">estimado</span>',
+                      "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
+            st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
+                f'<span style="color:{c["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
+                f'<span style="color:{c["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
+                unsafe_allow_html=True)
+    with h2:
+        st.markdown("**💉 Medicamentos**")
+        for m in db.get_medications(animal["id"], limit=5):
+            end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
+            badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
+            st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
+                f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
+                f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
+                f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
+                f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
+                f'</span></div>',unsafe_allow_html=True)
+        st.markdown("**🚚 Movimentações**")
+        for mv in db.get_movements(animal["id"], limit=4):
+            st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
+                f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
+                f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
+                f'</div>',unsafe_allow_html=True)
+
+
 def _campo_animal():
     # ── Passo 1: Localizar animal ─────────────────────────────────────────────
     tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
@@ -1085,209 +1296,19 @@ def _campo_animal():
         _photo_section(animal["id"], key_prefix="campo_")
 
     with t5:  # ÓBITO
-        if animal["status"] == "morto":
-            st.info("Este animal já está registrado como morto.")
-        else:
-            st.warning("Registrar óbito é **irreversível** e muda o status do animal para 'morto'.")
-            with st.form("f_obito", clear_on_submit=True):
-                causa = st.selectbox("Causa do óbito *", db.DEATH_CAUSES)
-                od1, od2 = st.columns(2)
-                with od1:
-                    obito_data = st.date_input("Data do óbito", value=date.today())
-                with od2:
-                    st.metric("Perda estimada", f"R$ {db.get_total_cost(animal['id']):,.2f}",
-                              help="Custo investido no animal até agora")
-                obs_ob = st.text_area("Observações", height=60,
-                    placeholder="Ex: encontrado no piquete norte, suspeita de cobra")
-                confirmar = st.checkbox("Confirmo o registro do óbito deste animal")
-                if st.form_submit_button("☠️ Registrar Óbito", type="primary", use_container_width=True):
-                    if not confirmar:
-                        st.error("Marque a confirmação para registrar.")
-                    else:
-                        r = db.register_death(animal["id"], obito_data.strftime("%Y-%m-%d"),
-                            causa, operator=st.session_state.user["name"], notes=obs_ob)
-                        st.success(f"Óbito registrado. Perda contabilizada: R$ {r.get('perda',0):,.2f}")
-                        st.rerun()
+        _tab_obito(animal)
 
     with t1:  # PESAGEM
-        # Comparação com estimativa anterior pendente
-        pend = db.get_last_estimate(animal["id"])
-        if pend:
-            met_lbl = db.WEIGH_METHODS.get(pend.get("method"),"estimativa")
-            st.info(f"📋 Última pesagem foi **{met_lbl.lower()}**: "
-                    f"**{pend['weight']:.1f} kg** em {pend['weigh_date']}. "
-                    f"Se pesar agora na balança, o app mostra a diferença.")
-
-        # Método fora do form para reagir à escolha
-        metodo_peso = st.radio("Método da pesagem",
-            list(db.WEIGH_METHODS.keys()),
-            format_func=lambda m: db.WEIGH_METHODS[m],
-            horizontal=True, key=f"peso_metodo_{animal['id']}")
-
-        nw = float(animal["current_weight"])
-        if metodo_peso == "medicao":
-            st.caption("Informe as medidas do animal — o peso é estimado pela fórmula "
-                       "de Schaeffer (perímetro torácico e comprimento corporal).")
-            mm1, mm2 = st.columns(2)
-            with mm1:
-                pt = st.number_input("Perímetro torácico (cm)", min_value=0.0,
-                    max_value=350.0, value=180.0, step=1.0, key=f"pt_{animal['id']}")
-            with mm2:
-                comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
-                    max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
-            nw = db.estimate_weight_by_measurement(pt, comp)
-            st.success(f"⚖️ Peso estimado por medição: **{nw:.1f} kg**")
-            medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
-        else:
-            medida_nota = ""
-
-        _pend_alerta = st.session_state.get(f"alerta_peso_{animal['id']}")
-        if _pend_alerta:
-            st.error("⚠️ **Confira antes de salvar** — o peso informado parece fora do padrão:")
-            for _a in _pend_alerta["alertas"]:
-                _ic = "🔴" if _a["severidade"] == "alta" else "🟡"
-                st.markdown(f"{_ic} {_a['mensagem']}")
-            _cc1, _cc2 = st.columns(2)
-            if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
-                           use_container_width=True):
-                db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
-                    st.session_state.user["name"], _pend_alerta["notas"],
-                    method=_pend_alerta["metodo"])
-                st.session_state.pop(f"alerta_peso_{animal['id']}", None)
-                st.success(f"✅ {_pend_alerta['peso']:.1f} kg salvo."); st.rerun()
-            if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
-                           use_container_width=True):
-                st.session_state.pop(f"alerta_peso_{animal['id']}", None); st.rerun()
-
-        with st.form("f_peso",clear_on_submit=True):
-            pc1,pc2=st.columns(2)
-            with pc1:
-                if metodo_peso == "medicao":
-                    st.number_input("Peso estimado (kg)", value=float(nw),
-                        disabled=True, key=f"pesomed_{animal['id']}")
-                    nw_final = nw
-                else:
-                    lbl = "Peso (kg) — balança" if metodo_peso=="pesado" else "Peso estimado (kg)"
-                    nw_final = st.number_input(lbl, min_value=1.0, max_value=2000.0,
-                        value=float(animal["current_weight"]), step=0.5, format="%.1f")
-            with pc2:
-                wd_=st.date_input("Data",value=date.today())
-            notes_p=st.text_area("Obs.",height=60,placeholder="Opcional",
-                value=medida_nota)
-            if st.form_submit_button("✅ Salvar Pesagem",type="primary",use_container_width=True):
-                # Confere indícios de erro ANTES de gravar. Não bloqueia: se houver
-                # alerta de severidade alta, pede uma confirmação — peso errado
-                # contamina GMD, projeção de abate, custo por arroba e ranking.
-                _hist = [{"peso": w["weight"], "data": w["weigh_date"]}
-                         for w in db.get_weighings(animal["id"])]
-                _alertas = avaliar_pesagem(nw_final, wd_.strftime("%Y-%m-%d"), _hist)
-                _graves = [a for a in _alertas if a["severidade"] == "alta"]
-                _ja_confirmado = st.session_state.pop(f"conf_peso_{animal['id']}", False)
-
-                if _graves and not _ja_confirmado:
-                    st.session_state[f"alerta_peso_{animal['id']}"] = {
-                        "alertas": _alertas, "peso": nw_final,
-                        "data": wd_.strftime("%Y-%m-%d"), "notas": notes_p,
-                        "metodo": metodo_peso}
-                    st.rerun()
-
-                db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
-                    st.session_state.user["name"], notes_p, method=metodo_peso)
-                for _a in _alertas:
-                    st.warning(f"⚠️ {_a['mensagem']}")
-                msg = f"✅ {nw_final:.1f} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
-                # Comparação estimativa × pesagem real
-                if metodo_peso == "pesado" and pend:
-                    err = nw_final - pend["weight"]
-                    pct = (err/pend["weight"]*100) if pend["weight"] else 0
-                    msg += (f" · Diferença para a estimativa anterior "
-                            f"({pend['weight']:.1f} kg): {err:+.1f} kg ({pct:+.1f}%)")
-                st.success(msg)
-                st.rerun()
+        _tab_pesagem(animal)
 
     with t2:  # MEDICAMENTO
-        insumos=[i for i in db.get_all_insumos() if i["category"] in ("medicamento","vacina")]
-        with st.form("f_med",clear_on_submit=True):
-            use_stock=st.toggle("Usar do Estoque",value=bool(insumos))
-            if use_stock and insumos:
-                ins_sel=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.0f} {x['unit']} em estoque)")
-                med_name=ins_sel["name"]; unit_def=ins_sel["unit"]; insumo_id=ins_sel["id"]
-            else:
-                med_name=st.text_input("Medicamento *",placeholder="Ex: Ivermectina 1%")
-                unit_def="ml"; insumo_id=None
-                ins_sel=None
-            mc1,mc2,mc3=st.columns(3)
-            with mc1: dose=st.number_input("Dose",min_value=0.0,step=0.5,format="%.1f")
-            with mc2: unit=st.selectbox("Unidade",["ml","mg","g","dose","comprimido"],
-                            index=["ml","mg","g","dose","comprimido"].index(unit_def) if unit_def in ["ml","mg","g","dose","comprimido"] else 0)
-            with mc3: route=st.selectbox("Via",ROUTES)
-            wd_c=st.number_input("Carência (dias)",min_value=0,max_value=180,value=0,step=1)
-            md_=st.date_input("Data Aplicação",value=date.today())
-            notes_m=st.text_area("Obs.",height=60,placeholder="Opcional")
-            if st.form_submit_button("✅ Salvar Medicamento",type="primary",use_container_width=True):
-                if not med_name:
-                    st.error("Informe o medicamento.")
-                else:
-                    db.add_medication(animal["id"],med_name,dose,unit,route,
-                        int(wd_c),md_.strftime("%Y-%m-%d"),
-                        st.session_state.user["name"],insumo_id,notes_m)
-                    st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
-                    st.rerun()
+        _tab_medicamento(animal)
 
     with t3:  # MOVIMENTAÇÃO
-        lotes=db.get_all_lotes()
-        with st.form("f_mov",clear_on_submit=True):
-            dest=st.selectbox("Destino (Lote)",lotes,
-                format_func=lambda x:f"{x['id']} — {x['name']} ({_plural(x['animal_count'],'animal','animais')} | {x['area_ha']} ha)")
-            mv_date=st.date_input("Data",value=date.today())
-            reason=st.selectbox("Motivo",["manejo","pesagem","tratamento","separação","venda","óbito"])
-            notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
-            if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
-                if dest:
-                    db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
-                        reason,st.session_state.user["name"],notes_mv)
-                    st.success(f"✅ {animal['id']} movido para {dest['name']}")
-                    st.rerun()
+        _tab_movimentacao(animal)
 
     with t4:  # HISTÓRICO
-        h1,h2=st.columns(2)
-        with h1:
-            st.markdown("**⚖️ Pesagens**")
-            ws=db.get_weighings(animal["id"])
-            if len(ws)>=2:
-                df_hw=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
-                df_hw.columns=["Data","Peso (kg)"]; df_hw["Data"]=pd.to_datetime(df_hw["Data"])
-                fig_hw=px.line(df_hw,x="Data",y="Peso (kg)",markers=True,
-                    color_discrete_sequence=[c["primaria"]])
-                fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=c["superficie"]),
-                    yaxis=dict(gridcolor=c["superficie"]))
-                st.plotly_chart(fig_hw,use_container_width=True)
-            for w in ws[:5]:
-                met = w.get("method") or "pesado"
-                mbadge = {"pesado":'<span class="badge-green">balança</span>',
-                          "estimado":'<span class="badge-yellow">estimado</span>',
-                          "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
-                st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
-                    f'<span style="color:{c["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
-                    f'<span style="color:{c["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
-                    unsafe_allow_html=True)
-        with h2:
-            st.markdown("**💉 Medicamentos**")
-            for m in db.get_medications(animal["id"], limit=5):
-                end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
-                badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
-                st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
-                    f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
-                    f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
-                    f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
-                    f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
-                    f'</span></div>',unsafe_allow_html=True)
-            st.markdown("**🚚 Movimentações**")
-            for mv in db.get_movements(animal["id"], limit=4):
-                st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
-                    f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
-                    f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
-                    f'</div>',unsafe_allow_html=True)
+        _tab_historico(animal)
 
 
 def _campo_importar():
@@ -1330,10 +1351,12 @@ def _campo_importar():
 
     # Qualidade: o histórico acumula as próprias linhas do arquivo, senão duas
     # pesagens do mesmo animal no mesmo CSV não se enxergariam.
+    animal_ids = {linha["animal_id"] for linha in aceitas}
+    all_weighings = db.get_weighings_batch(animal_ids)
     hist = {}
-    for a_id in {linha["animal_id"] for linha in aceitas}:
+    for a_id in animal_ids:
         hist[a_id] = [{"peso": w["weight"], "data": w["weigh_date"]}
-                      for w in db.get_weighings(a_id)]
+                      for w in all_weighings.get(a_id, [])]
 
     previa, graves = [], 0
     for linha in sorted(aceitas, key=lambda x: (x["animal_id"], x["data"])):
@@ -2556,6 +2579,23 @@ def _fin_centros_de_custo(lotes):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def _render_account_metrics(contas: list) -> str:
+    """Renderiza métricas de contas em aberto e vencidas, retornando a data atual em ISO."""
+    hoje = date.today().isoformat()
+    abertas = [c for c in contas if c["status"] == "aberto"]
+    vencidas = [c for c in abertas if c["vencimento"] < hoje]
+
+    kk = st.columns(3)
+    kk[0].metric("Em Aberto", len(abertas))
+    kk[1].metric("Vencidas", len(vencidas))
+    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
+
+    if vencidas:
+        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
+            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
+                     for c in vencidas))
+    return hoje
+
 def _fin_contas_a_pagar():
     """Parcelas geradas por compra de insumo com nota fiscal (§5, Trilha 3).
 
@@ -2572,19 +2612,7 @@ def _fin_contas_a_pagar():
         st.info("Nenhuma conta a pagar registrada ainda.")
         return
 
-    hoje = date.today().isoformat()
-    abertas = [c for c in contas if c["status"] == "aberto"]
-    vencidas = [c for c in abertas if c["vencimento"] < hoje]
-
-    kk = st.columns(3)
-    kk[0].metric("Em Aberto", len(abertas))
-    kk[1].metric("Vencidas", len(vencidas))
-    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
-
-    if vencidas:
-        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
-            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
-                     for c in vencidas))
+    hoje = _render_account_metrics(contas)
 
     STATUS_LABEL = {"aberto": "🟡 Aberto", "pago": "🟢 Pago", "cancelado": "⚪ Cancelado"}
     f_status = st.selectbox("Filtrar por situação", ["Todas", "aberto", "pago", "cancelado"],
@@ -2637,19 +2665,7 @@ def _fin_contas_a_receber():
         st.info("Nenhuma conta a receber registrada ainda.")
         return
 
-    hoje = date.today().isoformat()
-    abertas = [c for c in contas if c["status"] == "aberto"]
-    vencidas = [c for c in abertas if c["vencimento"] < hoje]
-
-    kk = st.columns(3)
-    kk[0].metric("Em Aberto", len(abertas))
-    kk[1].metric("Vencidas", len(vencidas))
-    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
-
-    if vencidas:
-        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
-            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
-                     for c in vencidas))
+    hoje = _render_account_metrics(contas)
 
     STATUS_LABEL = {"aberto": "🟡 Aberto", "recebido": "🟢 Recebido", "cancelado": "⚪ Cancelado"}
     f_status = st.selectbox("Filtrar por situação", ["Todas", "aberto", "recebido", "cancelado"],
@@ -2956,341 +2972,358 @@ def page_financeiro():
             with t: st.info("Sem animais ativos para esta análise.")
         return
 
-    with ft1:  # CUSTOS
-        ul   = _unit_label()
-        rows_f=[]
-        costs = db._costs_by_animal()
-        for a in animals:
-            tc    = costs.get(a["id"], 0.0)
-            yield_= a.get("carcass_yield") or 0.52
-            prod  = _live_weight(a["current_weight"], yield_)
-            gain  = a["current_weight"] - a["entry_weight"]
-            prod_g= _prod_weight(gain, yield_) if gain > 0 else 0
-            cpu   = round(tc/prod, 2) if prod else 0
-            cpu_g = round(tc/prod_g, 2) if prod_g > 0 else 0
-            rows_f.append({"ID":a["id"],"Raça":a["breed"],
-                "Peso (kg)":a["current_weight"],
-                f"Prod. ({ul})":prod,
-                "Custo Total (R$)":tc,
-                _cost_per_unit_label():cpu,
-                f"Ganho ({ul})":prod_g,
-                f"Custo Produção/{ul}":cpu_g})
-        df_f=pd.DataFrame(rows_f)
-
-        tot_tc  = df_f["Custo Total (R$)"].sum()
-        tot_prod= df_f[f"Prod. ({ul})"].sum()
-        tot_gnh = df_f[f"Ganho ({ul})"].sum()
-        kk=st.columns(4)
-        kk[0].metric("Custo Total do Rebanho", f"R$ {tot_tc:,.2f}")
-        kk[1].metric(f"Total {ul} no Rebanho", f"{tot_prod:.1f} {ul}")
-        kk[2].metric(f"Total {ul} Ganhos",     f"{tot_gnh:.1f} {ul}")
-        kk[3].metric(_cost_per_unit_label(),    f"R$ {tot_tc/tot_prod:.2f}" if tot_prod else "—")
-
-        prod_col = f"Prod. ({ul})"
-        cpu_col  = _cost_per_unit_label()
-        fmt_prod = "%.2f" if _use_arroba() else "%.1f"
-        st.dataframe(df_f,use_container_width=True,hide_index=True,
-            column_config={
-                "Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                prod_col:st.column_config.NumberColumn(format=fmt_prod),
-                "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                cpu_col:st.column_config.NumberColumn(format="R$ %.2f"),
-                f"Ganho ({ul})":st.column_config.NumberColumn(format=fmt_prod),
-                f"Custo Produção/{ul}":st.column_config.NumberColumn(format="R$ %.2f")})
-
-        fig_c=px.scatter(df_f,x=prod_col,y="Custo Total (R$)",
-            color=cpu_col,text="ID",
-            color_continuous_scale=ESCALA_BOM_RUIM,
-            labels={prod_col:f"Produção ({ul})","Custo Total (R$)":"Custo Total (R$)"})
-        fig_c.update_traces(textposition="top center",marker=dict(size=12))
-        fig_c.update_layout(**PLOTLY,height=320,coloraxis_colorbar=dict(title=f"R$/{ul}"))
-        st.plotly_chart(fig_c,use_container_width=True)
-
-    with ft_fix:  # CUSTOS FIXOS
-        st.subheader("🏢 Custos Fixos da Fazenda")
-        st.caption("Aluguel de pastagem, salários, bonificações, impostos, taxas e outros "
-                   "custos que não são atribuídos a um animal específico.")
-
-        # Filtro por período
-        pc1,pc2=st.columns(2)
-        with pc1:
-            start_f=st.date_input("De", value=date(date.today().year,1,1), key="fix_start")
-        with pc2:
-            end_f=st.date_input("Até", value=date.today(), key="fix_end")
-        s_iso, e_iso = start_f.isoformat(), end_f.isoformat()
-
-        fixed=db.get_fixed_costs(s_iso, e_iso)
-        total_fix=db.get_total_fixed_costs(s_iso, e_iso)
-        by_cat=db.get_fixed_costs_by_category(s_iso, e_iso)
-
-        mk=st.columns(3)
-        mk[0].metric("Total de Custos Fixos", f"R$ {total_fix:,.2f}")
-        mk[1].metric("Lançamentos", len(fixed))
-        n_animals=len(animals)
-        mk[2].metric("Rateio por Animal Ativo",
-                     f"R$ {total_fix/n_animals:,.2f}" if n_animals else "—",
-                     help="Custo fixo dividido igualmente pelos animais ativos")
-
-        # Formulário de lançamento
-        with st.expander("➕ Lançar Custo Fixo", expanded=not fixed):
-            with st.form("f_fixed",clear_on_submit=True):
-                fx1,fx2=st.columns(2)
-                with fx1:
-                    fx_cat=st.selectbox("Categoria *", db.FIXED_COST_CATEGORIES)
-                    fx_amount=st.number_input("Valor (R$) *", min_value=0.0, step=50.0, format="%.2f")
-                with fx2:
-                    fx_date=st.date_input("Data *", value=date.today())
-                    fx_recur=st.checkbox("Custo recorrente (mensal)")
-                fx_cc=st.selectbox("Centro de Custo", [None]+[l["id"] for l in lotes],
-                    format_func=lambda lid: "🏭 Geral da Fazenda" if lid is None
-                        else next((f"🌿 {l['id']} — {l['name']}" for l in lotes if l["id"]==lid), lid),
-                    help="Piquete a que este custo pertence. 'Geral da Fazenda' para o que "
-                         "não é de um piquete específico (salário, contabilidade).")
-                fx_desc=st.text_input("Descrição", placeholder="Ex: Aluguel piquete Norte / Salário João")
-                if st.form_submit_button("✅ Lançar Custo Fixo", type="primary", use_container_width=True):
-                    if fx_amount<=0:
-                        st.error("O valor deve ser maior que zero.")
-                    else:
-                        db.add_fixed_cost(fx_cat, fx_desc, fx_amount,
-                                          fx_date.strftime("%Y-%m-%d"), fx_recur, "",
-                                          lote_id=fx_cc)
-                        st.success(f"✅ {fx_cat}: R$ {fx_amount:,.2f} lançado!")
-                        st.rerun()
-
-        if fixed:
-            # Gráfico por categoria
-            cga,cgb=st.columns([2,3])
-            with cga:
-                df_cat=pd.DataFrame(by_cat)
-                df_cat.columns=["Categoria","Total"]
-                fig_fx=px.pie(df_cat,names="Categoria",values="Total",hole=0.45,
-                    color_discrete_sequence=SERIES + [c["perigo"]])
-                fig_fx.update_layout(**_layout(height=260,margin=dict(l=0,r=0,t=10,b=10),
-                    legend=dict(orientation="h",yanchor="bottom",y=-0.25)))
-                fig_fx.update_traces(textposition="inside",textinfo="percent")
-                st.plotly_chart(fig_fx,use_container_width=True)
-            with cgb:
-                nomes_lote={l["id"]:l["name"] for l in lotes}
-                df_fx=pd.DataFrame(fixed)[["cost_date","category","description","amount",
-                                           "recurring","lote_id"]].copy()
-                df_fx["recurring"]=df_fx["recurring"].map({1:"Mensal",0:"Único"})
-                df_fx["lote_id"]=df_fx["lote_id"].map(
-                    lambda lid: "Geral" if not lid else nomes_lote.get(lid, lid))
-                df_fx.columns=["Data","Categoria","Descrição","Valor (R$)","Tipo","Centro de Custo"]
-                st.dataframe(df_fx,use_container_width=True,hide_index=True,height=260,
-                    column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-
-            # Excluir lançamento
-            with st.expander("🗑️ Excluir um lançamento"):
-                opt={f"#{f['id']} · {f['cost_date']} · {f['category']} · R$ {f['amount']:,.2f}":f["id"] for f in fixed}
-                sel_del=st.selectbox("Lançamento", list(opt.keys()), key="del_fix")
-                if st.button("Excluir", type="secondary"):
-                    db.delete_fixed_cost(opt[sel_del])
-                    st.success("Lançamento excluído."); st.rerun()
-        else:
-            st.info("Nenhum custo fixo lançado no período selecionado.")
-
-    with ft2:  # SIMULADOR
-        ul = _unit_label()
-        arroba_mode = _use_arroba()
-        st.subheader("💵 Simulador de Venda")
-
-        precos_cat = db.get_category_prices()
-        base = st.radio("Base de preço",
-            ["categoria","manual"],
-            format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
-                                  else "✏️ Preço único manual",
-            horizontal=True, key="sim_base")
-
-        cotacao = 0.0
-        rendimento = 52
-        ajuste_pct = 0
-        if base == "manual":
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
-                default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
-                cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
-                    value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
-                if arroba_mode:
-                    rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
-            with sc2:
-                sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
-                st.markdown(
-                    f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
-                    f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {cotacao:.2f}/{ul}</div>'
-                    f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
-                    unsafe_allow_html=True)
-        else:  # categoria
-            st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
-                       "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
-            if not precos_cat or all(v <= 0 for v in precos_cat.values()):
-                st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
-                           "e informe os valores por kg de cada categoria.")
-            ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
-                help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
-            # Mostra os preços em uso
-            linhas = []
-            for band in db.AGE_BANDS:
-                for sex in ("M","F"):
-                    p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
-                    if p > 0:
-                        linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {p:.2f}/kg")
-            if linhas:
-                st.caption("Preços aplicados: " + "  |  ".join(linhas))
-
-        incluir_fixos=st.checkbox("Incluir rateio de custos fixos no cálculo",
-            help="Divide os custos fixos do ano igualmente entre os animais ativos")
-
-        rateio_fixo = 0.0
-        if incluir_fixos and animals:
-            total_fix_ano = db.get_total_fixed_costs(
-                date(date.today().year,1,1).isoformat(), date.today().isoformat())
-            rateio_fixo = total_fix_ano / len(animals)
-            st.info(f"Rateio de custos fixos: **R\\$ {rateio_fixo:,.2f}** por animal "
-                    f"(total R\\$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
-
-        sim_rows=[]
-        sem_preco=[]
-        costs = db._costs_by_animal()
-        for a in animals:
-            tc  = costs.get(a["id"], 0.0) + rateio_fixo
-            band = db.get_age_category(a.get("birth_date"))
-            if base == "categoria":
-                price_kg = precos_cat.get((band, a["sex"]), 0.0) * (1+ajuste_pct/100)
-                receita  = round(a["current_weight"] * price_kg, 2)
-                preco_aplicado = round(price_kg, 2)
-                if price_kg <= 0: sem_preco.append(a["id"])
-            else:
-                prod    = _live_weight(a["current_weight"], rendimento/100)
-                receita = round(prod * cotacao, 2)
-                preco_aplicado = round(cotacao, 2)
-            prod_disp = _live_weight(a["current_weight"], rendimento/100)
-            lucro = round(receita - tc, 2)
-            sim_rows.append({"ID":a["id"],"Categoria":band,
-                "Peso (kg)":a["current_weight"], f"Venda ({ul})":prod_disp,
-                "Preço (R$/kg)":preco_aplicado if base=="categoria" else None,
-                "Receita (R$)":receita,"Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
-                "Margem (%)":round(lucro/receita*100,1) if receita else 0})
-        df_sim=pd.DataFrame(sim_rows)
-        if base != "categoria":
-            df_sim = df_sim.drop(columns=["Preço (R$/kg)"])
-
-        if sem_preco:
-            st.warning(f"⚠️ Sem preço de categoria (receita R$ 0): **{', '.join(sem_preco)}**. "
-                       f"Defina os valores em **Preços/Categoria**.")
-
-        tot_rec=df_sim["Receita (R$)"].sum(); tot_luc=df_sim["Lucro (R$)"].sum()
-        tot_cost=df_sim["Custo Total (R$)"].sum()
-        margem_media=df_sim["Margem (%)"].mean()
-
-        sk=st.columns(4)
-        sk[0].metric("Receita Total", f"R$ {tot_rec:,.2f}")
-        sk[1].metric("Custo Total",   f"R$ {tot_cost:,.2f}")
-        sk[2].metric("Lucro / Prejuízo Total", f"R$ {tot_luc:,.2f}",
-            delta=f"{tot_luc:+,.2f}", delta_color="normal")
-        sk[3].metric("Margem Média", f"{margem_media:.1f}%",
-            delta=f"{margem_media:+.1f}%", delta_color="normal")
-
-        if tot_luc < 0:
-            st.error(f"⚠️ Projeção de **PREJUÍZO** de R$ {abs(tot_luc):,.2f}. "
-                     f"Reveja os preços, os custos ou o ponto de venda.")
-
-        fmt_prod = "%.2f" if arroba_mode else "%.1f"
-        cfg = {"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-               f"Venda ({ul})":st.column_config.NumberColumn(format=fmt_prod),
-               "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-               "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-               "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f")}
-        if base == "categoria":
-            cfg["Preço (R$/kg)"]=st.column_config.NumberColumn(format="R$ %.2f")
-        st.dataframe(df_sim,use_container_width=True,hide_index=True,column_config=cfg)
-
-    with ft3:  # BREAKEVEN
-        ul = _unit_label()
-        st.subheader("⚖️ Ponto de Equilíbrio (Breakeven)")
-        be_rows=[]
-        costs = db._costs_by_animal()
-        for a in animals:
-            tc   = costs.get(a["id"], 0.0)
-            prod = _live_weight(a["current_weight"], a.get("carcass_yield") or 0.52)
-            be   = round(tc/prod, 2) if prod else 0
-            be_rows.append({"ID":a["id"],"Raça":a["breed"],
-                "Peso (kg)":a["current_weight"],
-                f"Prod. ({ul})":prod,
-                "Custo Total (R$)":tc,
-                _breakeven_label():be})
-        df_be    = pd.DataFrame(be_rows)
-        be_col   = _breakeven_label()
-        prod_col = f"Prod. ({ul})"
-        fmt_prod = "%.2f" if _use_arroba() else "%.1f"
-        fig_be=px.bar(df_be.sort_values(be_col),
-            x="ID",y=be_col,color=be_col,
-            color_continuous_scale=ESCALA_BOM_RUIM,
-            labels={be_col:f"R$ mínimo por {ul}"})
-        fig_be.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
-            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
-        st.plotly_chart(fig_be,use_container_width=True)
-        st.dataframe(df_be,use_container_width=True,hide_index=True,
-            column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                prod_col:st.column_config.NumberColumn(format=fmt_prod),
-                "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                be_col:st.column_config.NumberColumn(format="R$ %.2f")})
-
-    with ft4:  # DESEMPENHO POR ORIGEM
-        st.subheader("🏆 Ranking de Fornecedor / Origem")
-        st.caption("Comparativo por origem sobre **todo o histórico** (ativos, vendidos e mortos): "
-                   "quem entrega o melhor **GMD**, a menor **mortalidade** e o menor "
-                   "**custo por @ produzida**.")
-        rank=db.get_fornecedor_ranking()
-        if not rank:
-            st.info("Sem animais com fornecedor informado ainda.")
-        else:
-            rows=[{"Fornecedor":r["fornecedor"],"Animais":r["n"],
-                   "Ativos":r["ativos"],"Vendidos":r["vendidos"],"Mortos":r["mortos"],
-                   "GMD Médio (kg/dia)":r["gmd_medio"],
-                   "Mortalidade (%)":r["taxa_mortalidade"],
-                   "@ produzidas":r["arrobas_produzidas"],
-                   "Custo/@ produzida (R$)":r["custo_por_arroba"]} for r in rank]
-            df_p=pd.DataFrame(rows)
-            st.dataframe(df_p,use_container_width=True,hide_index=True,
-                column_config={
-                    "GMD Médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
-                    "Mortalidade (%)":st.column_config.NumberColumn(format="%.1f%%"),
-                    "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
-                    "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-
-            c1,c2=st.columns(2)
-            with c1:
-                fig_p=px.bar(df_p,x="Fornecedor",y="GMD Médio (kg/dia)",
-                    color="GMD Médio (kg/dia)",
-                    color_continuous_scale=ESCALA_RUIM_BOM,
-                    text="GMD Médio (kg/dia)")
-                fig_p.update_traces(texttemplate="%{text:.3f}",textposition="outside")
-                fig_p.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
-                    title="GMD médio por fornecedor",
-                    xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
-                st.plotly_chart(fig_p,use_container_width=True)
-            with c2:
-                fig_m=px.bar(df_p,x="Fornecedor",y="Mortalidade (%)",
-                    color="Mortalidade (%)",
-                    color_continuous_scale=ESCALA_BOM_RUIM,
-                    text="Mortalidade (%)")
-                fig_m.update_traces(texttemplate="%{text:.1f}%",textposition="outside")
-                fig_m.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
-                    title="Taxa de mortalidade por fornecedor",
-                    xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
-                st.plotly_chart(fig_m,use_container_width=True)
-
-            melhor=next((r for r in rank if r["arrobas_produzidas"]>0),None)
-            if melhor:
-                st.success(f"🥇 Melhor GMD médio: **{rank[0]['fornecedor']}** "
-                           f"({rank[0]['gmd_medio']:.3f} kg/dia). "
-                           f"Compare com o **custo por @** e a **mortalidade** na tabela para "
-                           f"decidir de quem vale a pena comprar de novo.")
+    with ft1: _fin_custos_por_animal(animals)
+    with ft_fix: _fin_custos_fixos(animals, lotes)
+    with ft2: _fin_simulador(animals)
+    with ft3: _fin_breakeven(animals)
+    with ft4: _fin_desempenho_origem()
 
     with ft6:
         _fin_rateio_de_lote(animals)
+
+
+
+def _fin_custos_por_animal(animals):
+    ul   = _unit_label()
+    rows_f=[]
+    costs = db._costs_by_animal()
+    for a in animals:
+        tc    = costs.get(a["id"], 0.0)
+        yield_= a.get("carcass_yield") or 0.52
+        prod  = _live_weight(a["current_weight"], yield_)
+        gain  = a["current_weight"] - a["entry_weight"]
+        prod_g= _prod_weight(gain, yield_) if gain > 0 else 0
+        cpu   = round(tc/prod, 2) if prod else 0
+        cpu_g = round(tc/prod_g, 2) if prod_g > 0 else 0
+        rows_f.append({"ID":a["id"],"Raça":a["breed"],
+            "Peso (kg)":a["current_weight"],
+            f"Prod. ({ul})":prod,
+            "Custo Total (R$)":tc,
+            _cost_per_unit_label():cpu,
+            f"Ganho ({ul})":prod_g,
+            f"Custo Produção/{ul}":cpu_g})
+    df_f=pd.DataFrame(rows_f)
+
+    tot_tc  = df_f["Custo Total (R$)"].sum()
+    tot_prod= df_f[f"Prod. ({ul})"].sum()
+    tot_gnh = df_f[f"Ganho ({ul})"].sum()
+    kk=st.columns(4)
+    kk[0].metric("Custo Total do Rebanho", f"R$ {tot_tc:,.2f}")
+    kk[1].metric(f"Total {ul} no Rebanho", f"{tot_prod:.1f} {ul}")
+    kk[2].metric(f"Total {ul} Ganhos",     f"{tot_gnh:.1f} {ul}")
+    kk[3].metric(_cost_per_unit_label(),    f"R$ {tot_tc/tot_prod:.2f}" if tot_prod else "—")
+
+    prod_col = f"Prod. ({ul})"
+    cpu_col  = _cost_per_unit_label()
+    fmt_prod = "%.2f" if _use_arroba() else "%.1f"
+    st.dataframe(df_f,use_container_width=True,hide_index=True,
+        column_config={
+            "Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+            prod_col:st.column_config.NumberColumn(format=fmt_prod),
+            "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+            cpu_col:st.column_config.NumberColumn(format="R$ %.2f"),
+            f"Ganho ({ul})":st.column_config.NumberColumn(format=fmt_prod),
+            f"Custo Produção/{ul}":st.column_config.NumberColumn(format="R$ %.2f")})
+
+    fig_c=px.scatter(df_f,x=prod_col,y="Custo Total (R$)",
+        color=cpu_col,text="ID",
+        color_continuous_scale=ESCALA_BOM_RUIM,
+        labels={prod_col:f"Produção ({ul})","Custo Total (R$)":"Custo Total (R$)"})
+    fig_c.update_traces(textposition="top center",marker=dict(size=12))
+    fig_c.update_layout(**PLOTLY,height=320,coloraxis_colorbar=dict(title=f"R$/{ul}"))
+    st.plotly_chart(fig_c,use_container_width=True)
+
+
+
+def _fin_custos_fixos(animals, lotes):
+    st.subheader("🏢 Custos Fixos da Fazenda")
+    st.caption("Aluguel de pastagem, salários, bonificações, impostos, taxas e outros "
+               "custos que não são atribuídos a um animal específico.")
+
+    # Filtro por período
+    pc1,pc2=st.columns(2)
+    with pc1:
+        start_f=st.date_input("De", value=date(date.today().year,1,1), key="fix_start")
+    with pc2:
+        end_f=st.date_input("Até", value=date.today(), key="fix_end")
+    s_iso, e_iso = start_f.isoformat(), end_f.isoformat()
+
+    fixed=db.get_fixed_costs(s_iso, e_iso)
+    total_fix=db.get_total_fixed_costs(s_iso, e_iso)
+    by_cat=db.get_fixed_costs_by_category(s_iso, e_iso)
+
+    mk=st.columns(3)
+    mk[0].metric("Total de Custos Fixos", f"R$ {total_fix:,.2f}")
+    mk[1].metric("Lançamentos", len(fixed))
+    n_animals=len(animals)
+    mk[2].metric("Rateio por Animal Ativo",
+                 f"R$ {total_fix/n_animals:,.2f}" if n_animals else "—",
+                 help="Custo fixo dividido igualmente pelos animais ativos")
+
+    # Formulário de lançamento
+    with st.expander("➕ Lançar Custo Fixo", expanded=not fixed):
+        with st.form("f_fixed",clear_on_submit=True):
+            fx1,fx2=st.columns(2)
+            with fx1:
+                fx_cat=st.selectbox("Categoria *", db.FIXED_COST_CATEGORIES)
+                fx_amount=st.number_input("Valor (R$) *", min_value=0.0, step=50.0, format="%.2f")
+            with fx2:
+                fx_date=st.date_input("Data *", value=date.today())
+                fx_recur=st.checkbox("Custo recorrente (mensal)")
+            fx_cc=st.selectbox("Centro de Custo", [None]+[l["id"] for l in lotes],
+                format_func=lambda lid: "🏭 Geral da Fazenda" if lid is None
+                    else next((f"🌿 {l['id']} — {l['name']}" for l in lotes if l["id"]==lid), lid),
+                help="Piquete a que este custo pertence. 'Geral da Fazenda' para o que "
+                     "não é de um piquete específico (salário, contabilidade).")
+            fx_desc=st.text_input("Descrição", placeholder="Ex: Aluguel piquete Norte / Salário João")
+            if st.form_submit_button("✅ Lançar Custo Fixo", type="primary", use_container_width=True):
+                if fx_amount<=0:
+                    st.error("O valor deve ser maior que zero.")
+                else:
+                    db.add_fixed_cost(fx_cat, fx_desc, fx_amount,
+                                      fx_date.strftime("%Y-%m-%d"), fx_recur, "",
+                                      lote_id=fx_cc)
+                    st.success(f"✅ {fx_cat}: R$ {fx_amount:,.2f} lançado!")
+                    st.rerun()
+
+    if fixed:
+        # Gráfico por categoria
+        cga,cgb=st.columns([2,3])
+        with cga:
+            df_cat=pd.DataFrame(by_cat)
+            df_cat.columns=["Categoria","Total"]
+            fig_fx=px.pie(df_cat,names="Categoria",values="Total",hole=0.45,
+                color_discrete_sequence=SERIES + [c["perigo"]])
+            fig_fx.update_layout(**_layout(height=260,margin=dict(l=0,r=0,t=10,b=10),
+                legend=dict(orientation="h",yanchor="bottom",y=-0.25)))
+            fig_fx.update_traces(textposition="inside",textinfo="percent")
+            st.plotly_chart(fig_fx,use_container_width=True)
+        with cgb:
+            nomes_lote={l["id"]:l["name"] for l in lotes}
+            df_fx=pd.DataFrame(fixed)[["cost_date","category","description","amount",
+                                       "recurring","lote_id"]].copy()
+            df_fx["recurring"]=df_fx["recurring"].map({1:"Mensal",0:"Único"})
+            df_fx["lote_id"]=df_fx["lote_id"].map(
+                lambda lid: "Geral" if not lid else nomes_lote.get(lid, lid))
+            df_fx.columns=["Data","Categoria","Descrição","Valor (R$)","Tipo","Centro de Custo"]
+            st.dataframe(df_fx,use_container_width=True,hide_index=True,height=260,
+                column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+
+        # Excluir lançamento
+        with st.expander("🗑️ Excluir um lançamento"):
+            opt={f"#{f['id']} · {f['cost_date']} · {f['category']} · R$ {f['amount']:,.2f}":f["id"] for f in fixed}
+            sel_del=st.selectbox("Lançamento", list(opt.keys()), key="del_fix")
+            if st.button("Excluir", type="secondary"):
+                db.delete_fixed_cost(opt[sel_del])
+                st.success("Lançamento excluído."); st.rerun()
+    else:
+        st.info("Nenhum custo fixo lançado no período selecionado.")
+
+
+
+def _fin_simulador(animals):
+    ul = _unit_label()
+    arroba_mode = _use_arroba()
+    st.subheader("💵 Simulador de Venda")
+
+    precos_cat = db.get_category_prices()
+    base = st.radio("Base de preço",
+        ["categoria","manual"],
+        format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
+                              else "✏️ Preço único manual",
+        horizontal=True, key="sim_base")
+
+    cotacao = 0.0
+    rendimento = 52
+    ajuste_pct = 0
+    if base == "manual":
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
+            default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
+            cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
+                value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
+            if arroba_mode:
+                rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
+        with sc2:
+            sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
+            st.markdown(
+                f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
+                f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {cotacao:.2f}/{ul}</div>'
+                f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
+                unsafe_allow_html=True)
+    else:  # categoria
+        st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
+                   "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
+        if not precos_cat or all(v <= 0 for v in precos_cat.values()):
+            st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
+                       "e informe os valores por kg de cada categoria.")
+        ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
+            help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
+        # Mostra os preços em uso
+        linhas = []
+        for band in db.AGE_BANDS:
+            for sex in ("M","F"):
+                p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
+                if p > 0:
+                    linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {p:.2f}/kg")
+        if linhas:
+            st.caption("Preços aplicados: " + "  |  ".join(linhas))
+
+    incluir_fixos=st.checkbox("Incluir rateio de custos fixos no cálculo",
+        help="Divide os custos fixos do ano igualmente entre os animais ativos")
+
+    rateio_fixo = 0.0
+    if incluir_fixos and animals:
+        total_fix_ano = db.get_total_fixed_costs(
+            date(date.today().year,1,1).isoformat(), date.today().isoformat())
+        rateio_fixo = total_fix_ano / len(animals)
+        st.info(f"Rateio de custos fixos: **R\\$ {rateio_fixo:,.2f}** por animal "
+                f"(total R\\$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
+
+    sim_rows=[]
+    sem_preco=[]
+    costs = db._costs_by_animal()
+    for a in animals:
+        tc  = costs.get(a["id"], 0.0) + rateio_fixo
+        band = db.get_age_category(a.get("birth_date"))
+        if base == "categoria":
+            price_kg = precos_cat.get((band, a["sex"]), 0.0) * (1+ajuste_pct/100)
+            receita  = round(a["current_weight"] * price_kg, 2)
+            preco_aplicado = round(price_kg, 2)
+            if price_kg <= 0: sem_preco.append(a["id"])
+        else:
+            prod    = _live_weight(a["current_weight"], rendimento/100)
+            receita = round(prod * cotacao, 2)
+            preco_aplicado = round(cotacao, 2)
+        prod_disp = _live_weight(a["current_weight"], rendimento/100)
+        lucro = round(receita - tc, 2)
+        sim_rows.append({"ID":a["id"],"Categoria":band,
+            "Peso (kg)":a["current_weight"], f"Venda ({ul})":prod_disp,
+            "Preço (R$/kg)":preco_aplicado if base=="categoria" else None,
+            "Receita (R$)":receita,"Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
+            "Margem (%)":round(lucro/receita*100,1) if receita else 0})
+    df_sim=pd.DataFrame(sim_rows)
+    if base != "categoria":
+        df_sim = df_sim.drop(columns=["Preço (R$/kg)"])
+
+    if sem_preco:
+        st.warning(f"⚠️ Sem preço de categoria (receita R$ 0): **{', '.join(sem_preco)}**. "
+                   f"Defina os valores em **Preços/Categoria**.")
+
+    tot_rec=df_sim["Receita (R$)"].sum(); tot_luc=df_sim["Lucro (R$)"].sum()
+    tot_cost=df_sim["Custo Total (R$)"].sum()
+    margem_media=df_sim["Margem (%)"].mean()
+
+    sk=st.columns(4)
+    sk[0].metric("Receita Total", f"R$ {tot_rec:,.2f}")
+    sk[1].metric("Custo Total",   f"R$ {tot_cost:,.2f}")
+    sk[2].metric("Lucro / Prejuízo Total", f"R$ {tot_luc:,.2f}",
+        delta=f"{tot_luc:+,.2f}", delta_color="normal")
+    sk[3].metric("Margem Média", f"{margem_media:.1f}%",
+        delta=f"{margem_media:+.1f}%", delta_color="normal")
+
+    if tot_luc < 0:
+        st.error(f"⚠️ Projeção de **PREJUÍZO** de R$ {abs(tot_luc):,.2f}. "
+                 f"Reveja os preços, os custos ou o ponto de venda.")
+
+    fmt_prod = "%.2f" if arroba_mode else "%.1f"
+    cfg = {"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+           f"Venda ({ul})":st.column_config.NumberColumn(format=fmt_prod),
+           "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+           "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+           "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f")}
+    if base == "categoria":
+        cfg["Preço (R$/kg)"]=st.column_config.NumberColumn(format="R$ %.2f")
+    st.dataframe(df_sim,use_container_width=True,hide_index=True,column_config=cfg)
+
+
+
+def _fin_breakeven(animals):
+    ul = _unit_label()
+    st.subheader("⚖️ Ponto de Equilíbrio (Breakeven)")
+    be_rows=[]
+    costs = db._costs_by_animal()
+    for a in animals:
+        tc   = costs.get(a["id"], 0.0)
+        prod = _live_weight(a["current_weight"], a.get("carcass_yield") or 0.52)
+        be   = round(tc/prod, 2) if prod else 0
+        be_rows.append({"ID":a["id"],"Raça":a["breed"],
+            "Peso (kg)":a["current_weight"],
+            f"Prod. ({ul})":prod,
+            "Custo Total (R$)":tc,
+            _breakeven_label():be})
+    df_be    = pd.DataFrame(be_rows)
+    be_col   = _breakeven_label()
+    prod_col = f"Prod. ({ul})"
+    fmt_prod = "%.2f" if _use_arroba() else "%.1f"
+    fig_be=px.bar(df_be.sort_values(be_col),
+        x="ID",y=be_col,color=be_col,
+        color_continuous_scale=ESCALA_BOM_RUIM,
+        labels={be_col:f"R$ mínimo por {ul}"})
+    fig_be.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
+        xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
+    st.plotly_chart(fig_be,use_container_width=True)
+    st.dataframe(df_be,use_container_width=True,hide_index=True,
+        column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+            prod_col:st.column_config.NumberColumn(format=fmt_prod),
+            "Custo Total (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+            be_col:st.column_config.NumberColumn(format="R$ %.2f")})
+
+
+
+def _fin_desempenho_origem():
+    st.subheader("🏆 Ranking de Fornecedor / Origem")
+    st.caption("Comparativo por origem sobre **todo o histórico** (ativos, vendidos e mortos): "
+               "quem entrega o melhor **GMD**, a menor **mortalidade** e o menor "
+               "**custo por @ produzida**.")
+    rank=db.get_fornecedor_ranking()
+    if not rank:
+        st.info("Sem animais com fornecedor informado ainda.")
+    else:
+        rows=[{"Fornecedor":r["fornecedor"],"Animais":r["n"],
+               "Ativos":r["ativos"],"Vendidos":r["vendidos"],"Mortos":r["mortos"],
+               "GMD Médio (kg/dia)":r["gmd_medio"],
+               "Mortalidade (%)":r["taxa_mortalidade"],
+               "@ produzidas":r["arrobas_produzidas"],
+               "Custo/@ produzida (R$)":r["custo_por_arroba"]} for r in rank]
+        df_p=pd.DataFrame(rows)
+        st.dataframe(df_p,use_container_width=True,hide_index=True,
+            column_config={
+                "GMD Médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
+                "Mortalidade (%)":st.column_config.NumberColumn(format="%.1f%%"),
+                "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
+                "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+
+        c1,c2=st.columns(2)
+        with c1:
+            fig_p=px.bar(df_p,x="Fornecedor",y="GMD Médio (kg/dia)",
+                color="GMD Médio (kg/dia)",
+                color_continuous_scale=ESCALA_RUIM_BOM,
+                text="GMD Médio (kg/dia)")
+            fig_p.update_traces(texttemplate="%{text:.3f}",textposition="outside")
+            fig_p.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
+                title="GMD médio por fornecedor",
+                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
+            st.plotly_chart(fig_p,use_container_width=True)
+        with c2:
+            fig_m=px.bar(df_p,x="Fornecedor",y="Mortalidade (%)",
+                color="Mortalidade (%)",
+                color_continuous_scale=ESCALA_BOM_RUIM,
+                text="Mortalidade (%)")
+            fig_m.update_traces(texttemplate="%{text:.1f}%",textposition="outside")
+            fig_m.update_layout(**PLOTLY,height=300,coloraxis_showscale=False,
+                title="Taxa de mortalidade por fornecedor",
+                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"]))
+            st.plotly_chart(fig_m,use_container_width=True)
+
+        melhor=next((r for r in rank if r["arrobas_produzidas"]>0),None)
+        if melhor:
+            st.success(f"🥇 Melhor GMD médio: **{rank[0]['fornecedor']}** "
+                       f"({rank[0]['gmd_medio']:.3f} kg/dia). "
+                       f"Compare com o **custo por @** e a **mortalidade** na tabela para "
+                       f"decidir de quem vale a pena comprar de novo.")
+
 
 
 def _fin_rateio_de_lote(animals):
@@ -3345,9 +3378,11 @@ def _fin_rateio_de_lote(animals):
     animais_para_ratear = [{"id": a["id"], "peso": a["current_weight"]}
                            for a in animais_lote]
     if criterio == "peso_dia":
+        animal_ids = [a["id"] for a in animais_lote]
+        last_movements = db.get_last_movements_bulk(animal_ids)
         for item, a in zip(animais_para_ratear, animais_lote):
-            movs = db.get_movements(a["id"], limit=1)
-            item["entrada_no_lote"] = movs[0]["movement_date"] if movs else a["entry_date"]
+            mov_date = last_movements.get(a["id"])
+            item["entrada_no_lote"] = mov_date if mov_date else a["entry_date"]
         animais_para_ratear = com_dias_no_lote(animais_para_ratear, referencia)
 
     if not valor_total:
@@ -4659,6 +4694,273 @@ def page_sanitario():
                     st.rerun()
 
 
+def _render_tab_projecao_abate(animals):
+    st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
+               "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
+    rows = []
+    bulk_data = db.projecao_abate_bulk(animals)
+    _SITUACAO_ROTULO = {
+        "perdendo_peso": "⚠️ Perdendo peso",
+        "sem_ganho": "— (sem GMD)",
+    }
+    for a in animals:
+        data = bulk_data[a["id"]]
+        p = data["projecao"]
+        g_total = data["gmd_total"]
+        data_estimada = p["data"] or _SITUACAO_ROTULO.get(p["situacao"], "— (sem GMD)")
+        rows.append({"ID":a["id"],"Raça":a["breed"],
+            "Peso Atual (kg)":a["current_weight"],
+            "Peso-Alvo (kg)":a.get("target_weight") or 500,
+            "Falta (kg)":p["falta"],
+            "GMD recente":round(p["gmd"],3) if p["gmd"] else None,
+            "GMD total":round(g_total,3) if g_total else None,
+            "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
+            "Data estimada":data_estimada})
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True, height=420,
+        column_config={
+            "Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
+            "Peso-Alvo (kg)":st.column_config.NumberColumn(format="%.0f"),
+            "Falta (kg)":st.column_config.NumberColumn(format="%.1f"),
+            "GMD recente":st.column_config.NumberColumn(format="%.3f"),
+            "GMD total":st.column_config.NumberColumn(format="%.3f")})
+    prontos = [r for r in rows if r["Dias p/ abate"] == 0]
+    if prontos:
+        st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "
+                   f"(peso-alvo atingido).")
+    perdendo = [r for r in rows if r["Data estimada"] == "⚠️ Perdendo peso"]
+    if perdendo:
+        st.warning(f"⚠️ {_plural(len(perdendo),'animal está','animais estão')} perdendo peso — "
+                   f"diferente de faltar dado, é sinal de saúde/pasto/verminose a investigar.")
+
+
+def _render_tab_comparativo_piquete():
+    st.caption("GMD médio × investimento em nutrição de cada piquete. Um pasto com muito "
+               "trato tende a ter **GMD maior**, mas também **custo por GMD maior** — "
+               "aqui você compara a eficiência.")
+    perf = db.get_performance_by_lote()
+    if not perf:
+        st.info("Sem dados por piquete ainda.")
+    else:
+        rows = [{"Piquete":f"{p['lote_id']} — {p['lote_name']}","Animais":p["n"],
+                 "GMD médio (kg/dia)":p["gmd_medio"],
+                 "Nutrição/animal (R$)":p["custo_nut_por_animal"],
+                 "Custo por GMD (R$)":p["custo_por_gmd"]} for p in perf]
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={
+                "GMD médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
+                "Nutrição/animal (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo por GMD (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+        fig = go.Figure()
+        fig.add_bar(x=[p["lote_name"] for p in perf], y=[p["gmd_medio"] for p in perf],
+            name="GMD médio", marker_color=c["primaria"], yaxis="y")
+        fig.add_trace(go.Scatter(x=[p["lote_name"] for p in perf],
+            y=[p["custo_nut_por_animal"] for p in perf], name="Nutrição/animal (R$)",
+            mode="lines+markers", line=dict(color=c["atencao"],width=3), yaxis="y2"))
+        fig.update_layout(**_layout(height=320,
+            legend=dict(orientation="h",y=1.1),
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(title="GMD (kg/dia)",gridcolor=c["superficie"]),
+            yaxis2=dict(title="R$/animal",overlaying="y",side="right",showgrid=False)))
+        st.plotly_chart(fig, use_container_width=True)
+        if all(p["custo_nutricao"]==0 for p in perf):
+            st.info("💡 O custo de nutrição por piquete começa a ser contabilizado a partir "
+                    "das próximas confirmações de trato (na aba Trato do Modo Campo).")
+
+
+def _render_tab_simulador_terminacao(animals):
+    st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
+               "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
+               "de cada estratégia — os valores são **editáveis** e salvos para as "
+               "próximas simulações.")
+
+    pesos = sorted(a["current_weight"] for a in animals)
+    peso_medio = round(pesos[len(pesos)//2], 0) if pesos else 380.0
+    metas = [a.get("target_weight") for a in animals if a.get("target_weight")]
+    meta_pad = round(sum(metas)/len(metas), 0) if metas else 500.0
+    try:
+        arroba_pad = float(db.get_setting("preco_arroba", "300"))
+    except (TypeError, ValueError):
+        arroba_pad = 300.0
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        peso_atual = st.number_input("Peso atual (kg)", min_value=50.0, max_value=900.0,
+            value=float(peso_medio), step=10.0,
+            help="Padrão: peso mediano do rebanho ativo")
+    with c2:
+        peso_meta = st.number_input("Peso de abate (kg)", min_value=100.0, max_value=1000.0,
+            value=float(meta_pad), step=10.0)
+    with c3:
+        preco_arroba = st.number_input("Preço da @ (R$)", min_value=0.0, max_value=2000.0,
+            value=float(arroba_pad), step=5.0, format="%.2f",
+            help="Preço do boi gordo por arroba na venda")
+    with c4:
+        custo_boi = st.number_input("Custo do boi magro (R$)", min_value=0.0,
+            max_value=100000.0, value=0.0, step=50.0, format="%.2f",
+            help="Opcional — aquisição/valor do animal hoje. Igual para todos os "
+                 "cenários; deixe 0 para analisar só a etapa de terminação.")
+
+    st.markdown("**Cenários** — edite GMD (kg/dia), custo/dia (R$) e rendimento de carcaça (%)")
+    cen = db.get_terminacao_cenarios()
+    df_cen = pd.DataFrame(cen)[["nome", "gmd", "custo_dia", "rendimento"]]
+    edited = st.data_editor(df_cen, use_container_width=True, hide_index=True,
+        num_rows="dynamic", key="term_editor",
+        column_config={
+            "nome": st.column_config.TextColumn("Estratégia"),
+            "gmd": st.column_config.NumberColumn("GMD (kg/dia)", min_value=0.0,
+                max_value=3.0, step=0.05, format="%.3f"),
+            "custo_dia": st.column_config.NumberColumn("Custo/dia (R$)", min_value=0.0,
+                step=0.5, format="R$ %.2f"),
+            "rendimento": st.column_config.NumberColumn("Rendimento (%)", min_value=0.30,
+                max_value=0.70, step=0.01, format="%.2f")})
+
+    cA, cB = st.columns([1, 3])
+    with cA:
+        if st.button("💾 Salvar cenários", use_container_width=True):
+            db.set_terminacao_cenarios(edited.to_dict("records"))
+            db.set_setting("preco_arroba", round(preco_arroba, 2))
+            st.success("Cenários e preço da @ salvos!"); st.rerun()
+
+    cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
+    sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+
+    if peso_meta - peso_atual <= 0:
+        st.warning("O peso de abate precisa ser maior que o peso atual.")
+    elif not any(s["dias"] for s in sim):
+        st.info("Informe um GMD maior que zero em pelo menos um cenário.")
+    else:
+        ganho = round(peso_meta - peso_atual, 1)
+        st.markdown(f"Ganho necessário: **{ganho:.0f} kg** por cabeça.")
+        rows = [{"Estratégia":s["nome"],"Dias no trato":s["dias"],
+                 "@ produzidas":s["arrobas_produzidas"],
+                 "Custo alimentar (R$)":s["custo_alimentar"],
+                 "Custo/@ produzida (R$)":s["custo_por_arroba"],
+                 "Receita (R$)":s["receita"],"Lucro (R$)":s["lucro"],
+                 "Lucro/dia (R$)":s["lucro_por_dia"],
+                 "Margem (%)":s["margem"]} for s in sim]
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={
+                "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
+                "Custo alimentar (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Lucro/dia (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Margem (%)":st.column_config.NumberColumn(format="%.1f%%")})
+
+        validos = [s for s in sim if s["lucro"] is not None]
+        best = validos[0] if validos else None
+        if best and best["viavel"]:
+            st.success(f"🏆 Estratégia mais rentável: **{best['nome']}** — "
+                       f"lucro de **R\\$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
+                       f"(R\\$ {best['lucro_por_dia']:,.2f}/dia).")
+        elif best:
+            st.warning(f"⚠️ Nenhuma estratégia dá lucro positivo com estes parâmetros. "
+                       f"A menos ruim é **{best['nome']}** (R\\$ {best['lucro']:,.2f}).")
+
+        fig = go.Figure()
+        nomes = [s["nome"] for s in validos]
+        fig.add_bar(x=nomes, y=[s["lucro"] for s in validos], name="Lucro (R$)",
+            marker_color=[c["primaria"] if s["viavel"] else c["perigo"] for s in validos],
+            yaxis="y")
+        fig.add_trace(go.Scatter(x=nomes, y=[s["dias"] for s in validos],
+            name="Dias no trato", mode="lines+markers",
+            line=dict(color=c["atencao"], width=3), yaxis="y2"))
+        fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(title="Lucro (R$)", gridcolor=c["superficie"], zeroline=True,
+                zerolinecolor=c["borda_suave"]),
+            yaxis2=dict(title="Dias", overlaying="y", side="right", showgrid=False)))
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Receita = peso de abate × rendimento ÷ 15 × preço da @. "
+                   "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
+                   "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
+                   "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
+
+
+def _render_tab_correlacao_chuva_gmd():
+    st.caption("Associação entre a chuva do mês e o GMD médio do rebanho no mesmo "
+               "mês — usa todo o histórico de leituras de chuva e pesagens. "
+               "Correlação não demonstra causalidade.")
+
+    leituras = db.get_rain()
+    pesagens = db.get_all_weighings()
+    series = series_mensais(leituras, pesagens)
+
+    if not series:
+        st.info("Ainda não há mês com leitura de chuva **e** GMD calculável ao "
+               "mesmo tempo — registre chuva (Clima) e pesagens no mesmo período.")
+    else:
+        resultado = correlacao_chuva_gmd(series)
+        k1, k2 = st.columns(2)
+        k1.metric("Coeficiente de correlação",
+                 f"{resultado['coeficiente']:.2f}"
+                 if resultado["coeficiente"] is not None else "—")
+        k2.metric("Períodos avaliados", resultado["n"])
+        st.info(f"ℹ️ {resultado['interpretacao']}")
+
+        df_s = pd.DataFrame(series).sort_values("periodo")
+        fig = go.Figure()
+        fig.add_bar(x=df_s["periodo"], y=df_s["chuva_mm"], name="Chuva (mm)",
+                   marker_color=c["primaria"], yaxis="y")
+        fig.add_trace(go.Scatter(x=df_s["periodo"], y=df_s["gmd_medio"],
+            name="GMD médio (kg/dia)", mode="lines+markers",
+            line=dict(color=c["atencao"], width=3), yaxis="y2"))
+        fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
+            xaxis=dict(gridcolor=c["superficie"], title="Mês"),
+            yaxis=dict(title="Chuva (mm)", gridcolor=c["superficie"]),
+            yaxis2=dict(title="GMD médio (kg/dia)", overlaying="y", side="right",
+                       showgrid=False)))
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(df_s.rename(columns={
+            "periodo": "Mês", "chuva_mm": "Chuva (mm)",
+            "gmd_medio": "GMD médio (kg/dia)"}),
+            use_container_width=True, hide_index=True)
+
+
+def _render_tab_meta_gmd():
+    meta_atual = db.get_gmd_target()
+    c1, c2 = st.columns([1,2])
+    with c1:
+        nova = st.number_input("Meta de GMD (kg/dia)", min_value=0.0, max_value=3.0,
+            value=float(meta_atual), step=0.05, format="%.3f",
+            help="Ganho médio diário mínimo esperado")
+        if st.button("💾 Salvar meta", use_container_width=True):
+            db.set_setting("gmd_meta", round(nova, 3))
+            st.success("Meta salva!"); st.rerun()
+    with c2:
+        st.caption("Animais com GMD **abaixo da meta** são candidatos a investigação "
+                   "(saúde, verminose, pasto ruim) ou descarte. A meta também aparece "
+                   "como alerta na página **Alertas**.")
+
+    low = db.get_low_performance(meta_atual)
+    st.markdown(f"**{_plural(len(low),'animal','animais')} abaixo da meta "
+                f"({meta_atual:.3f} kg/dia)**")
+    if low:
+        rows = [{"ID":a["id"],"Raça":a["breed"],
+                 "Categoria":db.get_age_category(a.get("birth_date")),
+                 "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
+                 "GMD (kg/dia)":round(a["gmd"],3)} for a in low]
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
+        fig = px.bar(df.sort_values("GMD (kg/dia)"), x="GMD (kg/dia)", y="ID",
+            orientation="h", color="GMD (kg/dia)",
+            color_continuous_scale=ESCALA_RUIM_BOM)
+        fig.add_vline(x=meta_atual, line_dash="dash", line_color=c["primaria"],
+            annotation_text="Meta", annotation_position="top")
+        fig.update_layout(**PLOTLY, height=max(180,len(df)*30), coloraxis_showscale=False,
+            xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"],title=""))
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.success("✅ Todos os animais estão na meta ou acima!")
+
+
 def page_desempenho():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -4673,270 +4975,23 @@ def page_desempenho():
 
     # ── Meta de GMD e baixo desempenho ────────────────────────────────────────
     with dt1:
-        meta_atual = db.get_gmd_target()
-        c1, c2 = st.columns([1,2])
-        with c1:
-            nova = st.number_input("Meta de GMD (kg/dia)", min_value=0.0, max_value=3.0,
-                value=float(meta_atual), step=0.05, format="%.3f",
-                help="Ganho médio diário mínimo esperado")
-            if st.button("💾 Salvar meta", use_container_width=True):
-                db.set_setting("gmd_meta", round(nova, 3))
-                st.success("Meta salva!"); st.rerun()
-        with c2:
-            st.caption("Animais com GMD **abaixo da meta** são candidatos a investigação "
-                       "(saúde, verminose, pasto ruim) ou descarte. A meta também aparece "
-                       "como alerta na página **Alertas**.")
-
-        low = db.get_low_performance(meta_atual)
-        st.markdown(f"**{_plural(len(low),'animal','animais')} abaixo da meta "
-                    f"({meta_atual:.3f} kg/dia)**")
-        if low:
-            rows = [{"ID":a["id"],"Raça":a["breed"],
-                     "Categoria":db.get_age_category(a.get("birth_date")),
-                     "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
-                     "GMD (kg/dia)":round(a["gmd"],3)} for a in low]
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True,
-                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                    "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
-            fig = px.bar(df.sort_values("GMD (kg/dia)"), x="GMD (kg/dia)", y="ID",
-                orientation="h", color="GMD (kg/dia)",
-                color_continuous_scale=ESCALA_RUIM_BOM)
-            fig.add_vline(x=meta_atual, line_dash="dash", line_color=c["primaria"],
-                annotation_text="Meta", annotation_position="top")
-            fig.update_layout(**PLOTLY, height=max(180,len(df)*30), coloraxis_showscale=False,
-                xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"],title=""))
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.success("✅ Todos os animais estão na meta ou acima!")
+        _render_tab_meta_gmd()
 
     # ── Projeção de abate ─────────────────────────────────────────────────────
     with dt2:
-        st.caption("Estimativa de quando cada animal atinge o **peso-alvo**, mantido o GMD recente. "
-                   "Também mostramos o **GMD total** (de vida) como referência da trajetória.")
-        rows = []
-        bulk_data = db.projecao_abate_bulk(animals)
-        _SITUACAO_ROTULO = {
-            "perdendo_peso": "⚠️ Perdendo peso",
-            "sem_ganho": "— (sem GMD)",
-        }
-        for a in animals:
-            data = bulk_data[a["id"]]
-            p = data["projecao"]
-            g_total = data["gmd_total"]
-            data_estimada = p["data"] or _SITUACAO_ROTULO.get(p["situacao"], "— (sem GMD)")
-            rows.append({"ID":a["id"],"Raça":a["breed"],
-                "Peso Atual (kg)":a["current_weight"],
-                "Peso-Alvo (kg)":a.get("target_weight") or 500,
-                "Falta (kg)":p["falta"],
-                "GMD recente":round(p["gmd"],3) if p["gmd"] else None,
-                "GMD total":round(g_total,3) if g_total else None,
-                "Dias p/ abate":p["dias"] if p["dias"] is not None else None,
-                "Data estimada":data_estimada})
-        df = pd.DataFrame(rows)
-        st.dataframe(df, use_container_width=True, hide_index=True, height=420,
-            column_config={
-                "Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
-                "Peso-Alvo (kg)":st.column_config.NumberColumn(format="%.0f"),
-                "Falta (kg)":st.column_config.NumberColumn(format="%.1f"),
-                "GMD recente":st.column_config.NumberColumn(format="%.3f"),
-                "GMD total":st.column_config.NumberColumn(format="%.3f")})
-        prontos = [r for r in rows if r["Dias p/ abate"] == 0]
-        if prontos:
-            st.success(f"🟢 {_plural(len(prontos),'animal já pronto','animais já prontos')} para abate "
-                       f"(peso-alvo atingido).")
-        perdendo = [r for r in rows if r["Data estimada"] == "⚠️ Perdendo peso"]
-        if perdendo:
-            st.warning(f"⚠️ {_plural(len(perdendo),'animal está','animais estão')} perdendo peso — "
-                       f"diferente de faltar dado, é sinal de saúde/pasto/verminose a investigar.")
+        _render_tab_projecao_abate(animals)
 
     # ── Comparativo por piquete ───────────────────────────────────────────────
     with dt3:
-        st.caption("GMD médio × investimento em nutrição de cada piquete. Um pasto com muito "
-                   "trato tende a ter **GMD maior**, mas também **custo por GMD maior** — "
-                   "aqui você compara a eficiência.")
-        perf = db.get_performance_by_lote()
-        if not perf:
-            st.info("Sem dados por piquete ainda.")
-        else:
-            rows = [{"Piquete":f"{p['lote_id']} — {p['lote_name']}","Animais":p["n"],
-                     "GMD médio (kg/dia)":p["gmd_medio"],
-                     "Nutrição/animal (R$)":p["custo_nut_por_animal"],
-                     "Custo por GMD (R$)":p["custo_por_gmd"]} for p in perf]
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True,
-                column_config={
-                    "GMD médio (kg/dia)":st.column_config.NumberColumn(format="%.3f"),
-                    "Nutrição/animal (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Custo por GMD (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-            fig = go.Figure()
-            fig.add_bar(x=[p["lote_name"] for p in perf], y=[p["gmd_medio"] for p in perf],
-                name="GMD médio", marker_color=c["primaria"], yaxis="y")
-            fig.add_trace(go.Scatter(x=[p["lote_name"] for p in perf],
-                y=[p["custo_nut_por_animal"] for p in perf], name="Nutrição/animal (R$)",
-                mode="lines+markers", line=dict(color=c["atencao"],width=3), yaxis="y2"))
-            fig.update_layout(**_layout(height=320,
-                legend=dict(orientation="h",y=1.1),
-                xaxis=dict(gridcolor=c["superficie"]),
-                yaxis=dict(title="GMD (kg/dia)",gridcolor=c["superficie"]),
-                yaxis2=dict(title="R$/animal",overlaying="y",side="right",showgrid=False)))
-            st.plotly_chart(fig, use_container_width=True)
-            if all(p["custo_nutricao"]==0 for p in perf):
-                st.info("💡 O custo de nutrição por piquete começa a ser contabilizado a partir "
-                        "das próximas confirmações de trato (na aba Trato do Modo Campo).")
+        _render_tab_comparativo_piquete()
 
     # ── Simulador de terminação ───────────────────────────────────────────────
     with dt4:
-        st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
-                   "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
-                   "de cada estratégia — os valores são **editáveis** e salvos para as "
-                   "próximas simulações.")
-
-        pesos = sorted(a["current_weight"] for a in animals)
-        peso_medio = round(pesos[len(pesos)//2], 0) if pesos else 380.0
-        metas = [a.get("target_weight") for a in animals if a.get("target_weight")]
-        meta_pad = round(sum(metas)/len(metas), 0) if metas else 500.0
-        try:
-            arroba_pad = float(db.get_setting("preco_arroba", "300"))
-        except (TypeError, ValueError):
-            arroba_pad = 300.0
-
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            peso_atual = st.number_input("Peso atual (kg)", min_value=50.0, max_value=900.0,
-                value=float(peso_medio), step=10.0,
-                help="Padrão: peso mediano do rebanho ativo")
-        with c2:
-            peso_meta = st.number_input("Peso de abate (kg)", min_value=100.0, max_value=1000.0,
-                value=float(meta_pad), step=10.0)
-        with c3:
-            preco_arroba = st.number_input("Preço da @ (R$)", min_value=0.0, max_value=2000.0,
-                value=float(arroba_pad), step=5.0, format="%.2f",
-                help="Preço do boi gordo por arroba na venda")
-        with c4:
-            custo_boi = st.number_input("Custo do boi magro (R$)", min_value=0.0,
-                max_value=100000.0, value=0.0, step=50.0, format="%.2f",
-                help="Opcional — aquisição/valor do animal hoje. Igual para todos os "
-                     "cenários; deixe 0 para analisar só a etapa de terminação.")
-
-        st.markdown("**Cenários** — edite GMD (kg/dia), custo/dia (R$) e rendimento de carcaça (%)")
-        cen = db.get_terminacao_cenarios()
-        df_cen = pd.DataFrame(cen)[["nome", "gmd", "custo_dia", "rendimento"]]
-        edited = st.data_editor(df_cen, use_container_width=True, hide_index=True,
-            num_rows="dynamic", key="term_editor",
-            column_config={
-                "nome": st.column_config.TextColumn("Estratégia"),
-                "gmd": st.column_config.NumberColumn("GMD (kg/dia)", min_value=0.0,
-                    max_value=3.0, step=0.05, format="%.3f"),
-                "custo_dia": st.column_config.NumberColumn("Custo/dia (R$)", min_value=0.0,
-                    step=0.5, format="R$ %.2f"),
-                "rendimento": st.column_config.NumberColumn("Rendimento (%)", min_value=0.30,
-                    max_value=0.70, step=0.01, format="%.2f")})
-
-        cA, cB = st.columns([1, 3])
-        with cA:
-            if st.button("💾 Salvar cenários", use_container_width=True):
-                db.set_terminacao_cenarios(edited.to_dict("records"))
-                db.set_setting("preco_arroba", round(preco_arroba, 2))
-                st.success("Cenários e preço da @ salvos!"); st.rerun()
-
-        cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
-        sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
-
-        if peso_meta - peso_atual <= 0:
-            st.warning("O peso de abate precisa ser maior que o peso atual.")
-        elif not any(s["dias"] for s in sim):
-            st.info("Informe um GMD maior que zero em pelo menos um cenário.")
-        else:
-            ganho = round(peso_meta - peso_atual, 1)
-            st.markdown(f"Ganho necessário: **{ganho:.0f} kg** por cabeça.")
-            rows = [{"Estratégia":s["nome"],"Dias no trato":s["dias"],
-                     "@ produzidas":s["arrobas_produzidas"],
-                     "Custo alimentar (R$)":s["custo_alimentar"],
-                     "Custo/@ produzida (R$)":s["custo_por_arroba"],
-                     "Receita (R$)":s["receita"],"Lucro (R$)":s["lucro"],
-                     "Lucro/dia (R$)":s["lucro_por_dia"],
-                     "Margem (%)":s["margem"]} for s in sim]
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True,
-                column_config={
-                    "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
-                    "Custo alimentar (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Lucro/dia (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                    "Margem (%)":st.column_config.NumberColumn(format="%.1f%%")})
-
-            validos = [s for s in sim if s["lucro"] is not None]
-            best = validos[0] if validos else None
-            if best and best["viavel"]:
-                st.success(f"🏆 Estratégia mais rentável: **{best['nome']}** — "
-                           f"lucro de **R\\$ {best['lucro']:,.2f}** em **{best['dias']} dias** "
-                           f"(R\\$ {best['lucro_por_dia']:,.2f}/dia).")
-            elif best:
-                st.warning(f"⚠️ Nenhuma estratégia dá lucro positivo com estes parâmetros. "
-                           f"A menos ruim é **{best['nome']}** (R\\$ {best['lucro']:,.2f}).")
-
-            fig = go.Figure()
-            nomes = [s["nome"] for s in validos]
-            fig.add_bar(x=nomes, y=[s["lucro"] for s in validos], name="Lucro (R$)",
-                marker_color=[c["primaria"] if s["viavel"] else c["perigo"] for s in validos],
-                yaxis="y")
-            fig.add_trace(go.Scatter(x=nomes, y=[s["dias"] for s in validos],
-                name="Dias no trato", mode="lines+markers",
-                line=dict(color=c["atencao"], width=3), yaxis="y2"))
-            fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
-                xaxis=dict(gridcolor=c["superficie"]),
-                yaxis=dict(title="Lucro (R$)", gridcolor=c["superficie"], zeroline=True,
-                    zerolinecolor=c["borda_suave"]),
-                yaxis2=dict(title="Dias", overlaying="y", side="right", showgrid=False)))
-            st.plotly_chart(fig, use_container_width=True)
-            st.caption("Receita = peso de abate × rendimento ÷ 15 × preço da @. "
-                       "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
-                       "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
-                       "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
+        _render_tab_simulador_terminacao(animals)
 
     # ── Correlação chuva × GMD ────────────────────────────────────────────────
     with dt5:
-        st.caption("Associação entre a chuva do mês e o GMD médio do rebanho no mesmo "
-                   "mês — usa todo o histórico de leituras de chuva e pesagens. "
-                   "Correlação não demonstra causalidade.")
-
-        leituras = db.get_rain()
-        pesagens = db.get_all_weighings()
-        series = series_mensais(leituras, pesagens)
-
-        if not series:
-            st.info("Ainda não há mês com leitura de chuva **e** GMD calculável ao "
-                   "mesmo tempo — registre chuva (Clima) e pesagens no mesmo período.")
-        else:
-            resultado = correlacao_chuva_gmd(series)
-            k1, k2 = st.columns(2)
-            k1.metric("Coeficiente de correlação",
-                     f"{resultado['coeficiente']:.2f}"
-                     if resultado["coeficiente"] is not None else "—")
-            k2.metric("Períodos avaliados", resultado["n"])
-            st.info(f"ℹ️ {resultado['interpretacao']}")
-
-            df_s = pd.DataFrame(series).sort_values("periodo")
-            fig = go.Figure()
-            fig.add_bar(x=df_s["periodo"], y=df_s["chuva_mm"], name="Chuva (mm)",
-                       marker_color=c["primaria"], yaxis="y")
-            fig.add_trace(go.Scatter(x=df_s["periodo"], y=df_s["gmd_medio"],
-                name="GMD médio (kg/dia)", mode="lines+markers",
-                line=dict(color=c["atencao"], width=3), yaxis="y2"))
-            fig.update_layout(**_layout(height=320, legend=dict(orientation="h", y=1.1),
-                xaxis=dict(gridcolor=c["superficie"], title="Mês"),
-                yaxis=dict(title="Chuva (mm)", gridcolor=c["superficie"]),
-                yaxis2=dict(title="GMD médio (kg/dia)", overlaying="y", side="right",
-                           showgrid=False)))
-            st.plotly_chart(fig, use_container_width=True)
-
-            st.dataframe(df_s.rename(columns={
-                "periodo": "Mês", "chuva_mm": "Chuva (mm)",
-                "gmd_medio": "GMD médio (kg/dia)"}),
-                use_container_width=True, hide_index=True)
+        _render_tab_correlacao_chuva_gmd()
 
 
 def page_nutricao():
@@ -6422,7 +6477,6 @@ def page_admin():
                        "Em tabelas com ID automático, deixe a chave vazia.")
 
         if do_save:
-            import math
             def _pyval(v):
                 if v is None: return None
                 try:

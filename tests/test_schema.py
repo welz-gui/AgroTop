@@ -78,7 +78,7 @@ def _colunas(caminho):
             for (t,) in con.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-            for r in con.execute(f"PRAGMA table_info({t})")
+            for r in con.execute(f"PRAGMA table_info(\"{t}\")")
         }
     finally:
         con.close()
@@ -138,15 +138,15 @@ class TestFonteUnicaDeVerdade(unittest.TestCase):
         with open(os.path.join(ROOT, "database.py"), encoding="utf-8") as fh:
             linhas = fh.readlines()
 
-        # Faixa de linhas do executescript dentro de init_db().
+        # Faixa de linhas da constante de schema no database.py.
         ini = fim = None
         for n, linha in enumerate(linhas, 1):
-            if linha.lstrip().startswith("def init_db"):
+            if linha.startswith("_SCHEMA_SQL = \"\"\""):
                 ini = n
-            elif ini and fim is None and linha.lstrip().startswith("_migrate("):
+            elif ini and fim is None and linha.startswith("\"\"\""):
                 fim = n
-        self.assertIsNotNone(ini, "init_db() não encontrado em database.py")
-        self.assertIsNotNone(fim, "fim do DDL de init_db() não identificado")
+        self.assertIsNotNone(ini, "_SCHEMA_SQL não encontrado em database.py")
+        self.assertIsNotNone(fim, "fim da string _SCHEMA_SQL não identificado")
 
         def _e_comentario(linha: str) -> bool:
             """Comentário Python (#) ou SQL (--) — documentação, não instrução.
