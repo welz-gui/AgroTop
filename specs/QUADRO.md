@@ -28,28 +28,35 @@ propósito), nenhum dos dois delegável agora. O restante da Trilha 2 ("desenhar
 localização por propriedade na previsão do tempo) é integração de UI, trabalho do
 mantenedor (R31), não spec de agente.
 
-> **0051 fechada em 2026-08-24 com uma lacuna aceita conscientemente.**
-> [PR #188](https://github.com/welz-gui/AgroTop/pull/188) tinha funcionalidade e contrato
-> corretos desde a revisão anterior, mas divergiu de `main` antes de a 0053 (fotos, PR #187)
-> mesclar — as duas estendem os mesmos arquivos do app (ficha do animal, `api_client.dart`,
-> `models.dart`, `golden_screens_test.dart`, `mock_api_server.dart`, `mock_server_test.dart`,
-> `flow_test.dart`). O mantenedor resolveu o conflito por união (sanidade e fotos são seções
-> irmãs independentes, sem sobreposição lógica) — `golden_screens_test.dart` precisou de
-> reconstrução manual porque os dois PRs tinham inserido um `testWidgets` cada um no mesmo
-> ponto do arquivo, e o diff textual intercalou os dois corpos.
+> **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
+> tinha funcionalidade e contrato corretos desde a revisão anterior, mas divergiu de `main`
+> antes de a 0053 (fotos, PR #187) mesclar — as duas estendem os mesmos arquivos do app
+> (ficha do animal, `api_client.dart`, `models.dart`, `golden_screens_test.dart`,
+> `mock_api_server.dart`, `mock_server_test.dart`, `flow_test.dart`). O mantenedor resolveu
+> o conflito por união (sanidade e fotos são seções irmãs independentes, sem sobreposição
+> lógica) — `golden_screens_test.dart` precisou de reconstrução manual porque os dois PRs
+> tinham inserido um `testWidgets` cada um no mesmo ponto do arquivo, e o diff textual
+> intercalou os dois corpos.
 >
-> **O critério de aceite 5 da spec (testes visuais golden da seção de sanidade, com e sem
-> carência, nos três temas) ficou sem cumprir — decisão consciente do usuário, não descuido.**
-> Este ambiente não tem toolchain Flutter, então gerar os PNGs reais
-> (`CAPTURE_GOLDENS=1 flutter test --update-goldens`) não era possível para o mantenedor.
-> Perguntado, o usuário optou por mesclar mesmo assim em vez de esperar por outro agente com
-> Flutter — o resto da tela (contrato, `dose_sugerida` sem cálculo no Dart, carência com
-> ícone e texto, `flutter analyze`/`test`/`build` verdes) está correto e testado por
-> widget/asserção, só falta a comparação pixel a pixel. **Se algum agente futuro tiver
-> Flutter disponível**, completar isso é um adendo pequeno e independente — não precisa de
-> retrabalho nem nova spec: só adicionar `matchesGoldenFile(...)` nos dois blocos de
-> `testWidgets('seção de sanidade com e sem carência ativa nos três temas', ...)` em
-> `mobile/test/golden_screens_test.dart` e gerar os PNGs de verdade.
+> **O critério de aceite 5 (testes golden da seção de sanidade, com e sem carência, nos
+> três temas) ficou pendente no merge, e foi fechado depois** — [PR #227](https://github.com/welz-gui/AgroTop/pull/227),
+> 2026-08-24, mesmo dia. O mantenedor instalou o Flutter localmente (antes deste ambiente
+> não tinha o toolchain) e descobriu, na prática, dois problemas reais que valem registrar
+> para quem for gerar golden em outra máquina:
+> 1. **O caminho do projeto (acento em "Área de Trabalho") quebra `flutter analyze`/`test`
+>    no Windows nativo** — bug conhecido do toolchain Dart com paths não-ASCII, não é
+>    específico deste projeto. Contornado com uma **junction NTFS** apontando para uma
+>    pasta sem acento.
+> 2. **Renderização de golden é sensível à versão do Flutter e ao SO** — regenerar os goldens
+>    já existentes (sem trocar nada de propósito) no Windows local, e depois até no Linux com
+>    Flutter mais novo, mudou os bytes dos 24 PNGs já commitados, apesar de a comparação real
+>    (sem `--update-goldens`) continuar passando neles. A lição: **`git status` mostrando
+>    "modificado" depois de `--update-goldens` não prova divergência real** — só rodar a
+>    suíte sem a flag de atualização prova isso. Fechado gerando os PNGs num container Docker
+>    com **Ubuntu 24.04 + Flutter 3.44.8** (a versão exata pinada em
+>    `.github/workflows/mobile-ci.yml`), verificado nos dois sentidos (goldens antigos
+>    passam nesse ambiente antes de gerar; os novos passam numa segunda rodada limpa depois)
+>    — e confirmado de verdade pela CI real da PR (`build-apk` verde).
 
 > ### 🆕 11 specs novas em 2026-08-06 — a fila deixou de ser "adaptador de tela"
 >
@@ -168,7 +175,7 @@ mantenedor (R31), não spec de agente.
 | — | [0052](0052-api-foto-do-animal.md) — API: enviar e consultar foto do animal 🏗️ ⚠️médio | — | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) | | 2026-08-22 |
 | — | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) | | 2026-08-22 |
 | — | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) | | 2026-08-23 |
-| — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) ⚠️ (falta golden do critério 5, ver acima) | | 2026-08-24 |
+| — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) + [#227](https://github.com/welz-gui/AgroTop/pull/227) (golden do critério 5) | | 2026-08-24 |
 | 1 | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
 | 2 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | — | 🟢 disponível — depende da 0054 (só o contrato, pode mockar) | | 2026-08-24 |
 | 3 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟢 disponível — sem dependência, não toca API | | 2026-08-24 |
