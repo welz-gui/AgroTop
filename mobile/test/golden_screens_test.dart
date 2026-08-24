@@ -272,76 +272,102 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     for (final mode in ThemeMode.values) {
-      final tokenStore = GoldenTokenStore()
-        ..tokens = const StoredTokens(
-          accessToken: 'access-live',
-          refreshToken: 'refresh-valid',
+      for (final comCarencia in [true, false]) {
+        final tokenStore = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+
+        final api = ApiClient(
+          tokenStore: tokenStore,
+          httpClient: comCarencia
+              ? _client(
+                  carenciaAte: '2026-09-19',
+                  aplicacoes: [
+                    {
+                      'medicamento': 'Ivermectina 1%',
+                      'dose': 8.0,
+                      'unidade': 'ml',
+                      'via': 'Subcutânea',
+                      'carencia_dias': 28,
+                      'data': '2026-08-22',
+                      'protocolo_id': 1,
+                    }
+                  ],
+                )
+              : _client(),
+          baseUrl: 'http://mock.local',
         );
 
-      // Ficha COM carência ativa
-      final apiComCarencia = ApiClient(
-        tokenStore: tokenStore,
-        httpClient: _client(
-          carenciaAte: '2026-09-19',
-          aplicacoes: [
-            {
-              'medicamento': 'Ivermectina 1%',
-              'dose': 8.0,
-              'unidade': 'ml',
-              'via': 'Subcutânea',
-              'carencia_dias': 28,
-              'data': '2026-08-22',
-              'protocolo_id': 1,
-            }
-          ],
-        ),
-        baseUrl: 'http://mock.local',
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.light(),
-          darkTheme: ThemeData.dark(),
-          themeMode: mode,
-          home: AnimalDetailPage(
-            api: apiComCarencia,
-            id: 'BR0001',
-            onUnauthorized: () {},
-            onMovementCompleted: () {},
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.light(),
+            darkTheme: ThemeData.dark(),
+            themeMode: mode,
+            home: AnimalDetailPage(
+              api: api,
+              id: 'BR0001',
+              onUnauthorized: () {},
+              onMovementCompleted: () {},
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Em carência até 2026-09-19'), findsOneWidget);
-      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+        );
+        await tester.pumpAndSettle();
+        if (comCarencia) {
+          expect(find.text('Em carência até 2026-09-19'), findsOneWidget);
+          expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+        } else {
+          expect(find.text('Sem restrição de carência'), findsOneWidget);
+        }
 
-      final historyCard = find.byKey(const ValueKey('medications-history-card'));
-      await tester.scrollUntilVisible(
-        historyCard,
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('Histórico de aplicações (1)'), findsOneWidget);
+        final historyCard = find.byKey(const ValueKey('medications-history-card'));
+        await tester.scrollUntilVisible(
+          historyCard,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(
+          find.text(comCarencia ? 'Histórico de aplicações (1)' : 'Histórico de aplicações (0)'),
+          findsOneWidget,
+        );
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-09-sanidade-ficha-${comCarencia ? 'com' : 'sem'}-carencia.png',
+            ),
+          );
+        }
 
-      // Tela de registrar medicamento (SanidadePage / MedicationPage)
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData.light(),
-          darkTheme: ThemeData.dark(),
-          themeMode: mode,
-          home: MedicationPage(
-            api: apiComCarencia,
-            animalId: 'BR0001',
-            onUnauthorized: () {},
+        // Tela de registrar medicamento (SanidadePage / MedicationPage)
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.light(),
+            darkTheme: ThemeData.dark(),
+            themeMode: mode,
+            home: MedicationPage(
+              api: api,
+              animalId: 'BR0001',
+              onUnauthorized: () {},
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Sanidade BR0001'), findsOneWidget);
-      expect(find.text('Protocolo sanitário'), findsOneWidget);
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Sanidade BR0001'), findsOneWidget);
+        expect(find.text('Protocolo sanitário'), findsOneWidget);
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-10-sanidade-medicamento-${comCarencia ? 'com' : 'sem'}-carencia.png',
+            ),
+          );
+        }
 
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
     }
   });
 
