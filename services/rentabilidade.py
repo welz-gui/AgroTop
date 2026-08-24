@@ -117,7 +117,7 @@ def por_lote_de_venda(vendas: list[dict]) -> list[dict]:
     ordem: list[str] = []
 
     for venda in vendas:
-        chave = venda.get("lot_ref") or f"__venda_{venda['id']}__"
+        chave = venda.get("lot_ref") or f"__venda_{venda.get('id', id(venda))}__"
         grupo = grupos.get(chave)
         if grupo is None:
             grupo = {

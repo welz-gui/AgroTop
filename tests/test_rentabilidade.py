@@ -184,7 +184,7 @@ class TestPorLoteDeVenda(unittest.TestCase):
     def test_lista_vazia(self):
         self.assertEqual(por_lote_de_venda([]), [])
 
-    def test_agrupa_por_lot_ref_somando_peso_e_custo(self):
+    def test_agrupa_por_lot_ref_somando_metricas(self):
         resultado = por_lote_de_venda([
             _venda(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0),
             _venda(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0),
@@ -196,6 +196,8 @@ class TestPorLoteDeVenda(unittest.TestCase):
         self.assertEqual(lote["animais"], 2)
         self.assertEqual(lote["peso_total_kg"], 600.0)
         self.assertEqual(lote["custo_total"], 1800.0)
+        self.assertEqual(lote["receita_total"], 3000.0)
+        self.assertEqual(lote["lucro_total"], 1200.0)
 
     def test_custo_por_kg_e_por_arroba_batem_com_a_conta_manual(self):
         # peso 600 kg, rendimento 52% -> 312 kg de carcaça -> 20.8 @
@@ -221,6 +223,19 @@ class TestPorLoteDeVenda(unittest.TestCase):
         self.assertEqual(len(resultado), 2)
         self.assertTrue(all(r["animais"] == 1 for r in resultado))
         self.assertTrue(all(r["lot_ref"] is None for r in resultado))
+
+    def test_venda_sem_id_e_sem_lot_ref(self):
+        """Duas vendas ausentes de ID e lot_ref."""
+        resultado = por_lote_de_venda([
+            {"weight_kg": 100},
+            {"weight_kg": 200},
+        ])
+
+        self.assertEqual(len(resultado), 2)
+        self.assertTrue(all(r["animais"] == 1 for r in resultado))
+        self.assertTrue(all(r["lot_ref"] is None for r in resultado))
+        self.assertEqual(resultado[0]["peso_total_kg"], 100.0)
+        self.assertEqual(resultado[1]["peso_total_kg"], 200.0)
 
     def test_peso_zero_nao_divide_por_zero(self):
         resultado = por_lote_de_venda([_venda(1, weight_kg=0.0)])
