@@ -3,9 +3,6 @@
 Monta as estruturas `gta` e `contexto` para serem validadas por `services.gta.validar()`.
 """
 
-from typing import Optional
-
-
 def montar_contexto(
     movimentacao: dict,
     dados_do_documento: dict,
