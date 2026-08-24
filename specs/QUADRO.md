@@ -19,9 +19,9 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 37 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **fila zerada de novo** — nenhuma spec disponível; o que resta do
-ROADMAP §5 (confirmação de trato, "desenhar no mapa", Bluetooth, mobile offline) ainda não
-tem spec escrita — ver abaixo.
+(7 de 7 telas) · **2 specs novas na fila** — 0054/0055 (confirmação de trato/nutrição por
+piquete, API + mobile, última tela do escopo de Mobile v1 online) — ver abaixo. O restante
+do ROADMAP §5 ("desenhar no mapa", Bluetooth, mobile offline) ainda não tem spec escrita.
 
 > **0051 fechada em 2026-08-24 com uma lacuna aceita conscientemente.**
 > [PR #188](https://github.com/welz-gui/AgroTop/pull/188) tinha funcionalidade e contrato
@@ -164,6 +164,21 @@ tem spec escrita — ver abaixo.
 | — | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) | | 2026-08-22 |
 | — | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) | | 2026-08-23 |
 | — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) ⚠️ (falta golden do critério 5, ver acima) | | 2026-08-24 |
+| 1 | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 2 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | — | 🟢 disponível — depende da 0054 (só o contrato, pode mockar) | | 2026-08-24 |
+
+> **0054/0055 escritas em 2026-08-24 — última fatia do escopo de Mobile v1 online.** O web
+> já tem essa função pronta e em produção há tempo (`app.py::_campo_trato`, tabelas
+> `feeding_plans`/`feeding_checks`, funções `database.py::get_pending_feedings`/
+> `add_feeding_check`) — as duas specs só expõem isso pela API e reproduzem a tela no
+> mobile, mesmo padrão de sanidade (0050/0051) e foto (0052/0053). Diferença importante:
+> **trato é por piquete, não por animal** — a tela mobile não entra na ficha do animal, tem
+> ponto de entrada próprio (ver a spec 0055). A 0055 pode ser pega em paralelo com a 0054
+> (contra servidor mock), mas só confirma de verdade contra a API real depois da 0054
+> mesclar. **A 0055 carrega uma lição explícita da 0051**: o critério de golden tests exige
+> os PNGs de verdade gerados por `flutter test --update-goldens`, não só o código do teste
+> — se o agente não tiver Flutter disponível, a instrução é parar e reportar, não abrir a
+> PR alegando o critério cumprido.
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
