@@ -420,10 +420,20 @@ Regras gerais para trabalho paralelo:
    [0054](specs/0054-api-confirmacao-de-trato.md) (expõe `database.py::get_pending_feedings`/
    `add_feeding_check`, já usadas em produção pelo Modo Campo do web) e
    [0055](specs/0055-mobile-tela-de-confirmacao-de-trato.md) (tela por piquete, não por
-   animal — ponto de entrada próprio na navegação, fora da ficha).
+   animal — ponto de entrada próprio na navegação, fora da ficha). **Sexta fatia (leitura
+   de brinco por QR) — spec escrita em 2026-08-24, disponível:**
+   [0056](specs/0056-mobile-leitura-de-brinco-por-qr.md) — decodifica nativamente no
+   aparelho (sem endpoint novo, reaproveita `GET /animais/{id}`), diferente do web, que
+   tira uma foto e decodifica no servidor. Com esta fatia fechada, o escopo de "Mobile v1
+   — online" descrito no início deste item fica completo.
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
-   falha no campo.
+   falha no campo. **Specs escritas em 2026-08-24, disponíveis:**
+   [0057](specs/0057-api-importacao-de-pesagens-csv.md) (expõe
+   `services/importacao.py::parse_pesagens` + `services/qualidade.py::avaliar_pesagem`,
+   ambos já em produção no web via `app.py::_campo_importar`, num único endpoint com prévia
+   e gravação) e [0058](specs/0058-mobile-importacao-de-pesagens-csv.md) (tela de duas
+   etapas — prévia, depois confirmar — sem decodificar nem validar nada no app).
 4. **Bluetooth (balança e leitor de brinco).** Somente com o equipamento em mãos: **não
    existe protocolo padrão**, cada marca tem seu formato. Implementar como **um driver por
    modelo**, parseando linha → `(peso, brinco)`, atrás de uma interface — assim uma segunda
