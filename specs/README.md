@@ -63,14 +63,15 @@ parou sem escrever código — corrigido no backend (`?animal_id=` + `dose_suger
 ([#187](https://github.com/welz-gui/AgroTop/pull/187) — fotos na ficha do animal,
 compressão client-side).
 
-**Atualização de 2026-08-24 (a mais recente): 0051 concluída — a Trilha 1 e a Trilha 2
-fecharam por completo (0044–0053, todas ✅).** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
-(sanidade) mesclada com uma lacuna aceita conscientemente: divergiu de `main` antes da 0053
-mesclar, então o mantenedor resolveu o conflito real por união (as duas estendem seções
-irmãs da mesma ficha do animal) e mesclou sem o teste golden do critério 5 — este ambiente
-não tem toolchain Flutter para gerar os PNGs, e o usuário decidiu não esperar por outro
-agente. O resto está correto e testado (`dose_sugerida` sem cálculo no Dart, carência com
-ícone e texto, `flutter analyze`/`test`/`build` verdes). Detalhe completo em `QUADRO.md`.
+**Atualização de 2026-08-24: 0051 concluída — a Trilha 1 e a Trilha 2 fecharam por
+completo (0044–0053, todas ✅).** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
+(sanidade) mesclada com um conflito real resolvido por união contra a 0053 (as duas
+estendem seções irmãs da mesma ficha do animal). O teste golden do critério 5 ficou
+pendente no merge — este ambiente não tinha toolchain Flutter até então — e foi fechado no
+mesmo dia, [PR #227](https://github.com/welz-gui/AgroTop/pull/227), depois de o mantenedor
+instalar o Flutter e gerar os PNGs num ambiente Linux equivalente ao da CI. Detalhe
+completo (incluindo duas pegadinhas reais de toolchain descobertas no processo) em
+`QUADRO.md`.
 **Atualização de 2026-08-24:** duas specs novas — 0054/0055, confirmação de trato/nutrição
 por piquete (API + mobile). Mesmo padrão de sanidade/foto (função pronta no web,
 `app.py::_campo_trato`, só falta expor pela API e reproduzir no mobile).
@@ -146,7 +147,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0048](0048-api-movimentacao-entre-lotes.md) | API: movimentação de animais entre piquetes (Trilha 1) | implementação | **médio** | ✅ [#177](https://github.com/welz-gui/AgroTop/pull/177) |
 | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) | Mobile: tela de movimentação entre piquetes (Trilha 1) | implementação | baixo | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) |
 | [0050](0050-api-sanidade-medicamentos-e-carencia.md) | API: registrar medicamento e consultar carência (Trilha 1) | implementação | **médio** | ✅ [#181](https://github.com/welz-gui/AgroTop/pull/181) |
-| [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) ⚠️ (falta golden do critério 5) |
+| [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) + [#227](https://github.com/welz-gui/AgroTop/pull/227) |
 | [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) |
 | [0053](0053-mobile-tela-de-foto.md) | Mobile: tela de foto do animal (Trilha 1) | implementação | baixo | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) |
 | [0054](0054-api-confirmacao-de-trato.md) | API: confirmação de trato/nutrição por piquete (Trilha 1) | implementação | **médio** | 🟢 disponível |

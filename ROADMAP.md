@@ -406,12 +406,12 @@ Regras gerais para trabalho paralelo:
    [0051](specs/0051-mobile-tela-de-sanidade.md) não podia preencher dose automática sem
    duplicar a fórmula de `dose_for_animal` no Dart — um agente reivindicando a 0051 achou
    essa contradição e parou antes de escrever código, protocolo certo.
-   [PR #188](https://github.com/welz-gui/AgroTop/pull/188) mesclada com uma lacuna aceita
-   conscientemente: o teste golden do critério 5 (com/sem carência, três temas) ficou de
-   fora porque este ambiente não tem toolchain Flutter — decisão do usuário, não descuido;
-   o resto (contrato, `dose_sugerida` sem cálculo no Dart, CI Flutter/Python verdes) está
-   correto. Detalhe completo em `specs/QUADRO.md`. **Quarta fatia (foto) — ✅ concluída em
-   2026-08-23:**
+   [PR #188](https://github.com/welz-gui/AgroTop/pull/188) mesclada; o teste golden do
+   critério 5 (com/sem carência, três temas) ficou pendente no merge — este ambiente não
+   tinha toolchain Flutter até então — e foi fechado no mesmo dia,
+   [PR #227](https://github.com/welz-gui/AgroTop/pull/227), depois de instalar o Flutter e
+   gerar os PNGs num ambiente Linux equivalente ao da CI. Detalhe completo em
+   `specs/QUADRO.md`. **Quarta fatia (foto) — ✅ concluída em 2026-08-23:**
    [0052](specs/0052-api-foto-do-animal.md)/[PR #180](https://github.com/welz-gui/AgroTop/pull/180)
    (mantém fotos em `bytea`, sem storage externo) e
    [0053](specs/0053-mobile-tela-de-foto.md)/[PR #187](https://github.com/welz-gui/AgroTop/pull/187)
