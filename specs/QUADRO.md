@@ -19,9 +19,14 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 37 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **2 specs novas na fila** — 0054/0055 (confirmação de trato/nutrição por
-piquete, API + mobile, última tela do escopo de Mobile v1 online) — ver abaixo. O restante
-do ROADMAP §5 ("desenhar no mapa", Bluetooth, mobile offline) ainda não tem spec escrita.
+(7 de 7 telas) · **5 specs na fila** — 0054/0055 (confirmação de trato/nutrição por
+piquete, API + mobile) e a nova leva **0056/0057/0058** (leitura de brinco por QR + import
+de pesagens por CSV) — ver abaixo. Com essas cinco fechadas, o escopo original do ROADMAP
+§5 Trilha 1 (item "Mobile v1 — online" + item "Importação CSV do indicador da balança")
+fica completo — só restam Bluetooth (hardware) e mobile offline (deixado para o fim de
+propósito), nenhum dos dois delegável agora. O restante da Trilha 2 ("desenhar no mapa",
+localização por propriedade na previsão do tempo) é integração de UI, trabalho do
+mantenedor (R31), não spec de agente.
 
 > **0051 fechada em 2026-08-24 com uma lacuna aceita conscientemente.**
 > [PR #188](https://github.com/welz-gui/AgroTop/pull/188) tinha funcionalidade e contrato
@@ -166,6 +171,9 @@ do ROADMAP §5 ("desenhar no mapa", Bluetooth, mobile offline) ainda não tem sp
 | — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) ⚠️ (falta golden do critério 5, ver acima) | | 2026-08-24 |
 | 1 | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
 | 2 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | — | 🟢 disponível — depende da 0054 (só o contrato, pode mockar) | | 2026-08-24 |
+| 3 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟢 disponível — sem dependência, não toca API | | 2026-08-24 |
+| 4 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 5 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
 
 > **0054/0055 escritas em 2026-08-24 — última fatia do escopo de Mobile v1 online.** O web
 > já tem essa função pronta e em produção há tempo (`app.py::_campo_trato`, tabelas
@@ -179,6 +187,29 @@ do ROADMAP §5 ("desenhar no mapa", Bluetooth, mobile offline) ainda não tem sp
 > os PNGs de verdade gerados por `flutter test --update-goldens`, não só o código do teste
 > — se o agente não tiver Flutter disponível, a instrução é parar e reportar, não abrir a
 > PR alegando o critério cumprido.
+
+> **0056/0057/0058 escritas em 2026-08-24 — fecham o resto do escopo original de Mobile v1
+> online.** Duas frentes independentes entre si (podem ser pegas em paralelo, sem colisão
+> de arquivo):
+> - **0056 (leitura de QR)** não toca `backend_api/` — reaproveita `GET /animais/{id}`, que
+>   já existe desde a 0044. Decodifica o QR **nativamente no aparelho** (biblioteca Flutter
+>   de câmera embutida, não a foto+decode no servidor que o web usa) e busca o animal
+>   direto na API, **sem** passar pelo filtro local da lista já carregada — ver a spec para
+>   o porquê (busca por substring numa lista paginada não é o mesmo que "achar o animal
+>   exato que acabei de escanear"). Golden tests **não** são exigidos nesta — câmera ao
+>   vivo é view de plataforma, não pinta em teste de widget offline.
+> - **0057/0058 (importação de pesagens por CSV)** — o ROADMAP §5 lista isso **à parte**
+>   das 5 fatias do mobile (item 3 da Trilha 1), porque vale mesmo depois que houver
+>   Bluetooth. O parser (`services/importacao.py::parse_pesagens`, spec 0008) e o checador
+>   de qualidade (`services/qualidade.py::avaliar_pesagem`) já existem, testados, em
+>   produção no web (`app.py::_campo_importar`) — a 0057 só expõe os dois num endpoint que
+>   faz prévia e gravação com o **mesmo** parse (`confirmar=false`/`true`), e a 0058
+>   reproduz a tela de duas etapas (prévia → confirmar) no mobile, sem decodificar nem
+>   validar nada em Dart — só envia os bytes brutos do arquivo.
+> - As três, como a 0055, são telas **independentes da ficha do animal** (piquete/arquivo,
+>   não animal) — cada uma precisa do próprio ponto de entrada na navegação de
+>   `AnimalsPage`. Se `AppBar` já estiver cheio de ícones quando um agente pegar uma
+>   dessas, agrupar num menu é aceitável — a spec de cada uma deixa isso explícito.
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
