@@ -119,10 +119,7 @@ def __getattr__(name):
 
 # ─── Inicialização ────────────────────────────────────────────────────────────
 
-def init_db() -> None:
-    with _conn() as con:
-        if not _conexao.USE_PG:
-            con.executescript("""
+_SCHEMA_SQL = """
             -- Usuários
             CREATE TABLE IF NOT EXISTS users (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -957,7 +954,12 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_api_refresh_tokens_user
                 ON api_refresh_tokens (user_id);
-        """)
+"""
+
+def init_db() -> None:
+    with _conn() as con:
+        if not _conexao.USE_PG:
+            con.executescript(_SCHEMA_SQL)
         _migrate(con)
         _seed_users(con)
         _seed_fornecedores(con)
