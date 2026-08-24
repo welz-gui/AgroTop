@@ -6,6 +6,7 @@ from services.zootecnia import (
     get_age_display,
     get_age_months,
     calculate_gmd_total,
+    estimate_weight_by_measurement,
 )
 
 
@@ -195,3 +196,32 @@ class TestZootecniaCalculateGMDTotal(unittest.TestCase):
     def test_none_animal_returns_none(self):
         # None como animal -> TypeError ao indexar
         self.assertIsNone(calculate_gmd_total(None))
+
+
+class TestZootecniaEstimateWeight(unittest.TestCase):
+    def test_zero_or_negative_measurements(self):
+        # Test girth_cm <= 0
+        self.assertEqual(estimate_weight_by_measurement(0, 100), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(-10, 100), 0.0)
+
+        # Test length_cm <= 0
+        self.assertEqual(estimate_weight_by_measurement(100, 0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(100, -10), 0.0)
+
+        # Test both <= 0
+        self.assertEqual(estimate_weight_by_measurement(0, 0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(-10, -10), 0.0)
+
+    def test_valid_measurements(self):
+        # Calculation: (100^2 * 100) / 10838 = 1000000 / 10838 = 92.26... -> 92.3
+        self.assertEqual(estimate_weight_by_measurement(100, 100), 92.3)
+
+        # Calculation: (150^2 * 150) / 10838 = 3375000 / 10838 = 311.404... -> 311.4
+        self.assertEqual(estimate_weight_by_measurement(150, 150), 311.4)
+
+        # Calculation: (200^2 * 160) / 10838 = 6400000 / 10838 = 590.51... -> 590.5
+        self.assertEqual(estimate_weight_by_measurement(200, 160), 590.5)
+
+    def test_float_measurements(self):
+        # Calculation: (100.5^2 * 105.2) / 10838 = (10100.25 * 105.2) / 10838 = 1062546.3 / 10838 = 98.03... -> 98.0
+        self.assertEqual(estimate_weight_by_measurement(100.5, 105.2), 98.0)
