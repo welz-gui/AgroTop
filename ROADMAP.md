@@ -415,8 +415,12 @@ Regras gerais para trabalho paralelo:
    [0052](specs/0052-api-foto-do-animal.md)/[PR #180](https://github.com/welz-gui/AgroTop/pull/180)
    (mantém fotos em `bytea`, sem storage externo) e
    [0053](specs/0053-mobile-tela-de-foto.md)/[PR #187](https://github.com/welz-gui/AgroTop/pull/187)
-   (compressão no app porque `_compress_image` mora em `app.py`, intocável). Confirmação
-   de trato fica para uma spec de endpoint futura.
+   (compressão no app porque `_compress_image` mora em `app.py`, intocável). **Quinta fatia
+   (confirmação de trato) — specs escritas em 2026-08-24, disponíveis:**
+   [0054](specs/0054-api-confirmacao-de-trato.md) (expõe `database.py::get_pending_feedings`/
+   `add_feeding_check`, já usadas em produção pelo Modo Campo do web) e
+   [0055](specs/0055-mobile-tela-de-confirmacao-de-trato.md) (tela por piquete, não por
+   animal — ponto de entrada próprio na navegação, fora da ficha).
 3. **Importação CSV do indicador da balança.** Caminho universal, funciona em qualquer
    plataforma. Fazer junto da v1 — será necessário mesmo com Bluetooth, porque pareamento
    falha no campo.

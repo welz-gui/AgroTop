@@ -71,8 +71,11 @@ irmãs da mesma ficha do animal) e mesclou sem o teste golden do critério 5 —
 não tem toolchain Flutter para gerar os PNGs, e o usuário decidiu não esperar por outro
 agente. O resto está correto e testado (`dose_sugerida` sem cálculo no Dart, carência com
 ícone e texto, `flutter analyze`/`test`/`build` verdes). Detalhe completo em `QUADRO.md`.
-**Fila zerada de novo** — o que falta do ROADMAP §5 ainda não tem spec (confirmação de
-trato, "desenhar no mapa", Bluetooth, mobile offline).
+**Atualização de 2026-08-24 (a mais recente): duas specs novas — 0054/0055, confirmação
+de trato/nutrição por piquete (API + mobile).** Última fatia do escopo de Mobile v1
+online — mesmo padrão de sanidade/foto (função pronta no web, `app.py::_campo_trato`,
+só falta expor pela API e reproduzir no mobile). O que resta do ROADMAP §5 além delas
+ainda não tem spec ("desenhar no mapa", Bluetooth, mobile offline).
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -139,6 +142,8 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) ⚠️ (falta golden do critério 5) |
 | [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) |
 | [0053](0053-mobile-tela-de-foto.md) | Mobile: tela de foto do animal (Trilha 1) | implementação | baixo | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) |
+| [0054](0054-api-confirmacao-de-trato.md) | API: confirmação de trato/nutrição por piquete (Trilha 1) | implementação | **médio** | 🟢 disponível |
+| [0055](0055-mobile-tela-de-confirmacao-de-trato.md) | Mobile: tela de confirmação de trato (Trilha 1) | implementação | baixo | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
