@@ -7,6 +7,7 @@ from services.zootecnia import (
     get_age_months,
     calculate_gmd_total,
     estimate_weight_by_measurement,
+    kg_to_arrobas,
 )
 
 
@@ -225,3 +226,26 @@ class TestZootecniaEstimateWeight(unittest.TestCase):
     def test_float_measurements(self):
         # Calculation: (100.5^2 * 105.2) / 10838 = (10100.25 * 105.2) / 10838 = 1062546.3 / 10838 = 98.03... -> 98.0
         self.assertEqual(estimate_weight_by_measurement(100.5, 105.2), 98.0)
+
+
+class TestZootecniaKgToArrobas(unittest.TestCase):
+    def test_default_yield(self):
+        # 300 kg * 0.52 / 15.0 = 10.4
+        self.assertEqual(kg_to_arrobas(300), 10.4)
+
+        # 450 kg * 0.52 / 15.0 = 15.6
+        self.assertEqual(kg_to_arrobas(450), 15.6)
+
+    def test_custom_yield(self):
+        # 300 kg * 0.50 / 15.0 = 10.0
+        self.assertEqual(kg_to_arrobas(300, yield_=0.50), 10.0)
+
+    def test_zero_weight(self):
+        self.assertEqual(kg_to_arrobas(0), 0.0)
+
+    def test_rounding(self):
+        # 333 kg * 0.52 / 15.0 = 11.544 -> 11.54
+        self.assertEqual(kg_to_arrobas(333), 11.54)
+
+        # 334 kg * 0.52 / 15.0 = 11.578666... -> 11.58
+        self.assertEqual(kg_to_arrobas(334), 11.58)
