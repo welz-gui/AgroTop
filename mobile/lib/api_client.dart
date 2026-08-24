@@ -197,6 +197,85 @@ class ApiClient {
     return MovementResult.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<List<ProtocoloSummary>> listProtocolos({String? animalId}) async {
+    final uri = Uri.parse('$baseUrl/protocolos').replace(
+      queryParameters: animalId == null ? null : {'animal_id': animalId},
+    );
+    final response = await _authorized(
+      (headers) => _http.get(uri, headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar os protocolos.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((item) => ProtocoloSummary.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<AnimalMedications> getAnimalMedications(String animalId) async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse(
+          '$baseUrl/animais/${Uri.encodeComponent(animalId)}/medicamentos',
+        ),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar as informações de sanidade.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return AnimalMedications.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<String?> registerMedication(
+    String animalId, {
+    required String medicamento,
+    required double dose,
+    required String unidade,
+    required String via,
+    required int carenciaDias,
+    required String data,
+    int? protocoloId,
+    String? notas,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse(
+          '$baseUrl/animais/${Uri.encodeComponent(animalId)}/medicamentos',
+        ),
+        headers: {...headers, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'medicamento': medicamento,
+          'dose': dose,
+          'unidade': unidade,
+          'via': via,
+          'carencia_dias': carenciaDias,
+          'data': data,
+          'protocolo_id': protocoloId,
+          'notas': notas,
+        }),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 201) {
+      throw ApiException(
+        _message(body, 'Não foi possível registrar o medicamento.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return body is Map<String, dynamic>
+        ? body['carencia_ate'] as String?
+        : null;
+  }
+
   Future<List<AnimalPhoto>> listAnimalPhotos(String animalId) async {
     final response = await _authorized(
       (headers) => _http.get(

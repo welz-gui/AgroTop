@@ -13,9 +13,15 @@ class MockApiServer {
   int detailRequests = 0;
   int weighingRequests = 0;
   int movementRequests = 0;
+  int protocolosRequests = 0;
+  int medicationsRequests = 0;
+  int postMedicationRequests = 0;
+  String? carenciaAte;
+  final List<Map<String, dynamic>> _medications = [];
+  Map<String, dynamic>? lastMovementBody;
+  Map<String, dynamic>? lastMedicationBody;
   int photoUploadRequests = 0;
   int? lastPhotoUploadSize;
-  Map<String, dynamic>? lastMovementBody;
   final Map<int, List<int>> _photos = {};
   final Map<String, String> _animalLotes = {
     'BR0001': 'P01',
@@ -105,6 +111,80 @@ class MockApiServer {
           200,
           _animalLotes.keys.map(_animal).toList(growable: false),
         );
+        return;
+      }
+      if (request.method == 'GET' &&
+          path.startsWith('/animais/') &&
+          path.endsWith('/medicamentos')) {
+        final id = Uri.decodeComponent(
+          path.substring('/animais/'.length, path.length - '/medicamentos'.length),
+        );
+        if (!_animalLotes.containsKey(id)) {
+          await _json(request, 404, {'detail': 'Animal não encontrado'});
+          return;
+        }
+        medicationsRequests++;
+        await _json(request, 200, {
+          'carencia_ate': carenciaAte,
+          'aplicacoes': _medications,
+        });
+        return;
+      }
+      if (request.method == 'POST' &&
+          path.startsWith('/animais/') &&
+          path.endsWith('/medicamentos')) {
+        final id = Uri.decodeComponent(
+          path.substring('/animais/'.length, path.length - '/medicamentos'.length),
+        );
+        if (!_animalLotes.containsKey(id)) {
+          await _json(request, 404, {'detail': 'Animal não encontrado'});
+          return;
+        }
+        postMedicationRequests++;
+        final body = await _body(request);
+        lastMedicationBody = body;
+        final carenciaDias = (body['carencia_dias'] as num).toInt();
+        if (carenciaDias > 0) {
+          final dataApp = DateTime.parse(body['data'] as String);
+          final carenciaFim = dataApp.add(Duration(days: carenciaDias));
+          carenciaAte =
+              '${carenciaFim.year.toString().padLeft(4, '0')}-'
+              '${carenciaFim.month.toString().padLeft(2, '0')}-'
+              '${carenciaFim.day.toString().padLeft(2, '0')}';
+        }
+        _medications.insert(0, {
+          'medicamento': body['medicamento'],
+          'dose': (body['dose'] as num).toDouble(),
+          'unidade': body['unidade'],
+          'via': body['via'],
+          'carencia_dias': carenciaDias,
+          'data': body['data'],
+          'protocolo_id': body['protocolo_id'],
+        });
+        await _json(request, 201, {'carencia_ate': carenciaAte});
+        return;
+      }
+      if (request.method == 'GET' && path == '/protocolos') {
+        protocolosRequests++;
+        final animalId = request.uri.queryParameters['animal_id'];
+        await _json(request, 200, [
+          {
+            'id': 1,
+            'nome': 'Ivermectina 1%',
+            'via': 'Subcutânea',
+            'carencia_dias': 28,
+            'unidade_dose': 'ml',
+            'dose_sugerida': animalId == 'BR0001' ? 7.6 : (animalId != null ? 5.0 : null),
+          },
+          {
+            'id': 2,
+            'nome': 'Vacina Aftosa',
+            'via': 'Subcutânea',
+            'carencia_dias': 0,
+            'unidade_dose': 'ml',
+            'dose_sugerida': animalId != null ? 2.0 : null,
+          },
+        ]);
         return;
       }
       if (request.method == 'GET' && path == '/animais/BR0001/fotos') {
