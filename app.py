@@ -2556,6 +2556,23 @@ def _fin_centros_de_custo(lotes):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def _render_account_metrics(contas: list) -> str:
+    """Renderiza métricas de contas em aberto e vencidas, retornando a data atual em ISO."""
+    hoje = date.today().isoformat()
+    abertas = [c for c in contas if c["status"] == "aberto"]
+    vencidas = [c for c in abertas if c["vencimento"] < hoje]
+
+    kk = st.columns(3)
+    kk[0].metric("Em Aberto", len(abertas))
+    kk[1].metric("Vencidas", len(vencidas))
+    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
+
+    if vencidas:
+        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
+            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
+                     for c in vencidas))
+    return hoje
+
 def _fin_contas_a_pagar():
     """Parcelas geradas por compra de insumo com nota fiscal (§5, Trilha 3).
 
@@ -2572,19 +2589,7 @@ def _fin_contas_a_pagar():
         st.info("Nenhuma conta a pagar registrada ainda.")
         return
 
-    hoje = date.today().isoformat()
-    abertas = [c for c in contas if c["status"] == "aberto"]
-    vencidas = [c for c in abertas if c["vencimento"] < hoje]
-
-    kk = st.columns(3)
-    kk[0].metric("Em Aberto", len(abertas))
-    kk[1].metric("Vencidas", len(vencidas))
-    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
-
-    if vencidas:
-        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
-            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
-                     for c in vencidas))
+    hoje = _render_account_metrics(contas)
 
     STATUS_LABEL = {"aberto": "🟡 Aberto", "pago": "🟢 Pago", "cancelado": "⚪ Cancelado"}
     f_status = st.selectbox("Filtrar por situação", ["Todas", "aberto", "pago", "cancelado"],
@@ -2637,19 +2642,7 @@ def _fin_contas_a_receber():
         st.info("Nenhuma conta a receber registrada ainda.")
         return
 
-    hoje = date.today().isoformat()
-    abertas = [c for c in contas if c["status"] == "aberto"]
-    vencidas = [c for c in abertas if c["vencimento"] < hoje]
-
-    kk = st.columns(3)
-    kk[0].metric("Em Aberto", len(abertas))
-    kk[1].metric("Vencidas", len(vencidas))
-    kk[2].metric("Total em Aberto", f"R$ {sum(c['valor'] for c in abertas):,.2f}")
-
-    if vencidas:
-        st.warning(f"⚠️ **{_plural(len(vencidas),'conta vencida','contas vencidas')}:** " +
-            ", ".join(f"**{c['descricao']}** ({c['parcela_numero']}/{c['parcela_total']})"
-                     for c in vencidas))
+    hoje = _render_account_metrics(contas)
 
     STATUS_LABEL = {"aberto": "🟡 Aberto", "recebido": "🟢 Recebido", "cancelado": "⚪ Cancelado"}
     f_status = st.selectbox("Filtrar por situação", ["Todas", "aberto", "recebido", "cancelado"],
