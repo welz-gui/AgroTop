@@ -8,7 +8,7 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
-from datetime import datetime, date
+from datetime import date
 from typing import Optional
 
 from . import eventos
