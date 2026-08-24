@@ -1352,10 +1352,12 @@ def _campo_importar():
 
     # Qualidade: o histórico acumula as próprias linhas do arquivo, senão duas
     # pesagens do mesmo animal no mesmo CSV não se enxergariam.
+    animal_ids = {linha["animal_id"] for linha in aceitas}
+    all_weighings = db.get_weighings_batch(animal_ids)
     hist = {}
-    for a_id in {linha["animal_id"] for linha in aceitas}:
+    for a_id in animal_ids:
         hist[a_id] = [{"peso": w["weight"], "data": w["weigh_date"]}
-                      for w in db.get_weighings(a_id)]
+                      for w in all_weighings.get(a_id, [])]
 
     previa, graves = [], 0
     for linha in sorted(aceitas, key=lambda x: (x["animal_id"], x["data"])):
