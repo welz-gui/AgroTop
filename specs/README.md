@@ -528,6 +528,89 @@ Só devem aparecer os arquivos que a spec pediu. Se aparecer mais, remova.
 
 Ela será integrada depois pelo mantenedor. Assinatura diferente inutiliza o trabalho.
 
+## 📱 Ambiente Flutter local — leia antes de qualquer spec mobile
+
+**Desde 2026-08-24 este ambiente TEM Flutter instalado** (`C:\flutter`, versão 3.47.1) —
+antes disso, todo agente de spec mobile dependia só da CI para `analyze`/`test`/`build`.
+Isso mudou, mas com três pegadinhas reais descobertas na instalação — leia antes de rodar
+qualquer comando `flutter`, senão você vai bater na mesma parede e perder tempo
+redescobrindo o que já está documentado aqui.
+
+### 1. O caminho do projeto quebra `flutter analyze`/`flutter test` no Windows nativo
+
+`D:\Área de Trabalho\AgroTop` tem um acento (Á) — e isso corrompe a comunicação
+LSP interna do `flutter analyze`/`test` no Windows (`FormatException: Unexpected end of
+input`, servidor de análise morre com código 255). **Não é bug desta mudança nem do seu
+worktree** — é um bug conhecido do toolchain Dart com paths não-ASCII no Windows.
+
+**Contorne com uma junction NTFS** apontando para uma pasta sem acento, e rode todo comando
+`flutter` **através dela**, nunca do caminho original:
+
+```powershell
+New-Item -ItemType Junction -Path "C:\agrotop-mobile-<nome-do-seu-worktree>" `
+  -Target "<caminho-completo-do-seu-worktree>\mobile"
+Set-Location "C:\agrotop-mobile-<nome-do-seu-worktree>"
+C:\flutter\bin\flutter.bat analyze
+C:\flutter\bin\flutter.bat test
+```
+
+A junction não copia nada — são os mesmos arquivos do seu worktree, só um caminho-alias
+sem acento. Use um nome de junction **único por worktree** (`C:\agrotop-mobile-<nome>`) pra
+não colidir com a do mantenedor (`C:\agrotop-mobile`) nem com a de outro agente rodando em
+paralelo. Apague a junction (`Remove-Item C:\agrotop-mobile-<nome>`) ao terminar — ela não
+é removida automaticamente com o worktree.
+
+`C:\flutter\bin` não está no PATH permanente de propósito (mudar PATH é configuração de
+sistema, deixada para o usuário decidir) — use o caminho completo `C:\flutter\bin\flutter.bat`
+em todo comando, ou rode `$env:PATH = "C:\flutter\bin;$env:PATH"` só nesta sessão de shell.
+
+### 2. Falta o Android SDK — `flutter build apk --debug` não funciona localmente ainda
+
+`flutter analyze` e `flutter test` (incluindo golden) funcionam pela junction. **`flutter
+build apk --debug` não** — falta o Android SDK, que ainda não foi instalado neste ambiente.
+Se sua spec pede esse comando como último passo de verificação, rode os dois primeiros
+localmente, e **diga explicitamente no corpo do PR que o build do APK não foi verificado
+localmente** (a CI — job `build-apk` de `.github/workflows/mobile-ci.yml` — cobre isso).
+Não afirme ter rodado o que não rodou (regra 0 deste arquivo vale aqui também).
+
+### 3. Golden tests: `git status` "modificado" depois de `--update-goldens` NÃO prova nada
+
+`--update-goldens` **sempre** sobrescreve o PNG com os bytes recém-renderizados, mesmo que
+o arquivo antigo passasse numa comparação normal — a codificação PNG (compressão,
+metadados) pode variar entre execuções sem a imagem ter mudado de verdade. **A prova real é
+rodar `flutter test` sem a flag** e ver se a comparação passa.
+
+Pior ainda: a **renderização em si** é sensível à versão do Flutter e ao sistema
+operacional — o mesmo teste, no Windows local ou em versões de Flutter diferentes da que a
+CI usa, pode produzir PNGs genuinamente diferentes dos que a CI vai aceitar. **Para gerar
+goldens que a CI vai aceitar de verdade, use o container Docker já preparado**, que replica
+a versão exata pinada em `.github/workflows/mobile-ci.yml` (Flutter 3.44.8, Ubuntu 24.04):
+
+```powershell
+# Sempre rode flutter pub get antes — o container é efêmero, o pub cache não persiste.
+docker run --rm -v flutter-sdk-3448:/flutter -v "<caminho-completo>\mobile:/app" -w /app `
+  -e PATH="/flutter/bin:/usr/bin:/bin" ubuntu:24.04 bash -c `
+  "apt-get update -qq && apt-get install -y -qq git curl unzip xz-utils ca-certificates libglu1-mesa > /dev/null && flutter pub get && flutter test"
+
+# Para gerar/atualizar PNGs, acrescente -e CAPTURE_GOLDENS=1 e --update-goldens no flutter test.
+# DEPOIS de gerar, rode de novo SEM --update-goldens (comando acima) — só isso prova que
+# os PNGs novos passam numa comparação real, não só que foram escritos.
+```
+
+O volume Docker `flutter-sdk-3448` já tem o Flutter 3.44.8 instalado (poupa ~250 MB de
+download por execução). Se não existir na sua máquina, crie uma vez:
+
+```powershell
+docker volume create flutter-sdk-3448
+docker run --rm -v flutter-sdk-3448:/flutter ubuntu:24.04 bash -c "apt-get update -qq && apt-get install -y -qq git curl unzip xz-utils ca-certificates libglu1-mesa > /dev/null && git clone -q https://github.com/flutter/flutter.git /flutter && cd /flutter && git checkout -q 3.44.8"
+```
+
+**Não confie em goldens gerados só no Windows local** (item 1) — eles servem para
+`flutter analyze`/`test` de lógica (que não comparam pixel), mas não para golden de
+verdade. Precedente real: a spec 0051 ([PR #227](https://github.com/welz-gui/AgroTop/pull/227))
+seguiu exatamente este roteiro — gerar no Docker, verificar duas vezes (antes E depois),
+confirmar na CI real — e passou de primeira.
+
 ## Por que este diretório existe
 
 Em 2026-07-30, onze PRs foram abertos por automação sem especificação. Apenas quatro
