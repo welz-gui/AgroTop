@@ -15,16 +15,17 @@ baixo** — a ordem é prioridade, não sugestão.
 [#181](https://github.com/welz-gui/AgroTop/pull/181),
 [#180](https://github.com/welz-gui/AgroTop/pull/180),
 [#187](https://github.com/welz-gui/AgroTop/pull/187),
-[#188](https://github.com/welz-gui/AgroTop/pull/188)) · CI agora cobre Flutter também
+[#188](https://github.com/welz-gui/AgroTop/pull/188),
+[#233](https://github.com/welz-gui/AgroTop/pull/233)) · CI agora cobre Flutter também
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 37 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **7 specs na fila** — 0054/0055 (confirmação de trato/nutrição por
-piquete, API + mobile), 0056/0057/0058 (leitura de brinco por QR + import de pesagens por
-CSV) e a nova leva **0059/0060** (mobile offline: chave de idempotência na API + fila local
-no app, [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) — ver abaixo. Com
-0054–0058 fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 — online" +
-item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
+(7 de 7 telas) · **0054 concluída** (API de trato) · **6 specs na fila** — 0055 (tela
+mobile de trato, contrato já real), 0056/0057/0058 (leitura de brinco por QR + import de
+pesagens por CSV) e **0059/0060** (mobile offline: chave de idempotência na API + fila
+local no app, [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) — ver abaixo.
+Com 0055–0058 fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 — online"
++ item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
 fechadas, só resta Bluetooth (hardware, não delegável por definição) de toda a Trilha 1. O
 restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
 é integração de UI, trabalho do mantenedor (R31), não spec de agente.
@@ -177,26 +178,29 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 | — | [0049](0049-mobile-tela-de-movimentacao-entre-lotes.md) — Mobile: tela de movimentação entre piquetes 🏗️ | — | ✅ [#183](https://github.com/welz-gui/AgroTop/pull/183) | | 2026-08-22 |
 | — | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) | | 2026-08-23 |
 | — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) + [#227](https://github.com/welz-gui/AgroTop/pull/227) (golden do critério 5) | | 2026-08-24 |
-| 1 | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
-| 2 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | — | 🟢 disponível — depende da 0054 (só o contrato, pode mockar) | | 2026-08-24 |
-| 3 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟢 disponível — sem dependência, não toca API | | 2026-08-24 |
-| 4 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
-| 5 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
-| 6 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
-| 7 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
+| — | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | ✅ [#233](https://github.com/welz-gui/AgroTop/pull/233) | | 2026-08-24 |
+| 1 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | — | 🟢 disponível — **0054 já mesclada**, pode testar contra a API real | | 2026-08-24 |
+| 2 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟢 disponível — sem dependência, não toca API | | 2026-08-24 |
+| 3 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 4 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
+| 5 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 6 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
 
-> **0054/0055 escritas em 2026-08-24 — última fatia do escopo de Mobile v1 online.** O web
-> já tem essa função pronta e em produção há tempo (`app.py::_campo_trato`, tabelas
-> `feeding_plans`/`feeding_checks`, funções `database.py::get_pending_feedings`/
-> `add_feeding_check`) — as duas specs só expõem isso pela API e reproduzem a tela no
-> mobile, mesmo padrão de sanidade (0050/0051) e foto (0052/0053). Diferença importante:
-> **trato é por piquete, não por animal** — a tela mobile não entra na ficha do animal, tem
-> ponto de entrada próprio (ver a spec 0055). A 0055 pode ser pega em paralelo com a 0054
-> (contra servidor mock), mas só confirma de verdade contra a API real depois da 0054
-> mesclar. **A 0055 carrega uma lição explícita da 0051**: o critério de golden tests exige
-> os PNGs de verdade gerados por `flutter test --update-goldens`, não só o código do teste
-> — se o agente não tiver Flutter disponível, a instrução é parar e reportar, não abrir a
-> PR alegando o critério cumprido.
+> **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
+> `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
+> `database.py::get_pending_feedings`/`add_feeding_check` (já em produção no web via
+> `app.py::_campo_trato`) sem lógica nova. Revisão local completa antes do merge: suíte de
+> `test_backend_api.py` (42 testes, cada critério da spec com prova real — inclusive que
+> `operator` vem do token mesmo com valor falso no corpo, e que a baixa de estoque só
+> acontece com insumo vinculado de verdade) e suíte inteira do projeto (753 testes) rodadas
+> num worktree isolado antes de mesclar.
+>
+> **0055 continua disponível** — agora com a API real mesclada, não precisa mais só de
+> mock. **Trato é por piquete, não por animal** — a tela mobile não entra na ficha do
+> animal, tem ponto de entrada próprio (ver a spec). **Carrega uma lição explícita da
+> 0051**: o critério de golden tests exige os PNGs de verdade gerados por
+> `flutter test --update-goldens`, não só o código do teste — se o agente não tiver Flutter
+> disponível, a instrução é parar e reportar, não abrir a PR alegando o critério cumprido.
 
 > **0056/0057/0058 escritas em 2026-08-24 — fecham o resto do escopo original de Mobile v1
 > online.** Duas frentes independentes entre si (podem ser pegas em paralelo, sem colisão
