@@ -122,15 +122,16 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 > publicar) — a reivindicação só existe, para efeito de coordenação com outras ferramentas,
 > no nome que a spec define.
 >
-> **Se você está iniciando mais de uma ferramenta de agente ao mesmo tempo** (Codex +
-> Antigravity + Claude Code, ou qualquer combinação), **não confie no modo autoatendimento
-> (Variante A) para nenhuma delas** — a defesa por nome de branch só é confiável quando
-> **você atribui a spec explicitamente a cada ferramenta** (Variante B,
-> [README.md](README.md)), garantindo que nenhuma duas peguem a mesma tarefa por
-> coincidência de fila. Ver a seção "Quando atribuir explicitamente" no README para o
-> porquê disso já ser regra desde a colisão de 2026-07-31 — este incidente mostra que ela
-> vale ainda mais forte entre ferramentas diferentes, que nem compartilham a mesma
-> implementação do protocolo de reivindicação.
+> **Isto não significa abandonar o modo autoatendimento (Variante A) ao usar mais de uma
+> ferramenta.** Com o passo 2 acima seguido de verdade (nome exato de branch), **disparar
+> ferramentas diferentes com um intervalo entre uma e outra continua seguro** — a
+> reivindicação da primeira já está visível no remoto quando a segunda tenta a dela, e o
+> `git push` rejeitado funciona normalmente, igual sempre funcionou entre sessões da mesma
+> ferramenta. O que não é seguro é disparar duas ferramentas **ao mesmo tempo, sem
+> intervalo** (mesmo risco de corrida que já existia antes deste incidente, ver a colisão
+> de 2026-07-31) — nesse caso, ou espere uma terminar de reivindicar antes de iniciar a
+> próxima, ou use Variante B ([README.md](README.md)) com specs diferentes atribuídas a
+> cada uma como camada extra de segurança.
 
 ---
 
