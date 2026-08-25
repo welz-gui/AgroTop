@@ -298,9 +298,16 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 >    git ls-remote --heads origin                        # ver o que já está tomado
 >    git push origin HEAD:refs/heads/<branch-da-spec>    # reivindicar — ATÔMICO
 >    ```
->    Se o push falhar dizendo que a referência já existe, a tarefa está tomada:
->    **PARE e avise quem te instruiu. NÃO pegue outra tarefa** — pegar outra faz você
->    executar duas numa sessão, uma delas jogada fora, e esconde a colisão de quem coordena.
+>    Se o push falhar dizendo que a referência já existe, a tarefa está tomada. **Como este
+>    é o primeiro comando, você ainda não fez nenhum trabalho — relate a colisão (qual
+>    spec/branch já estava tomado, para quem coordena não perder visibilidade) e volte ao
+>    passo 1 para tentar a próxima tarefa livre da fila.** Pular aqui é grátis. Repita até
+>    conseguir reivindicar uma; se **nenhuma** da fila estiver livre, **PARE e avise quem te
+>    instruiu** — não invente tarefa fora da fila. (Esta regra vale só *antes* de trabalhar:
+>    se você já tivesse lido a spec ou escrito código antes de reivindicar — o que a ordem
+>    destes passos não deveria permitir — a instrução seria parar, nunca pular para outra
+>    depois de já ter trabalhado; ver `QUADRO.md` sobre por que "pegue a próxima" era errado
+>    *depois* de já ter feito o trabalho.)
 >    Não edite o quadro — quem atualiza é o mantenedor.
 > 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
