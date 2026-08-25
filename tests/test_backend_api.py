@@ -10,7 +10,7 @@ import io
 import os
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 # Força segredo de teste com tamanho adequado (>= 32 chars) e modo SQLite
@@ -29,6 +29,7 @@ from backend_api.config import (
     get_secret_key,
 )
 from backend_api.main import app, limiter
+from backend_api.schemas import ConfirmarTratoInput
 from repositories.animais import get_all_animals, get_animal
 from repositories.conexao import _conn, configurar_sqlite
 from repositories.pesagens import get_weighings
@@ -819,6 +820,192 @@ class TestSanidadeEndpoint(BackendApiTestCase):
         source = inspect.getsource(main_mod)
         self.assertNotIn("INSERT INTO medications", source)
         self.assertNotIn("UPDATE animals SET status='carencia'", source)
+
+
+class TestTratoEndpoint(BackendApiTestCase):
+    def _create_plan(self, *, active=True, insumo_id=None, quantity=8.0):
+        lote = db.get_all_lotes()[0]
+        db.add_feeding_plan(
+            str(lote["id"]),
+            "Trato API",
+            quantity,
+            "kg",
+            "diario",
+            insumo_id=insumo_id,
+        )
+        with _conn() as con:
+            plan_id = con.execute(
+                "SELECT id FROM feeding_plans ORDER BY id DESC LIMIT 1"
+            ).fetchone()[0]
+        if not active:
+            db.set_feeding_plan_active(plan_id, 0)
+        return plan_id, str(lote["id"])
+
+    def _create_insumo(self, stock):
+        with _conn() as con:
+            return con.execute(
+                """INSERT INTO insumos
+                   (name, category, unit, current_stock, min_stock, cost_per_unit)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                ("Insumo de trato API", "Ração", "kg", stock, 0, 1.0),
+            ).lastrowid
+
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def _payload(self, **changes):
+        payload = {
+            "situacao": "feito",
+            "quantidade_aplicada": 3.0,
+            "baixar_estoque": False,
+            "notas": "Confirmação via API",
+        }
+        payload.update(changes)
+        return payload
+
+    def test_get_trato_pendentes_sem_authorization_retorna_401(self):
+        """Critério 1 (Spec 0054): a lista de trato exige token."""
+        res = self.client.get("/trato/pendentes")
+        self.assertEqual(res.status_code, 401)
+
+    def test_get_trato_pendentes_retorna_ativos_e_estado_do_database(self):
+        """Critérios 2–3: só planos ativos e o período vem do serviço existente."""
+        active_id, _ = self._create_plan()
+        inactive_id, _ = self._create_plan(active=False)
+        expected = {
+            item["id"]: item
+            for item in db.get_pending_feedings(date.today())
+        }
+
+        res = self.client.get("/trato/pendentes", headers=self._headers())
+
+        self.assertEqual(res.status_code, 200)
+        items = {item["plano_id"]: item for item in res.json()}
+        self.assertIn(active_id, items)
+        self.assertNotIn(inactive_id, items)
+        self.assertEqual(items[active_id]["lote_id"], str(expected[active_id]["lote_id"]))
+        self.assertEqual(items[active_id]["lote_nome"], expected[active_id]["lote_name"])
+        self.assertEqual(items[active_id]["produto"], expected[active_id]["product_name"])
+        self.assertEqual(items[active_id]["quantidade"], expected[active_id]["quantity"])
+        self.assertEqual(items[active_id]["unidade"], expected[active_id]["unit"])
+        self.assertEqual(items[active_id]["frequencia"], expected[active_id]["frequency"])
+        self.assertEqual(items[active_id]["insumo_id"], expected[active_id]["insumo_id"])
+        self.assertEqual(
+            items[active_id]["confirmado_no_periodo"],
+            expected[active_id]["done_this_period"],
+        )
+        self.assertEqual(
+            items[active_id]["ultima_confirmacao"],
+            expected[active_id]["last_check"],
+        )
+
+    def test_post_confirmar_trato_grava_token_e_atualiza_pendencia(self):
+        """Critérios 4–6: persiste, usa token e GET seguinte reconhece a confirmação."""
+        plan_id, lote_id = self._create_plan()
+        payload = self._payload(
+            operator="operador_falso",
+            lote_id="LOTE_FALSO",
+            insumo_id=999999,
+            quantity_unit="litro",
+            check_date="2000-01-01",
+        )
+
+        post_res = self.client.post(
+            f"/trato/{plan_id}/confirmar",
+            json=payload,
+            headers=self._headers(),
+        )
+
+        self.assertEqual(post_res.status_code, 201)
+        self.assertEqual(post_res.json(), {"ok": True})
+        with _conn() as con:
+            row = con.execute(
+                """SELECT plan_id, lote_id, check_date, status, actual_quantity, operator, notes
+                   FROM feeding_checks ORDER BY id DESC LIMIT 1"""
+            ).fetchone()
+        self.assertEqual(row["plan_id"], plan_id)
+        self.assertEqual(str(row["lote_id"]), lote_id)
+        self.assertEqual(row["check_date"], date.today().isoformat())
+        self.assertEqual(row["status"], "feito")
+        self.assertEqual(row["actual_quantity"], 3.0)
+        self.assertEqual(row["operator"], "testuser")
+        self.assertNotEqual(row["operator"], "operador_falso")
+        self.assertEqual(row["notes"], "Confirmação via API")
+
+        pending_res = self.client.get("/trato/pendentes", headers=self._headers())
+        item = next(item for item in pending_res.json() if item["plano_id"] == plan_id)
+        self.assertTrue(item["confirmado_no_periodo"])
+
+    def test_post_confirmar_trato_baixa_estoque_do_insumo_vinculado(self):
+        """Critério 7: a baixa é delegada ao plano que tem insumo vinculado."""
+        insumo_id = self._create_insumo(20.0)
+        plan_id, _ = self._create_plan(insumo_id=insumo_id)
+
+        res = self.client.post(
+            f"/trato/{plan_id}/confirmar",
+            json=self._payload(quantidade_aplicada=3.5, baixar_estoque=True),
+            headers=self._headers(),
+        )
+
+        self.assertEqual(res.status_code, 201)
+        with _conn() as con:
+            stock = con.execute(
+                "SELECT current_stock FROM insumos WHERE id=?", (insumo_id,)
+            ).fetchone()[0]
+        self.assertEqual(stock, 16.5)
+
+    def test_post_confirmar_trato_sem_insumo_nao_baixa_estoque(self):
+        """Critério 8: um ID de insumo enviado pelo cliente não pode forçar baixa."""
+        unrelated_insumo_id = self._create_insumo(20.0)
+        plan_id, _ = self._create_plan()
+
+        res = self.client.post(
+            f"/trato/{plan_id}/confirmar",
+            json=self._payload(baixar_estoque=True, insumo_id=unrelated_insumo_id),
+            headers=self._headers(),
+        )
+
+        self.assertEqual(res.status_code, 201)
+        with _conn() as con:
+            stock = con.execute(
+                "SELECT current_stock FROM insumos WHERE id=?", (unrelated_insumo_id,)
+            ).fetchone()[0]
+        self.assertEqual(stock, 20.0)
+
+    def test_post_confirmar_trato_inexistente_ou_inativo_retorna_404(self):
+        """Critério 9: planos inexistentes e inativos não são confirmáveis."""
+        inactive_id, _ = self._create_plan(active=False)
+        headers = self._headers()
+
+        missing_res = self.client.post("/trato/999999/confirmar", json=self._payload(), headers=headers)
+        inactive_res = self.client.post(
+            f"/trato/{inactive_id}/confirmar",
+            json=self._payload(),
+            headers=headers,
+        )
+
+        self.assertEqual(missing_res.status_code, 404)
+        self.assertEqual(inactive_res.status_code, 404)
+
+    def test_post_confirmar_trato_situacao_invalida_retorna_422(self):
+        """Critério 10: a validação de situação é responsabilidade do Pydantic."""
+        plan_id, _ = self._create_plan()
+
+        res = self.client.post(
+            f"/trato/{plan_id}/confirmar",
+            json=self._payload(situacao="invalido"),
+            headers=self._headers(),
+        )
+
+        self.assertEqual(res.status_code, 422)
+
+    def test_backend_api_delega_sql_e_schema_nao_aceita_ids_do_cliente(self):
+        """Critérios 11–12: a rota não duplica SQL nem recebe dados do plano."""
+        source = inspect.getsource(main_mod)
+        self.assertNotIn("INSERT INTO feeding_checks", source)
+        self.assertNotIn("UPDATE insumos SET current_stock", source)
+        for field in ("lote_id", "insumo_id", "quantity_unit"):
+            self.assertNotIn(field, ConfirmarTratoInput.model_fields)
 
 
 class TestSecurityAndIsolation(unittest.TestCase):
