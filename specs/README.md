@@ -82,14 +82,20 @@ por piquete (API + mobile). Mesmo padrão de sanidade/foto (função pronta no w
 parte das fatias do mobile). Com 0054–0058 fechadas, o escopo original do ROADMAP §5
 Trilha 1 fica completo.
 
-**Atualização de 2026-08-24 (a mais recente): duas specs novas — 0059/0060, implementando
-a [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md) (mobile offline).** 0059
+**Atualização de 2026-08-24: duas specs novas — 0059/0060, implementando a
+[ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md) (mobile offline).** 0059
 (API: header `Idempotency-Key` nos quatro endpoints de escrita existentes) e 0060 (mobile:
 fila local + cache raso, cobrindo só pesagem/medicamento/movimentação — foto, trato e CSV
 ficam de fora desta fatia, decisão registrada nas specs). Com elas fechadas, só resta
 Bluetooth (hardware, não delegável) de toda a Trilha 1. O que resta da Trilha 2 ("desenhar
 no mapa", localização por propriedade na previsão do tempo) é integração de UI, trabalho
 do mantenedor (R31), não spec de agente.
+
+**Atualização de 2026-08-24 (a mais recente): 0054 concluída**
+([#233](https://github.com/welz-gui/AgroTop/pull/233) — `GET /trato/pendentes` +
+`POST /trato/{plano_id}/confirmar`, expondo `get_pending_feedings`/`add_feeding_check` sem
+lógica nova; 42 testes cobrindo cada critério, suíte completa do projeto — 753 testes —
+rodada num worktree isolado antes do merge). **0055 disponível**, agora contra a API real.
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -156,7 +162,7 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0051](0051-mobile-tela-de-sanidade.md) | Mobile: tela de sanidade (Trilha 1) | implementação | baixo | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) + [#227](https://github.com/welz-gui/AgroTop/pull/227) |
 | [0052](0052-api-foto-do-animal.md) | API: enviar e consultar foto do animal (Trilha 1) | implementação | **médio** | ✅ [#180](https://github.com/welz-gui/AgroTop/pull/180) |
 | [0053](0053-mobile-tela-de-foto.md) | Mobile: tela de foto do animal (Trilha 1) | implementação | baixo | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) |
-| [0054](0054-api-confirmacao-de-trato.md) | API: confirmação de trato/nutrição por piquete (Trilha 1) | implementação | **médio** | 🟢 disponível |
+| [0054](0054-api-confirmacao-de-trato.md) | API: confirmação de trato/nutrição por piquete (Trilha 1) | implementação | **médio** | ✅ [#233](https://github.com/welz-gui/AgroTop/pull/233) |
 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) | Mobile: tela de confirmação de trato (Trilha 1) | implementação | baixo | 🟢 disponível |
 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) | Mobile: leitura de brinco por QR Code (Trilha 1) | implementação | baixo | 🟢 disponível |
 | [0057](0057-api-importacao-de-pesagens-csv.md) | API: importação de pesagens por CSV (Trilha 1) | implementação | **médio** | 🟢 disponível |

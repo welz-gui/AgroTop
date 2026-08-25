@@ -419,11 +419,13 @@ Regras gerais para trabalho paralelo:
    (mantém fotos em `bytea`, sem storage externo) e
    [0053](specs/0053-mobile-tela-de-foto.md)/[PR #187](https://github.com/welz-gui/AgroTop/pull/187)
    (compressão no app porque `_compress_image` mora em `app.py`, intocável). **Quinta fatia
-   (confirmação de trato) — specs escritas em 2026-08-24, disponíveis:**
-   [0054](specs/0054-api-confirmacao-de-trato.md) (expõe `database.py::get_pending_feedings`/
-   `add_feeding_check`, já usadas em produção pelo Modo Campo do web) e
+   (confirmação de trato) — API ✅ concluída em 2026-08-24:**
+   [0054](specs/0054-api-confirmacao-de-trato.md)/[PR #233](https://github.com/welz-gui/AgroTop/pull/233)
+   (expõe `database.py::get_pending_feedings`/`add_feeding_check`, já usadas em produção
+   pelo Modo Campo do web). Tela disponível:
    [0055](specs/0055-mobile-tela-de-confirmacao-de-trato.md) (tela por piquete, não por
-   animal — ponto de entrada próprio na navegação, fora da ficha). **Sexta fatia (leitura
+   animal — ponto de entrada próprio na navegação, fora da ficha; contrato real, a API já
+   mesclou). **Sexta fatia (leitura
    de brinco por QR) — spec escrita em 2026-08-24, disponível:**
    [0056](specs/0056-mobile-leitura-de-brinco-por-qr.md) — decodifica nativamente no
    aparelho (sem endpoint novo, reaproveita `GET /animais/{id}`), diferente do web, que
