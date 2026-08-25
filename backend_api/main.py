@@ -6,6 +6,7 @@ reaproveitando a camada de serviços e repositórios existente.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
@@ -27,6 +28,7 @@ from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
     CarenciaOutput,
+    ConfirmarTratoInput,
     LoginInput,
     LogoutInput,
     LoteSummary,
@@ -42,9 +44,17 @@ from backend_api.schemas import (
     RefreshInput,
     RefreshOutput,
     TokenOutput,
+    TratoPendenteOutput,
     UserSummary,
 )
-from database import add_photo, get_all_lotes, get_photo_image, get_photos
+from database import (
+    add_feeding_check,
+    add_photo,
+    get_all_lotes,
+    get_pending_feedings,
+    get_photo_image,
+    get_photos,
+)
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
 from repositories.pesagens import add_weighing, calculate_gmd
 from repositories.sanidade import (
@@ -347,6 +357,61 @@ def get_photo_file(
 
     image_bytes, mime = result
     return Response(content=image_bytes, media_type=mime)
+
+
+@app.get("/trato/pendentes", response_model=list[TratoPendenteOutput])
+def list_tratos_pendentes(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Lista os itens de trato ativos e sua confirmação no período atual."""
+    return [
+        {
+            "plano_id": plan["id"],
+            "lote_id": str(plan["lote_id"]),
+            "lote_nome": plan.get("lote_name") or "",
+            "produto": plan["product_name"],
+            "quantidade": float(plan["quantity"]),
+            "unidade": plan["unit"],
+            "frequencia": plan["frequency"],
+            "insumo_id": plan.get("insumo_id"),
+            "confirmado_no_periodo": plan["done_this_period"],
+            "ultima_confirmacao": plan["last_check"],
+        }
+        for plan in get_pending_feedings(date.today())
+    ]
+
+
+@app.post("/trato/{plano_id}/confirmar", status_code=status.HTTP_201_CREATED)
+def confirmar_trato(
+    plano_id: int,
+    data: ConfirmarTratoInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, bool]:
+    """Confirma a execução de um item de trato ativo no dia de hoje."""
+    today = date.today()
+    plan = next(
+        (item for item in get_pending_feedings(today) if item["id"] == plano_id),
+        None,
+    )
+    if plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item de trato não encontrado.",
+        )
+
+    add_feeding_check(
+        plan_id=plano_id,
+        lote_id=plan["lote_id"],
+        check_date=today.isoformat(),
+        status=data.situacao,
+        actual_quantity=data.quantidade_aplicada,
+        operator=user.get("username", ""),
+        notes=data.notas or "",
+        deduct_stock=data.baixar_estoque,
+        insumo_id=plan.get("insumo_id"),
+        quantity_unit=plan["unit"],
+    )
+    return {"ok": True}
 
 
 @app.get("/protocolos", response_model=list[ProtocoloOutput])

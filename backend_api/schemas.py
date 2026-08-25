@@ -1,6 +1,6 @@
 """Modelos Pydantic (schemas) da API Backend AgroTop."""
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -164,3 +164,25 @@ class MedicamentosOutput(BaseModel):
 
 class CarenciaOutput(BaseModel):
     carencia_ate: Optional[str] = None
+
+
+class TratoPendenteOutput(BaseModel):
+    plano_id: int
+    lote_id: str
+    lote_nome: str
+    produto: str
+    quantidade: float
+    unidade: str
+    frequencia: str
+    insumo_id: Optional[int] = None
+    confirmado_no_periodo: bool
+    ultima_confirmacao: Optional[str] = None
+
+
+class ConfirmarTratoInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    situacao: Literal["feito", "parcial", "nao_feito"]
+    quantidade_aplicada: float
+    baixar_estoque: bool
+    notas: Optional[str] = None
