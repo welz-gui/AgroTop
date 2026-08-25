@@ -530,11 +530,13 @@ Ela será integrada depois pelo mantenedor. Assinatura diferente inutiliza o tra
 
 ## 📱 Ambiente Flutter local — leia antes de qualquer spec mobile
 
-**Desde 2026-08-24 este ambiente TEM Flutter instalado** (`C:\flutter`, versão 3.47.1) —
-antes disso, todo agente de spec mobile dependia só da CI para `analyze`/`test`/`build`.
-Isso mudou, mas com três pegadinhas reais descobertas na instalação — leia antes de rodar
-qualquer comando `flutter`, senão você vai bater na mesma parede e perder tempo
-redescobrindo o que já está documentado aqui.
+**Desde 2026-08-24 este ambiente TEM o toolchain mobile completo** — Flutter (`C:\flutter`,
+versão 3.47.1), JDK 17 e Android SDK, tudo instalado e verificado de ponta a ponta
+(`flutter analyze`, `flutter test` com golden, e `flutter build apk --debug` gerando um APK
+de verdade). Antes disso, todo agente de spec mobile dependia só da CI. Isso mudou, mas com
+três pegadinhas reais descobertas na instalação — leia antes de rodar qualquer comando
+`flutter`, senão você vai bater na mesma parede e perder tempo redescobrindo o que já está
+documentado aqui.
 
 ### 1. O caminho do projeto quebra `flutter analyze`/`flutter test` no Windows nativo
 
@@ -564,14 +566,46 @@ paralelo. Apague a junction (`Remove-Item C:\agrotop-mobile-<nome>`) ao terminar
 sistema, deixada para o usuário decidir) — use o caminho completo `C:\flutter\bin\flutter.bat`
 em todo comando, ou rode `$env:PATH = "C:\flutter\bin;$env:PATH"` só nesta sessão de shell.
 
-### 2. Falta o Android SDK — `flutter build apk --debug` não funciona localmente ainda
+### 2. Android SDK + JDK — instalados, `flutter build apk --debug` funciona de verdade
 
-`flutter analyze` e `flutter test` (incluindo golden) funcionam pela junction. **`flutter
-build apk --debug` não** — falta o Android SDK, que ainda não foi instalado neste ambiente.
-Se sua spec pede esse comando como último passo de verificação, rode os dois primeiros
-localmente, e **diga explicitamente no corpo do PR que o build do APK não foi verificado
-localmente** (a CI — job `build-apk` de `.github/workflows/mobile-ci.yml` — cobre isso).
-Não afirme ter rodado o que não rodou (regra 0 deste arquivo vale aqui também).
+**Desde 2026-08-24 este ambiente também tem JDK 17 e Android SDK instalados** — os três
+passos de verificação de qualquer spec mobile (`flutter analyze`, `flutter test`,
+`flutter build apk --debug`) rodam localmente, pela mesma junction do item 1. Confirmado
+de ponta a ponta: `√ Built build\app\outputs\flutter-apk\app-debug.apk`.
+
+- **JDK 17** (Temurin/Eclipse Adoptium) em `C:\jdk17`.
+- **Android SDK** em `C:\android-sdk` — `platform-tools`, `platforms;android-35`,
+  `platforms;android-36`, `build-tools;35.0.0`, `build-tools;28.0.3` instalados via
+  `sdkmanager`, **todas as licenças aceitas** (`sdkmanager --licenses`, respondido `y` para
+  todas). Isso importa: com as licenças já aceitas, o próprio Gradle consegue instalar
+  sozinho, sem travar pedindo confirmação, qualquer componente adicional que faltar na hora
+  do build (ex.: `build-tools;36.0.0` e `CMake 3.22.1` foram baixados automaticamente na
+  primeira build deste projeto, sem intervenção).
+- **Nada disso foi posto em variável de ambiente do sistema** (JAVA_HOME, ANDROID_HOME) —
+  de propósito, mesmo critério do item 1 sobre não mexer em configuração de sistema. Em vez
+  disso, ficou gravado na config **do próprio Flutter**:
+  ```powershell
+  C:\flutter\bin\flutter.bat config --android-sdk "C:\android-sdk"
+  C:\flutter\bin\flutter.bat config --jdk-dir "C:\jdk17"
+  ```
+  Essas duas configs são globais do Flutter (gravadas fora do worktree), então **você não
+  precisa repetir isso** — só confirme que `flutter doctor -v` mostra `[√] Android
+  toolchain` antes de partir para o build. Se não mostrar, rode os dois comandos acima de
+  novo (não deveria ser necessário, mas não custa confirmar).
+
+**Verificação completa, os três passos, pela junction:**
+
+```powershell
+Set-Location "C:\agrotop-mobile-<nome-do-seu-worktree>"
+C:\flutter\bin\flutter.bat analyze
+C:\flutter\bin\flutter.bat test
+C:\flutter\bin\flutter.bat build apk --debug --dart-define=AGROTOP_API_URL=https://api.example.invalid
+```
+
+O primeiro `build apk` de um worktree novo demora bastante (Gradle baixa dependências na
+primeira vez, ~15-20 min) — builds seguintes são bem mais rápidos. Se ainda assim algo
+falhar, **diga isso explicitamente no PR** em vez de pular a etapa em silêncio (regra 0
+deste arquivo vale aqui também) — mas não é mais esperado falhar por falta de toolchain.
 
 ### 3. Golden tests: `git status` "modificado" depois de `--update-goldens` NÃO prova nada
 
