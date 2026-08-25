@@ -285,7 +285,10 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 >    Não edite o quadro — quem atualiza é o mantenedor.
 > 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
-> 5. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
+> 5. **Se a tarefa tocar `mobile/`**, leia também a seção **"📱 Ambiente Flutter local"**
+>    neste arquivo — o toolchain (Flutter + Android SDK + JDK) já está instalado e tem
+>    pegadinhas reais documentadas que vão te custar tempo se você não ler antes.
+> 6. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
 #### Variante B — você atribui a spec ⭐ **use esta**
 
@@ -298,7 +301,10 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 >
 > 1. Leia `specs/<arquivo-da-spec>.md` — é a **sua** tarefa, escopo fechado.
 > 2. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
-> 3. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
+> 3. **Se a tarefa tocar `mobile/`**, leia também a seção **"📱 Ambiente Flutter local"**
+>    neste arquivo — o toolchain (Flutter + Android SDK + JDK) já está instalado e tem
+>    pegadinhas reais documentadas que vão te custar tempo se você não ler antes.
+> 4. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
 
 #### Continuação, igual nas duas variantes
 
