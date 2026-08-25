@@ -6,6 +6,7 @@ import '../models.dart';
 import 'animal_photo_section.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
+import 'qr_scanner_page.dart';
 import 'weighing_page.dart';
 
 class AnimalsPage extends StatefulWidget {
@@ -15,12 +16,14 @@ class AnimalsPage extends StatefulWidget {
     required this.themeMode,
     required this.onThemeChanged,
     required this.onUnauthorized,
+    this.qrScannerBuilder,
   });
 
   final ApiClient api;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeChanged;
   final VoidCallback onUnauthorized;
+  final QrScannerBuilder? qrScannerBuilder;
 
   @override
   State<AnimalsPage> createState() => _AnimalsPageState();
@@ -130,6 +133,18 @@ class _AnimalsPageState extends State<AnimalsPage> {
     }
   }
 
+  Future<void> _openQrScanner() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QrScannerPage(
+          api: widget.api,
+          onUnauthorized: widget.onUnauthorized,
+          scannerBuilder: widget.qrScannerBuilder,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -180,9 +195,15 @@ class _AnimalsPageState extends State<AnimalsPage> {
         children: [
           TextField(
             key: const ValueKey('animal-search'),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Buscar por ID ou brinco',
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(
+                key: const ValueKey('scan-qr-button'),
+                tooltip: 'Ler QR do brinco',
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: _openQrScanner,
+              ),
             ),
             onChanged: (value) => setState(() => _query = value),
           ),
