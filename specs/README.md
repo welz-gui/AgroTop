@@ -76,14 +76,20 @@ completo (incluindo duas pegadinhas reais de toolchain descobertas no processo) 
 por piquete (API + mobile). Mesmo padrão de sanidade/foto (função pronta no web,
 `app.py::_campo_trato`, só falta expor pela API e reproduzir no mobile).
 
-**Atualização de 2026-08-24 (a mais recente): mais três specs — 0056/0057/0058.**
+**Atualização de 2026-08-24: mais três specs — 0056/0057/0058.**
 0056 (mobile: leitura de brinco por QR, nativa no aparelho, sem tocar `backend_api/`) e
 0057/0058 (API + mobile: importação de pesagens por CSV, item 3 da Trilha 1, listado à
-parte das fatias do mobile). Com as cinco specs abertas (0054–0058) fechadas, o escopo
-original do ROADMAP §5 Trilha 1 fica completo, exceto Bluetooth (hardware) e mobile
-offline (deixado para o fim de propósito) — nenhum dos dois delegável agora. O que resta
-da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo) é
-integração de UI, trabalho do mantenedor (R31), não spec de agente.
+parte das fatias do mobile). Com 0054–0058 fechadas, o escopo original do ROADMAP §5
+Trilha 1 fica completo.
+
+**Atualização de 2026-08-24 (a mais recente): duas specs novas — 0059/0060, implementando
+a [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md) (mobile offline).** 0059
+(API: header `Idempotency-Key` nos quatro endpoints de escrita existentes) e 0060 (mobile:
+fila local + cache raso, cobrindo só pesagem/medicamento/movimentação — foto, trato e CSV
+ficam de fora desta fatia, decisão registrada nas specs). Com elas fechadas, só resta
+Bluetooth (hardware, não delegável) de toda a Trilha 1. O que resta da Trilha 2 ("desenhar
+no mapa", localização por propriedade na previsão do tempo) é integração de UI, trabalho
+do mantenedor (R31), não spec de agente.
 
 Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 
@@ -155,6 +161,8 @@ Ver [ROADMAP.md](../ROADMAP.md) seção 10 para o fluxo completo.
 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) | Mobile: leitura de brinco por QR Code (Trilha 1) | implementação | baixo | 🟢 disponível |
 | [0057](0057-api-importacao-de-pesagens-csv.md) | API: importação de pesagens por CSV (Trilha 1) | implementação | **médio** | 🟢 disponível |
 | [0058](0058-mobile-importacao-de-pesagens-csv.md) | Mobile: importação de pesagens por CSV (Trilha 1) | implementação | baixo | 🟢 disponível |
+| [0059](0059-api-idempotency-key.md) | API: chave de idempotência nos endpoints de escrita (Trilha 1) | implementação | **médio** | 🟢 disponível |
+| [0060](0060-mobile-fila-offline.md) | Mobile: fila offline e cache raso de leitura (Trilha 1) | implementação | **médio** | 🟢 disponível |
 
 **0007 foi DESTRAVADA em 2026-08-03.** A spec 0024 entregou o mapa que faltava: 92 % das
 ocorrências têm token de valor idêntico, e sobram só sete cores sem correspondente. O
