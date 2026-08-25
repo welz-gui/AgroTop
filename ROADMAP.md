@@ -51,7 +51,10 @@ login por cookie · câmera (QR + OCR de brinco + foto).
   o provedor é substituível; **Supabase Auth vetado**.
 - **[ADR 0005](docs/adr/0005-fila-de-sincronizacao.md)** — a fila de sincronização (§10.3)
   fica **fora** de `animal_events`, em `evento_sincronizacao`. Nenhuma exceção ao gatilho
-  append-only: nada em `animal_events` muda, nunca.
+  append-only: nada em `animal_events` muda, nunca. **Não é sobre o mobile** — ver ADR 0006.
+- **[ADR 0006](docs/adr/0006-mobile-offline-fila-de-escrita.md)** — arquitetura do mobile
+  offline (Trilha 1, etapa 5): cache raso + fila local burra + `idempotency_key`
+  obrigatória, **sem merge automático de conflito**.
 - **[supabase/README.md](supabase/README.md)** — fluxo de alteração de schema.
 
 ---
@@ -440,7 +443,11 @@ Regras gerais para trabalho paralelo:
    marca depois fica contida.
 5. **Mobile v2 — offline + fila de sincronização.** Deixado para o fim de propósito: é a
    parte caríssima (idempotência, conflitos, ordem de dependência) e não deve bloquear a
-   Trilha 3.
+   Trilha 3. **Arquitetura decidida em 2026-08-24, [ADR 0006](docs/adr/0006-mobile-offline-fila-de-escrita.md):**
+   cache raso de leitura + fila local burra + `idempotency_key` obrigatória + zero merge
+   automático (conflito vira erro visível, o operador decide). Ainda sem specs escritas —
+   a ADR resolve a arquitetura, não substitui a spec da API (`idempotency_key` nos
+   endpoints existentes) nem a do mobile (fila local + tela de sincronização).
 
 **Regras específicas**
 - **Autenticação pela própria API**, contra a tabela `users`. **Supabase Auth é vetado**
