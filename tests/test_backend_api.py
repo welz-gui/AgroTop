@@ -1008,6 +1008,235 @@ class TestTratoEndpoint(BackendApiTestCase):
             self.assertNotIn(field, ConfirmarTratoInput.model_fields)
 
 
+class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def _count_weighings(self):
+        with _conn() as con:
+            return con.execute("SELECT COUNT(*) FROM weighings").fetchone()[0]
+
+    def test_post_importar_csv_sem_token_retorna_401(self):
+        """Critério 1: POST /pesagens/importar-csv sem Authorization devolve 401."""
+        csv_content = b"animal,peso,data\nBR0001,450.0,2026-08-20\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", csv_content, "text/csv")},
+            data={"confirmar": "false"},
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_post_importar_csv_confirmar_false_ou_ausente_nao_grava_no_banco(self):
+        """Critério 2: Com confirmar=false (ou ausente), nada é gravado no banco."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        self.assertTrue(len(animals) >= 2)
+        a1, a2 = animals[0]["id"], animals[1]["id"]
+
+        csv_content = f"brinco;peso;data\n{a1};480,5;2026-08-20\n{a2};510,0;2026-08-21\n".encode("utf-8")
+
+        count_before = self._count_weighings()
+
+        # Sem confirmar (ausente)
+        res1 = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", csv_content, "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res1.status_code, 200)
+        data1 = res1.json()
+        self.assertEqual(data1["gravadas"], 0)
+        self.assertEqual(len(data1["aceitas"]), 2)
+        self.assertEqual(self._count_weighings(), count_before)
+
+        # Com confirmar=false
+        res2 = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", csv_content, "text/csv")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res2.status_code, 200)
+        data2 = res2.json()
+        self.assertEqual(data2["gravadas"], 0)
+        self.assertEqual(len(data2["aceitas"]), 2)
+        self.assertEqual(self._count_weighings(), count_before)
+
+    def test_post_importar_csv_confirmar_true_grava_no_banco(self):
+        """Critério 3: Com confirmar=true, novas linhas em weighings bate com gravadas == len(aceitas)."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        self.assertTrue(len(animals) >= 2)
+        a1, a2 = animals[0]["id"], animals[1]["id"]
+
+        csv_content = f"brinco;peso;data\n{a1};480.5;2026-08-20\n{a2};510.0;2026-08-21\n".encode("utf-8")
+
+        count_before = self._count_weighings()
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("balanca.csv", csv_content, "text/csv")},
+            data={"confirmar": "true"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["gravadas"], 2)
+        self.assertEqual(data["gravadas"], len(data["aceitas"]))
+        self.assertEqual(self._count_weighings(), count_before + 2)
+
+    def test_post_importar_csv_resultado_identico_ao_parse_pesagens(self):
+        """Critério 4: aceitas, rejeitadas e total_linhas conferem com services.importacao.parse_pesagens."""
+        from services.importacao import parse_pesagens
+
+        ativos = {a["id"] for a in get_all_animals(status="ativo")}
+        csv_text = "animal,peso,data\nBR0001,450.0,2026-08-20\nINVALIDO,abc,2026-08-20\nINEXISTENTE_9999,500.0,2026-08-20\n"
+        csv_bytes = csv_text.encode("utf-8")
+
+        expected_parse = parse_pesagens(csv_text, ids_conhecidos=ativos)
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("teste.csv", csv_bytes, "text/csv")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        self.assertEqual(data["total_linhas"], expected_parse["total_linhas"])
+        self.assertEqual(len(data["rejeitadas"]), len(expected_parse["rejeitadas"]))
+        for r_api, r_exp in zip(data["rejeitadas"], expected_parse["rejeitadas"]):
+            self.assertEqual(r_api["linha"], r_exp["linha"])
+            self.assertEqual(r_api["conteudo"], r_exp["conteudo"])
+            self.assertEqual(r_api["motivo"], r_exp["motivo"])
+
+        self.assertEqual(len(data["aceitas"]), len(expected_parse["aceitas"]))
+        expected_sorted = sorted(expected_parse["aceitas"], key=lambda x: (x["animal_id"], x["data"]))
+        for a_api, a_exp in zip(data["aceitas"], expected_sorted):
+            self.assertEqual(a_api["animal_id"], a_exp["animal_id"])
+            self.assertEqual(a_api["peso"], a_exp["peso"])
+            self.assertEqual(a_api["data"], a_exp["data"])
+
+    def test_post_importar_csv_alertas_severidade_alta(self):
+        """Critério 5: Alertas batem com severidade alta de avaliar_pesagem."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1, a2 = animals[0]["id"], animals[1]["id"]
+        w2 = float(animals[1].get("current_weight") or 400.0)
+
+        # a1 tem peso com variação absurda (> 20%), a2 tem peso idêntico ao atual (sem alerta de variação/GMD)
+        csv_text = f"brinco,peso,data\n{a1},800.0,2026-08-20\n{a2},{w2:.1f},2026-08-20\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("alertas.csv", csv_text.encode("utf-8"), "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        aceitas_map = {item["animal_id"]: item for item in data["aceitas"]}
+
+        self.assertIn(a1, aceitas_map)
+        self.assertIn(a2, aceitas_map)
+        self.assertTrue(len(aceitas_map[a1]["alertas"]) >= 1)
+        self.assertTrue(any("Variação" in alerta or "fora da faixa" in alerta for alerta in aceitas_map[a1]["alertas"]))
+        self.assertEqual(len(aceitas_map[a2]["alertas"]), 0)
+
+    def test_post_importar_csv_acumulo_historico_mesmo_animal(self):
+        """Critério 6: Duas linhas do mesmo animal fazem a segunda enxergar a primeira no histórico."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1 = animals[0]["id"]
+
+        # Primeira pesagem em 2026-08-01 com 400kg. Segunda pesagem em 2026-08-02 com 800kg (GMD absurdo de 400kg/dia -> gera alerta)
+        csv_text = f"brinco,peso,data\n{a1},400.0,2026-08-01\n{a1},800.0,2026-08-02\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("duas_pesagens.csv", csv_text.encode("utf-8"), "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["aceitas"]), 2)
+
+        # Primeira pesagem (400kg)
+        self.assertEqual(data["aceitas"][0]["peso"], 400.0)
+        # Segunda pesagem (800kg) enxergou os 400kg no histórico acumulado e gerou alerta de variação
+        self.assertEqual(data["aceitas"][1]["peso"], 800.0)
+        self.assertTrue(len(data["aceitas"][1]["alertas"]) >= 1)
+
+    def test_post_importar_csv_operator_vem_do_token(self):
+        """Critério 7: operator gravado em weighings é o usuário do token, ignorando campos extras."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1 = animals[0]["id"]
+
+        csv_text = f"brinco,peso,data\n{a1},460.0,2026-08-20\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagem_op.csv", csv_text.encode("utf-8"), "text/csv")},
+            data={"confirmar": "true", "operator": "hacker_operator"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+
+        with _conn() as con:
+            row = con.execute(
+                "SELECT operator, notes FROM weighings WHERE animal_uuid = (SELECT uuid FROM animals WHERE id = ?) ORDER BY id DESC LIMIT 1",
+                (a1,),
+            ).fetchone()
+            self.assertEqual(row["operator"], "testuser")
+            self.assertIn("importado de pesagem_op.csv", row["notes"])
+
+    def test_post_importar_csv_latin1_encoding(self):
+        """Critério 8: Arquivo em latin-1 (cp1252) é decodificado e aceito corretamente."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1 = animals[0]["id"]
+
+        # Cabeçalho com acentuação em latin-1
+        csv_latin1 = f"cabeçalho_não_usado\n{a1};475,5;2026-08-20\n".encode("latin-1")
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("balanca_latin1.txt", csv_latin1, "text/plain")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["aceitas"]), 1)
+        self.assertEqual(data["aceitas"][0]["animal_id"], a1)
+        self.assertEqual(data["aceitas"][0]["peso"], 475.5)
+
+    def test_post_importar_csv_validacoes_tamanho_e_extensao(self):
+        """Critério 9: Arquivo > 1MB retorna 413, arquivo vazio ou extensão inválida retorna 422."""
+        # Arquivo > 1 MB
+        big_bytes = b"a,100,2026-08-20\n" * 70000  # > 1 MB
+        res_big = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("grande.csv", big_bytes, "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res_big.status_code, 413)
+
+        # Arquivo vazio
+        res_empty = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("vazio.csv", b"", "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res_empty.status_code, 422)
+
+        # Extensão inválida (.pdf)
+        res_ext = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.pdf", b"qualquer conteudo", "application/pdf")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res_ext.status_code, 422)
+
+    def test_backend_api_nao_duplica_sql_pesagens_importacao(self):
+        """Critério 10: backend_api não contém SQL direto de escrita em weighings ou animals."""
+        source = inspect.getsource(main_mod)
+        self.assertNotIn("INSERT INTO weighings", source)
+        self.assertNotIn("UPDATE animals SET current_weight", source)
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
@@ -1035,3 +1264,4 @@ class TestSecurityAndIsolation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -186,3 +186,24 @@ class ConfirmarTratoInput(BaseModel):
     quantidade_aplicada: float
     baixar_estoque: bool
     notas: Optional[str] = None
+
+
+class PesagemAceita(BaseModel):
+    animal_id: str
+    peso: float
+    data: str
+    alertas: list[str] = Field(default_factory=list)
+
+
+class PesagemRejeitada(BaseModel):
+    linha: int
+    conteudo: str
+    motivo: str
+
+
+class ImportarPesagensOutput(BaseModel):
+    total_linhas: int
+    aceitas: list[PesagemAceita]
+    rejeitadas: list[PesagemRejeitada]
+    gravadas: int
+
