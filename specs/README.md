@@ -288,7 +288,12 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 >
 > 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila (as concluídas estão
 >    marcadas ✅ e não têm número de ordem).
-> 2. **Antes de qualquer outra coisa**, reivindique-a criando o branch no remoto:
+> 2. **Antes de qualquer outra coisa**, reivindique-a criando o branch no remoto —
+>    **`<branch-da-spec>` é o valor exato do campo `Branch:` no cabeçalho da spec, não o
+>    nome de worktree/sessão que sua ferramenta gera por padrão** (se sua ferramenta usa
+>    outro nome automaticamente, crie e empurre esta ref manualmente também — é o nome que
+>    outras ferramentas de agente vão verificar, ver aviso no `QUADRO.md` sobre o incidente
+>    de 2026-08-24/25 entre Codex e Antigravity):
 >    ```
 >    git ls-remote --heads origin                        # ver o que já está tomado
 >    git push origin HEAD:refs/heads/<branch-da-spec>    # reivindicar — ATÔMICO
@@ -309,6 +314,17 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 **Obrigatória** com mais de um agente ativo, e **recomendada mesmo com um só**. A colisão de
 2026-07-31 aconteceu com dois agentes iniciados em paralelo lendo a fila juntos; a de
 2026-08-02 aconteceu com o quadro desatualizado. Atribuir no prompt elimina as duas.
+
+> ⚠️ **"Mais de um agente" inclui ferramentas diferentes rodando ao mesmo tempo** (Codex +
+> Antigravity + Claude Code, ou qualquer combinação) — não só duas sessões da mesma
+> ferramenta. **Incidente de 2026-08-24/25:** Codex e Antigravity trabalharam na mesma
+> spec (0054) ao mesmo tempo em modo autoatendimento; nenhuma detectou a outra porque cada
+> ferramenta reivindica sob seu **próprio nome de branch** por padrão (o Codex usa
+> `codex/queue-<data>`, não o `Branch:` que a spec define) — a trava atômica só protege
+> colisão na mesma ref, e as duas nunca escreveram na mesma. Detalhe completo em
+> `QUADRO.md`. **Se você vai rodar mais de uma ferramenta ao mesmo tempo, use Variante B
+> para as duas, com specs diferentes atribuídas** — nunca deixe duas ferramentas em
+> autoatendimento (Variante A) simultâneo, mesmo que sejam ferramentas diferentes.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).

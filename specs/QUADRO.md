@@ -100,6 +100,38 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 > dois agentes podem lê-lo ao mesmo tempo, ambos verem a mesma tarefa livre e ambos
 > reivindicá-la. Quem manda é o **branch no remoto** — ver o protocolo abaixo.
 
+> ### 🛑 A trava atômica só protege o nome de branch exato — não confie na convenção da
+> ### sua ferramenta
+>
+> **Incidente de 2026-08-24/25:** duas ferramentas de agente diferentes (Codex e
+> Antigravity) trabalharam na **mesma spec (0054) ao mesmo tempo**, sem nenhuma delas
+> detectar a outra. Causa: o Codex reivindica tarefas sob seu **próprio nome de branch**
+> (`codex/queue-<data>`), não o nome que a spec 0054 define
+> (`feat/api-confirmacao-de-trato`). A Antigravity reivindicou corretamente sob o nome da
+> spec, terminou primeiro e mesclou ([PR #233](https://github.com/welz-gui/AgroTop/pull/233))
+> — o Codex só descobriu a colisão ao tentar publicar o próprio trabalho, achando o nome já
+> tomado. **A trava atômica (`git push origin HEAD:refs/heads/<branch-da-spec>`) é real e
+> funciona** — mas só protege contra colisão em cima da **mesma ref**. Duas ferramentas
+> escrevendo em refs diferentes nunca colidem entre si, mesmo trabalhando na spec idêntica.
+>
+> **Se você é um agente, independente da ferramenta:** a branch que você reivindica **tem
+> que ser o nome exato do campo `Branch:` no cabeçalho da spec** — não o nome de worktree
+> ou sessão que sua ferramenta gera por padrão. Se sua ferramenta cria automaticamente uma
+> branch com outro nome, **crie e empurre manualmente a branch com o nome certo como parte
+> da reivindicação** (pode ser um segundo `git push` do mesmo commit, ou renomear antes de
+> publicar) — a reivindicação só existe, para efeito de coordenação com outras ferramentas,
+> no nome que a spec define.
+>
+> **Se você está iniciando mais de uma ferramenta de agente ao mesmo tempo** (Codex +
+> Antigravity + Claude Code, ou qualquer combinação), **não confie no modo autoatendimento
+> (Variante A) para nenhuma delas** — a defesa por nome de branch só é confiável quando
+> **você atribui a spec explicitamente a cada ferramenta** (Variante B,
+> [README.md](README.md)), garantindo que nenhuma duas peguem a mesma tarefa por
+> coincidência de fila. Ver a seção "Quando atribuir explicitamente" no README para o
+> porquê disso já ser regra desde a colisão de 2026-07-31 — este incidente mostra que ela
+> vale ainda mais forte entre ferramentas diferentes, que nem compartilham a mesma
+> implementação do protocolo de reivindicação.
+
 ---
 
 ## Fila
