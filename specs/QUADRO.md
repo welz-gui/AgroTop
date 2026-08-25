@@ -19,14 +19,15 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 37 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **5 specs na fila** — 0054/0055 (confirmação de trato/nutrição por
-piquete, API + mobile) e a nova leva **0056/0057/0058** (leitura de brinco por QR + import
-de pesagens por CSV) — ver abaixo. Com essas cinco fechadas, o escopo original do ROADMAP
-§5 Trilha 1 (item "Mobile v1 — online" + item "Importação CSV do indicador da balança")
-fica completo — só restam Bluetooth (hardware) e mobile offline (deixado para o fim de
-propósito), nenhum dos dois delegável agora. O restante da Trilha 2 ("desenhar no mapa",
-localização por propriedade na previsão do tempo) é integração de UI, trabalho do
-mantenedor (R31), não spec de agente.
+(7 de 7 telas) · **7 specs na fila** — 0054/0055 (confirmação de trato/nutrição por
+piquete, API + mobile), 0056/0057/0058 (leitura de brinco por QR + import de pesagens por
+CSV) e a nova leva **0059/0060** (mobile offline: chave de idempotência na API + fila local
+no app, [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) — ver abaixo. Com
+0054–0058 fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 — online" +
+item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
+fechadas, só resta Bluetooth (hardware, não delegável por definição) de toda a Trilha 1. O
+restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
+é integração de UI, trabalho do mantenedor (R31), não spec de agente.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
 > tinha funcionalidade e contrato corretos desde a revisão anterior, mas divergiu de `main`
@@ -181,6 +182,8 @@ mantenedor (R31), não spec de agente.
 | 3 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟢 disponível — sem dependência, não toca API | | 2026-08-24 |
 | 4 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
 | 5 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
+| 6 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 7 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
 
 > **0054/0055 escritas em 2026-08-24 — última fatia do escopo de Mobile v1 online.** O web
 > já tem essa função pronta e em produção há tempo (`app.py::_campo_trato`, tabelas
@@ -217,6 +220,23 @@ mantenedor (R31), não spec de agente.
 >   não animal) — cada uma precisa do próprio ponto de entrada na navegação de
 >   `AnimalsPage`. Se `AppBar` já estiver cheio de ícones quando um agente pegar uma
 >   dessas, agrupar num menu é aceitável — a spec de cada uma deixa isso explícito.
+
+> **0059/0060 escritas em 2026-08-24 — implementam a [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)
+> (mobile offline).** A ADR já resolveu a arquitetura (cache raso + fila local burra +
+> `idempotency_key` + zero merge automático de conflito) — as specs só executam.
+> - **0059 (API)** adiciona um header opcional `Idempotency-Key` aos quatro endpoints de
+>   escrita que já existem (pesagem, medicamento, movimentação, foto) — nova tabela
+>   `api_idempotency_keys`, mesmo padrão de `api_refresh_tokens` (spec 0044). **Não cobre**
+>   os endpoints da 0054/0057 (trato, importação CSV) porque eles ainda não estão
+>   mesclados — fica para uma spec futura quando existirem.
+> - **0060 (mobile)** cobre só pesagem, medicamento e movimentação na fila offline — **foto
+>   fica de fora** (payload binário, complexidade real que a ADR não pediu), **trato e CSV
+>   ficam de fora** (specs ainda não mescladas). Cache raso cobre lista de animais, ficha e
+>   lotes — **não cobre protocolos** (o formulário de sanidade continua preenchível
+>   manualmente offline, mesmo comportamento já previsto para `dose_sugerida` nula).
+> - A 0060 pode ser pega em paralelo com a 0059 (contra mock), mas a deduplicação de
+>   verdade só existe depois que a 0059 mesclar — a spec pede para isso ficar explícito no
+>   PR.
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem

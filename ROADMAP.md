@@ -445,9 +445,13 @@ Regras gerais para trabalho paralelo:
    parte caríssima (idempotência, conflitos, ordem de dependência) e não deve bloquear a
    Trilha 3. **Arquitetura decidida em 2026-08-24, [ADR 0006](docs/adr/0006-mobile-offline-fila-de-escrita.md):**
    cache raso de leitura + fila local burra + `idempotency_key` obrigatória + zero merge
-   automático (conflito vira erro visível, o operador decide). Ainda sem specs escritas —
-   a ADR resolve a arquitetura, não substitui a spec da API (`idempotency_key` nos
-   endpoints existentes) nem a do mobile (fila local + tela de sincronização).
+   automático (conflito vira erro visível, o operador decide). **Specs escritas em
+   2026-08-24, disponíveis:** [0059](specs/0059-api-idempotency-key.md) (header
+   `Idempotency-Key` nos quatro endpoints de escrita existentes — pesagem, medicamento,
+   movimentação, foto; não cobre 0054/0057 porque ainda não mescladas) e
+   [0060](specs/0060-mobile-fila-offline.md) (fila local + cache raso no app — cobre só
+   pesagem/medicamento/movimentação; foto, trato e CSV ficam de fora desta fatia, decisão
+   registrada na spec).
 
 **Regras específicas**
 - **Autenticação pela própria API**, contra a tabela `users`. **Supabase Auth é vetado**
