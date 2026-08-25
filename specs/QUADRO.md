@@ -633,8 +633,9 @@ git push origin HEAD:refs/heads/<branch-da-spec>   # reivindicar — ATÔMICO
 ```
 
 Se o push falhar com referência já existente, a tarefa está tomada. **Se você ainda não
-trabalhou, pule para a próxima da fila** — é grátis. **Se já trabalhou, PARE e avise**;
-nunca comece uma segunda tarefa na mesma sessão.
+trabalhou, relate a colisão (qual spec/branch já estava tomado) e pule para a próxima da
+fila** — é grátis. **Se já trabalhou, PARE e avise**; nunca comece uma segunda tarefa na
+mesma sessão.
 
 > ### 🛑 Por que "pegue a próxima" era a instrução errada
 >
