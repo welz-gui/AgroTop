@@ -315,16 +315,23 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 2026-07-31 aconteceu com dois agentes iniciados em paralelo lendo a fila juntos; a de
 2026-08-02 aconteceu com o quadro desatualizado. Atribuir no prompt elimina as duas.
 
-> ⚠️ **"Mais de um agente" inclui ferramentas diferentes rodando ao mesmo tempo** (Codex +
-> Antigravity + Claude Code, ou qualquer combinação) — não só duas sessões da mesma
-> ferramenta. **Incidente de 2026-08-24/25:** Codex e Antigravity trabalharam na mesma
-> spec (0054) ao mesmo tempo em modo autoatendimento; nenhuma detectou a outra porque cada
-> ferramenta reivindica sob seu **próprio nome de branch** por padrão (o Codex usa
-> `codex/queue-<data>`, não o `Branch:` que a spec define) — a trava atômica só protege
-> colisão na mesma ref, e as duas nunca escreveram na mesma. Detalhe completo em
-> `QUADRO.md`. **Se você vai rodar mais de uma ferramenta ao mesmo tempo, use Variante B
-> para as duas, com specs diferentes atribuídas** — nunca deixe duas ferramentas em
-> autoatendimento (Variante A) simultâneo, mesmo que sejam ferramentas diferentes.
+> ⚠️ **"Mais de um agente" inclui ferramentas diferentes** (Codex + Antigravity +
+> Claude Code, ou qualquer combinação), não só duas sessões da mesma ferramenta.
+> **Incidente de 2026-08-24/25:** Codex e Antigravity trabalharam na mesma spec (0054) ao
+> mesmo tempo em modo autoatendimento; nenhuma detectou a outra — **não** porque estavam
+> simultâneas, mas porque o Codex reivindica sob seu **próprio nome de branch** por padrão
+> (`codex/queue-<data>`, não o `Branch:` que a spec define). A trava atômica só protege
+> colisão na mesma ref; as duas nunca escreveram na mesma. Detalhe completo em `QUADRO.md`.
+>
+> **A correção é a instrução do passo 2 da Variante A** — reivindicar sob o nome exato do
+> campo `Branch:`, não o nome automático da ferramenta. Com isso seguido de verdade,
+> **disparar ferramentas diferentes em Variante A com um intervalo entre uma e outra
+> continua seguro** — a reivindicação do primeiro já está visível no remoto quando o
+> segundo tenta a dele, e o `git push` rejeitado funciona normalmente. Variante B aqui é
+> uma camada **extra** de segurança, mais importante quando o intervalo entre disparos é
+> curto ou você não tem certeza de que a ferramenta vai seguir a instrução do nome de
+> branch corretamente — não é obrigatória por si só toda vez que mais de uma ferramenta
+> está em uso.
 
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
