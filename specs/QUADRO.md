@@ -20,12 +20,12 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 37 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **0054 concluída** (API de trato) · **6 specs na fila** — 0055 (tela
-mobile de trato, contrato já real), 0056/0057/0058 (leitura de brinco por QR + import de
-pesagens por CSV) e **0059/0060** (mobile offline: chave de idempotência na API + fila
-local no app, [ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) — ver abaixo.
-Com 0055–0058 fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 — online"
-+ item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
+(7 de 7 telas) · **0054 e 0055 concluídas** (API + tela mobile de trato) · **5 specs na
+fila** — 0056/0057 (PRs abertos, aguardando revisão), 0058 (importação CSV) e **0059/0060**
+(mobile offline: chave de idempotência na API + fila local no app,
+[ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) — ver abaixo.
+Com 0056–0058 também fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 —
+online" + item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
 fechadas, só resta Bluetooth (hardware, não delegável por definição) de toda a Trilha 1. O
 restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
 é integração de UI, trabalho do mantenedor (R31), não spec de agente.
@@ -212,12 +212,12 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 | — | [0053](0053-mobile-tela-de-foto.md) — Mobile: tela de foto do animal 🏗️ | — | ✅ [#187](https://github.com/welz-gui/AgroTop/pull/187) | | 2026-08-23 |
 | — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) + [#227](https://github.com/welz-gui/AgroTop/pull/227) (golden do critério 5) | | 2026-08-24 |
 | — | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | ✅ [#233](https://github.com/welz-gui/AgroTop/pull/233) | | 2026-08-24 |
-| 1 | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | — | 🟢 disponível — **0054 já mesclada**, pode testar contra a API real | | 2026-08-24 |
-| 2 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟢 disponível — sem dependência, não toca API | | 2026-08-24 |
-| 3 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
-| 4 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
-| 5 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
-| 6 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
+| — | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | `feat/mobile-confirmacao-de-trato` | ✅ [#242](https://github.com/welz-gui/AgroTop/pull/242) | | 2026-08-26 |
+| 1 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟡 [PR #240](https://github.com/welz-gui/AgroTop/pull/240) aberto, aguardando revisão | | 2026-08-24 |
+| 2 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟡 [PR #241](https://github.com/welz-gui/AgroTop/pull/241) aberto, aguardando revisão | | 2026-08-24 |
+| 3 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
+| 4 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 5 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -228,12 +228,25 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 > acontece com insumo vinculado de verdade) e suíte inteira do projeto (753 testes) rodadas
 > num worktree isolado antes de mesclar.
 >
-> **0055 continua disponível** — agora com a API real mesclada, não precisa mais só de
-> mock. **Trato é por piquete, não por animal** — a tela mobile não entra na ficha do
-> animal, tem ponto de entrada próprio (ver a spec). **Carrega uma lição explícita da
-> 0051**: o critério de golden tests exige os PNGs de verdade gerados por
-> `flutter test --update-goldens`, não só o código do teste — se o agente não tiver Flutter
-> disponível, a instrução é parar e reportar, não abrir a PR alegando o critério cumprido.
+> **0055 concluída em 2026-08-26 — [PR #242](https://github.com/welz-gui/AgroTop/pull/242).**
+> Botão de trato (com badge de pendências) no `AppBar` da lista de animais, abrindo a tela
+> agrupada por piquete, contra a API real da 0054. Implementação original do Codex; a
+> geração dos golden tests travou a entrega (regeneração no Windows reescrevia PNGs
+> pré-existentes que não deveriam mudar — mesma lição da 0051) e foi finalizada no mesmo
+> container Docker (`ubuntu:24.04` + Flutter 3.44.8, igual ao pin do CI) já usado para
+> fechar o critério 5 da 0051. Só as 3 variantes de tema da tela **lista** (realmente
+> afetada pelo botão novo) e as 2 telas novas de trato ganharam golden — as outras 9
+> pré-existentes continuam byte-idênticas ao `origin/main`.
+>
+> **Achado à parte, sem relação com o código:** durante a revisão, o Codex retomou e
+> trabalhou **no mesmo worktree** que estava sendo usado para fechar os goldens, ao mesmo
+> tempo — escrita concorrente na mesma pasta (mais arriscado que colisão de branch, que já
+> era protegida). Um efeito colateral real: um `flutter build` local dentro desse worktree
+> bagunçou o `pubspec.lock` com versões de dependência diferentes das que o container/CI
+> usa; foi corrigido regenerando o lock no mesmo container antes do commit final. Não gerou
+> ajuste de processo novo — já não se deve reutilizar o worktree de uma tarefa que outra
+> sessão está fechando; ver seção "Como uma tarefa é atribuída" e a Variante C do
+> [README.md](README.md) para o fluxo recomendado.
 
 > **0056/0057/0058 escritas em 2026-08-24 — fecham o resto do escopo original de Mobile v1
 > online.** Duas frentes independentes entre si (podem ser pegas em paralelo, sem colisão
