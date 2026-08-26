@@ -28,6 +28,7 @@ from backend_api.config import (
     TOKEN_ISSUER,
     get_secret_key,
 )
+from backend_api.idempotency import get_cached_response, store_response
 from backend_api.main import app, limiter
 from backend_api.schemas import ConfirmarTratoInput
 from repositories.animais import get_all_animals, get_animal
@@ -1006,6 +1007,195 @@ class TestTratoEndpoint(BackendApiTestCase):
         self.assertNotIn("UPDATE insumos SET current_stock", source)
         for field in ("lote_id", "insumo_id", "quantity_unit"):
             self.assertNotIn(field, ConfirmarTratoInput.model_fields)
+
+
+class TestIdempotency(BackendApiTestCase):
+    """Testes de idempotência nos endpoints de escrita (Spec 0059 / ADR 0006)."""
+
+    def test_idempotency_module_functions(self):
+        """Valida o funcionamento direto de get_cached_response e store_response."""
+        self.assertIsNone(get_cached_response(""))
+        self.assertIsNone(get_cached_response(None))
+        self.assertIsNone(get_cached_response("nonexistent-key"))
+
+        store_response("test-key-1", "/test/endpoint", 201, {"msg": "ok", "id": 123})
+        cached = get_cached_response("test-key-1")
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached["status_code"], 201)
+        self.assertEqual(cached["response_body"], {"msg": "ok", "id": 123})
+
+    def test_pesagem_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 2: POST /animais/{id}/pesagens com mesma Idempotency-Key gera 1 linha em weighings e respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "pesagem-uuid-1"}
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        payload = {"peso": 450.5, "data": "2026-08-25", "method": "manual", "notes": "Pesagem teste idempotencia"}
+
+        res1 = self.client.post(f"/animais/{animal_id}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 201)
+        body1 = res1.json()
+
+        # Segunda chamada com a mesma chave
+        res2 = self.client.post(f"/animais/{animal_id}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 201)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+
+        # Confere que existe apenas 1 pesagem gravada no banco
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM weighings WHERE notes = 'Pesagem teste idempotencia'").fetchall()
+            self.assertEqual(len(rows), 1)
+
+    def test_medicamentos_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 3: POST /animais/{id}/medicamentos com mesma Idempotency-Key gera 1 linha em medications e respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "med-uuid-1"}
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        payload = {
+            "medicamento": "Vacina Aftosa",
+            "dose": 5.0,
+            "unidade": "ml",
+            "via": "subcutanea",
+            "carencia_dias": 15,
+            "data": "2026-08-25",
+            "notas": "Dose de rotina idempotente",
+        }
+
+        res1 = self.client.post(f"/animais/{animal_id}/medicamentos", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 201)
+        body1 = res1.json()
+
+        res2 = self.client.post(f"/animais/{animal_id}/medicamentos", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 201)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM medications WHERE notes = 'Dose de rotina idempotente'").fetchall()
+            self.assertEqual(len(rows), 1)
+
+    def test_movimentar_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 3: POST /animais/movimentar com mesma Idempotency-Key executa uma vez e retorna respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "mov-uuid-1"}
+        animais = get_all_animals()
+        lotes = db.get_all_lotes()
+        origem_id = lotes[0]["id"]
+        destino_id = str(lotes[1]["id"])
+        a1_id = animais[0]["id"]
+        a2_id = animais[1]["id"]
+
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id IN (?, ?)", (origem_id, a1_id, a2_id))
+
+        payload = {
+            "animal_ids": [a1_id, a2_id],
+            "to_lote_id": destino_id,
+            "movement_date": "2026-08-25",
+            "reason": "Manejo rotina",
+            "notes": "Idempotency test movimentar",
+        }
+
+        res1 = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 200)
+        body1 = res1.json()
+
+        res2 = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 200)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM animal_movements WHERE notes = 'Idempotency test movimentar'").fetchall()
+            self.assertEqual(len(rows), 2)  # 2 animais movidos na única execução
+
+    def test_fotos_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 3: POST /animais/{id}/fotos com mesma Idempotency-Key gera 1 foto em animal_photos e respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "foto-uuid-1"}
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        animal_uuid = animal.get("uuid") or animal.get("animal_uuid")
+        photo_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xff\xdb\x00C\x00"
+
+        res1 = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("foto.jpg", photo_bytes, "image/jpeg")},
+            data={"taken_date": "2026-08-25"},
+            headers=headers,
+        )
+        self.assertEqual(res1.status_code, 201)
+        body1 = res1.json()
+
+        res2 = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("foto.jpg", photo_bytes, "image/jpeg")},
+            data={"taken_date": "2026-08-25"},
+            headers=headers,
+        )
+        self.assertEqual(res2.status_code, 201)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+        self.assertEqual(body1["id"], body2["id"])
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM animal_photos WHERE animal_uuid = ?", (animal_uuid,)).fetchall()
+            self.assertEqual(len(rows), 1)
+
+    def test_chaves_diferentes_fazem_duas_escritas_normais(self):
+        """Critério 4: Duas chamadas com chaves diferentes fazem duas escritas normais."""
+        token = self._get_access_token()
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        payload = {"peso": 460.0, "data": "2026-08-25", "method": "manual", "notes": "Pesagem diff key"}
+
+        res1 = self.client.post(
+            f"/animais/{animal_id}/pesagens",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "key-alpha"},
+        )
+        self.assertEqual(res1.status_code, 201)
+
+        res2 = self.client.post(
+            f"/animais/{animal_id}/pesagens",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "key-beta"},
+        )
+        self.assertEqual(res2.status_code, 201)
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM weighings WHERE notes = 'Pesagem diff key'").fetchall()
+            self.assertEqual(len(rows), 2)
+
+    def test_chamada_que_falha_nao_grava_chave_e_permite_tentativa_com_mesma_chave(self):
+        """Critério 5: Chamada com erro (ex. 404) não grava a chave; retry com mesma chave executa normalmente."""
+        token = self._get_access_token()
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "fail-then-retry-key"}
+        payload = {"peso": 470.0, "data": "2026-08-25", "method": "manual"}
+
+        # Primeira chamada falha com 404 (animal inexistente)
+        res_fail = self.client.post("/animais/999999/pesagens", json=payload, headers=headers)
+        self.assertEqual(res_fail.status_code, 404)
+
+        # Confirma que a chave NÃO foi gravada em cache
+        self.assertIsNone(get_cached_response("fail-then-retry-key"))
+
+        # Segunda chamada com animal válido e a MESMA chave tem sucesso (201)
+        res_success = self.client.post(f"/animais/{animal_id}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res_success.status_code, 201)
+
+        # Agora a chave foi gravada com sucesso
+        cached = get_cached_response("fail-then-retry-key")
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached["status_code"], 201)
 
 
 class TestSecurityAndIsolation(unittest.TestCase):

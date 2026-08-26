@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any, Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -24,6 +24,7 @@ from backend_api.auth import (
     verify_refresh_token,
 )
 from backend_api.config import ACCESS_TOKEN_EXPIRE_SECONDS
+from backend_api.idempotency import get_cached_response, store_response
 from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
@@ -208,8 +209,17 @@ def register_pesagem(
     animal_id: str,
     data: PesagemInput,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
-) -> PesagemOutput:
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> Any:
     """Registra uma nova pesagem para o animal autenticado pelo operador."""
+    endpoint = f"/animais/{animal_id}/pesagens"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     try:
         add_weighing(
             animal_id=animal_id,
@@ -225,13 +235,17 @@ def register_pesagem(
             detail=str(exc),
         )
 
-    return PesagemOutput(
-        status="success",
-        message="Pesagem registrada com sucesso.",
-        animal_id=animal_id,
-        peso=data.peso,
-        data=data.data,
-    )
+    out = {
+        "status": "success",
+        "message": "Pesagem registrada com sucesso.",
+        "animal_id": animal_id,
+        "peso": data.peso,
+        "data": data.data,
+    }
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+
+    return out
 
 
 @app.get("/lotes", response_model=list[LoteSummary])
@@ -255,8 +269,17 @@ def list_lotes(
 def movimentar_animais(
     data: MovimentarInput,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, list[str]]:
     """Transfere um ou mais animais para outro piquete (em lote)."""
+    endpoint = "/animais/movimentar"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     motivo = data.reason or "manejo"
     observacoes = data.notes or ""
     operador = user.get("username", "")
@@ -269,17 +292,28 @@ def movimentar_animais(
         operator=operador,
         notes=observacoes,
     )
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_200_OK, resultado)
     return resultado
 
 
 @app.post("/animais/{animal_id}/fotos", response_model=PhotoUploadOutput, status_code=status.HTTP_201_CREATED)
 def upload_animal_photo(
     animal_id: str,
+    response: Response,
     arquivo: UploadFile = File(...),
     taken_date: Optional[str] = Form(None),
     user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, int]:
     """Envia uma foto do animal (JPEG ou PNG, até 5 MB)."""
+    endpoint = f"/animais/{animal_id}/fotos"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     content_type = (arquivo.content_type or "").lower().strip()
     if content_type not in ALLOWED_PHOTO_MIMES:
         raise HTTPException(
@@ -315,7 +349,11 @@ def upload_animal_photo(
     if not photos:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao recuperar foto salva.")
 
-    return {"id": photos[0]["id"]}
+    out = {"id": photos[0]["id"]}
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+
+    return out
 
 
 @app.get("/animais/{animal_id}/fotos", response_model=list[PhotoSummary])
@@ -486,8 +524,17 @@ def register_medicamento(
     animal_id: str,
     data: MedicamentoInput,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, Optional[str]]:
     """Registra uma aplicação individual sem movimentar estoque."""
+    endpoint = f"/animais/{animal_id}/medicamentos"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     try:
         add_medication(
             animal_id=animal_id,
@@ -509,4 +556,7 @@ def register_medicamento(
         )
 
     carencia_ate = get_withdrawal_end(animal_id)
-    return {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
+    out = {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+    return out

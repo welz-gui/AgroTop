@@ -954,6 +954,14 @@ _SCHEMA_SQL = """
             );
             CREATE INDEX IF NOT EXISTS idx_api_refresh_tokens_user
                 ON api_refresh_tokens (user_id);
+
+            CREATE TABLE IF NOT EXISTS api_idempotency_keys (
+                idempotency_key TEXT PRIMARY KEY,
+                endpoint        TEXT NOT NULL,
+                status_code     INTEGER NOT NULL,
+                response_body   TEXT NOT NULL,
+                created_at      TEXT DEFAULT (datetime('now','localtime'))
+            );
 """
 
 def init_db() -> None:
