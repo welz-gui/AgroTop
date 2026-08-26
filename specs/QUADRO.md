@@ -218,6 +218,8 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 | 3 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
 | 4 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
 | 5 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
+| 6 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
+| 7 | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -287,6 +289,23 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 > - A 0060 pode ser pega em paralelo com a 0059 (contra mock), mas a deduplicação de
 >   verdade só existe depois que a 0059 mesclar — a spec pede para isso ficar explícito no
 >   PR.
+
+> **0061/0062 escritas em 2026-08-26 — achados de teste real em aparelho Android**, contra
+> a API rodando em produção (Supabase). Duas correções pequenas e independentes entre si:
+> - **0061** troca o campo de método de pesagem (texto livre) por uma seleção fixa das 3
+>   opções que o web já usa (`WEIGH_METHODS`) — evita typo virando um "método" novo e
+>   inconsistente nos relatórios.
+> - **0062** alinha o default do checkbox "baixar do estoque" na confirmação de trato ao
+>   que o app web já faz (marcado por padrão quando o item tem `insumo_id`) e adiciona um
+>   atalho de confirmação de um toque para o caso comum — o mobile tinha nascido com o
+>   default oposto (desmarcado), forçando o operador a marcar toda vez.
+>
+> **Achado à parte, sem spec associada:** a seleção de medicamento/vacina por protocolo
+> (com dose sugerida por peso e carência) **já existe** de ponta a ponta — mobile
+> (`medication_page.dart`) e servidor (`dose_for_animal`) — mas pareceu quebrada porque a
+> tabela `health_protocols` estava vazia em produção **e** a tela de cadastro
+> (`app.py::page_sanitario`, aba "⚙️ Protocolos") nunca tinha sido usada. Não é bug, não
+> precisa de spec — precisa é cadastrar os protocolos pela tela que já existe.
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
