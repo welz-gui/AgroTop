@@ -298,9 +298,16 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 >    git ls-remote --heads origin                        # ver o que já está tomado
 >    git push origin HEAD:refs/heads/<branch-da-spec>    # reivindicar — ATÔMICO
 >    ```
->    Se o push falhar dizendo que a referência já existe, a tarefa está tomada:
->    **PARE e avise quem te instruiu. NÃO pegue outra tarefa** — pegar outra faz você
->    executar duas numa sessão, uma delas jogada fora, e esconde a colisão de quem coordena.
+>    Se o push falhar dizendo que a referência já existe, a tarefa está tomada. **Como este
+>    é o primeiro comando, você ainda não fez nenhum trabalho — relate a colisão (qual
+>    spec/branch já estava tomado, para quem coordena não perder visibilidade) e volte ao
+>    passo 1 para tentar a próxima tarefa livre da fila.** Pular aqui é grátis. Repita até
+>    conseguir reivindicar uma; se **nenhuma** da fila estiver livre, **PARE e avise quem te
+>    instruiu** — não invente tarefa fora da fila. (Esta regra vale só *antes* de trabalhar:
+>    se você já tivesse lido a spec ou escrito código antes de reivindicar — o que a ordem
+>    destes passos não deveria permitir — a instrução seria parar, nunca pular para outra
+>    depois de já ter trabalhado; ver `QUADRO.md` sobre por que "pegue a próxima" era errado
+>    *depois* de já ter feito o trabalho.)
 >    Não edite o quadro — quem atualiza é o mantenedor.
 > 3. Leia a spec da tarefa por inteiro. O escopo é fechado.
 > 4. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
@@ -405,6 +412,120 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 > **Por último, e não esqueça: remova o worktree** — `ExitWorktree` com ação `keep`, ou
 > `git worktree remove <caminho>`. Worktree abandonado **segura o branch** e impede o
 > mantenedor de trabalhar nele. Já aconteceu cinco vezes.
+
+#### Variante C — protocolo passo a passo, ordem travada (autocontida)
+
+Mesma lógica da Variante A + a seção "Continuação" acima, só que em passos numerados e
+travados na ordem — útil para ferramentas que não seguem bem um prompt em várias seções, ou
+quando você quer o texto inteiro num bloco só, sem precisar juntar pedaços deste arquivo.
+
+> Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
+> AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
+>
+> Siga os passos NA ORDEM. Não pule para o passo 5 antes de terminar o 4.
+>
+> **PASSO 1 — prove que está dentro do worktree**
+> ```
+> git rev-parse --show-toplevel
+> test "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" \
+>   && echo "OK: dentro de um worktree" \
+>   || echo "PARE: esta e a pasta principal"
+> ```
+> Se der `PARE`, não continue: crie o worktree e entre nele. Já houve agente escrevendo no
+> checkout do mantenedor achando estar isolado.
+>
+> **PASSO 2 — atualize e leia a fila**
+> ```
+> git fetch origin
+> ```
+> Abra `specs/QUADRO.md` e pegue a **primeira tarefa com número de ordem**. As concluídas
+> estão marcadas ✅ e não têm número.
+>
+> **PASSO 3 — confirme no GitHub que a tarefa está mesmo livre**
+>
+> O quadro é mantido à mão e ATRASA. Faça as duas conferências abaixo para a tarefa que você
+> escolheu. Em (a), `<branch-da-spec>` é o valor **exato** do campo `Branch:` no cabeçalho da
+> spec — não um nome de worktree/sessão que sua ferramenta gera sozinha (ex.: o Codex usa
+> `codex/queue-<data>` por padrão; isso já causou duas ferramentas trabalharem na mesma spec
+> sem se detectarem — incidente de 2026-08-24/25 em `QUADRO.md`).
+> ```
+> # (a) alguém já reivindicou este branch?
+> git ls-remote --heads origin <branch-da-spec>
+>
+> # (b) o arquivo que a spec manda criar já existe?
+> git cat-file -e origin/main:<arquivo-que-a-spec-manda-criar> 2>/dev/null \
+>   && echo "JA FEITA" || echo "nao feita"
+> ```
+> Se (a) retornar alguma linha, OU (b) disser JA FEITA: essa tarefa está tomada ou
+> concluída. **Relate isso** (qual spec já estava tomada/feita, para quem coordena não
+> perder visibilidade) e **VOLTE AO PASSO 2**, pegando a próxima da fila.
+>
+> Pular de tarefa AQUI é de graça, porque você ainda não trabalhou. Repita quantas vezes
+> precisar até achar uma livre. Se a fila acabar sem nenhuma livre, PARE e avise quem te
+> instruiu.
+>
+> **PASSO 4 — reivindique, de forma atômica**
+> ```
+> git push origin HEAD:refs/heads/<branch-da-spec>
+> ```
+> Use o nome **exato** do campo `Branch:` da spec, mesmo que sua ferramenta já tenha criado
+> automaticamente um branch com outro nome — esta ref é o que outras ferramentas de agente
+> verificam para saber se a tarefa está tomada.
+>
+> Se este push falhar dizendo que a referência já existe, outro agente ganhou a corrida nos
+> últimos segundos: relate qual branch já estava tomado e **VOLTE AO PASSO 2**. Ainda é de
+> graça.
+>
+> Só depois deste push ter dado certo você tem a tarefa.
+>
+> **PASSO 5 — agora sim, trabalhe**
+>
+> 1. Leia `specs/<arquivo-da-spec>.md` por inteiro. O escopo é fechado.
+> 2. Leia a seção **"Regras válidas para TODAS as specs"** neste arquivo.
+> 3. **Se a tarefa tocar `mobile/`**, leia também a seção **"📱 Ambiente Flutter local"**
+>    neste arquivo — o toolchain (Flutter + Android SDK + JDK) já está instalado localmente
+>    e tem pegadinhas reais documentadas (path com acento quebra o analysis server — use a
+>    junction documentada) que custam tempo se você não ler antes.
+> 4. Leia `ROADMAP.md` seções 2 e 3. `DESIGN.md` se a tarefa tocar interface.
+>
+> Faça **apenas** o que a spec pede. Se identificar outro problema, **anote no PR em vez de
+> corrigir**. Se a spec fixar a assinatura de uma função, respeite-a **exatamente**.
+>
+> ⚠️ **A PARTIR DAQUI**, se descobrir qualquer colisão, **PARE e avise. NÃO pegue outra
+> tarefa.** Depois de ter trabalhado, trocar de tarefa significa fazer duas numa sessão e
+> jogar uma fora.
+>
+> **PASSO 6 — antes de abrir o PR**
+> ```
+> AGROTOP_FORCE_SQLITE=1 python -m unittest discover -s tests -t . -v
+> python -m compileall app.py database.py repositories services ui tests tools
+> git diff --stat origin/main
+> ```
+> O `-t .` não é opcional (ROADMAP R16) e o `AGROTOP_FORCE_SQLITE=1` é a segunda trava: sem
+> os dois, os testes podem conectar no banco de produção. No diff, só devem aparecer os
+> arquivos que a spec pediu — não altere `specs/`, `ROADMAP.md` nem `README.md`.
+>
+> **Se a tarefa tocar `mobile/`**, rode também os testes Flutter (comandos na seção
+> "📱 Ambiente Flutter local" acima) — inclusive golden tests **sem** `--update-goldens`
+> contra os PNGs que você gerou, antes de assumir que passam. Se não tiver Flutter
+> disponível no seu ambiente, **PARE e reporte isso** — nunca alegue o critério de golden
+> test cumprido sem os `.png` de verdade no diff.
+>
+> **PASSO 7 — entregue**
+>
+> Abra o PR para `main`, **PRONTO PARA REVISÃO**, nunca como rascunho.
+>
+> Cole no seu relatório a URL COMPLETA que o `gh pr create` devolveu. Confirme com:
+> ```
+> gh pr view --json number,url
+> ```
+> Não invente nem estime o número. Se o comando falhar, diga que falhou e por quê.
+>
+> **PASSO 8 — não esqueça**
+>
+> Remova o worktree: `ExitWorktree` com ação `keep`, ou `git worktree remove <caminho>`.
+> Worktree abandonado segura o branch e impede o mantenedor de trabalhar nele. Já aconteceu
+> sete vezes.
 
 ### Ao terminar
 
