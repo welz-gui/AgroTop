@@ -4,6 +4,7 @@ import '../api_client.dart';
 import '../app.dart';
 import '../models.dart';
 import 'animal_photo_section.dart';
+import 'feeding_page.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
 import 'weighing_page.dart';
@@ -37,11 +38,28 @@ class _AnimalsPageState extends State<AnimalsPage> {
   String _query = '';
   bool _selecting = false;
   final _selectedIds = <String>{};
+  int? _pendingFeedings;
 
   @override
   void initState() {
     super.initState();
     _load(reset: true);
+    _loadPendingFeedings();
+  }
+
+  Future<void> _loadPendingFeedings() async {
+    try {
+      final feedings = await widget.api.listPendingFeedings();
+      if (mounted) {
+        setState(
+          () => _pendingFeedings = feedings
+              .where((feeding) => !feeding.confirmadoNoPeriodo)
+              .length,
+        );
+      }
+    } catch (_) {
+      // A lista de animais continua útil sem a contagem de trato.
+    }
   }
 
   Future<void> _load({required bool reset}) async {
@@ -130,12 +148,23 @@ class _AnimalsPageState extends State<AnimalsPage> {
     }
   }
 
+  Future<void> _openFeeding() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) =>
+            FeedingPage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+      ),
+    );
+    if (mounted) _loadPendingFeedings();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Animais ativos'),
       actions: [
         ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
+        _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
         IconButton(
           onPressed: _logout,
           tooltip: 'Sair',
@@ -295,6 +324,52 @@ class _AnimalsPageState extends State<AnimalsPage> {
       ),
     );
   }
+}
+
+class _FeedingButton extends StatelessWidget {
+  const _FeedingButton({required this.pendingCount, required this.onPressed});
+
+  final int? pendingCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      IconButton(
+        key: const ValueKey('open-feeding'),
+        onPressed: onPressed,
+        tooltip: 'Trato do dia',
+        icon: const Icon(Icons.grass_outlined),
+      ),
+      if (pendingCount != null && pendingCount! > 0)
+        Positioned(
+          right: 5,
+          top: 4,
+          child: Semantics(
+            label: '$pendingCount pendências de trato',
+            child: Container(
+              key: const ValueKey('pending-feeding-badge'),
+              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$pendingCount',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onError,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 class AnimalDetailPage extends StatefulWidget {
@@ -585,7 +660,9 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                       for (final app in medications.aplicacoes)
                         ListTile(
                           leading: const Icon(Icons.medication_outlined),
-                          title: Text('${app.medicamento} · ${app.dose} ${app.unidade}'),
+                          title: Text(
+                            '${app.medicamento} · ${app.dose} ${app.unidade}',
+                          ),
                           subtitle: Text(
                             '${app.data} · Via ${app.via}'
                             '${app.carenciaDias > 0 ? ' · Carência: ${app.carenciaDias}d' : ''}',
