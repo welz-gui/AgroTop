@@ -218,8 +218,8 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 | — | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | `feat/mobile-confirmacao-de-trato` | ✅ [#242](https://github.com/welz-gui/AgroTop/pull/242) | | 2026-08-26 |
 | 1 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟡 [PR #240](https://github.com/welz-gui/AgroTop/pull/240) aberto, aguardando revisão | | 2026-08-24 |
 | 2 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟡 [PR #241](https://github.com/welz-gui/AgroTop/pull/241) aberto, aguardando revisão | | 2026-08-24 |
-| 3 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | 🟢 disponível — depende da 0057 (só o contrato, pode mockar) | | 2026-08-24 |
-| 4 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-08-24 |
+| 3 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | `feat/mobile-importacao-de-pesagens-csv` | 🟡 branch reivindicado, em andamento (sem PR ainda) | | 2026-08-24 |
+| 4 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟡 [PR #247](https://github.com/welz-gui/AgroTop/pull/247) aberto, aguardando revisão | | 2026-08-24 |
 | 5 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
 | 6 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
 | 7 | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
