@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../models.dart';
+import '../offline_queue.dart';
+import '../shallow_cache.dart';
+import 'offline_cache_banner.dart';
 
 class MovementPage extends StatefulWidget {
   const MovementPage({
@@ -10,12 +13,16 @@ class MovementPage extends StatefulWidget {
     required this.animalIds,
     required this.onUnauthorized,
     this.initialDate,
+    this.offlineQueue,
+    this.shallowCache,
   });
 
   final ApiClient api;
   final List<String> animalIds;
   final VoidCallback onUnauthorized;
   final DateTime? initialDate;
+  final OfflineQueue? offlineQueue;
+  final ShallowCache? shallowCache;
 
   @override
   State<MovementPage> createState() => _MovementPageState();
@@ -24,19 +31,42 @@ class MovementPage extends StatefulWidget {
 class _MovementPageState extends State<MovementPage> {
   late final Future<List<LoteSummary>> _lotes;
   late final TextEditingController _date;
+  late final OfflineQueue _offlineQueue;
+  late final ShallowCache? _shallowCache;
   final _notes = TextEditingController();
   String? _selectedLoteId;
   bool _saving = false;
   String? _error;
   MovementResult? _result;
+  String? _lotesFromCacheTime;
 
   @override
   void initState() {
     super.initState();
-    _lotes = widget.api.listLotes();
+    _offlineQueue = widget.offlineQueue ?? OfflineQueue();
+    _shallowCache = widget.shallowCache;
+    _lotes = _loadLotes();
     _date = TextEditingController(
       text: _formatDate(widget.initialDate ?? DateTime.now()),
     );
+  }
+
+  Future<List<LoteSummary>> _loadLotes() async {
+    try {
+      final lotes = await widget.api.listLotes();
+      await _shallowCache?.saveLotes(lotes);
+      _lotesFromCacheTime = null;
+      return lotes;
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      final cached = _shallowCache?.getLotes();
+      if (cached != null) {
+        _lotesFromCacheTime = cached.formattedTime;
+        return cached.data;
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -80,12 +110,15 @@ class _MovementPageState extends State<MovementPage> {
       _saving = true;
       _error = null;
     });
+    final toLote = _selectedLoteId!;
+    final dateVal = _date.text;
+    final notesVal = _notes.text.trim().isEmpty ? null : _notes.text.trim();
     try {
       final result = await widget.api.moveAnimals(
         animalIds: widget.animalIds,
-        toLoteId: _selectedLoteId!,
-        movementDate: _date.text,
-        notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+        toLoteId: toLote,
+        movementDate: dateVal,
+        notes: notesVal,
       );
       if (mounted) setState(() => _result = result);
     } on ApiException catch (error) {
@@ -97,11 +130,19 @@ class _MovementPageState extends State<MovementPage> {
         setState(() => _error = error.message);
       }
     } catch (_) {
+      await _offlineQueue.enqueueMovement(
+        animalIds: widget.animalIds,
+        toLoteId: toLote,
+        movementDate: dateVal,
+        notes: notesVal,
+      );
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Salvo. Será enviado quando houver conexão.'),
+          ),
         );
+        Navigator.of(context).pop(true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -151,6 +192,10 @@ class _MovementPageState extends State<MovementPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (_lotesFromCacheTime != null) ...[
+              OfflineCacheBanner(formattedTime: _lotesFromCacheTime!),
+              const SizedBox(height: 16),
+            ],
             Text(
               widget.animalIds.length == 1
                   ? 'Animal selecionado: ${widget.animalIds.single}'

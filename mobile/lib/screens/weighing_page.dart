@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../models.dart';
+import '../offline_queue.dart';
 
 class WeighingPage extends StatefulWidget {
   const WeighingPage({
@@ -10,12 +11,14 @@ class WeighingPage extends StatefulWidget {
     required this.animalId,
     required this.onUnauthorized,
     this.initialDate,
+    this.offlineQueue,
   });
 
   final ApiClient api;
   final String animalId;
   final VoidCallback onUnauthorized;
   final DateTime? initialDate;
+  final OfflineQueue? offlineQueue;
 
   @override
   State<WeighingPage> createState() => _WeighingPageState();
@@ -26,12 +29,14 @@ class _WeighingPageState extends State<WeighingPage> {
   final _weight = TextEditingController();
   final _method = TextEditingController(text: 'pesado');
   late final TextEditingController _date;
+  late final OfflineQueue _offlineQueue;
   bool _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _offlineQueue = widget.offlineQueue ?? OfflineQueue();
     _date = TextEditingController(
       text: _formatDate(widget.initialDate ?? DateTime.now()),
     );
@@ -78,12 +83,15 @@ class _WeighingPageState extends State<WeighingPage> {
       _saving = true;
       _error = null;
     });
+    final pesoVal = double.parse(_weight.text.replaceFirst(',', '.'));
+    final dataVal = _date.text.trim();
+    final methodVal = _method.text.trim();
     try {
       final result = await widget.api.registerWeighing(
         widget.animalId,
-        peso: double.parse(_weight.text.replaceFirst(',', '.')),
-        data: _date.text,
-        method: _method.text.trim(),
+        peso: pesoVal,
+        data: dataVal,
+        method: methodVal,
       );
       if (mounted) Navigator.of(context).pop<WeighingResult>(result);
     } on ApiException catch (error) {
@@ -95,11 +103,19 @@ class _WeighingPageState extends State<WeighingPage> {
         setState(() => _error = error.message);
       }
     } catch (_) {
+      await _offlineQueue.enqueueWeighing(
+        animalId: widget.animalId,
+        peso: pesoVal,
+        data: dataVal,
+        method: methodVal,
+      );
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Salvo. Será enviado quando houver conexão.'),
+          ),
         );
+        Navigator.of(context).pop(true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

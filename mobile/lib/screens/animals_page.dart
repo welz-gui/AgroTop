@@ -1,14 +1,18 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../app.dart';
 import '../models.dart';
+import '../offline_queue.dart';
+import '../shallow_cache.dart';
 import 'animal_photo_section.dart';
 import 'csv_import_page.dart';
 import 'feeding_page.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
+import 'offline_cache_banner.dart';
 import 'qr_scanner_page.dart';
+import 'sync_report_dialog.dart';
 import 'weighing_page.dart';
 
 class AnimalsPage extends StatefulWidget {
@@ -19,6 +23,8 @@ class AnimalsPage extends StatefulWidget {
     required this.onThemeChanged,
     required this.onUnauthorized,
     this.qrScannerBuilder,
+    this.offlineQueue,
+    this.shallowCache,
   });
 
   final ApiClient api;
@@ -26,15 +32,20 @@ class AnimalsPage extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeChanged;
   final VoidCallback onUnauthorized;
   final QrScannerBuilder? qrScannerBuilder;
+  final OfflineQueue? offlineQueue;
+  final ShallowCache? shallowCache;
 
   @override
   State<AnimalsPage> createState() => _AnimalsPageState();
 }
 
-class _AnimalsPageState extends State<AnimalsPage> {
+class _AnimalsPageState extends State<AnimalsPage>
+    with WidgetsBindingObserver {
   static const _pageSize = 50;
 
   final _animals = <AnimalSummary>[];
+  late final OfflineQueue _offlineQueue;
+  late final ShallowCache? _shallowCache;
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -43,12 +54,59 @@ class _AnimalsPageState extends State<AnimalsPage> {
   bool _selecting = false;
   final _selectedIds = <String>{};
   int? _pendingFeedings;
+  int _pendingQueueCount = 0;
+  String? _cachedTime;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _offlineQueue = widget.offlineQueue ?? OfflineQueue();
+    _shallowCache = widget.shallowCache;
     _load(reset: true);
     _loadPendingFeedings();
+    _loadPendingQueueCount();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncQueue(manual: false);
+    }
+  }
+
+  Future<void> _loadPendingQueueCount() async {
+    try {
+      final count = await _offlineQueue.countPending();
+      if (mounted) {
+        setState(() => _pendingQueueCount = count);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _syncQueue({required bool manual}) async {
+    try {
+      final report = await _offlineQueue.sync(widget.api);
+      await _loadPendingQueueCount();
+      if (report.sincronizados.isNotEmpty && mounted) {
+        await _load(reset: true);
+        _loadPendingFeedings();
+      }
+      if (manual && mounted) {
+        showDialog<void>(
+          context: context,
+          builder: (_) => SyncReportDialog(report: report),
+        );
+      }
+    } catch (_) {
+      await _loadPendingQueueCount();
+    }
   }
 
   Future<void> _loadPendingFeedings() async {
@@ -81,11 +139,15 @@ class _AnimalsPageState extends State<AnimalsPage> {
         limit: _pageSize,
       );
       if (!mounted) return;
+      if (reset && _shallowCache != null) {
+        await _shallowCache.saveAnimals(page);
+      }
       setState(() {
         if (reset) _animals.clear();
         _animals.addAll(page);
         _hasMore = page.length == _pageSize;
         _error = null;
+        _cachedTime = null;
       });
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -93,9 +155,35 @@ class _AnimalsPageState extends State<AnimalsPage> {
         widget.onUnauthorized();
         return;
       }
+      if (reset && _shallowCache != null) {
+        final cached = _shallowCache.getAnimals();
+        if (cached != null && cached.data.isNotEmpty) {
+          setState(() {
+            _animals.clear();
+            _animals.addAll(cached.data);
+            _hasMore = false;
+            _cachedTime = cached.formattedTime;
+            _error = null;
+          });
+          return;
+        }
+      }
       setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
+        if (reset && _shallowCache != null) {
+          final cached = _shallowCache.getAnimals();
+          if (cached != null && cached.data.isNotEmpty) {
+            setState(() {
+              _animals.clear();
+              _animals.addAll(cached.data);
+              _hasMore = false;
+              _cachedTime = cached.formattedTime;
+              _error = null;
+            });
+            return;
+          }
+        }
         setState(
           () => _error =
               'API indisponível. Verifique a conexão e tente novamente.',
@@ -143,11 +231,14 @@ class _AnimalsPageState extends State<AnimalsPage> {
           api: widget.api,
           animalIds: animalIds,
           onUnauthorized: widget.onUnauthorized,
+          offlineQueue: _offlineQueue,
+          shallowCache: _shallowCache,
         ),
       ),
     );
     if (moved == true && mounted) {
       _stopSelecting();
+      await _loadPendingQueueCount();
       await _load(reset: true);
     }
   }
@@ -194,6 +285,10 @@ class _AnimalsPageState extends State<AnimalsPage> {
           tooltip: 'Importar pesagens',
           icon: const Icon(Icons.upload_file_outlined),
         ),
+        _SyncQueueButton(
+          pendingCount: _pendingQueueCount,
+          onPressed: () => _syncQueue(manual: true),
+        ),
         IconButton(
           onPressed: _logout,
           tooltip: 'Sair',
@@ -236,6 +331,11 @@ class _AnimalsPageState extends State<AnimalsPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
+          if (_cachedTime != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OfflineCacheBanner(formattedTime: _cachedTime!),
+            ),
           TextField(
             key: const ValueKey('animal-search'),
             decoration: InputDecoration(
@@ -298,19 +398,12 @@ class _AnimalsPageState extends State<AnimalsPage> {
             for (final animal in filtered) ...[
               Card(
                 child: ListTile(
-                  minVerticalPadding: 14,
                   leading: CircleAvatar(
-                    child: _selecting
-                        ? Icon(
-                            _selectedIds.contains(animal.id)
-                                ? Icons.check
-                                : Icons.circle_outlined,
-                          )
-                        : Text(
-                            animal.id.length > 4
-                                ? animal.id.substring(animal.id.length - 4)
-                                : animal.id,
-                          ),
+                    child: Text(
+                      animal.id.length > 4
+                          ? animal.id.substring(animal.id.length - 4)
+                          : animal.id,
+                    ),
                   ),
                   title: Text(animal.id),
                   subtitle: Text(
@@ -327,16 +420,23 @@ class _AnimalsPageState extends State<AnimalsPage> {
                   onLongPress: () => _startSelecting(animal.id),
                   onTap: _selecting
                       ? () => _toggleSelection(animal.id)
-                      : () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AnimalDetailPage(
-                              api: widget.api,
-                              id: animal.id,
-                              onUnauthorized: widget.onUnauthorized,
-                              onMovementCompleted: () => _load(reset: true),
+                      : () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => AnimalDetailPage(
+                                api: widget.api,
+                                id: animal.id,
+                                onUnauthorized: widget.onUnauthorized,
+                                onMovementCompleted: () => _load(reset: true),
+                                offlineQueue: _offlineQueue,
+                                shallowCache: _shallowCache,
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                          if (mounted) {
+                            await _loadPendingQueueCount();
+                          }
+                        },
                 ),
               ),
               const SizedBox(height: 8),
@@ -352,13 +452,65 @@ class _AnimalsPageState extends State<AnimalsPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.expand_more),
-                label: Text(_loadingMore ? 'Carregando…' : 'Carregar mais'),
+                label: Text(
+                  _loadingMore ? 'Carregando…' : 'Carregar mais',
+                ),
               ),
             ),
         ],
       ),
     );
   }
+}
+
+class _SyncQueueButton extends StatelessWidget {
+  const _SyncQueueButton({required this.pendingCount, required this.onPressed});
+
+  final int pendingCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      IconButton(
+        key: const ValueKey('sync-queue-button'),
+        onPressed: onPressed,
+        tooltip: pendingCount > 0
+            ? 'Fila offline ($pendingCount pendente${pendingCount == 1 ? "" : "s"})'
+            : 'Fila offline',
+        icon: Icon(
+          pendingCount > 0 ? Icons.cloud_upload_outlined : Icons.cloud_outlined,
+        ),
+      ),
+      if (pendingCount > 0)
+        Positioned(
+          right: 5,
+          top: 4,
+          child: Semantics(
+            label: '$pendingCount pendências na fila offline',
+            child: Container(
+              key: const ValueKey('pending-queue-badge'),
+              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$pendingCount',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 class _FeedingButton extends StatelessWidget {
@@ -414,12 +566,16 @@ class AnimalDetailPage extends StatefulWidget {
     required this.id,
     required this.onUnauthorized,
     required this.onMovementCompleted,
+    this.offlineQueue,
+    this.shallowCache,
   });
 
   final ApiClient api;
   final String id;
   final VoidCallback onUnauthorized;
   final VoidCallback onMovementCompleted;
+  final OfflineQueue? offlineQueue;
+  final ShallowCache? shallowCache;
 
   @override
   State<AnimalDetailPage> createState() => _AnimalDetailPageState();
@@ -428,65 +584,88 @@ class AnimalDetailPage extends StatefulWidget {
 class _AnimalDetailPageState extends State<AnimalDetailPage> {
   late Future<AnimalDetail> _detail;
   late Future<AnimalMedications> _medications;
+  late final OfflineQueue _offlineQueue;
+  late final ShallowCache? _shallowCache;
+  String? _detailCachedTime;
 
   @override
   void initState() {
     super.initState();
-    _detail = widget.api.getAnimal(widget.id);
-    _medications = widget.api.getAnimalMedications(widget.id);
+    _offlineQueue = widget.offlineQueue ?? OfflineQueue();
+    _shallowCache = widget.shallowCache;
+    _detail = _loadDetail();
+    _medications = _loadMedications();
+  }
+
+  Future<AnimalDetail> _loadDetail() async {
+    try {
+      final detail = await widget.api.getAnimal(widget.id);
+      if (_shallowCache != null) {
+        await _shallowCache.saveAnimalDetail(detail);
+      }
+      return detail;
+    } catch (_) {
+      if (_shallowCache != null) {
+        final cached = _shallowCache.getAnimalDetail(widget.id);
+        if (cached != null) {
+          if (mounted) {
+            setState(() => _detailCachedTime = cached.formattedTime);
+          }
+          return cached.data;
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<AnimalMedications> _loadMedications() async {
+    try {
+      return await widget.api.getAnimalMedications(widget.id);
+    } catch (_) {
+      return const AnimalMedications(carenciaAte: null, aplicacoes: []);
+    }
   }
 
   void _reload() => setState(() {
-    _detail = widget.api.getAnimal(widget.id);
-    _medications = widget.api.getAnimalMedications(widget.id);
+    _detail = _loadDetail();
+    _medications = _loadMedications();
   });
 
   String _metric(double? value, String suffix, {int decimals = 1}) =>
       value == null
-      ? 'Sem dados'
-      : '${value.toStringAsFixed(decimals)} $suffix';
+          ? 'Sem dados'
+          : '${value.toStringAsFixed(decimals)} $suffix';
 
   String _value(Object? value) => value?.toString() ?? 'Não informado';
 
   Future<void> _openWeighing() async {
-    final result = await Navigator.of(context).push<WeighingResult>(
+    final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => WeighingPage(
           api: widget.api,
           animalId: widget.id,
           onUnauthorized: widget.onUnauthorized,
+          offlineQueue: _offlineQueue,
         ),
       ),
     );
     if (result == null || !mounted) return;
     _reload();
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(result.message)));
-  }
-
-  Future<void> _openMovement() async {
-    final moved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => MovementPage(
-          api: widget.api,
-          animalIds: [widget.id],
-          onUnauthorized: widget.onUnauthorized,
-        ),
-      ),
-    );
-    if (moved != true || !mounted) return;
-    _reload();
-    widget.onMovementCompleted();
+    if (result is WeighingResult) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(result.message)));
+    }
   }
 
   Future<void> _openMedication() async {
-    final result = await Navigator.of(context).push<String?>(
+    final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => MedicationPage(
           api: widget.api,
           animalId: widget.id,
           onUnauthorized: widget.onUnauthorized,
+          offlineQueue: _offlineQueue,
         ),
       ),
     );
@@ -499,9 +678,35 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     );
   }
 
+  Future<void> _openMovement() async {
+    final moved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MovementPage(
+          api: widget.api,
+          animalIds: [widget.id],
+          onUnauthorized: widget.onUnauthorized,
+          offlineQueue: _offlineQueue,
+          shallowCache: _shallowCache,
+        ),
+      ),
+    );
+    if (moved != true || !mounted) return;
+    _reload();
+    widget.onMovementCompleted();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('Ficha ${widget.id}')),
+    appBar: AppBar(
+      title: Text('Ficha ${widget.id}'),
+      actions: [
+        IconButton(
+          onPressed: _reload,
+          tooltip: 'Recarregar',
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
     body: FutureBuilder<List<dynamic>>(
       future: Future.wait([_detail, _medications]),
       builder: (context, snapshot) {
@@ -510,18 +715,10 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
         }
         if (snapshot.hasError) {
           final error = snapshot.error;
-          if (error is ApiException && error.statusCode == 401) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-              widget.onUnauthorized();
-            });
-          }
-          return ErrorState(
-            message: error is ApiException
-                ? error.message
-                : 'API indisponível. A ficha não pôde ser carregada.',
-            onRetry: _reload,
-          );
+          final message = error is ApiException
+              ? error.message
+              : 'Não foi possível carregar os dados do animal.';
+          return ErrorState(message: message, onRetry: _reload);
         }
         final animal = snapshot.data![0] as AnimalDetail;
         final medications = snapshot.data![1] as AnimalMedications;
@@ -530,12 +727,16 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
           'F' => 'Fêmea',
           _ => 'Não informado',
         };
-
         final inWithdrawal = medications.carenciaAte != null;
 
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (_detailCachedTime != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: OfflineCacheBanner(formattedTime: _detailCachedTime!),
+              ),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -564,12 +765,11 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
             ),
             const SizedBox(height: 12),
 
-            // Card de Carência (com ícone e texto claro, sem depender apenas de cor)
             Card(
               key: const ValueKey('carencia-status-card'),
               color: inWithdrawal
                   ? Theme.of(context).colorScheme.errorContainer
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  : null,
               child: ListTile(
                 leading: Icon(
                   inWithdrawal

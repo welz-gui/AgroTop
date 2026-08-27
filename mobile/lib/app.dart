@@ -3,15 +3,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'app_colors.dart';
+import 'offline_queue.dart';
 import 'screens/animals_page.dart';
 import 'screens/login_page.dart';
 import 'secure_token_store.dart';
+import 'shallow_cache.dart';
 
 class AgroTopApp extends StatefulWidget {
-  const AgroTopApp({super.key, required this.preferences, this.apiClient});
+  const AgroTopApp({
+    super.key,
+    required this.preferences,
+    this.apiClient,
+    this.offlineQueue,
+    this.shallowCache,
+  });
 
   final SharedPreferences preferences;
   final ApiClient? apiClient;
+  final OfflineQueue? offlineQueue;
+  final ShallowCache? shallowCache;
 
   @override
   State<AgroTopApp> createState() => _AgroTopAppState();
@@ -20,6 +30,8 @@ class AgroTopApp extends StatefulWidget {
 class _AgroTopAppState extends State<AgroTopApp> {
   static const _themeKey = 'theme_mode';
   late final ApiClient _api;
+  late final OfflineQueue _offlineQueue;
+  late final ShallowCache _shallowCache;
   late ThemeMode _themeMode;
   bool _restoring = true;
   bool _hasSession = false;
@@ -28,6 +40,8 @@ class _AgroTopAppState extends State<AgroTopApp> {
   void initState() {
     super.initState();
     _api = widget.apiClient ?? ApiClient(tokenStore: const SecureTokenStore());
+    _offlineQueue = widget.offlineQueue ?? OfflineQueue();
+    _shallowCache = widget.shallowCache ?? ShallowCache(widget.preferences);
     _themeMode = switch (widget.preferences.getString(_themeKey)) {
       'light' => ThemeMode.light,
       'system' => ThemeMode.system,
@@ -65,6 +79,8 @@ class _AgroTopAppState extends State<AgroTopApp> {
             themeMode: _themeMode,
             onThemeChanged: _setTheme,
             onUnauthorized: () => setState(() => _hasSession = false),
+            offlineQueue: _offlineQueue,
+            shallowCache: _shallowCache,
           )
         : LoginPage(
             api: _api,
