@@ -4,6 +4,7 @@ import '../api_client.dart';
 import '../app.dart';
 import '../models.dart';
 import 'animal_photo_section.dart';
+import 'csv_import_page.dart';
 import 'feeding_page.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
@@ -158,6 +159,13 @@ class _AnimalsPageState extends State<AnimalsPage> {
     if (mounted) _loadPendingFeedings();
   }
 
+  Future<void> _openCsvImport() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) =>
+          CsvImportPage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -165,6 +173,12 @@ class _AnimalsPageState extends State<AnimalsPage> {
       actions: [
         ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
         _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
+        IconButton(
+          key: const ValueKey('open-csv-import'),
+          onPressed: _openCsvImport,
+          tooltip: 'Importar pesagens',
+          icon: const Icon(Icons.upload_file_outlined),
+        ),
         IconButton(
           onPressed: _logout,
           tooltip: 'Sair',
