@@ -62,6 +62,11 @@ animal_photos.taken_date
 animal_photos.operator
 animal_photos.created_at
 animal_photos.animal_uuid
+api_idempotency_keys.idempotency_key
+api_idempotency_keys.endpoint
+api_idempotency_keys.status_code
+api_idempotency_keys.response_body
+api_idempotency_keys.created_at
 api_refresh_tokens.token
 api_refresh_tokens.user_id
 api_refresh_tokens.expires_at
