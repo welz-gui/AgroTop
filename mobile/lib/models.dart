@@ -230,10 +230,7 @@ class MedicationApplication {
 }
 
 class AnimalMedications {
-  const AnimalMedications({
-    this.carenciaAte,
-    required this.aplicacoes,
-  });
+  const AnimalMedications({this.carenciaAte, required this.aplicacoes});
 
   final String? carenciaAte;
   final List<MedicationApplication> aplicacoes;
@@ -267,5 +264,57 @@ class AnimalPhoto {
     id: json['id'] as int,
     takenDate: json['taken_date'] as String,
     mime: json['mime'] as String,
+  );
+}
+
+class PendingFeeding {
+  const PendingFeeding({
+    required this.planId,
+    required this.loteId,
+    required this.loteNome,
+    required this.produto,
+    required this.quantidade,
+    required this.unidade,
+    required this.frequencia,
+    required this.confirmadoNoPeriodo,
+    this.insumoId,
+    this.ultimaConfirmacao,
+  });
+
+  final int planId;
+  final String loteId;
+  final String loteNome;
+  final String produto;
+  final double quantidade;
+  final String unidade;
+  final String frequencia;
+  final int? insumoId;
+  final bool confirmadoNoPeriodo;
+  final String? ultimaConfirmacao;
+
+  factory PendingFeeding.fromJson(Map<String, dynamic> json) => PendingFeeding(
+    planId: (json['plano_id'] as num).toInt(),
+    loteId: json['lote_id'].toString(),
+    loteNome: json['lote_nome'] as String,
+    produto: json['produto'] as String,
+    quantidade: (json['quantidade'] as num).toDouble(),
+    unidade: json['unidade'] as String,
+    frequencia: json['frequencia'] as String,
+    insumoId: (json['insumo_id'] as num?)?.toInt(),
+    confirmadoNoPeriodo: json['confirmado_no_periodo'] as bool,
+    ultimaConfirmacao: json['ultima_confirmacao'] as String?,
+  );
+
+  PendingFeeding confirmedNow() => PendingFeeding(
+    planId: planId,
+    loteId: loteId,
+    loteNome: loteNome,
+    produto: produto,
+    quantidade: quantidade,
+    unidade: unidade,
+    frequencia: frequencia,
+    insumoId: insumoId,
+    confirmadoNoPeriodo: true,
+    ultimaConfirmacao: ultimaConfirmacao,
   );
 }

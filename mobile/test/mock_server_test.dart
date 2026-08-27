@@ -50,6 +50,27 @@ void main() {
       final animals = await api.listAnimals();
       expect(animals.first.id, 'BR0001');
       expect(server.refreshRequests, 1);
+      final pendingFeedings = await api.listPendingFeedings();
+      expect(server.feedingRequests, 1);
+      expect(pendingFeedings, hasLength(3));
+      expect(
+        pendingFeedings.where((item) => item.confirmadoNoPeriodo),
+        hasLength(1),
+      );
+      await api.confirmFeeding(
+        101,
+        situation: 'parcial',
+        quantityApplied: 20.0,
+        deductStock: true,
+        notes: 'Restante amanhã',
+      );
+      expect(server.postFeedingRequests, 1);
+      expect(server.lastFeedingBody, {
+        'situacao': 'parcial',
+        'quantidade_aplicada': 20.0,
+        'baixar_estoque': true,
+        'notas': 'Restante amanhã',
+      });
       final before = await api.getAnimal('BR0001');
       expect(before.currentWeight, 382.4);
 

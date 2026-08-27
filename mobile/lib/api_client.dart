@@ -167,6 +167,51 @@ class ApiClient {
         .toList(growable: false);
   }
 
+  Future<List<PendingFeeding>> listPendingFeedings() async {
+    final response = await _authorized(
+      (headers) =>
+          _http.get(Uri.parse('$baseUrl/trato/pendentes'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar os tratos pendentes.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((item) => PendingFeeding.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<void> confirmFeeding(
+    int planId, {
+    required String situation,
+    required double quantityApplied,
+    required bool deductStock,
+    String? notes,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl/trato/$planId/confirmar'),
+        headers: {...headers, 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'situacao': situation,
+          'quantidade_aplicada': quantityApplied,
+          'baixar_estoque': deductStock,
+          'notas': notes,
+        }),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 201) {
+      throw ApiException(
+        _message(body, 'Não foi possível confirmar o trato.'),
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
   Future<MovementResult> moveAnimals({
     required List<String> animalIds,
     required String toLoteId,

@@ -21,6 +21,10 @@ class MockApiServer {
   Map<String, dynamic>? lastMovementBody;
   Map<String, dynamic>? lastMedicationBody;
   int photoUploadRequests = 0;
+  int feedingRequests = 0;
+  int postFeedingRequests = 0;
+  bool failNextFeedingConfirmation = false;
+  Map<String, dynamic>? lastFeedingBody;
   int? lastPhotoUploadSize;
   final Map<int, List<int>> _photos = {};
   final Map<String, String> _animalLotes = {
@@ -28,6 +32,44 @@ class MockApiServer {
     'BR0002': 'P02',
     'BR0003': 'P01',
   };
+  final List<Map<String, dynamic>> _feedings = [
+    {
+      'plano_id': 101,
+      'lote_id': 'P01',
+      'lote_nome': 'Piquete Central',
+      'produto': 'Sal mineral',
+      'quantidade': 25.0,
+      'unidade': 'kg',
+      'frequencia': 'diário',
+      'insumo_id': 8,
+      'confirmado_no_periodo': false,
+      'ultima_confirmacao': null,
+    },
+    {
+      'plano_id': 102,
+      'lote_id': 'P01',
+      'lote_nome': 'Piquete Central',
+      'produto': 'Ração proteica',
+      'quantidade': 12.0,
+      'unidade': 'kg',
+      'frequencia': 'diário',
+      'insumo_id': null,
+      'confirmado_no_periodo': true,
+      'ultima_confirmacao': '2026-08-25',
+    },
+    {
+      'plano_id': 103,
+      'lote_id': 'P02',
+      'lote_nome': 'Piquete Norte',
+      'produto': 'Núcleo mineral',
+      'quantidade': 8.0,
+      'unidade': 'kg',
+      'frequencia': 'semanal',
+      'insumo_id': null,
+      'confirmado_no_periodo': false,
+      'ultima_confirmacao': null,
+    },
+  ];
 
   String get baseUrl => 'http://${_server.address.address}:${_server.port}';
 
@@ -90,6 +132,36 @@ class MockApiServer {
         return;
       }
 
+      if (request.method == 'GET' && path == '/trato/pendentes') {
+        feedingRequests++;
+        await _json(request, 200, _feedings);
+        return;
+      }
+      if (request.method == 'POST' &&
+          path.startsWith('/trato/') &&
+          path.endsWith('/confirmar')) {
+        postFeedingRequests++;
+        final body = await _body(request);
+        lastFeedingBody = body;
+        if (failNextFeedingConfirmation) {
+          failNextFeedingConfirmation = false;
+          await _json(request, 500, {'detail': 'Erro no servidor mock'});
+          return;
+        }
+        final planId = int.tryParse(
+          path.substring('/trato/'.length, path.length - '/confirmar'.length),
+        );
+        final feeding = _feedings.where((item) => item['plano_id'] == planId);
+        if (feeding.isEmpty) {
+          await _json(request, 404, {'detail': 'Plano não encontrado'});
+          return;
+        }
+        feeding.single['confirmado_no_periodo'] = true;
+        feeding.single['ultima_confirmacao'] = '2026-08-25';
+        await _json(request, 201, {'ok': true});
+        return;
+      }
+
       if (request.method == 'GET' && path == '/animais') {
         listRequests++;
         if (request.uri.queryParameters['skip'] != '0' ||
@@ -117,7 +189,10 @@ class MockApiServer {
           path.startsWith('/animais/') &&
           path.endsWith('/medicamentos')) {
         final id = Uri.decodeComponent(
-          path.substring('/animais/'.length, path.length - '/medicamentos'.length),
+          path.substring(
+            '/animais/'.length,
+            path.length - '/medicamentos'.length,
+          ),
         );
         if (!_animalLotes.containsKey(id)) {
           await _json(request, 404, {'detail': 'Animal não encontrado'});
@@ -134,7 +209,10 @@ class MockApiServer {
           path.startsWith('/animais/') &&
           path.endsWith('/medicamentos')) {
         final id = Uri.decodeComponent(
-          path.substring('/animais/'.length, path.length - '/medicamentos'.length),
+          path.substring(
+            '/animais/'.length,
+            path.length - '/medicamentos'.length,
+          ),
         );
         if (!_animalLotes.containsKey(id)) {
           await _json(request, 404, {'detail': 'Animal não encontrado'});
@@ -174,7 +252,9 @@ class MockApiServer {
             'via': 'Subcutânea',
             'carencia_dias': 28,
             'unidade_dose': 'ml',
-            'dose_sugerida': animalId == 'BR0001' ? 7.6 : (animalId != null ? 5.0 : null),
+            'dose_sugerida': animalId == 'BR0001'
+                ? 7.6
+                : (animalId != null ? 5.0 : null),
           },
           {
             'id': 2,
