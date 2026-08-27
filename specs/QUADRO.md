@@ -20,10 +20,13 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 37 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **0054 e 0055 concluídas** (API + tela mobile de trato) · **5 specs na
-fila** — 0056/0057 (PRs abertos, aguardando revisão), 0058 (importação CSV) e **0059/0060**
+(7 de 7 telas) · **0054 e 0055 concluídas** (API + tela mobile de trato) · **9 specs na
+fila** — 0056/0057 (PRs abertos, aguardando revisão), 0058 (importação CSV), **0059/0060**
 (mobile offline: chave de idempotência na API + fila local no app,
-[ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) — ver abaixo.
+[ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) e **0063/0064** (alertas
+operacionais, primeiro item do Tier 1 da
+[ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) — ver abaixo. (0061/0062
+também disponíveis, achados de teste real — ver nota abaixo.)
 Com 0056–0058 também fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 —
 online" + item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
 fechadas, só resta Bluetooth (hardware, não delegável por definição) de toda a Trilha 1. O
@@ -220,6 +223,8 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 | 5 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
 | 6 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
 | 7 | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
+| 8 | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | 🟢 disponível | | 2026-08-26 |
+| 9 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — pode mockar, dedupe/real só após 0063 mesclar | | 2026-08-26 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -306,6 +311,17 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 > tabela `health_protocols` estava vazia em produção **e** a tela de cadastro
 > (`app.py::page_sanitario`, aba "⚙️ Protocolos") nunca tinha sido usada. Não é bug, não
 > precisa de spec — precisa é cadastrar os protocolos pela tela que já existe.
+
+> **0063/0064 escritas em 2026-08-26 — primeiro item do Tier 1 da
+> [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)** (paridade admin no
+> mobile): alertas operacionais (`app.py::page_alertas`, aba "🔔 Operacionais" — sumidos,
+> carência, prontos para abate, estoque crítico, baixo desempenho). **Tela só leitura**,
+> sem nenhuma ação de escrita — mais simples que trato/movimentação. **"Recomendações"
+> (motor de regras) ficou de fora de propósito**: o contexto que ela consome é montado hoje
+> dentro do `app.py` (`_contexto_recomendacoes`), não em `database.py`/`services/` —
+> expor isso pela API pede mover esse contexto antes, trabalho de outra spec. Mesmo padrão
+> API-antes-de-mobile de sempre: 0063 (API) não tem dependência, 0064 (mobile) pode ser
+> pega em paralelo contra mock, mas testar contra a API real espera a 0063 mesclar.
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
