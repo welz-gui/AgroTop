@@ -47,6 +47,35 @@ void main() {
 
       final login = await api.login('admin', 'senha-segura');
       expect(login.user.username, 'admin');
+      final csvBytes = Uint8List.fromList([
+        66,
+        82,
+        48,
+        48,
+        48,
+        49,
+        59,
+        52,
+        49,
+        50,
+      ]);
+      final preview = await api.importWeighingsCsv(
+        bytes: csvBytes,
+        filename: 'pesagens.csv',
+        confirmar: false,
+      );
+      expect(preview.gravadas, 0);
+      expect(preview.aceitas.single.alertas, isNotEmpty);
+      expect(preview.rejeitadas.single.motivo, 'Peso inválido');
+      final csvResult = await api.importWeighingsCsv(
+        bytes: csvBytes,
+        filename: 'pesagens.csv',
+        confirmar: true,
+      );
+      expect(csvResult.gravadas, 1);
+      expect(server.csvImportRequests, 2);
+      expect(server.csvImportConfirmations, [false, true]);
+      expect(server.csvImportFiles, [csvBytes, csvBytes]);
       final animals = await api.listAnimals();
       expect(animals.first.id, 'BR0001');
       expect(server.refreshRequests, 1);
