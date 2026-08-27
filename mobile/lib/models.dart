@@ -267,6 +267,76 @@ class AnimalPhoto {
   );
 }
 
+class CsvImportAccepted {
+  const CsvImportAccepted({
+    required this.animalId,
+    required this.peso,
+    required this.data,
+    required this.alertas,
+  });
+
+  final String animalId;
+  final double peso;
+  final String data;
+  final List<String> alertas;
+
+  factory CsvImportAccepted.fromJson(Map<String, dynamic> json) =>
+      CsvImportAccepted(
+        animalId: json['animal_id'] as String,
+        peso: (json['peso'] as num).toDouble(),
+        data: json['data'] as String,
+        alertas: List<String>.from(
+          json['alertas'] as List<dynamic>? ?? const [],
+        ),
+      );
+}
+
+class CsvImportRejected {
+  const CsvImportRejected({
+    required this.linha,
+    required this.conteudo,
+    required this.motivo,
+  });
+
+  final int linha;
+  final String conteudo;
+  final String motivo;
+
+  factory CsvImportRejected.fromJson(Map<String, dynamic> json) =>
+      CsvImportRejected(
+        linha: (json['linha'] as num).toInt(),
+        conteudo: json['conteudo'] as String,
+        motivo: json['motivo'] as String,
+      );
+}
+
+class CsvImportResult {
+  const CsvImportResult({
+    required this.totalLinhas,
+    required this.aceitas,
+    required this.rejeitadas,
+    required this.gravadas,
+  });
+
+  final int totalLinhas;
+  final List<CsvImportAccepted> aceitas;
+  final List<CsvImportRejected> rejeitadas;
+  final int gravadas;
+
+  factory CsvImportResult.fromJson(
+    Map<String, dynamic> json,
+  ) => CsvImportResult(
+    totalLinhas: (json['total_linhas'] as num).toInt(),
+    aceitas: (json['aceitas'] as List<dynamic>? ?? const [])
+        .map((item) => CsvImportAccepted.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false),
+    rejeitadas: (json['rejeitadas'] as List<dynamic>? ?? const [])
+        .map((item) => CsvImportRejected.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false),
+    gravadas: (json['gravadas'] as num).toInt(),
+  );
+}
+
 class PendingFeeding {
   const PendingFeeding({
     required this.planId,

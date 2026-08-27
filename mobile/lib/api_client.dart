@@ -392,6 +392,39 @@ class ApiClient {
     return (body as Map<String, dynamic>)['id'] as int;
   }
 
+  Future<CsvImportResult> importWeighingsCsv({
+    required Uint8List bytes,
+    required String filename,
+    required bool confirmar,
+  }) async {
+    final response = await _authorized((headers) async {
+      final request =
+          http.MultipartRequest(
+              'POST',
+              Uri.parse('$baseUrl/pesagens/importar-csv'),
+            )
+            ..headers.addAll(headers)
+            ..fields['confirmar'] = confirmar.toString()
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'arquivo',
+                bytes,
+                filename: filename,
+                contentType: MediaType('text', 'csv'),
+              ),
+            );
+      return http.Response.fromStream(await _http.send(request));
+    });
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível importar as pesagens.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return CsvImportResult.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<void> logout() async {
     final tokens = _tokens ?? await tokenStore.read();
     try {
