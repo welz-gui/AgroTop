@@ -21,6 +21,9 @@ class MockApiServer {
   Map<String, dynamic>? lastMovementBody;
   Map<String, dynamic>? lastMedicationBody;
   int photoUploadRequests = 0;
+  int csvImportRequests = 0;
+  final List<List<int>> csvImportFiles = [];
+  final List<bool> csvImportConfirmations = [];
   int feedingRequests = 0;
   int postFeedingRequests = 0;
   bool failNextFeedingConfirmation = false;
@@ -129,6 +132,49 @@ class MockApiServer {
       if (request.headers.value(HttpHeaders.authorizationHeader) !=
           'Bearer access-live') {
         await _json(request, 401, {'detail': 'Token inválido ou expirado'});
+        return;
+      }
+
+      if (request.method == 'POST' && path == '/pesagens/importar-csv') {
+        final contentType = request.headers.contentType;
+        final boundary = contentType?.parameters['boundary'];
+        if (contentType?.mimeType != 'multipart/form-data' ||
+            boundary == null) {
+          await _json(request, 422, {'detail': 'Multipart inválido'});
+          return;
+        }
+        final raw = await request.fold<List<int>>(
+          <int>[],
+          (bytes, chunk) => bytes..addAll(chunk),
+        );
+        final file = _multipartFile(raw, boundary);
+        final confirmar = _multipartField(raw, boundary, 'confirmar');
+        if (file == null || (confirmar != 'false' && confirmar != 'true')) {
+          await _json(request, 422, {'detail': 'Campos inválidos'});
+          return;
+        }
+        csvImportRequests++;
+        csvImportFiles.add(file);
+        csvImportConfirmations.add(confirmar == 'true');
+        await _json(request, 200, {
+          'total_linhas': 3,
+          'aceitas': [
+            {
+              'animal_id': 'BR0001',
+              'peso': 412.5,
+              'data': '2026-08-25',
+              'alertas': ['Variação de peso exige conferência'],
+            },
+          ],
+          'rejeitadas': [
+            {
+              'linha': 3,
+              'conteudo': 'BR0002;sem-peso;2026-08-25',
+              'motivo': 'Peso inválido',
+            },
+          ],
+          'gravadas': confirmar == 'true' ? 1 : 0,
+        });
         return;
       }
 
@@ -440,6 +486,17 @@ class MockApiServer {
     final dataEnd = body.indexOf('\r\n--$boundary', dataStart + 4);
     if (dataEnd < 0) return null;
     return latin1.encode(body.substring(dataStart + 4, dataEnd));
+  }
+
+  String? _multipartField(List<int> raw, String boundary, String name) {
+    final body = latin1.decode(raw);
+    final markerIndex = body.indexOf('name="$name"');
+    if (markerIndex < 0) return null;
+    final dataStart = body.indexOf('\r\n\r\n', markerIndex);
+    if (dataStart < 0) return null;
+    final dataEnd = body.indexOf('\r\n--$boundary', dataStart + 4);
+    if (dataEnd < 0) return null;
+    return body.substring(dataStart + 4, dataEnd);
   }
 
   Map<String, dynamic> _animal(String id) => {
