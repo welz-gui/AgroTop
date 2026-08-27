@@ -30,6 +30,7 @@ from backend_api.schemas import (
     AnimalSummary,
     CarenciaOutput,
     ConfirmarTratoInput,
+    ImportarPesagensOutput,
     LoginInput,
     LogoutInput,
     LoteSummary,
@@ -37,8 +38,10 @@ from backend_api.schemas import (
     MedicamentosOutput,
     MovimentarInput,
     MovimentarOutput,
+    PesagemAceita,
     PesagemInput,
     PesagemOutput,
+    PesagemRejeitada,
     PhotoSummary,
     PhotoUploadOutput,
     ProtocoloOutput,
@@ -57,7 +60,7 @@ from database import (
     get_photos,
 )
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
-from repositories.pesagens import add_weighing, calculate_gmd
+from repositories.pesagens import add_weighing, calculate_gmd, get_weighings_batch
 from repositories.sanidade import (
     add_medication,
     dose_for_animal,
@@ -65,10 +68,13 @@ from repositories.sanidade import (
     get_protocols,
     get_withdrawal_end,
 )
+from services.importacao import parse_pesagens
+from services.qualidade import avaliar_pesagem
 from services.zootecnia import calculate_gmd_total
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_PHOTO_MIMES = {"image/jpeg", "image/png", "image/jpg"}
+MAX_CSV_SIZE = 1 * 1024 * 1024  # 1 MB
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -246,6 +252,106 @@ def register_pesagem(
         store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
 
     return out
+
+
+@app.post("/pesagens/importar-csv", response_model=ImportarPesagensOutput)
+def importar_pesagens_csv(
+    arquivo: UploadFile = File(...),
+    confirmar: Optional[str] = Form(None),
+    user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
+) -> dict[str, Any]:
+    """Importa pesagens de um arquivo CSV/TXT do indicador da balança."""
+    filename = arquivo.filename or ""
+    lower_filename = filename.lower()
+    if not (lower_filename.endswith(".csv") or lower_filename.endswith(".txt")):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Arquivo deve ter extensão .csv ou .txt.",
+        )
+
+    try:
+        raw_bytes = arquivo.file.read()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Não foi possível ler o arquivo.",
+        )
+
+    if len(raw_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Arquivo vazio.",
+        )
+
+    if len(raw_bytes) > MAX_CSV_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Arquivo excede o tamanho máximo de 1 MB.",
+        )
+
+    try:
+        texto = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            texto = raw_bytes.decode("latin-1")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Não foi possível decodificar o arquivo.",
+            )
+
+    ativos = {a["id"] for a in get_all_animals(status="ativo")}
+    resultado = parse_pesagens(texto, ids_conhecidos=ativos)
+    aceitas_raw = resultado["aceitas"]
+    rejeitadas = resultado["rejeitadas"]
+    total_linhas = resultado["total_linhas"]
+
+    animal_ids = {linha["animal_id"] for linha in aceitas_raw}
+    all_weighings = get_weighings_batch(animal_ids)
+    hist: dict[str, list[dict[str, Any]]] = {}
+    for a_id in animal_ids:
+        hist[a_id] = [
+            {"peso": w["weight"], "data": w["weigh_date"]}
+            for w in all_weighings.get(a_id, [])
+        ]
+
+    aceitas_com_alertas = []
+    for linha in sorted(aceitas_raw, key=lambda x: (x["animal_id"], x["data"])):
+        alertas = avaliar_pesagem(linha["peso"], linha["data"], hist[linha["animal_id"]])
+        altos = [a["mensagem"] for a in alertas if a.get("severidade") == "alta"]
+        aceitas_com_alertas.append({
+            "animal_id": str(linha["animal_id"]),
+            "peso": float(linha["peso"]),
+            "data": str(linha["data"]),
+            "alertas": altos,
+        })
+        hist[linha["animal_id"]].insert(
+            0, {"peso": linha["peso"], "data": linha["data"]}
+        )
+
+    should_confirm = str(confirmar).lower() in ("true", "1", "t", "yes")
+    gravadas = 0
+
+    if should_confirm and aceitas_com_alertas:
+        operator = user.get("username", "") if user else ""
+        notes = f"importado de {filename}" if filename else "importado de CSV"
+        for linha in aceitas_com_alertas:
+            add_weighing(
+                animal_id=linha["animal_id"],
+                weight=linha["peso"],
+                weigh_date=linha["data"],
+                operator=operator,
+                notes=notes,
+                method="pesado",
+            )
+            gravadas += 1
+
+    return {
+        "total_linhas": total_linhas,
+        "aceitas": aceitas_com_alertas,
+        "rejeitadas": rejeitadas,
+        "gravadas": gravadas,
+    }
 
 
 @app.get("/lotes", response_model=list[LoteSummary])
