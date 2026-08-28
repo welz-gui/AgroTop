@@ -18,19 +18,16 @@ baixo** — a ordem é prioridade, não sugestão.
 [#188](https://github.com/welz-gui/AgroTop/pull/188),
 [#233](https://github.com/welz-gui/AgroTop/pull/233)) · CI agora cobre Flutter também
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
-37 tabelas em produção, todas com RLS (políticas explícitas de negação para
+38 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **0054 e 0055 concluídas** (API + tela mobile de trato) · **9 specs na
-fila** — 0056/0057 (PRs abertos, aguardando revisão), 0058 (importação CSV), **0059/0060**
-(mobile offline: chave de idempotência na API + fila local no app,
-[ADR 0006](../docs/adr/0006-mobile-offline-fila-de-escrita.md)) e **0063/0064** (alertas
-operacionais, primeiro item do Tier 1 da
-[ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) — ver abaixo. (0061/0062
-também disponíveis, achados de teste real — ver nota abaixo.)
-Com 0056–0058 também fechadas, o escopo original do ROADMAP §5 Trilha 1 (item "Mobile v1 —
-online" + item "Importação CSV do indicador da balança") fica completo. Com 0059/0060 também
-fechadas, só resta Bluetooth (hardware, não delegável por definição) de toda a Trilha 1. O
-restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
+(7 de 7 telas) · **0044–0059 todas concluídas** — o escopo original do ROADMAP §5 Trilha 1
+("Mobile v1 — online" + "Importação CSV do indicador da balança") fica completo; só falta a
+0060 (mobile offline, [PR #250](https://github.com/welz-gui/AgroTop/pull/250) aberto) pra
+fechar a Trilha 1 inteira (resta só Bluetooth, hardware, não delegável por definição) ·
+**5 specs na fila** — 0060 (PR aberto), 0061 (branch reivindicado, sem PR ainda), 0062
+(confirmação rápida de trato), **0063/0064** (alertas operacionais, primeiro item do Tier 1
+da [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) — ver abaixo.
+O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
 é integração de UI, trabalho do mantenedor (R31), não spec de agente.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -216,15 +213,15 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 | — | [0051](0051-mobile-tela-de-sanidade.md) — Mobile: tela de sanidade 🏗️ | — | ✅ [#188](https://github.com/welz-gui/AgroTop/pull/188) + [#227](https://github.com/welz-gui/AgroTop/pull/227) (golden do critério 5) | | 2026-08-24 |
 | — | [0054](0054-api-confirmacao-de-trato.md) — API: confirmação de trato/nutrição por piquete 🏗️ ⚠️médio | — | ✅ [#233](https://github.com/welz-gui/AgroTop/pull/233) | | 2026-08-24 |
 | — | [0055](0055-mobile-tela-de-confirmacao-de-trato.md) — Mobile: tela de confirmação de trato 🏗️ | `feat/mobile-confirmacao-de-trato` | ✅ [#242](https://github.com/welz-gui/AgroTop/pull/242) | | 2026-08-26 |
-| 1 | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | 🟡 [PR #240](https://github.com/welz-gui/AgroTop/pull/240) aberto, aguardando revisão | | 2026-08-24 |
-| 2 | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | 🟡 [PR #241](https://github.com/welz-gui/AgroTop/pull/241) aberto, aguardando revisão | | 2026-08-24 |
-| 3 | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | `feat/mobile-importacao-de-pesagens-csv` | 🟡 branch reivindicado, em andamento (sem PR ainda) | | 2026-08-24 |
-| 4 | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | 🟡 [PR #247](https://github.com/welz-gui/AgroTop/pull/247) aberto, aguardando revisão | | 2026-08-24 |
-| 5 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟢 disponível — depende da 0059 (pode mockar; dedupe real só depois da 0059 mesclar) | | 2026-08-24 |
-| 6 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
-| 7 | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
-| 8 | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | 🟢 disponível | | 2026-08-26 |
-| 9 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — pode mockar, dedupe/real só após 0063 mesclar | | 2026-08-26 |
+| — | [0056](0056-mobile-leitura-de-brinco-por-qr.md) — Mobile: leitura de brinco por QR Code 🏗️ | — | ✅ [#240](https://github.com/welz-gui/AgroTop/pull/240) | | 2026-08-27 |
+| — | [0057](0057-api-importacao-de-pesagens-csv.md) — API: importação de pesagens por CSV 🏗️ ⚠️médio | — | ✅ [#241](https://github.com/welz-gui/AgroTop/pull/241) | | 2026-08-27 |
+| — | [0058](0058-mobile-importacao-de-pesagens-csv.md) — Mobile: importação de pesagens por CSV 🏗️ | — | ✅ [#249](https://github.com/welz-gui/AgroTop/pull/249) | | 2026-08-27 |
+| — | [0059](0059-api-idempotency-key.md) — API: chave de idempotência nos endpoints de escrita 🏗️ ⚠️médio | — | ✅ [#247](https://github.com/welz-gui/AgroTop/pull/247) | | 2026-08-27 |
+| 1 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟡 [PR #250](https://github.com/welz-gui/AgroTop/pull/250) aberto, aguardando revisão | | 2026-08-24 |
+| 2 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | `feat/mobile-metodo-de-pesagem` | 🟡 branch reivindicado, em andamento (sem PR ainda) | | 2026-08-26 |
+| 3 | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
+| 4 | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | 🟢 disponível | | 2026-08-26 |
+| 5 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — pode mockar, dedupe/real só após 0063 mesclar | | 2026-08-26 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -322,6 +319,26 @@ restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previ
 > expor isso pela API pede mover esse contexto antes, trabalho de outra spec. Mesmo padrão
 > API-antes-de-mobile de sempre: 0063 (API) não tem dependência, 0064 (mobile) pode ser
 > pega em paralelo contra mock, mas testar contra a API real espera a 0063 mesclar.
+
+> **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
+> [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
+> [#247](https://github.com/welz-gui/AgroTop/pull/247).** Revisão em lote, cada PR com
+> worktree isolado + suíte local antes do merge. Dois conflitos reais de verdade, os dois
+> resolvidos por união (mesmo padrão da 0051/0053):
+> - **0056 × 0055** em `mobile/lib/screens/animals_page.dart` — o botão de QR (0056) e o
+>   botão de trato (0055, já em `main`) foram adicionados no mesmo ponto do arquivo, sem
+>   sobreposição lógica (QR fica no campo de busca, trato no `AppBar`).
+> - **0059 × 0057** em `tests/test_backend_api.py` — as duas specs adicionaram uma classe
+>   de teste nova no mesmo ponto do arquivo (`TestIdempotency` e
+>   `TestImportarPesagensCsvEndpoint`), sem sobreposição de lógica.
+>
+> **Achado à parte, só neste ambiente Windows local**: `flutter test` sem
+> `--concurrency=1` descarta arquivos de teste **silenciosamente** nesta máquina — reporta
+> "All tests passed!" mesmo sem ter carregado todos os arquivos. Confirmado reproduzível
+> (3 rodadas) e **confirmado que NÃO acontece** no container Docker com Ubuntu 24.04 +
+> Flutter 3.44.8 (o mesmo ambiente do CI) — rodou 3 vezes, mesmo total sempre. Ou seja: o
+> "CI verde" do histórico mobile continua confiável; o cuidado é só para quem verificar
+> `flutter test` localmente no Windows — use sempre `--concurrency=1` nesse caso.
 
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
