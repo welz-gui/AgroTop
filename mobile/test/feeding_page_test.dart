@@ -129,10 +129,17 @@ void main() {
     expect(find.byKey(const ValueKey('feeding-lote-P02')), findsOneWidget);
     expect(find.textContaining('Confirmado em 2026-08-25'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('confirm-feeding-101')));
+    await tester.tap(find.byKey(const ValueKey('feeding-item-101')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('feeding-deduct-stock')), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('feeding-deduct-stock')));
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.byKey(const ValueKey('feeding-deduct-stock')),
+          )
+          .value,
+      true,
+    );
     await tester.enterText(
       find.byKey(const ValueKey('feeding-quantity')),
       '20,5',
@@ -155,6 +162,126 @@ void main() {
     expect(find.textContaining('Confirmado agora'), findsOneWidget);
     expect(find.byKey(const ValueKey('feeding-item-103')), findsOneWidget);
   });
+
+  testWidgets(
+    'confirmação rápida num item com insumo_id dispara POST com baixa de estoque sem abrir a folha',
+    (tester) async {
+      final feedings = _feedings();
+      Map<String, dynamic>? submitted;
+      final api = ApiClient(
+        tokenStore: _TokenStore(),
+        baseUrl: 'http://mock.local',
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/animais') return _json([]);
+          if (request.method == 'GET' &&
+              request.url.path == '/trato/pendentes') {
+            return _json(feedings);
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/trato/101/confirmar') {
+            submitted = jsonDecode(request.body) as Map<String, dynamic>;
+            return _json({'ok': true}, status: 201);
+          }
+          return _json({'detail': 'Não encontrado'}, status: 404);
+        }),
+      );
+
+      await _pumpAnimals(tester, api);
+      await tester.tap(find.byKey(const ValueKey('open-feeding')));
+      await tester.pumpAndSettle();
+
+      // Clica no botão rápido de confirmação
+      await tester.tap(find.byKey(const ValueKey('confirm-feeding-101')));
+      await tester.pumpAndSettle();
+
+      // Folha detalhada NÃO foi aberta
+      expect(find.byKey(const ValueKey('submit-feeding')), findsNothing);
+      expect(find.byKey(const ValueKey('feeding-situation')), findsNothing);
+
+      // Enviou valores padrão com baixar_estoque: true
+      expect(submitted, {
+        'situacao': 'feito',
+        'quantidade_aplicada': 25.0,
+        'baixar_estoque': true,
+        'notas': null,
+      });
+
+      expect(find.textContaining('Trato confirmado: Sal mineral'), findsOneWidget);
+      expect(find.textContaining('Confirmado agora'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'confirmação rápida num item sem insumo_id dispara POST com baixar_estoque false',
+    (tester) async {
+      final feedings = _feedings();
+      Map<String, dynamic>? submitted;
+      final api = ApiClient(
+        tokenStore: _TokenStore(),
+        baseUrl: 'http://mock.local',
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/animais') return _json([]);
+          if (request.method == 'GET' &&
+              request.url.path == '/trato/pendentes') {
+            return _json(feedings);
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/trato/103/confirmar') {
+            submitted = jsonDecode(request.body) as Map<String, dynamic>;
+            return _json({'ok': true}, status: 201);
+          }
+          return _json({'detail': 'Não encontrado'}, status: 404);
+        }),
+      );
+
+      await _pumpAnimals(tester, api);
+      await tester.tap(find.byKey(const ValueKey('open-feeding')));
+      await tester.pumpAndSettle();
+
+      // Clica no botão rápido do item 103 (sem insumo_id)
+      await tester.tap(find.byKey(const ValueKey('confirm-feeding-103')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('submit-feeding')), findsNothing);
+      expect(submitted, {
+        'situacao': 'feito',
+        'quantidade_aplicada': 8.0,
+        'baixar_estoque': false,
+        'notas': null,
+      });
+    },
+  );
+
+  testWidgets(
+    'item já confirmado no período não exibe botão de atalho nem abre folha ao tocar',
+    (tester) async {
+      final feedings = _feedings();
+      final api = ApiClient(
+        tokenStore: _TokenStore(),
+        baseUrl: 'http://mock.local',
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/animais') return _json([]);
+          if (request.method == 'GET' &&
+              request.url.path == '/trato/pendentes') {
+            return _json(feedings);
+          }
+          return _json({'detail': 'Não encontrado'}, status: 404);
+        }),
+      );
+
+      await _pumpAnimals(tester, api);
+      await tester.tap(find.byKey(const ValueKey('open-feeding')));
+      await tester.pumpAndSettle();
+
+      // Item 102 já está confirmado no período
+      expect(find.byKey(const ValueKey('confirm-feeding-102')), findsNothing);
+
+      // Tocar no item não abre a folha
+      await tester.tap(find.byKey(const ValueKey('feeding-item-102')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('submit-feeding')), findsNothing);
+    },
+  );
 
   testWidgets('erro conserva formulário e não permite estoque sem insumo', (
     tester,
@@ -181,7 +308,7 @@ void main() {
     await _pumpAnimals(tester, api);
     await tester.tap(find.byKey(const ValueKey('open-feeding')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('confirm-feeding-101')));
+    await tester.tap(find.byKey(const ValueKey('feeding-item-101')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('feeding-quantity')),
@@ -211,7 +338,7 @@ void main() {
 
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('confirm-feeding-103')));
+    await tester.tap(find.byKey(const ValueKey('feeding-item-103')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('feeding-deduct-stock')), findsNothing);
     expect(find.byKey(const ValueKey('feeding-no-stock-link')), findsOneWidget);
