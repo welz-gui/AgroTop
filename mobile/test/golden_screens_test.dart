@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app.dart';
 import 'package:agrotop_mobile/app_colors.dart';
+import 'package:agrotop_mobile/models.dart';
+import 'package:agrotop_mobile/offline_queue.dart';
+import 'package:agrotop_mobile/shallow_cache.dart';
 import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
@@ -566,4 +569,158 @@ void main() {
       }
     }
   });
+
+  testWidgets(
+    'indicador de pendências na fila offline (vazia e com itens) nos três temas',
+    (tester) async {
+      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+      if (captureGoldens) await loadAppFonts();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final mode in ThemeMode.values) {
+        for (final withPending in [false, true]) {
+          final store = GoldenTokenStore()
+            ..tokens = const StoredTokens(
+              accessToken: 'access-live',
+              refreshToken: 'refresh-valid',
+            );
+          final api = ApiClient(
+            tokenStore: store,
+            baseUrl: 'http://mock.local',
+            httpClient: _client(allFeedingsConfirmed: true),
+          );
+          final queue = OfflineQueue(storage: MemoryQueueStorage());
+          if (withPending) {
+            await queue.enqueueWeighing(
+              animalId: 'BR0001',
+              peso: 410.0,
+              data: '2026-08-27',
+            );
+          }
+
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppThemes.light,
+              darkTheme: AppThemes.dark,
+              themeMode: mode,
+              home: AnimalsPage(
+                api: api,
+                themeMode: mode,
+                onThemeChanged: (_) {},
+                onUnauthorized: () {},
+                offlineQueue: queue,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(const ValueKey('sync-queue-button')), findsOneWidget);
+          if (withPending) {
+            expect(
+              find.byKey(const ValueKey('pending-queue-badge')),
+              findsOneWidget,
+            );
+            expect(find.text('1'), findsOneWidget);
+          } else {
+            expect(
+              find.byKey(const ValueKey('pending-queue-badge')),
+              findsNothing,
+            );
+          }
+
+          if (captureGoldens) {
+            await expectLater(
+              find.byType(MaterialApp),
+              matchesGoldenFile(
+                'goldens/${mode.name}-${withPending ? '14-fila-offline-com-itens' : '13-fila-offline-vazia'}.png',
+              ),
+            );
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'banner de dados cacheados desatualizados nos três temas',
+    (tester) async {
+      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+      if (captureGoldens) await loadAppFonts();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final mode in ThemeMode.values) {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final shallowCache = ShallowCache(prefs);
+        await shallowCache.saveAnimals([
+          const AnimalSummary(
+            id: 'BR0001',
+            breed: 'Nelore',
+            sex: 'M',
+            currentWeight: 382.4,
+            loteId: 'P01',
+          ),
+        ]);
+
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        // Cliente que simula falha de conexão
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            throw http.ClientException('Conexão indisponível');
+          }),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: AnimalsPage(
+              api: api,
+              themeMode: mode,
+              onThemeChanged: (_) {},
+              onUnauthorized: () {},
+              shallowCache: shallowCache,
+              offlineQueue: OfflineQueue(storage: MemoryQueueStorage()),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('offline-cache-banner')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('pode estar desatualizado'), findsOneWidget);
+        expect(find.text('BR0001'), findsOneWidget);
+
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-15-cache-desatualizado-banner.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    },
+  );
 }
