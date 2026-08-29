@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../models.dart';
+import '../offline_queue.dart';
 
 class MedicationPage extends StatefulWidget {
   const MedicationPage({
@@ -10,12 +11,14 @@ class MedicationPage extends StatefulWidget {
     required this.animalId,
     required this.onUnauthorized,
     this.initialDate,
+    this.offlineQueue,
   });
 
   final ApiClient api;
   final String animalId;
   final VoidCallback onUnauthorized;
   final DateTime? initialDate;
+  final OfflineQueue? offlineQueue;
 
   @override
   State<MedicationPage> createState() => _MedicationPageState();
@@ -30,6 +33,7 @@ class _MedicationPageState extends State<MedicationPage> {
   final _carenciaDias = TextEditingController(text: '0');
   final _notes = TextEditingController();
   late final TextEditingController _date;
+  late final OfflineQueue _offlineQueue;
 
   List<ProtocoloSummary>? _protocolos;
   ProtocoloSummary? _selectedProtocolo;
@@ -40,6 +44,7 @@ class _MedicationPageState extends State<MedicationPage> {
   @override
   void initState() {
     super.initState();
+    _offlineQueue = widget.offlineQueue ?? OfflineQueue();
     _date = TextEditingController(
       text: _formatDate(widget.initialDate ?? DateTime.now()),
     );
@@ -129,17 +134,25 @@ class _MedicationPageState extends State<MedicationPage> {
       _saving = true;
       _error = null;
     });
+    final medVal = _medicamento.text.trim();
+    final doseVal = double.parse(_dose.text.replaceFirst(',', '.'));
+    final unidadeVal = _unidade.text.trim();
+    final viaVal = _via.text.trim();
+    final carenciaVal = int.parse(_carenciaDias.text.trim());
+    final dataVal = _date.text.trim();
+    final protoVal = _selectedProtocolo?.id;
+    final notasVal = _notes.text.trim().isEmpty ? null : _notes.text.trim();
     try {
       final carenciaAte = await widget.api.registerMedication(
         widget.animalId,
-        medicamento: _medicamento.text.trim(),
-        dose: double.parse(_dose.text.replaceFirst(',', '.')),
-        unidade: _unidade.text.trim(),
-        via: _via.text.trim(),
-        carenciaDias: int.parse(_carenciaDias.text.trim()),
-        data: _date.text.trim(),
-        protocoloId: _selectedProtocolo?.id,
-        notas: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+        medicamento: medVal,
+        dose: doseVal,
+        unidade: unidadeVal,
+        via: viaVal,
+        carenciaDias: carenciaVal,
+        data: dataVal,
+        protocoloId: protoVal,
+        notas: notasVal,
       );
       if (mounted) Navigator.of(context).pop<String?>(carenciaAte ?? '');
     } on ApiException catch (error) {
@@ -151,11 +164,24 @@ class _MedicationPageState extends State<MedicationPage> {
         setState(() => _error = error.message);
       }
     } catch (_) {
+      await _offlineQueue.enqueueMedication(
+        animalId: widget.animalId,
+        medicamento: medVal,
+        dose: doseVal,
+        unidade: unidadeVal,
+        via: viaVal,
+        carenciaDias: carenciaVal,
+        data: dataVal,
+        protocoloId: protoVal,
+        notas: notasVal,
+      );
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Salvo. Será enviado quando houver conexão.'),
+          ),
         );
+        Navigator.of(context).pop<String?>('');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
