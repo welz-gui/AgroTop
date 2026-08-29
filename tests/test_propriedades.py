@@ -54,7 +54,7 @@ class TestHierarquiaNasceCompleta(BaseB4):
 
     def test_seed_e_idempotente(self):
         """Rodar init_db duas vezes não pode duplicar a hierarquia."""
-        db.init_db()
+        db.init_db(forcar=True)   # a guarda pularia; aqui o seed tem de rodar
         self.assertEqual(len(self._linhas("SELECT id FROM properties")), 1)
 
     def test_padrao_devolve_a_propriedade_com_nomes_da_cadeia(self):
