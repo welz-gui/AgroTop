@@ -2186,7 +2186,11 @@ def get_fornecedor_ranking() -> list[dict]:
 
 @_cache
 def get_alert_animals() -> dict:
-    animals = get_all_animals()
+    # "ativo" + "carencia": animais em carência saem do status "ativo" (ver
+    # refresh_carencia_status), mas continuam no rebanho em manejo — é
+    # justamente a categoria "Em Carência" abaixo que precisa enxergá-los.
+    # Sem isso, a categoria nunca retorna nada (bug real, não achado da spec).
+    animals = get_all_animals(status="ativo") + get_all_animals(status="carencia")
     today   = date.today()
     sumidos, carencia_active, prontos = [], [], []
 
