@@ -80,7 +80,7 @@ jobs:
           # da 0027. Remover junto com esta branch.
           echo "===== APOS BASELINE: constraints de animals ====="
           psql -h localhost -U agrotop_test -d agrotop_test -Ac \
-            "SELECT conname||' | '||contype||' | '||pg_get_constraintdef(oid)
+            "SELECT conname||' | '||contype::text||' | '||pg_get_constraintdef(oid)
                FROM pg_constraint WHERE conrelid='public.animals'::regclass
               ORDER BY conname;"
           echo "===== APOS BASELINE: indices de animals ====="
@@ -91,7 +91,7 @@ jobs:
             n=$(basename "$f" | cut -c1-4)
             if [ "$n" = "0027" ]; then
               echo "===== ANTES DA 0027: constraints de animals ====="
-              psql -h localhost -U agrotop_test -d agrotop_test -Ac                 "SELECT conname||' | '||contype||' | '||pg_get_constraintdef(oid)
+              psql -h localhost -U agrotop_test -d agrotop_test -Ac                 "SELECT conname||' | '||contype::text||' | '||pg_get_constraintdef(oid)
                    FROM pg_constraint WHERE conrelid='public.animals'::regclass
                   ORDER BY conname;"
               echo "===== ANTES DA 0027: FKs que apontam para animals ====="
