@@ -128,11 +128,17 @@ class ApiClient {
     required String data,
     String method = 'pesado',
     String notes = '',
+    String? idempotencyKey,
   }) async {
     final response = await _authorized(
       (headers) => _http.post(
         Uri.parse('$baseUrl/animais/${Uri.encodeComponent(animalId)}/pesagens'),
-        headers: {...headers, 'Content-Type': 'application/json'},
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode({
           'peso': peso,
           'data': data,
@@ -218,11 +224,17 @@ class ApiClient {
     required String movementDate,
     String? reason = 'manejo',
     String? notes,
+    String? idempotencyKey,
   }) async {
     final response = await _authorized(
       (headers) => _http.post(
         Uri.parse('$baseUrl/animais/movimentar'),
-        headers: {...headers, 'Content-Type': 'application/json'},
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode({
           'animal_ids': animalIds,
           'to_lote_id': toLoteId,
@@ -290,13 +302,19 @@ class ApiClient {
     required String data,
     int? protocoloId,
     String? notas,
+    String? idempotencyKey,
   }) async {
     final response = await _authorized(
       (headers) => _http.post(
         Uri.parse(
           '$baseUrl/animais/${Uri.encodeComponent(animalId)}/medicamentos',
         ),
-        headers: {...headers, 'Content-Type': 'application/json'},
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode({
           'medicamento': medicamento,
           'dose': dose,

@@ -39,19 +39,36 @@ android {
         if (keystorePropertiesFile.exists()) {
             create("release") {
                 keyAlias = keystoreProperties["keyAlias"] as String?
+                    ?: error("keyAlias ausente em key.properties")
                 keyPassword = keystoreProperties["keyPassword"] as String?
-                storeFile = file(keystoreProperties["storeFile"] as String)
+                    ?: error("keyPassword ausente em key.properties")
+                // Relativo a android/app/ — se o .jks estiver em android/, use "../nome.jks".
+                storeFile = file(
+                    keystoreProperties["storeFile"] as String?
+                        ?: error("storeFile ausente em key.properties")
+                )
                 storePassword = keystoreProperties["storePassword"] as String?
+                    ?: error("storePassword ausente em key.properties")
             }
         }
     }
 
     buildTypes {
         release {
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
+            // Nunca cai para a chave de debug silenciosamente: um release assinado com
+            // debug e enviado à Play Store amarra essa chave como identidade permanente
+            // do app, sem possibilidade de troca depois. Falha alto e cedo em vez disso.
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                throw GradleException(
+                    "Build de release sem android/key.properties — a assinatura de debug " +
+                        "nunca deve gerar um release real (ficaria permanentemente amarrada " +
+                        "como identidade do app na Play Store). Crie android/key.properties " +
+                        "com storePassword/keyPassword/keyAlias/storeFile (caminho relativo " +
+                        "a android/app/), ou rode 'flutter build apk --debug' para um build " +
+                        "de teste."
+                )
             }
         }
     }

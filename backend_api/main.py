@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any, Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -24,11 +24,14 @@ from backend_api.auth import (
     verify_refresh_token,
 )
 from backend_api.config import ACCESS_TOKEN_EXPIRE_SECONDS
+from backend_api.idempotency import get_cached_response, store_response
 from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
+    AlertasOutput,
     CarenciaOutput,
     ConfirmarTratoInput,
+    ImportarPesagensOutput,
     LoginInput,
     LogoutInput,
     LoteSummary,
@@ -36,8 +39,10 @@ from backend_api.schemas import (
     MedicamentosOutput,
     MovimentarInput,
     MovimentarOutput,
+    PesagemAceita,
     PesagemInput,
     PesagemOutput,
+    PesagemRejeitada,
     PhotoSummary,
     PhotoUploadOutput,
     ProtocoloOutput,
@@ -50,13 +55,17 @@ from backend_api.schemas import (
 from database import (
     add_feeding_check,
     add_photo,
+    check_low_stock,
+    get_alert_animals,
     get_all_lotes,
+    get_gmd_target,
+    get_low_performance,
     get_pending_feedings,
     get_photo_image,
     get_photos,
 )
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
-from repositories.pesagens import add_weighing, calculate_gmd
+from repositories.pesagens import add_weighing, calculate_gmd, get_weighings_batch
 from repositories.sanidade import (
     add_medication,
     dose_for_animal,
@@ -64,10 +73,13 @@ from repositories.sanidade import (
     get_protocols,
     get_withdrawal_end,
 )
+from services.importacao import parse_pesagens
+from services.qualidade import avaliar_pesagem
 from services.zootecnia import calculate_gmd_total
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_PHOTO_MIMES = {"image/jpeg", "image/png", "image/jpg"}
+MAX_CSV_SIZE = 1 * 1024 * 1024  # 1 MB
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -84,6 +96,68 @@ app.add_middleware(SlowAPIMiddleware)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "app": "AgroTop Backend API"}
+
+
+@app.get("/alertas", response_model=AlertasOutput)
+def list_alertas(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, list[dict[str, Any]]]:
+    """Expõe os alertas operacionais já calculados para o app web."""
+    alertas = get_alert_animals()
+    meta_gmd = get_gmd_target()
+
+    return {
+        "sumidos": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "lote_id": str(animal["lote_id"]) if animal.get("lote_id") is not None else None,
+                "peso_atual": float(animal["current_weight"]),
+                "dias_sem_pesagem": int(animal["days_since_weighing"]),
+            }
+            for animal in alertas["sumidos"]
+        ],
+        "carencia": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "carencia_ate": animal["withdrawal_end"],
+                "dias_restantes": int(animal["days_remaining"]),
+            }
+            for animal in alertas["carencia"]
+        ],
+        "prontos_para_abate": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "peso_atual": float(animal["current_weight"]),
+                "peso_alvo": float(animal.get("target_weight") or 500),
+                "arrobas": float(animal["arrobas"]),
+            }
+            for animal in alertas["prontos"]
+        ],
+        "estoque_baixo": [
+            {
+                "insumo_id": int(insumo["id"]),
+                "nome": insumo["name"],
+                "estoque_atual": float(insumo["current_stock"]),
+                "estoque_minimo": float(insumo["min_stock"]),
+                "unidade": insumo["unit"],
+            }
+            for insumo in check_low_stock()
+        ],
+        "baixo_desempenho": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "lote_id": str(animal["lote_id"]) if animal.get("lote_id") is not None else None,
+                "peso_atual": float(animal["current_weight"]),
+                "gmd": float(animal["gmd"]),
+                "meta_gmd": meta_gmd,
+            }
+            for animal in get_low_performance(meta_gmd)
+        ],
+    }
 
 
 @app.post("/auth/login", response_model=TokenOutput)
@@ -208,8 +282,17 @@ def register_pesagem(
     animal_id: str,
     data: PesagemInput,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
-) -> PesagemOutput:
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> Any:
     """Registra uma nova pesagem para o animal autenticado pelo operador."""
+    endpoint = f"/animais/{animal_id}/pesagens"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     try:
         add_weighing(
             animal_id=animal_id,
@@ -225,13 +308,117 @@ def register_pesagem(
             detail=str(exc),
         )
 
-    return PesagemOutput(
-        status="success",
-        message="Pesagem registrada com sucesso.",
-        animal_id=animal_id,
-        peso=data.peso,
-        data=data.data,
-    )
+    out = {
+        "status": "success",
+        "message": "Pesagem registrada com sucesso.",
+        "animal_id": animal_id,
+        "peso": data.peso,
+        "data": data.data,
+    }
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+
+    return out
+
+
+@app.post("/pesagens/importar-csv", response_model=ImportarPesagensOutput)
+def importar_pesagens_csv(
+    arquivo: UploadFile = File(...),
+    confirmar: Optional[str] = Form(None),
+    user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
+) -> dict[str, Any]:
+    """Importa pesagens de um arquivo CSV/TXT do indicador da balança."""
+    filename = arquivo.filename or ""
+    lower_filename = filename.lower()
+    if not (lower_filename.endswith(".csv") or lower_filename.endswith(".txt")):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Arquivo deve ter extensão .csv ou .txt.",
+        )
+
+    try:
+        raw_bytes = arquivo.file.read()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Não foi possível ler o arquivo.",
+        )
+
+    if len(raw_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Arquivo vazio.",
+        )
+
+    if len(raw_bytes) > MAX_CSV_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Arquivo excede o tamanho máximo de 1 MB.",
+        )
+
+    try:
+        texto = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            texto = raw_bytes.decode("latin-1")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Não foi possível decodificar o arquivo.",
+            )
+
+    ativos = {a["id"] for a in get_all_animals(status="ativo")}
+    resultado = parse_pesagens(texto, ids_conhecidos=ativos)
+    aceitas_raw = resultado["aceitas"]
+    rejeitadas = resultado["rejeitadas"]
+    total_linhas = resultado["total_linhas"]
+
+    animal_ids = {linha["animal_id"] for linha in aceitas_raw}
+    all_weighings = get_weighings_batch(animal_ids)
+    hist: dict[str, list[dict[str, Any]]] = {}
+    for a_id in animal_ids:
+        hist[a_id] = [
+            {"peso": w["weight"], "data": w["weigh_date"]}
+            for w in all_weighings.get(a_id, [])
+        ]
+
+    aceitas_com_alertas = []
+    for linha in sorted(aceitas_raw, key=lambda x: (x["animal_id"], x["data"])):
+        alertas = avaliar_pesagem(linha["peso"], linha["data"], hist[linha["animal_id"]])
+        altos = [a["mensagem"] for a in alertas if a.get("severidade") == "alta"]
+        aceitas_com_alertas.append({
+            "animal_id": str(linha["animal_id"]),
+            "peso": float(linha["peso"]),
+            "data": str(linha["data"]),
+            "alertas": altos,
+        })
+        hist[linha["animal_id"]].insert(
+            0, {"peso": linha["peso"], "data": linha["data"]}
+        )
+
+    should_confirm = str(confirmar).lower() in ("true", "1", "t", "yes")
+    gravadas = 0
+
+    if should_confirm and aceitas_com_alertas:
+        operator = user.get("username", "") if user else ""
+        notes = f"importado de {filename}" if filename else "importado de CSV"
+        for linha in aceitas_com_alertas:
+            add_weighing(
+                animal_id=linha["animal_id"],
+                weight=linha["peso"],
+                weigh_date=linha["data"],
+                operator=operator,
+                notes=notes,
+                method="pesado",
+            )
+            gravadas += 1
+
+    return {
+        "total_linhas": total_linhas,
+        "aceitas": aceitas_com_alertas,
+        "rejeitadas": rejeitadas,
+        "gravadas": gravadas,
+    }
 
 
 @app.get("/lotes", response_model=list[LoteSummary])
@@ -255,8 +442,17 @@ def list_lotes(
 def movimentar_animais(
     data: MovimentarInput,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, list[str]]:
     """Transfere um ou mais animais para outro piquete (em lote)."""
+    endpoint = "/animais/movimentar"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     motivo = data.reason or "manejo"
     observacoes = data.notes or ""
     operador = user.get("username", "")
@@ -269,17 +465,28 @@ def movimentar_animais(
         operator=operador,
         notes=observacoes,
     )
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_200_OK, resultado)
     return resultado
 
 
 @app.post("/animais/{animal_id}/fotos", response_model=PhotoUploadOutput, status_code=status.HTTP_201_CREATED)
 def upload_animal_photo(
     animal_id: str,
+    response: Response,
     arquivo: UploadFile = File(...),
     taken_date: Optional[str] = Form(None),
     user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, int]:
     """Envia uma foto do animal (JPEG ou PNG, até 5 MB)."""
+    endpoint = f"/animais/{animal_id}/fotos"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     content_type = (arquivo.content_type or "").lower().strip()
     if content_type not in ALLOWED_PHOTO_MIMES:
         raise HTTPException(
@@ -315,7 +522,11 @@ def upload_animal_photo(
     if not photos:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao recuperar foto salva.")
 
-    return {"id": photos[0]["id"]}
+    out = {"id": photos[0]["id"]}
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+
+    return out
 
 
 @app.get("/animais/{animal_id}/fotos", response_model=list[PhotoSummary])
@@ -486,8 +697,17 @@ def register_medicamento(
     animal_id: str,
     data: MedicamentoInput,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, Optional[str]]:
     """Registra uma aplicação individual sem movimentar estoque."""
+    endpoint = f"/animais/{animal_id}/medicamentos"
+    if idempotency_key:
+        cached = get_cached_response(idempotency_key)
+        if cached is not None:
+            response.status_code = cached["status_code"]
+            return cached["response_body"]
+
     try:
         add_medication(
             animal_id=animal_id,
@@ -509,4 +729,7 @@ def register_medicamento(
         )
 
     carencia_ate = get_withdrawal_end(animal_id)
-    return {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
+    out = {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
+    if idempotency_key:
+        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+    return out

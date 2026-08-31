@@ -104,7 +104,7 @@ class TestDDLCompleto(unittest.TestCase):
         real_migrate = db._migrate
         db._migrate = lambda con: None
         try:
-            db.init_db()
+            db.init_db(forcar=True)   # mesmo caminho de banco: a guarda pularia
             so_ddl = _colunas(caminho)
         finally:
             db._migrate = real_migrate
@@ -123,7 +123,9 @@ class TestDDLCompleto(unittest.TestCase):
     def test_init_db_e_idempotente(self):
         """Rodar init_db() duas vezes não pode falhar nem alterar o schema."""
         db, caminho, antes = _schema_sqlite_novo()
-        db.init_db()  # segunda vez
+        # `forcar` porque a guarda de init_db() pularia a 2ª execução — e o que
+        # este teste quer conferir é justamente que ela roda sem estragar nada.
+        db.init_db(forcar=True)  # segunda vez
         self.assertEqual(_colunas(caminho), antes,
                          "init_db() não é idempotente — o schema mudou na 2ª execução")
 

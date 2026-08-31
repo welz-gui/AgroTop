@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -53,15 +57,29 @@ jobs:
         env:
           PGPASSWORD: agrotop_test
         run: |
+          # 0000_baseline_producao.sql é um snapshot de produção (tools/dump_schema_nuvem.py),
+          # não um schema vazio — a cada regeneração ele passa a incluir o efeito de
+          # todas as migrations aplicadas até aquele momento. Última regeneração:
+          # commit 95c8859, 2026-08-19 (já inclui até a migration 0024).
+          # Reaplicar uma migration já contida no baseline só é seguro se ela usar
+          # guarda (IF EXISTS/IF NOT EXISTS) — confirmado migration por migração até
+          # a 0024. A única exceção real é a 0017 (animals_uuid_vira_pk): faz
+          # DROP CONSTRAINT animals_pkey sem guarda, e o baseline já criou essa
+          # mesma constraint com 14 FKs dependendo dela — reaplicar quebra.
+          # ponytail: lista de exclusão manual, não detecção automática do que já
+          # está no baseline. Se 0000_baseline_producao.sql for regenerado de novo
+          # (procure por "chore: regenera baseline" no histórico), reconferir se
+          # alguma migration nova entre 0007 e a nova data de corte também precisa
+          # entrar nesta exclusão (só migrations sem IF EXISTS/IF NOT EXISTS em
+          # DROP/ALTER de constraint são candidatas).
           psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/0000_baseline_producao.sql
-          psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
-            -f supabase/migrations/0007_eventos_e_auditoria.sql
-          # A 0013 é aplicada à parte enquanto o baseline não for regenerado a
-          # partir da nuvem. Depois disso vira redundante — e inofensiva, porque
-          # é toda `IF NOT EXISTS`.
-          psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
-            -f supabase/migrations/0013_fila_de_sincronizacao.sql
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            n=$(basename "$f" | cut -c1-4)
+            if [ "$n" != "0000" ] && [ "$n" != "0017" ] && [ "$((10#$n))" -ge 7 ]; then
+              psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 -f "$f"
+            fi
+          done
 
       # tests/__init__.py continua forçando SQLite no processo principal. Os
       # testes de integração abrem subprocessos e removem essa trava somente

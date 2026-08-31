@@ -28,6 +28,7 @@ from backend_api.config import (
     TOKEN_ISSUER,
     get_secret_key,
 )
+from backend_api.idempotency import get_cached_response, store_response
 from backend_api.main import app, limiter
 from backend_api.schemas import ConfirmarTratoInput
 from repositories.animais import get_all_animals, get_animal
@@ -1008,6 +1009,541 @@ class TestTratoEndpoint(BackendApiTestCase):
             self.assertNotIn(field, ConfirmarTratoInput.model_fields)
 
 
+class TestIdempotency(BackendApiTestCase):
+    """Testes de idempotência nos endpoints de escrita (Spec 0059 / ADR 0006)."""
+
+    def test_idempotency_module_functions(self):
+        """Valida o funcionamento direto de get_cached_response e store_response."""
+        self.assertIsNone(get_cached_response(""))
+        self.assertIsNone(get_cached_response(None))
+        self.assertIsNone(get_cached_response("nonexistent-key"))
+
+        store_response("test-key-1", "/test/endpoint", 201, {"msg": "ok", "id": 123})
+        cached = get_cached_response("test-key-1")
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached["status_code"], 201)
+        self.assertEqual(cached["response_body"], {"msg": "ok", "id": 123})
+
+    def test_pesagem_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 2: POST /animais/{id}/pesagens com mesma Idempotency-Key gera 1 linha em weighings e respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "pesagem-uuid-1"}
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        payload = {"peso": 450.5, "data": "2026-08-25", "method": "manual", "notes": "Pesagem teste idempotencia"}
+
+        res1 = self.client.post(f"/animais/{animal_id}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 201)
+        body1 = res1.json()
+
+        # Segunda chamada com a mesma chave
+        res2 = self.client.post(f"/animais/{animal_id}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 201)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+
+        # Confere que existe apenas 1 pesagem gravada no banco
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM weighings WHERE notes = 'Pesagem teste idempotencia'").fetchall()
+            self.assertEqual(len(rows), 1)
+
+    def test_medicamentos_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 3: POST /animais/{id}/medicamentos com mesma Idempotency-Key gera 1 linha em medications e respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "med-uuid-1"}
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        payload = {
+            "medicamento": "Vacina Aftosa",
+            "dose": 5.0,
+            "unidade": "ml",
+            "via": "subcutanea",
+            "carencia_dias": 15,
+            "data": "2026-08-25",
+            "notas": "Dose de rotina idempotente",
+        }
+
+        res1 = self.client.post(f"/animais/{animal_id}/medicamentos", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 201)
+        body1 = res1.json()
+
+        res2 = self.client.post(f"/animais/{animal_id}/medicamentos", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 201)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM medications WHERE notes = 'Dose de rotina idempotente'").fetchall()
+            self.assertEqual(len(rows), 1)
+
+    def test_movimentar_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 3: POST /animais/movimentar com mesma Idempotency-Key executa uma vez e retorna respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "mov-uuid-1"}
+        animais = get_all_animals()
+        lotes = db.get_all_lotes()
+        origem_id = lotes[0]["id"]
+        destino_id = str(lotes[1]["id"])
+        a1_id = animais[0]["id"]
+        a2_id = animais[1]["id"]
+
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id IN (?, ?)", (origem_id, a1_id, a2_id))
+
+        payload = {
+            "animal_ids": [a1_id, a2_id],
+            "to_lote_id": destino_id,
+            "movement_date": "2026-08-25",
+            "reason": "Manejo rotina",
+            "notes": "Idempotency test movimentar",
+        }
+
+        res1 = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 200)
+        body1 = res1.json()
+
+        res2 = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 200)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM animal_movements WHERE notes = 'Idempotency test movimentar'").fetchall()
+            self.assertEqual(len(rows), 2)  # 2 animais movidos na única execução
+
+    def test_fotos_idempotente_mesma_chave_nao_duplica_e_retorna_mesma_resposta(self):
+        """Critério 3: POST /animais/{id}/fotos com mesma Idempotency-Key gera 1 foto em animal_photos e respostas idênticas."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "foto-uuid-1"}
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        animal_uuid = animal.get("uuid") or animal.get("animal_uuid")
+        photo_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xff\xdb\x00C\x00"
+
+        res1 = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("foto.jpg", photo_bytes, "image/jpeg")},
+            data={"taken_date": "2026-08-25"},
+            headers=headers,
+        )
+        self.assertEqual(res1.status_code, 201)
+        body1 = res1.json()
+
+        res2 = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("foto.jpg", photo_bytes, "image/jpeg")},
+            data={"taken_date": "2026-08-25"},
+            headers=headers,
+        )
+        self.assertEqual(res2.status_code, 201)
+        body2 = res2.json()
+
+        self.assertEqual(body1, body2)
+        self.assertEqual(body1["id"], body2["id"])
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM animal_photos WHERE animal_uuid = ?", (animal_uuid,)).fetchall()
+            self.assertEqual(len(rows), 1)
+
+    def test_chaves_diferentes_fazem_duas_escritas_normais(self):
+        """Critério 4: Duas chamadas com chaves diferentes fazem duas escritas normais."""
+        token = self._get_access_token()
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        payload = {"peso": 460.0, "data": "2026-08-25", "method": "manual", "notes": "Pesagem diff key"}
+
+        res1 = self.client.post(
+            f"/animais/{animal_id}/pesagens",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "key-alpha"},
+        )
+        self.assertEqual(res1.status_code, 201)
+
+        res2 = self.client.post(
+            f"/animais/{animal_id}/pesagens",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "key-beta"},
+        )
+        self.assertEqual(res2.status_code, 201)
+
+        with _conn() as con:
+            rows = con.execute("SELECT * FROM weighings WHERE notes = 'Pesagem diff key'").fetchall()
+            self.assertEqual(len(rows), 2)
+
+    def test_chamada_que_falha_nao_grava_chave_e_permite_tentativa_com_mesma_chave(self):
+        """Critério 5: Chamada com erro (ex. 404) não grava a chave; retry com mesma chave executa normalmente."""
+        token = self._get_access_token()
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "fail-then-retry-key"}
+        payload = {"peso": 470.0, "data": "2026-08-25", "method": "manual"}
+
+        # Primeira chamada falha com 404 (animal inexistente)
+        res_fail = self.client.post("/animais/999999/pesagens", json=payload, headers=headers)
+        self.assertEqual(res_fail.status_code, 404)
+
+        # Confirma que a chave NÃO foi gravada em cache
+        self.assertIsNone(get_cached_response("fail-then-retry-key"))
+
+        # Segunda chamada com animal válido e a MESMA chave tem sucesso (201)
+        res_success = self.client.post(f"/animais/{animal_id}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res_success.status_code, 201)
+
+        # Agora a chave foi gravada com sucesso
+        cached = get_cached_response("fail-then-retry-key")
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached["status_code"], 201)
+
+
+class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def _count_weighings(self):
+        with _conn() as con:
+            return con.execute("SELECT COUNT(*) FROM weighings").fetchone()[0]
+
+    def test_post_importar_csv_sem_token_retorna_401(self):
+        """Critério 1: POST /pesagens/importar-csv sem Authorization devolve 401."""
+        csv_content = b"animal,peso,data\nBR0001,450.0,2026-08-20\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", csv_content, "text/csv")},
+            data={"confirmar": "false"},
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_post_importar_csv_confirmar_false_ou_ausente_nao_grava_no_banco(self):
+        """Critério 2: Com confirmar=false (ou ausente), nada é gravado no banco."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        self.assertTrue(len(animals) >= 2)
+        a1, a2 = animals[0]["id"], animals[1]["id"]
+
+        csv_content = f"brinco;peso;data\n{a1};480,5;2026-08-20\n{a2};510,0;2026-08-21\n".encode("utf-8")
+
+        count_before = self._count_weighings()
+
+        # Sem confirmar (ausente)
+        res1 = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", csv_content, "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res1.status_code, 200)
+        data1 = res1.json()
+        self.assertEqual(data1["gravadas"], 0)
+        self.assertEqual(len(data1["aceitas"]), 2)
+        self.assertEqual(self._count_weighings(), count_before)
+
+        # Com confirmar=false
+        res2 = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", csv_content, "text/csv")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res2.status_code, 200)
+        data2 = res2.json()
+        self.assertEqual(data2["gravadas"], 0)
+        self.assertEqual(len(data2["aceitas"]), 2)
+        self.assertEqual(self._count_weighings(), count_before)
+
+    def test_post_importar_csv_confirmar_true_grava_no_banco(self):
+        """Critério 3: Com confirmar=true, novas linhas em weighings bate com gravadas == len(aceitas)."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        self.assertTrue(len(animals) >= 2)
+        a1, a2 = animals[0]["id"], animals[1]["id"]
+
+        csv_content = f"brinco;peso;data\n{a1};480.5;2026-08-20\n{a2};510.0;2026-08-21\n".encode("utf-8")
+
+        count_before = self._count_weighings()
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("balanca.csv", csv_content, "text/csv")},
+            data={"confirmar": "true"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["gravadas"], 2)
+        self.assertEqual(data["gravadas"], len(data["aceitas"]))
+        self.assertEqual(self._count_weighings(), count_before + 2)
+
+    def test_post_importar_csv_resultado_identico_ao_parse_pesagens(self):
+        """Critério 4: aceitas, rejeitadas e total_linhas conferem com services.importacao.parse_pesagens."""
+        from services.importacao import parse_pesagens
+
+        ativos = {a["id"] for a in get_all_animals(status="ativo")}
+        csv_text = "animal,peso,data\nBR0001,450.0,2026-08-20\nINVALIDO,abc,2026-08-20\nINEXISTENTE_9999,500.0,2026-08-20\n"
+        csv_bytes = csv_text.encode("utf-8")
+
+        expected_parse = parse_pesagens(csv_text, ids_conhecidos=ativos)
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("teste.csv", csv_bytes, "text/csv")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+
+        self.assertEqual(data["total_linhas"], expected_parse["total_linhas"])
+        self.assertEqual(len(data["rejeitadas"]), len(expected_parse["rejeitadas"]))
+        for r_api, r_exp in zip(data["rejeitadas"], expected_parse["rejeitadas"]):
+            self.assertEqual(r_api["linha"], r_exp["linha"])
+            self.assertEqual(r_api["conteudo"], r_exp["conteudo"])
+            self.assertEqual(r_api["motivo"], r_exp["motivo"])
+
+        self.assertEqual(len(data["aceitas"]), len(expected_parse["aceitas"]))
+        expected_sorted = sorted(expected_parse["aceitas"], key=lambda x: (x["animal_id"], x["data"]))
+        for a_api, a_exp in zip(data["aceitas"], expected_sorted):
+            self.assertEqual(a_api["animal_id"], a_exp["animal_id"])
+            self.assertEqual(a_api["peso"], a_exp["peso"])
+            self.assertEqual(a_api["data"], a_exp["data"])
+
+    def test_post_importar_csv_alertas_severidade_alta(self):
+        """Critério 5: Alertas batem com severidade alta de avaliar_pesagem."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1, a2 = animals[0]["id"], animals[1]["id"]
+        w2 = float(animals[1].get("current_weight") or 400.0)
+
+        # a1 tem peso com variação absurda (> 20%), a2 tem peso idêntico ao atual (sem alerta de variação/GMD)
+        csv_text = f"brinco,peso,data\n{a1},800.0,2026-08-20\n{a2},{w2:.1f},2026-08-20\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("alertas.csv", csv_text.encode("utf-8"), "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        aceitas_map = {item["animal_id"]: item for item in data["aceitas"]}
+
+        self.assertIn(a1, aceitas_map)
+        self.assertIn(a2, aceitas_map)
+        self.assertTrue(len(aceitas_map[a1]["alertas"]) >= 1)
+        self.assertTrue(any("Variação" in alerta or "fora da faixa" in alerta for alerta in aceitas_map[a1]["alertas"]))
+        self.assertEqual(len(aceitas_map[a2]["alertas"]), 0)
+
+    def test_post_importar_csv_acumulo_historico_mesmo_animal(self):
+        """Critério 6: Duas linhas do mesmo animal fazem a segunda enxergar a primeira no histórico."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1 = animals[0]["id"]
+
+        # Primeira pesagem em 2026-08-01 com 400kg. Segunda pesagem em 2026-08-02 com 800kg (GMD absurdo de 400kg/dia -> gera alerta)
+        csv_text = f"brinco,peso,data\n{a1},400.0,2026-08-01\n{a1},800.0,2026-08-02\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("duas_pesagens.csv", csv_text.encode("utf-8"), "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["aceitas"]), 2)
+
+        # Primeira pesagem (400kg)
+        self.assertEqual(data["aceitas"][0]["peso"], 400.0)
+        # Segunda pesagem (800kg) enxergou os 400kg no histórico acumulado e gerou alerta de variação
+        self.assertEqual(data["aceitas"][1]["peso"], 800.0)
+        self.assertTrue(len(data["aceitas"][1]["alertas"]) >= 1)
+
+    def test_post_importar_csv_operator_vem_do_token(self):
+        """Critério 7: operator gravado em weighings é o usuário do token, ignorando campos extras."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1 = animals[0]["id"]
+
+        csv_text = f"brinco,peso,data\n{a1},460.0,2026-08-20\n"
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagem_op.csv", csv_text.encode("utf-8"), "text/csv")},
+            data={"confirmar": "true", "operator": "hacker_operator"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+
+        with _conn() as con:
+            row = con.execute(
+                "SELECT operator, notes FROM weighings WHERE animal_uuid = (SELECT uuid FROM animals WHERE id = ?) ORDER BY id DESC LIMIT 1",
+                (a1,),
+            ).fetchone()
+            self.assertEqual(row["operator"], "testuser")
+            self.assertIn("importado de pesagem_op.csv", row["notes"])
+
+    def test_post_importar_csv_latin1_encoding(self):
+        """Critério 8: Arquivo em latin-1 (cp1252) é decodificado e aceito corretamente."""
+        animals = [a for a in get_all_animals(status="ativo")]
+        a1 = animals[0]["id"]
+
+        # Cabeçalho com acentuação em latin-1
+        csv_latin1 = f"cabeçalho_não_usado\n{a1};475,5;2026-08-20\n".encode("latin-1")
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("balanca_latin1.txt", csv_latin1, "text/plain")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(len(data["aceitas"]), 1)
+        self.assertEqual(data["aceitas"][0]["animal_id"], a1)
+        self.assertEqual(data["aceitas"][0]["peso"], 475.5)
+
+    def test_post_importar_csv_validacoes_tamanho_e_extensao(self):
+        """Critério 9: Arquivo > 1MB retorna 413, arquivo vazio ou extensão inválida retorna 422."""
+        # Arquivo > 1 MB
+        big_bytes = b"a,100,2026-08-20\n" * 70000  # > 1 MB
+        res_big = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("grande.csv", big_bytes, "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res_big.status_code, 413)
+
+        # Arquivo vazio
+        res_empty = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("vazio.csv", b"", "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res_empty.status_code, 422)
+
+        # Extensão inválida (.pdf)
+        res_ext = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.pdf", b"qualquer conteudo", "application/pdf")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res_ext.status_code, 422)
+
+    def test_backend_api_nao_duplica_sql_pesagens_importacao(self):
+        """Critério 10: backend_api não contém SQL direto de escrita em weighings ou animals."""
+        source = inspect.getsource(main_mod)
+        self.assertNotIn("INSERT INTO weighings", source)
+        self.assertNotIn("UPDATE animals SET current_weight", source)
+
+
+class TestAlertasEndpoint(BackendApiTestCase):
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def test_get_alertas_sem_token_retorna_401(self):
+        """Critério 1 (Spec 0063): alertas exige autenticação."""
+        response = self.client.get("/alertas")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_alertas_sem_itens_retorna_cinco_listas_vazias(self):
+        """Critério 2: fazenda sem alerta mantém todas as categorias no contrato."""
+        with patch.object(main_mod, "get_alert_animals", return_value={"sumidos": [], "carencia": [], "prontos": []}), \
+             patch.object(main_mod, "check_low_stock", return_value=[]), \
+             patch.object(main_mod, "get_low_performance", return_value=[]):
+            response = self.client.get("/alertas", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "sumidos": [],
+                "carencia": [],
+                "prontos_para_abate": [],
+                "estoque_baixo": [],
+                "baixo_desempenho": [],
+            },
+        )
+
+    def test_get_alertas_expoe_alertas_calculados_pelas_funcoes_existentes(self):
+        """Critérios 2–7: a rota só adapta os cinco conjuntos já calculados."""
+        today = date.today()
+        lote_id = str(db.get_all_lotes()[0]["id"])
+
+        def add_animal(animal_id, weight, target_weight, entry_date):
+            db.add_animal(
+                animal_id,
+                "Nelore",
+                "M",
+                None,
+                entry_date.isoformat(),
+                weight,
+                target_weight,
+                0.0,
+                lote_id,
+                None,
+            )
+
+        add_animal("ALERTA_SUMIDO", 410.0, 500.0, today - timedelta(days=31))
+        add_animal("ALERTA_RECENTE", 410.0, 500.0, today)
+        add_animal("ALERTA_CARENCIA", 410.0, 500.0, today)
+        add_animal("ALERTA_CARENCIA_VENCIDA", 410.0, 500.0, today)
+        add_animal("ALERTA_ABATE", 520.0, None, today)
+        add_animal("ALERTA_NAO_ABATE", 499.0, None, today)
+        add_animal("ALERTA_GMD", 300.0, 500.0, today - timedelta(days=20))
+        add_animal("ALERTA_SEM_GMD", 300.0, 500.0, today)
+
+        add_medication(
+            "ALERTA_CARENCIA",
+            "Medicamento com carência",
+            1.0,
+            "mL",
+            "Subcutânea",
+            4,
+            today.isoformat(),
+            applied_by="teste",
+        )
+        add_medication(
+            "ALERTA_CARENCIA_VENCIDA",
+            "Medicamento vencido",
+            1.0,
+            "mL",
+            "Subcutânea",
+            2,
+            (today - timedelta(days=5)).isoformat(),
+            applied_by="teste",
+        )
+        db.add_weighing("ALERTA_GMD", 308.0, today.isoformat())
+        db.set_setting("gmd_meta", "0.5")
+        with _conn() as con:
+            stock_id = con.execute(
+                """INSERT INTO insumos
+                   (name, category, unit, current_stock, min_stock, cost_per_unit)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                ("Estoque no mínimo", "Ração", "kg", 5.0, 5.0, 1.0),
+            ).lastrowid
+            con.execute(
+                """INSERT INTO insumos
+                   (name, category, unit, current_stock, min_stock, cost_per_unit)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                ("Estoque suficiente", "Ração", "kg", 6.0, 5.0, 1.0),
+            )
+        db.clear_cache()
+
+        response = self.client.get("/alertas", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        alertas = response.json()
+        sumidos = {item["animal_id"]: item for item in alertas["sumidos"]}
+        carencia = {item["animal_id"]: item for item in alertas["carencia"]}
+        prontos = {item["animal_id"]: item for item in alertas["prontos_para_abate"]}
+        estoque = {item["insumo_id"]: item for item in alertas["estoque_baixo"]}
+        desempenho = {item["animal_id"]: item for item in alertas["baixo_desempenho"]}
+
+        self.assertEqual(sumidos["ALERTA_SUMIDO"]["dias_sem_pesagem"], 31)
+        self.assertNotIn("ALERTA_RECENTE", sumidos)
+        self.assertEqual(carencia["ALERTA_CARENCIA"]["dias_restantes"], 4)
+        self.assertNotIn("ALERTA_CARENCIA_VENCIDA", carencia)
+        self.assertEqual(prontos["ALERTA_ABATE"]["peso_alvo"], 500.0)
+        self.assertNotIn("ALERTA_NAO_ABATE", prontos)
+        self.assertEqual(estoque[stock_id]["estoque_atual"], 5.0)
+        self.assertEqual(estoque[stock_id]["estoque_minimo"], 5.0)
+        self.assertNotIn("Estoque suficiente", {item["nome"] for item in estoque.values()})
+        self.assertEqual(desempenho["ALERTA_GMD"]["gmd"], 0.4)
+        self.assertEqual(desempenho["ALERTA_GMD"]["meta_gmd"], 0.5)
+        self.assertNotIn("ALERTA_SEM_GMD", desempenho)
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
@@ -1035,3 +1571,4 @@ class TestSecurityAndIsolation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -118,8 +118,7 @@ CREATE TABLE IF NOT EXISTS animals (
     peso_nascimento double precision,
     origem text DEFAULT 'comprado'::text NOT NULL,
     CONSTRAINT animals_pkey PRIMARY KEY (uuid),
-    CONSTRAINT animals_id_key UNIQUE (id),
-    CONSTRAINT animals_uuid_key UNIQUE (uuid)
+    CONSTRAINT animals_id_key UNIQUE (id)
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -587,6 +586,12 @@ CREATE TABLE IF NOT EXISTS weighings (
     animal_uuid text NOT NULL,
     CONSTRAINT weighings_pkey PRIMARY KEY (id)
 );
+
+-- UNIQUE sobre as mesmas colunas da PRIMARY KEY. Fora do CREATE TABLE de
+-- propósito: declarada inline, o PostgreSQL descarta em silêncio, e o
+-- replay deixa de reproduzir a produção (ver _redundante_com_a_pk em
+-- tools/dump_schema_nuvem.py).
+ALTER TABLE animals ADD CONSTRAINT animals_uuid_key UNIQUE (uuid);
 
 -- Chaves estrangeiras aplicadas ao final: assim a ordem de
 -- criação das tabelas acima não importa.

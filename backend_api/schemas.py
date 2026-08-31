@@ -186,3 +186,72 @@ class ConfirmarTratoInput(BaseModel):
     quantidade_aplicada: float
     baixar_estoque: bool
     notas: Optional[str] = None
+
+
+class PesagemAceita(BaseModel):
+    animal_id: str
+    peso: float
+    data: str
+    alertas: list[str] = Field(default_factory=list)
+
+
+class PesagemRejeitada(BaseModel):
+    linha: int
+    conteudo: str
+    motivo: str
+
+
+class ImportarPesagensOutput(BaseModel):
+    total_linhas: int
+    aceitas: list[PesagemAceita]
+    rejeitadas: list[PesagemRejeitada]
+    gravadas: int
+
+
+class AlertaSumidoOutput(BaseModel):
+    animal_id: str
+    breed: str
+    lote_id: Optional[str] = None
+    peso_atual: float
+    dias_sem_pesagem: int
+
+
+class AlertaCarenciaOutput(BaseModel):
+    animal_id: str
+    breed: str
+    carencia_ate: str
+    dias_restantes: int
+
+
+class AlertaAbateOutput(BaseModel):
+    animal_id: str
+    breed: str
+    peso_atual: float
+    peso_alvo: float
+    arrobas: float
+
+
+class AlertaEstoqueBaixoOutput(BaseModel):
+    insumo_id: int
+    nome: str
+    estoque_atual: float
+    estoque_minimo: float
+    unidade: str
+
+
+class AlertaBaixoDesempenhoOutput(BaseModel):
+    animal_id: str
+    breed: str
+    lote_id: Optional[str] = None
+    peso_atual: float
+    gmd: float
+    meta_gmd: float
+
+
+class AlertasOutput(BaseModel):
+    sumidos: list[AlertaSumidoOutput]
+    carencia: list[AlertaCarenciaOutput]
+    prontos_para_abate: list[AlertaAbateOutput]
+    estoque_baixo: list[AlertaEstoqueBaixoOutput]
+    baixo_desempenho: list[AlertaBaixoDesempenhoOutput]
+
