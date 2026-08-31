@@ -1427,6 +1427,123 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
         self.assertNotIn("UPDATE animals SET current_weight", source)
 
 
+class TestAlertasEndpoint(BackendApiTestCase):
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def test_get_alertas_sem_token_retorna_401(self):
+        """Critério 1 (Spec 0063): alertas exige autenticação."""
+        response = self.client.get("/alertas")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_alertas_sem_itens_retorna_cinco_listas_vazias(self):
+        """Critério 2: fazenda sem alerta mantém todas as categorias no contrato."""
+        with patch.object(main_mod, "get_alert_animals", return_value={"sumidos": [], "carencia": [], "prontos": []}), \
+             patch.object(main_mod, "check_low_stock", return_value=[]), \
+             patch.object(main_mod, "get_low_performance", return_value=[]):
+            response = self.client.get("/alertas", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "sumidos": [],
+                "carencia": [],
+                "prontos_para_abate": [],
+                "estoque_baixo": [],
+                "baixo_desempenho": [],
+            },
+        )
+
+    def test_get_alertas_expoe_alertas_calculados_pelas_funcoes_existentes(self):
+        """Critérios 2–7: a rota só adapta os cinco conjuntos já calculados."""
+        today = date.today()
+        lote_id = str(db.get_all_lotes()[0]["id"])
+
+        def add_animal(animal_id, weight, target_weight, entry_date):
+            db.add_animal(
+                animal_id,
+                "Nelore",
+                "M",
+                None,
+                entry_date.isoformat(),
+                weight,
+                target_weight,
+                0.0,
+                lote_id,
+                None,
+            )
+
+        add_animal("ALERTA_SUMIDO", 410.0, 500.0, today - timedelta(days=31))
+        add_animal("ALERTA_RECENTE", 410.0, 500.0, today)
+        add_animal("ALERTA_CARENCIA", 410.0, 500.0, today)
+        add_animal("ALERTA_CARENCIA_VENCIDA", 410.0, 500.0, today)
+        add_animal("ALERTA_ABATE", 520.0, None, today)
+        add_animal("ALERTA_NAO_ABATE", 499.0, None, today)
+        add_animal("ALERTA_GMD", 300.0, 500.0, today - timedelta(days=20))
+        add_animal("ALERTA_SEM_GMD", 300.0, 500.0, today)
+
+        add_medication(
+            "ALERTA_CARENCIA",
+            "Medicamento com carência",
+            1.0,
+            "mL",
+            "Subcutânea",
+            4,
+            today.isoformat(),
+            applied_by="teste",
+        )
+        add_medication(
+            "ALERTA_CARENCIA_VENCIDA",
+            "Medicamento vencido",
+            1.0,
+            "mL",
+            "Subcutânea",
+            2,
+            (today - timedelta(days=5)).isoformat(),
+            applied_by="teste",
+        )
+        db.add_weighing("ALERTA_GMD", 308.0, today.isoformat())
+        db.set_setting("gmd_meta", "0.5")
+        with _conn() as con:
+            stock_id = con.execute(
+                """INSERT INTO insumos
+                   (name, category, unit, current_stock, min_stock, cost_per_unit)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                ("Estoque no mínimo", "Ração", "kg", 5.0, 5.0, 1.0),
+            ).lastrowid
+            con.execute(
+                """INSERT INTO insumos
+                   (name, category, unit, current_stock, min_stock, cost_per_unit)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                ("Estoque suficiente", "Ração", "kg", 6.0, 5.0, 1.0),
+            )
+        db.clear_cache()
+
+        response = self.client.get("/alertas", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        alertas = response.json()
+        sumidos = {item["animal_id"]: item for item in alertas["sumidos"]}
+        carencia = {item["animal_id"]: item for item in alertas["carencia"]}
+        prontos = {item["animal_id"]: item for item in alertas["prontos_para_abate"]}
+        estoque = {item["insumo_id"]: item for item in alertas["estoque_baixo"]}
+        desempenho = {item["animal_id"]: item for item in alertas["baixo_desempenho"]}
+
+        self.assertEqual(sumidos["ALERTA_SUMIDO"]["dias_sem_pesagem"], 31)
+        self.assertNotIn("ALERTA_RECENTE", sumidos)
+        self.assertEqual(carencia["ALERTA_CARENCIA"]["dias_restantes"], 4)
+        self.assertNotIn("ALERTA_CARENCIA_VENCIDA", carencia)
+        self.assertEqual(prontos["ALERTA_ABATE"]["peso_alvo"], 500.0)
+        self.assertNotIn("ALERTA_NAO_ABATE", prontos)
+        self.assertEqual(estoque[stock_id]["estoque_atual"], 5.0)
+        self.assertEqual(estoque[stock_id]["estoque_minimo"], 5.0)
+        self.assertNotIn("Estoque suficiente", {item["nome"] for item in estoque.values()})
+        self.assertEqual(desempenho["ALERTA_GMD"]["gmd"], 0.4)
+        self.assertEqual(desempenho["ALERTA_GMD"]["meta_gmd"], 0.5)
+        self.assertNotIn("ALERTA_SEM_GMD", desempenho)
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
