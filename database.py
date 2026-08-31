@@ -964,7 +964,25 @@ _SCHEMA_SQL = """
             );
 """
 
-def init_db() -> None:
+_INICIALIZADO_EM = None
+
+
+def init_db(forcar: bool = False) -> None:
+    """Cria/atualiza o schema e semeia os dados obrigatórios.
+
+    `app.py` chama isto a cada rerun do Streamlit, e antes da guarda abaixo
+    todo clique pagava 1 conexão + 11 queries de seed e backfill (~0,45 s em
+    produção). O trabalho é idempotente, mas repeti-lo não tem valor: uma vez
+    por processo e por banco basta.
+
+    `forcar=True` ignora a guarda — é como os testes de idempotência conferem
+    que rodar duas vezes de verdade não duplica nem altera nada.
+    """
+    global _INICIALIZADO_EM
+    alvo = _conexao.DATABASE_URL or _conexao.DB_PATH
+    if not forcar and _INICIALIZADO_EM == alvo:
+        return
+
     with _conn() as con:
         if not _conexao.USE_PG:
             con.executescript(_SCHEMA_SQL)
@@ -989,6 +1007,9 @@ def init_db() -> None:
         # Safety net só para banco EXISTENTE, criado antes da B4 — o seed
         # novo acima já não deixa NULL nenhum para este backfill cobrir.
         propriedades._backfill_property_id(con)
+
+    # Só depois de tudo dar certo: um init que falhou no meio precisa rodar de novo.
+    _INICIALIZADO_EM = alvo
 
 
 def _migrate(con) -> None:
