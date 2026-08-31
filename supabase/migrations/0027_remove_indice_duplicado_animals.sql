@@ -83,7 +83,14 @@ ALTER TABLE public.partos DROP CONSTRAINT partos_mae_uuid_fkey;
 ALTER TABLE public.sales DROP CONSTRAINT fk_sales_animal_uuid;
 ALTER TABLE public.weighings DROP CONSTRAINT fk_weighings_animal_uuid;
 
-ALTER TABLE public.animals DROP CONSTRAINT animals_uuid_key;
+-- IF EXISTS: em replay a partir de 0000_baseline_producao.sql (dump de schema,
+-- não histórico incremental), o Postgres pode já ter amarrado as 14 FKs a
+-- animals_pkey na criação (não preserva qual índice cada FK usava
+-- originalmente em produção) — nesse cenário animals_uuid_key nunca chega a
+-- ficar referenciado, e pode já não existir isoladamente. Em produção real
+-- (onde esta migration já foi aplicada via MCP, ver histórico acima) o
+-- comportamento documentado nas seções anteriores é o que de fato ocorreu.
+ALTER TABLE public.animals DROP CONSTRAINT IF EXISTS animals_uuid_key;
 
 ALTER TABLE public.animal_costs ADD CONSTRAINT fk_animal_costs_animal_uuid FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
 ALTER TABLE public.animal_events ADD CONSTRAINT animal_events_animal_uuid_fkey FOREIGN KEY (animal_uuid) REFERENCES public.animals(uuid);
