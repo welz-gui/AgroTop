@@ -21,6 +21,8 @@ class _FeedingPageState extends State<FeedingPage> {
   List<PendingFeeding>? _feedings;
   String? _error;
 
+  final _quickConfirming = <int>{};
+
   @override
   void initState() {
     super.initState();
@@ -50,7 +52,7 @@ class _FeedingPageState extends State<FeedingPage> {
     }
   }
 
-  Future<void> _confirm(PendingFeeding feeding) async {
+  Future<void> _openDetail(PendingFeeding feeding) async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -71,6 +73,61 @@ class _FeedingPageState extends State<FeedingPage> {
     });
   }
 
+  Future<void> _quickConfirm(PendingFeeding feeding) async {
+    if (_quickConfirming.contains(feeding.planId)) return;
+    setState(() => _quickConfirming.add(feeding.planId));
+    try {
+      await widget.api.confirmFeeding(
+        feeding.planId,
+        situation: 'feito',
+        quantityApplied: feeding.quantidade,
+        deductStock: feeding.insumoId != null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _feedings = _feedings!
+            .map(
+              (item) =>
+                  item.planId == feeding.planId ? item.confirmedNow() : item,
+            )
+            .toList(growable: false);
+      });
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text('Trato confirmado: ${feeding.produto}')),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      if (error.statusCode == 401) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        widget.onUnauthorized();
+      } else {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'API indisponível. Verifique a conexão e tente novamente.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _quickConfirming.remove(feeding.planId));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final feedings = _feedings;
@@ -80,16 +137,28 @@ class _FeedingPageState extends State<FeedingPage> {
           ? _error == null
                 ? const Center(child: CircularProgressIndicator())
                 : _LoadError(message: _error!, onRetry: _load)
-          : _FeedingList(feedings: feedings, onConfirm: _confirm),
+          : _FeedingList(
+              feedings: feedings,
+              onOpenDetail: _openDetail,
+              onQuickConfirm: _quickConfirm,
+              quickConfirming: _quickConfirming,
+            ),
     );
   }
 }
 
 class _FeedingList extends StatelessWidget {
-  const _FeedingList({required this.feedings, required this.onConfirm});
+  const _FeedingList({
+    required this.feedings,
+    required this.onOpenDetail,
+    required this.onQuickConfirm,
+    required this.quickConfirming,
+  });
 
   final List<PendingFeeding> feedings;
-  final ValueChanged<PendingFeeding> onConfirm;
+  final ValueChanged<PendingFeeding> onOpenDetail;
+  final ValueChanged<PendingFeeding> onQuickConfirm;
+  final Set<int> quickConfirming;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +203,9 @@ class _FeedingList extends StatelessWidget {
                 loteId: entry.key,
                 loteNome: entry.value.first.loteNome,
                 feedings: entry.value,
-                onConfirm: onConfirm,
+                onOpenDetail: onOpenDetail,
+                onQuickConfirm: onQuickConfirm,
+                quickConfirming: quickConfirming,
               ),
               const SizedBox(height: 12),
             ],
@@ -149,13 +220,17 @@ class _LoteFeedingSection extends StatelessWidget {
     required this.loteId,
     required this.loteNome,
     required this.feedings,
-    required this.onConfirm,
+    required this.onOpenDetail,
+    required this.onQuickConfirm,
+    required this.quickConfirming,
   });
 
   final String loteId;
   final String loteNome;
   final List<PendingFeeding> feedings;
-  final ValueChanged<PendingFeeding> onConfirm;
+  final ValueChanged<PendingFeeding> onOpenDetail;
+  final ValueChanged<PendingFeeding> onQuickConfirm;
+  final Set<int> quickConfirming;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -181,7 +256,12 @@ class _LoteFeedingSection extends StatelessWidget {
             ),
           ),
           for (final feeding in feedings)
-            _FeedingItem(feeding: feeding, onConfirm: onConfirm),
+            _FeedingItem(
+              feeding: feeding,
+              onOpenDetail: onOpenDetail,
+              onQuickConfirm: onQuickConfirm,
+              isQuickConfirming: quickConfirming.contains(feeding.planId),
+            ),
         ],
       ),
     ),
@@ -189,10 +269,17 @@ class _LoteFeedingSection extends StatelessWidget {
 }
 
 class _FeedingItem extends StatelessWidget {
-  const _FeedingItem({required this.feeding, required this.onConfirm});
+  const _FeedingItem({
+    required this.feeding,
+    required this.onOpenDetail,
+    required this.onQuickConfirm,
+    this.isQuickConfirming = false,
+  });
 
   final PendingFeeding feeding;
-  final ValueChanged<PendingFeeding> onConfirm;
+  final ValueChanged<PendingFeeding> onOpenDetail;
+  final ValueChanged<PendingFeeding> onQuickConfirm;
+  final bool isQuickConfirming;
 
   @override
   Widget build(BuildContext context) {
@@ -201,6 +288,7 @@ class _FeedingItem extends StatelessWidget {
       opacity: confirmed ? 0.65 : 1,
       child: ListTile(
         key: ValueKey('feeding-item-${feeding.planId}'),
+        onTap: confirmed ? null : () => onOpenDetail(feeding),
         leading: Icon(
           confirmed ? Icons.check_circle : Icons.radio_button_unchecked,
           color: confirmed ? Theme.of(context).colorScheme.primary : null,
@@ -213,12 +301,17 @@ class _FeedingItem extends StatelessWidget {
         isThreeLine: confirmed,
         trailing: confirmed
             ? const Icon(Icons.done, semanticLabel: 'Confirmado')
-            : IconButton(
-                key: ValueKey('confirm-feeding-${feeding.planId}'),
-                tooltip: 'Confirmar trato',
-                icon: const Icon(Icons.check),
-                onPressed: () => onConfirm(feeding),
-              ),
+            : isQuickConfirming
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    key: ValueKey('confirm-feeding-${feeding.planId}'),
+                    tooltip: 'Confirmação rápida',
+                    icon: const Icon(Icons.check),
+                    onPressed: () => onQuickConfirm(feeding),
+                  ),
       ),
     );
   }
@@ -244,13 +337,14 @@ class _FeedingConfirmationSheetState extends State<_FeedingConfirmationSheet> {
   late final TextEditingController _quantity;
   final _notes = TextEditingController();
   var _situation = 'feito';
-  var _deductStock = false;
+  late bool _deductStock;
   var _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _deductStock = widget.feeding.insumoId != null;
     _quantity = TextEditingController(
       text: widget.feeding.quantidade.toStringAsFixed(2),
     );
