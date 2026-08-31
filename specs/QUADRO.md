@@ -220,7 +220,7 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 | 1 | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | 🟡 [PR #250](https://github.com/welz-gui/AgroTop/pull/250) aberto, aguardando revisão | | 2026-08-24 |
 | 2 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | `feat/mobile-metodo-de-pesagem` | 🟡 branch reivindicado, em andamento (sem PR ainda) | | 2026-08-26 |
 | 3 | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | 🟢 disponível — sem dependência | | 2026-08-26 |
-| 4 | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | 🟢 disponível | | 2026-08-26 |
+| 4 | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | `feat/api-alertas-operacionais` | 🟡 branch reivindicado pelo mantenedor, aguardando agente (sem trabalho ainda) | | 2026-08-26 |
 | 5 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — pode mockar, dedupe/real só após 0063 mesclar | | 2026-08-26 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
