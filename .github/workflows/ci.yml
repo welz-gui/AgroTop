@@ -74,8 +74,31 @@ jobs:
           # DROP/ALTER de constraint são candidatas).
           psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/0000_baseline_producao.sql
+          # ── DIAGNÓSTICO TEMPORÁRIO (chore/diagnostico-0027) ────────────────
+          # Por que `animals_uuid_key` não existe no replay, se o baseline a
+          # declara? Tira um retrato logo depois do baseline e outro logo antes
+          # da 0027. Remover junto com esta branch.
+          echo "===== APOS BASELINE: constraints de animals ====="
+          psql -h localhost -U agrotop_test -d agrotop_test -Ac \
+            "SELECT conname||' | '||contype||' | '||pg_get_constraintdef(oid)
+               FROM pg_constraint WHERE conrelid='public.animals'::regclass
+              ORDER BY conname;"
+          echo "===== APOS BASELINE: indices de animals ====="
+          psql -h localhost -U agrotop_test -d agrotop_test -Ac \
+            "SELECT indexname||' | '||indexdef FROM pg_indexes
+              WHERE schemaname='public' AND tablename='animals' ORDER BY indexname;"
           for f in $(ls supabase/migrations/*.sql | sort); do
             n=$(basename "$f" | cut -c1-4)
+            if [ "$n" = "0027" ]; then
+              echo "===== ANTES DA 0027: constraints de animals ====="
+              psql -h localhost -U agrotop_test -d agrotop_test -Ac                 "SELECT conname||' | '||contype||' | '||pg_get_constraintdef(oid)
+                   FROM pg_constraint WHERE conrelid='public.animals'::regclass
+                  ORDER BY conname;"
+              echo "===== ANTES DA 0027: FKs que apontam para animals ====="
+              psql -h localhost -U agrotop_test -d agrotop_test -Ac                 "SELECT conrelid::regclass||'.'||conname||' -> '||confkey::text
+                   FROM pg_constraint WHERE confrelid='public.animals'::regclass
+                  ORDER BY 1;"
+            fi
             if [ "$n" != "0000" ] && [ "$n" != "0017" ] && [ "$((10#$n))" -ge 7 ]; then
               psql -h localhost -U agrotop_test -d agrotop_test -v ON_ERROR_STOP=1 -f "$f"
             fi
