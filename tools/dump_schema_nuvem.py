@@ -129,6 +129,38 @@ def escrever_snapshot(colunas, data):
     return len(colunas)
 
 
+def _colunas_da_constraint(definicao: str) -> str:
+    """Lista de colunas de um PRIMARY KEY/UNIQUE, normalizada para comparação.
+
+    `pg_get_constraintdef` devolve "PRIMARY KEY (uuid)" e "UNIQUE (uuid)"; o que
+    interessa é só o miolo entre parênteses.
+    """
+    ini, fim = definicao.find("("), definicao.rfind(")")
+    if ini < 0 or fim <= ini:
+        return ""
+    return ",".join(parte.strip() for parte in definicao[ini + 1:fim].split(","))
+
+
+def _redundante_com_a_pk(con: dict, definicao_pk: str | None) -> bool:
+    """UNIQUE sobre exatamente as mesmas colunas da PRIMARY KEY.
+
+    ⚠️ Declarada INLINE, junto da PK no mesmo `CREATE TABLE`, o PostgreSQL
+    **descarta essa constraint em silêncio** — sem erro, sem aviso. Foi o que
+    fez a migration 0027 falhar no replay em 2026-08-29: o baseline declarava
+    `animals_uuid_key UNIQUE (uuid)` ao lado de `animals_pkey PRIMARY KEY
+    (uuid)`, a constraint nunca nascia, e o `DROP CONSTRAINT` da 0027 então
+    reclamava que ela não existia. Medido em PG16 no CI (2026-08-31).
+
+    Por `ALTER TABLE ADD CONSTRAINT` separado o Postgres cria normalmente — que
+    é como produção chegou a ter as duas (a 0005 promoveu `idx_animals_uuid` a
+    UNIQUE muito antes de a 0017 tornar `uuid` a PK). Por isso estas saem do
+    `CREATE TABLE` e viram ALTER: é o que faz o replay reproduzir produção.
+    """
+    if definicao_pk is None or con["tipo"] != "u":
+        return False
+    return _colunas_da_constraint(con["definicao"]) == _colunas_da_constraint(definicao_pk)
+
+
 def escrever_baseline(colunas, constraints, indices, data,
                       funcoes=None, triggers=None):
     por_tabela = {}
@@ -154,6 +186,7 @@ def escrever_baseline(colunas, constraints, indices, data,
         fh.write("-- Validar com: python tools/testar_baseline.py\n\n")
 
         fks = []
+        unicas_redundantes = []
         for tabela in sorted(por_tabela):
             fh.write(f"CREATE TABLE IF NOT EXISTS {tabela} (\n")
             partes = []
@@ -174,13 +207,27 @@ def escrever_baseline(colunas, constraints, indices, data,
                 partes.append(linha)
             # PK/UNIQUE/CHECK ficam inline; FK sai para o fim do arquivo, porque
             # a ordem alfabética das tabelas não respeita a dependência entre elas.
+            definicao_pk = next((c["definicao"] for c in cons_por_tabela.get(tabela, [])
+                                 if c["tipo"] == "p"), None)
             for con in cons_por_tabela.get(tabela, []):
                 if con["tipo"] == "f":
                     fks.append((tabela, con))
+                elif _redundante_com_a_pk(con, definicao_pk):
+                    unicas_redundantes.append((tabela, con))
                 else:
                     partes.append(f"    CONSTRAINT {con['nome']} {con['definicao']}")
             fh.write(",\n".join(partes))
             fh.write("\n);\n\n")
+
+        if unicas_redundantes:
+            fh.write("-- UNIQUE sobre as mesmas colunas da PRIMARY KEY. Fora do\n")
+            fh.write("-- CREATE TABLE de propósito: declarada inline, o PostgreSQL\n")
+            fh.write("-- descarta em silêncio, e o replay deixa de reproduzir a\n")
+            fh.write("-- produção (ver _redundante_com_a_pk neste arquivo).\n")
+            for tabela, con in unicas_redundantes:
+                fh.write(f"ALTER TABLE {tabela} "
+                         f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
+            fh.write("\n")
 
         if fks:
             fh.write("-- Chaves estrangeiras aplicadas ao final: assim a ordem de\n")
