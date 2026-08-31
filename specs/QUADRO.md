@@ -339,6 +339,25 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 > "CI verde" do histórico mobile continua confiável; o cuidado é só para quem verificar
 > `flutter test` localmente no Windows — use sempre `--concurrency=1` nesse caso.
 
+> **Causa raiz do mistério da migration 0027 — encontrada em [#263](https://github.com/welz-gui/AgroTop/pull/263),
+> 2026-08-31.** O [#258](https://github.com/welz-gui/AgroTop/pull/258) só tinha contornado o
+> sintoma (`DROP CONSTRAINT IF EXISTS`) sem entender por quê `animals_uuid_key` sumia no
+> replay do CI. Achado: **o PostgreSQL descarta em silêncio** uma `UNIQUE` declarada inline
+> no mesmo `CREATE TABLE` de uma `PRIMARY KEY` sobre a mesma coluna — sem erro, sem aviso.
+> `0000_baseline_producao.sql` declarava `animals_pkey PRIMARY KEY (uuid)` e
+> `animals_uuid_key UNIQUE (uuid)` lado a lado; a segunda nunca nascia no replay, embora o
+> arquivo a descrevesse corretamente — **o baseline descrevia um schema que não
+> reproduzia**. Em produção as duas existiam porque foram criadas em passos separados
+> (`ALTER TABLE` por `ALTER TABLE`, não inline), ao longo de semanas de migrations
+> diferentes. Fix: `tools/dump_schema_nuvem.py` agora separa qualquer `UNIQUE` redundante
+> com a PK para fora do `CREATE TABLE`, e `tests/test_dump_baseline.py` (9 testes) trava
+> isso — inclusive escaneando o baseline em disco, para o padrão não voltar em silêncio se
+> alguém regenerar o arquivo. O `IF EXISTS` do #258 continua na 0027, agora redundante mas
+> inofensivo. **Lição:** um baseline gerado por dump de catálogo pode divergir do replay
+> de formas que só aparecem quando alguma migration futura tenta usar o que o dump
+> descreveu — vale desconfiar de qualquer "constraint não existe" num replay que o arquivo
+> parece declarar corretamente.
+
 > **0049/0051/0053 destravadas em 2026-08-22** — a 0047 mesclou (PR #178). Estendem o
 > mesmo app Flutter em `mobile/`: podem ser pegas em paralelo por agentes diferentes sem
 > colidir (telas diferentes) — só confira `git diff --stat origin/main` antes de abrir
