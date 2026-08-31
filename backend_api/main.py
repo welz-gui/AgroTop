@@ -28,6 +28,7 @@ from backend_api.idempotency import get_cached_response, store_response
 from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
+    AlertasOutput,
     CarenciaOutput,
     ConfirmarTratoInput,
     ImportarPesagensOutput,
@@ -54,7 +55,11 @@ from backend_api.schemas import (
 from database import (
     add_feeding_check,
     add_photo,
+    check_low_stock,
+    get_alert_animals,
     get_all_lotes,
+    get_gmd_target,
+    get_low_performance,
     get_pending_feedings,
     get_photo_image,
     get_photos,
@@ -91,6 +96,68 @@ app.add_middleware(SlowAPIMiddleware)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "app": "AgroTop Backend API"}
+
+
+@app.get("/alertas", response_model=AlertasOutput)
+def list_alertas(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, list[dict[str, Any]]]:
+    """Expõe os alertas operacionais já calculados para o app web."""
+    alertas = get_alert_animals()
+    meta_gmd = get_gmd_target()
+
+    return {
+        "sumidos": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "lote_id": str(animal["lote_id"]) if animal.get("lote_id") is not None else None,
+                "peso_atual": float(animal["current_weight"]),
+                "dias_sem_pesagem": int(animal["days_since_weighing"]),
+            }
+            for animal in alertas["sumidos"]
+        ],
+        "carencia": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "carencia_ate": animal["withdrawal_end"],
+                "dias_restantes": int(animal["days_remaining"]),
+            }
+            for animal in alertas["carencia"]
+        ],
+        "prontos_para_abate": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "peso_atual": float(animal["current_weight"]),
+                "peso_alvo": float(animal.get("target_weight") or 500),
+                "arrobas": float(animal["arrobas"]),
+            }
+            for animal in alertas["prontos"]
+        ],
+        "estoque_baixo": [
+            {
+                "insumo_id": int(insumo["id"]),
+                "nome": insumo["name"],
+                "estoque_atual": float(insumo["current_stock"]),
+                "estoque_minimo": float(insumo["min_stock"]),
+                "unidade": insumo["unit"],
+            }
+            for insumo in check_low_stock()
+        ],
+        "baixo_desempenho": [
+            {
+                "animal_id": str(animal["id"]),
+                "breed": animal.get("breed") or "",
+                "lote_id": str(animal["lote_id"]) if animal.get("lote_id") is not None else None,
+                "peso_atual": float(animal["current_weight"]),
+                "gmd": float(animal["gmd"]),
+                "meta_gmd": meta_gmd,
+            }
+            for animal in get_low_performance(meta_gmd)
+        ],
+    }
 
 
 @app.post("/auth/login", response_model=TokenOutput)
