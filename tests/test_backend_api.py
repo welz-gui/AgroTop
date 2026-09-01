@@ -6,7 +6,6 @@ sanidade/carência e fotos dos animais.
 """
 
 import inspect
-import io
 import os
 import tempfile
 import unittest
