@@ -27,7 +27,7 @@ class WeighingPage extends StatefulWidget {
 class _WeighingPageState extends State<WeighingPage> {
   final _formKey = GlobalKey<FormState>();
   final _weight = TextEditingController();
-  final _method = TextEditingController(text: 'pesado');
+  String _method = 'pesado';
   late final TextEditingController _date;
   late final OfflineQueue _offlineQueue;
   bool _saving = false;
@@ -46,7 +46,6 @@ class _WeighingPageState extends State<WeighingPage> {
   void dispose() {
     _weight.dispose();
     _date.dispose();
-    _method.dispose();
     super.dispose();
   }
 
@@ -85,7 +84,7 @@ class _WeighingPageState extends State<WeighingPage> {
     });
     final pesoVal = double.parse(_weight.text.replaceFirst(',', '.'));
     final dataVal = _date.text.trim();
-    final methodVal = _method.text.trim();
+    final methodVal = _method;
     try {
       final result = await widget.api.registerWeighing(
         widget.animalId,
@@ -175,17 +174,29 @@ class _WeighingPageState extends State<WeighingPage> {
                         validator: _validateDate,
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
+                      DropdownButtonFormField<String>(
                         key: const ValueKey('weighing-method'),
-                        controller: _method,
+                        initialValue: 'pesado',
                         decoration: const InputDecoration(
                           labelText: 'Método',
                           prefixIcon: Icon(Icons.scale_outlined),
                         ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                            ? 'Informe o método.'
-                            : null,
+                        isExpanded: true,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'pesado',
+                            child: Text('Pesado na balança'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'estimado',
+                            child: Text('Estimado pelo operador'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'medicao',
+                            child: Text('Estimado por medição (fita/fórmula)'),
+                          ),
+                        ],
+                        onChanged: (value) => _method = value!,
                       ),
                     ],
                   ),

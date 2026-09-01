@@ -203,7 +203,7 @@ void main() {
           expect(jsonDecode(request.body), {
             'peso': 401.2,
             'data': '2026-08-22',
-            'method': 'pesado',
+            'method': 'medicao',
             'notes': '',
           });
           currentWeight = 401.2;
@@ -377,6 +377,10 @@ void main() {
         find.byKey(const ValueKey('weighing-date')),
         '2026-08-22',
       );
+      await tester.tap(find.byKey(const ValueKey('weighing-method')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Estimado por medição (fita/fórmula)').last);
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('save-weighing')));
       await tester.pumpAndSettle();
 
