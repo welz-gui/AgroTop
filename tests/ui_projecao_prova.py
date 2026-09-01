@@ -77,8 +77,8 @@ class TestProjecaoNaTela(unittest.TestCase):
         """Ponta a ponta do bug corrigido: db.projecao_abate_bulk (o que a
         tela chama) não pode arredondar para baixo."""
         entrada = (date.today() - timedelta(days=60)).isoformat()
-        db.add_animal("PROJ1", "Nelore", "M", None, entrada,
-                      300.0, 500.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("PROJ1", "Nelore", "M", None, entrada,
+                      300.0, 500.0, 1000.0, None, None))
         db.clear_cache()
         db.add_weighing("PROJ1", 370.0, (date.today() - timedelta(days=11)).isoformat())
         db.add_weighing("PROJ1", 400.0, (date.today() - timedelta(days=1)).isoformat())
@@ -94,8 +94,8 @@ class TestProjecaoNaTela(unittest.TestCase):
 
     def test_perdendo_peso_aparece_diferenciado_de_sem_dados(self):
         entrada = (date.today() - timedelta(days=60)).isoformat()
-        db.add_animal("PROJ2", "Nelore", "F", None, entrada,
-                      300.0, 500.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("PROJ2", "Nelore", "F", None, entrada,
+                      300.0, 500.0, 1000.0, None, None))
         db.clear_cache()
         db.add_weighing("PROJ2", 440.0, (date.today() - timedelta(days=11)).isoformat())
         db.add_weighing("PROJ2", 420.0, (date.today() - timedelta(days=1)).isoformat())

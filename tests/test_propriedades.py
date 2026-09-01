@@ -75,21 +75,21 @@ class TestNadaFicaSemPropriedade(BaseB4):
 
     def test_animal_novo_nasce_com_propriedade(self):
         """Se a escrita não preencher, a etapa B4.3 nunca poderá exigir a coluna."""
-        db.add_animal("P1", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 1000.0, "P01", None)
+        db.add_animal(db.AnimalData("P1", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 1000.0, "P01", None))
         a = self._linhas("SELECT property_id FROM animals WHERE id='P1'")[0]
         self.assertTrue(a["property_id"], "animal novo sem propriedade")
 
     def test_animal_herda_a_propriedade_do_piquete(self):
         lote = self._linhas("SELECT id, property_id FROM lotes LIMIT 1")[0]
-        db.add_animal("P2", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 1000.0, lote["id"], None)
+        db.add_animal(db.AnimalData("P2", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 1000.0, lote["id"], None))
         a = self._linhas("SELECT property_id FROM animals WHERE id='P2'")[0]
         self.assertEqual(a["property_id"], lote["property_id"])
 
     def test_animal_sem_piquete_usa_a_padrao(self):
-        db.add_animal("P3", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("P3", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 1000.0, None, None))
         a = self._linhas("SELECT property_id FROM animals WHERE id='P3'")[0]
         self.assertEqual(a["property_id"], propriedades.padrao()["id"])
 

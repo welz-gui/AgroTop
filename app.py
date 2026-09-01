@@ -4389,7 +4389,7 @@ def _cadastro_compra():
                 for e in errs: st.error(f"❌ {e}")
             else:
                 db.add_animal(
-                    aid, breed,
+                    db.AnimalData(aid, breed,
                     "M" if "Macho" in sex else "F",
                     birth_date_str,
                     entry_date.strftime("%Y-%m-%d"),
@@ -4403,7 +4403,7 @@ def _cadastro_compra():
                     gta_number=gta_number,
                     weight_method=peso_metodo,
                     purchase_mode=compra_modo,
-                )
+                ))
                 cat = db.get_age_category(birth_date_str)
                 st.success(f"✅ Animal **{aid}** cadastrado! Categoria: **{cat}** · "
                            f"Peso: {entry_weight:.1f} kg ({db.WEIGH_METHODS[peso_metodo]})")

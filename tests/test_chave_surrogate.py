@@ -49,8 +49,8 @@ class TestUuidGerado(BaseSurrogate):
         self.assertEqual(len(valores), len(set(valores)), "há uuid repetido")
 
     def test_animal_novo_nasce_com_uuid(self):
-        db.add_animal("SURR1", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 0.0, None, None)
+        db.add_animal(db.AnimalData("SURR1", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 0.0, None, None))
         a = self._linhas("SELECT uuid FROM animals WHERE id=?", ("SURR1",))[0]
         self.assertTrue(a["uuid"], "add_animal não gerou uuid")
 
@@ -266,8 +266,8 @@ class TestEscritaPreencheUuid(BaseSurrogate):
         return self._linhas(f"SELECT id FROM {tabela} WHERE animal_uuid IS NULL")
 
     def test_cadastro_de_animal_preenche_tudo(self):
-        db.add_animal("E4A", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("E4A", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 1000.0, None, None))
         for t in ("weighings", "animal_costs"):
             with self.subTest(tabela=t):
                 self.assertEqual(self._sem_espelho(t, "E4A"), [])
@@ -295,14 +295,14 @@ class TestEscritaPreencheUuid(BaseSurrogate):
         self.assertEqual(self._sem_espelho("animal_movements", aid), [])
 
     def test_venda_preenche(self):
-        db.add_animal("E4V", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 0.0, None, None)
+        db.add_animal(db.AnimalData("E4V", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 0.0, None, None))
         db.register_sale(["E4V"], "2026-07-31", "abate", "kg", 10.0)
         self.assertEqual(self._sem_espelho("sales", "E4V"), [])
 
     def test_obito_preenche(self):
-        db.add_animal("E4M", "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 0.0, None, None)
+        db.add_animal(db.AnimalData("E4M", "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 0.0, None, None))
         db.register_death("E4M", "2026-07-31", "Cobra")
         self.assertEqual(self._sem_espelho("deaths", "E4M"), [])
 

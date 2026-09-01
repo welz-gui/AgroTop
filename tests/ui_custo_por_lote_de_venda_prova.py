@@ -68,10 +68,10 @@ class TestCustoPorLoteDeVendaNaTela(unittest.TestCase):
     def test_venda_de_varios_animais_vira_um_lote_so(self):
         entrada = (date.today() - timedelta(days=120)).isoformat()
         hoje = date.today().isoformat()
-        db.add_animal("LOTEV1", "Nelore", "M", None, entrada,
-                      300.0, 450.0, 1000.0, None, None)
-        db.add_animal("LOTEV2", "Nelore", "M", None, entrada,
-                      310.0, 460.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("LOTEV1", "Nelore", "M", None, entrada,
+                      300.0, 450.0, 1000.0, None, None))
+        db.add_animal(db.AnimalData("LOTEV2", "Nelore", "M", None, entrada,
+                      310.0, 460.0, 1000.0, None, None))
         db.add_animal_cost("LOTEV1", "operacional", "trato", 200.0, hoje)
         db.add_animal_cost("LOTEV2", "operacional", "trato", 200.0, hoje)
         db.clear_cache()
@@ -95,8 +95,8 @@ class TestCustoPorLoteDeVendaNaTela(unittest.TestCase):
     def test_venda_avulsa_vira_lote_de_uma_cabeca(self):
         entrada = (date.today() - timedelta(days=90)).isoformat()
         hoje = date.today().isoformat()
-        db.add_animal("LOTEV3", "Angus", "F", None, entrada,
-                      280.0, 420.0, 900.0, None, None)
+        db.add_animal(db.AnimalData("LOTEV3", "Angus", "F", None, entrada,
+                      280.0, 420.0, 900.0, None, None))
         db.clear_cache()
         db.register_sale(["LOTEV3"], hoje, "abate", "cabeca", 3000.0)
         db.clear_cache()
