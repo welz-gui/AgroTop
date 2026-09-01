@@ -52,21 +52,64 @@ class TestDialetoPostgres(unittest.TestCase):
             import uuid
 
             import database as db
+            from repositories.animais import get_animal
 
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "PG" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "M", None, "2026-08-01",
                 300.0, 500.0, 0.0, None, None,
-            )
+            ))
             db.add_weighing(animal_id, 345.0, "2026-08-02", operator="CI")
 
-            animal = db.get_animal(animal_id)
+            animal = get_animal(animal_id)
             assert animal is not None
             assert animal["current_weight"] == 345.0
             pesagens = db.get_weighings(animal_id)
             assert any(p["weight"] == 345.0 for p in pesagens)
+            """
+        )
+
+    def test_executemany_grava_em_lote(self):
+        """`_PGConn` precisa expor `executemany`, não só `execute`.
+
+        Vários pontos do código (importação de dispositivos/pesagens,
+        backfill de uuid/identificadores, confirmação de chegada) trocaram
+        um loop de `execute` por um único `executemany` para ganho de
+        performance. SQLite tem `executemany` nativo, então esse caminho
+        nunca quebrava em CI — só no Postgres real, onde `_PGConn` só
+        proxeava `execute`. Achado ao revisar PRs automatizadas do Jules
+        (2026-09-01): `AttributeError: '_PGConn' object has no attribute
+        'executemany'`.
+        """
+        self._executar(
+            """
+            import uuid
+
+            import database as db
+            from repositories.animais import get_animal
+
+            assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
+            db.init_db()
+            animal_id = "EM" + uuid.uuid4().hex[:10]
+            db.add_animal(db.AnimalData(
+                animal_id, "Nelore", "M", None, "2026-08-01",
+                300.0, 500.0, 0.0, None, None,
+            ))
+            animal_uuid = get_animal(animal_id)["uuid"]
+
+            with db._conn() as con:
+                con.executemany(
+                    "INSERT INTO weighings (animal_uuid,weigh_date,weight) "
+                    "VALUES(?,?,?)",
+                    [(animal_uuid, "2026-08-03", 350.0),
+                     (animal_uuid, "2026-08-10", 360.0)],
+                )
+
+            pesagens = db.get_weighings(animal_id)
+            pesos = {p["weight"] for p in pesagens}
+            assert 350.0 in pesos and 360.0 in pesos, pesagens
             """
         )
 
@@ -82,10 +125,10 @@ class TestDialetoPostgres(unittest.TestCase):
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "EV" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "F", None, "2026-08-01",
                 280.0, 480.0, 0.0, None, None,
-            )
+            ))
             with db._conn() as con:
                 evento = con.execute(
                     "SELECT e.id FROM animal_events e "
@@ -121,16 +164,17 @@ class TestDialetoPostgres(unittest.TestCase):
             import uuid
 
             import database as db
+            from repositories.animais import get_animal
             from repositories import eventos
 
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "SY" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "F", None, "2026-08-01",
                 280.0, 480.0, 0.0, None, None,
-            )
-            animal_uuid = db.get_animal(animal_id)["uuid"]
+            ))
+            animal_uuid = get_animal(animal_id)["uuid"]
             evento_id = eventos.do_animal(animal_uuid)[0]["id"]
 
             antes = eventos.contar_pendentes()
@@ -163,16 +207,17 @@ class TestDialetoPostgres(unittest.TestCase):
             import psycopg2
 
             import database as db
+            from repositories.animais import get_animal
             from repositories import eventos
 
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "SZ" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "M", None, "2026-08-01",
                 300.0, 500.0, 0.0, None, None,
-            )
-            animal_uuid = db.get_animal(animal_id)["uuid"]
+            ))
+            animal_uuid = get_animal(animal_id)["uuid"]
             evento_id = eventos.do_animal(animal_uuid)[0]["id"]
             eventos.registrar_situacao(evento_id, "enviado", usuario="CI")
 

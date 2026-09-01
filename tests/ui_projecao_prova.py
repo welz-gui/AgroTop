@@ -32,6 +32,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
+from repositories.animais import get_animal  # noqa: E402
 
 try:
     from streamlit.testing.v1 import AppTest
@@ -83,12 +84,12 @@ class TestProjecaoNaTela(unittest.TestCase):
         db.add_weighing("PROJ1", 400.0, (date.today() - timedelta(days=1)).isoformat())
         db.clear_cache()
 
-        r = db.projecao_abate(db.get_animal("PROJ1"))
+        r = db.projecao_abate(get_animal("PROJ1"))
         # falta 100 kg a 3 kg/dia = 33,33 dias -> ceil = 34, nunca 33
         self.assertEqual(r["falta"], 100.0)
         self.assertEqual(r["dias"], 34)
 
-        bulk = db.projecao_abate_bulk([db.get_animal("PROJ1")])["PROJ1"]["projecao"]
+        bulk = db.projecao_abate_bulk([get_animal("PROJ1")])["PROJ1"]["projecao"]
         self.assertEqual(bulk["dias"], 34)
 
     def test_perdendo_peso_aparece_diferenciado_de_sem_dados(self):
@@ -100,7 +101,7 @@ class TestProjecaoNaTela(unittest.TestCase):
         db.add_weighing("PROJ2", 420.0, (date.today() - timedelta(days=1)).isoformat())
         db.clear_cache()
 
-        r = db.projecao_abate(db.get_animal("PROJ2"))
+        r = db.projecao_abate(get_animal("PROJ2"))
         self.assertIsNone(r["dias"])
         self.assertEqual(r["situacao"], "perdendo_peso")
 

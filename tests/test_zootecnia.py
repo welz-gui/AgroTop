@@ -6,6 +6,7 @@ from services.zootecnia import (
     get_age_display,
     get_age_months,
     calculate_gmd_total,
+    calculate_gmd_total_bulk,
     estimate_weight_by_measurement,
     kg_to_arrobas,
 )
@@ -197,6 +198,98 @@ class TestZootecniaCalculateGMDTotal(unittest.TestCase):
     def test_none_animal_returns_none(self):
         # None como animal -> TypeError ao indexar
         self.assertIsNone(calculate_gmd_total(None))
+
+
+class TestZootecniaCalculateGMDTotalBulk(unittest.TestCase):
+    @patch("services.zootecnia.date")
+    def test_calculate_gmd_total_bulk_happy_path(self, mock_date):
+        mock_date.today.return_value = date(2024, 1, 10)
+        mock_date.fromisoformat.side_effect = date.fromisoformat
+
+        animals = [
+            {
+                "id": "1",
+                "entry_date": "2024-01-01",
+                "current_weight": 300.0,
+                "entry_weight": 200.0
+            },
+            {
+                "id": "2",
+                "entry_date": "2024-01-05",
+                "current_weight": 400.0,
+                "entry_weight": 350.0
+            }
+        ]
+
+        # ID 1: 9 days diff. (300 - 200) / 9 = 11.111
+        # ID 2: 5 days diff. (400 - 350) / 5 = 10.000
+        result = calculate_gmd_total_bulk(animals)
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result["1"], 11.111, places=3)
+        self.assertAlmostEqual(result["2"], 10.000, places=3)
+
+    @patch("services.zootecnia.date")
+    def test_calculate_gmd_total_bulk_zero_and_negative_days(self, mock_date):
+        mock_date.today.return_value = date(2024, 1, 1)
+        mock_date.fromisoformat.side_effect = date.fromisoformat
+
+        animals = [
+            {
+                "id": "1",
+                "entry_date": "2024-01-01",  # 0 days
+                "current_weight": 300.0,
+                "entry_weight": 200.0
+            },
+            {
+                "id": "2",
+                "entry_date": "2024-01-05",  # negative days
+                "current_weight": 400.0,
+                "entry_weight": 350.0
+            }
+        ]
+
+        result = calculate_gmd_total_bulk(animals)
+        self.assertEqual(len(result), 2)
+        self.assertIsNone(result["1"])
+        self.assertIsNone(result["2"])
+
+    @patch("services.zootecnia.date")
+    def test_calculate_gmd_total_bulk_exceptions(self, mock_date):
+        mock_date.today.return_value = date(2024, 1, 10)
+        mock_date.fromisoformat.side_effect = date.fromisoformat
+
+        animals = [
+            {
+                "id": "1",
+                "entry_date": "invalid-date",  # ValueError
+                "current_weight": 300.0,
+                "entry_weight": 200.0
+            },
+            {
+                "id": "2",
+                "current_weight": 300.0,
+                "entry_weight": 200.0  # Missing entry_date (KeyError)
+            },
+            {
+                "id": "3",
+                "entry_date": "2024-01-01",
+                "current_weight": "300.0",  # TypeError (string instead of float)
+                "entry_weight": 200.0
+            },
+            {
+                "id": "4",
+                "entry_date": "2024-01-01",
+                "current_weight": 300.0,
+                "entry_weight": 200.0  # Valid animal to ensure loop continues
+            }
+        ]
+
+        result = calculate_gmd_total_bulk(animals)
+        self.assertEqual(len(result), 4)
+        self.assertIsNone(result["1"])
+        self.assertIsNone(result["2"])
+        self.assertIsNone(result["3"])
+        self.assertAlmostEqual(result["4"], 11.111, places=3)
 
 
 class TestZootecniaEstimateWeight(unittest.TestCase):

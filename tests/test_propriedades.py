@@ -94,7 +94,7 @@ class TestNadaFicaSemPropriedade(BaseB4):
         self.assertEqual(a["property_id"], propriedades.padrao()["id"])
 
     def test_piquete_novo_nasce_com_propriedade(self):
-        db.add_lote("PX", "Piquete Novo", 10.0, 12.0)
+        db.add_lote(db.LoteData("PX", "Piquete Novo", 10.0, 12.0))
         l = self._linhas("SELECT property_id FROM lotes WHERE id='PX'")[0]
         self.assertTrue(l["property_id"], "piquete novo sem propriedade")
 
@@ -132,7 +132,7 @@ class TestMovimentacaoEntrePropriedades(BaseB4):
         """Hoje o animal segue o piquete. Tratar isso como trânsito é a B6."""
         outra = propriedades.criar_propriedade(
             propriedades.padrao()["produtor_id"], "Segunda propriedade")
-        db.add_lote("PZ", "Piquete da segunda", 10.0, 12.0, property_id=outra)
+        db.add_lote(db.LoteData("PZ", "Piquete da segunda", 10.0, 12.0, property_id=outra))
         db.clear_cache()
 
         aid = db.get_all_animals(status="ativo")[0]["id"]

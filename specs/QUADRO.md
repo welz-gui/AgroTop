@@ -28,6 +28,8 @@ da Trilha 1 também — API real já mesclada, não precisa mockar) — ver abai
 O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
 é integração de UI, trabalho do mantenedor (R31), não spec de agente.
 
+**Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
+
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
 > tinha funcionalidade e contrato corretos desde a revisão anterior, mas divergiu de `main`
 > antes de a 0053 (fotos, PR #187) mesclar — as duas estendem os mesmos arquivos do app
@@ -130,6 +132,57 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 > de 2026-07-31) — nesse caso, ou espere uma terminar de reivindicar antes de iniciar a
 > próxima, ou use Variante B ([README.md](README.md)) com specs diferentes atribuídas a
 > cada uma como camada extra de segurança.
+
+> ### ⚠️ A camada de conexão mudou (2026-08-31) — leia antes de mexer em dados
+>
+> Três mudanças em `repositories/conexao.py` e `database.py`, medidas contra o Postgres
+> de produção. Tempo de banco por rerun: financeiro **6.669 ms → 902 ms**, dashboard
+> **2.830 ms → 453 ms**. Custo por `with _conn()` de leitura: **255 ms → 25 ms**.
+> Contexto completo em [docs/revisao-relatorio-arquitetura-2026-08.md](../docs/revisao-relatorio-arquitetura-2026-08.md),
+> seções 9 a 11.
+>
+> **1. `_conn()` empresta do pool** (só no Postgres; SQLite continua abrindo e fechando).
+> Cada `with _conn()` recebe uma conexão **só sua**. Não "simplifique" para uma conexão
+> compartilhada: `_conn()` é dono da transação, e o Streamlit atende cada sessão numa
+> thread do mesmo processo — o rollback de uma abortaria a gravação em voo de outra.
+> `tests/test_pool_de_conexoes.py` falha se alguém tentar.
+>
+> **2. `init_db(forcar=False)`** roda uma vez por processo e por banco. Se o seu teste
+> precisa que o seed rode de novo no MESMO caminho de banco, passe `forcar=True` — sem
+> isso a chamada é no-op e o teste mede a coisa errada. Trocar de banco com
+> `configurar_sqlite()` já reinicializa sozinho.
+>
+> **3. A conexão nasce em `autocommit` e só abre transação no primeiro comando de
+> escrita.** Isso tirou o `COMMIT` (49 ms) do caminho de leitura. A classificação é
+> conservadora — só `SELECT`/`EXPLAIN`/`SHOW` contam como leitura. **Se você escrever SQL
+> de escrita que comece com outra palavra**, confira `_VERBOS_DE_LEITURA`: classificar
+> escrita como leitura descartaria dado em silêncio.
+>
+> ### ⚠️ Dois erros que já custaram CI vermelho
+>
+> **Não declare `UNIQUE` sobre as mesmas colunas da PRIMARY KEY dentro de um
+> `CREATE TABLE`.** O PostgreSQL descarta a constraint **em silêncio** — sem erro, sem
+> aviso. Foi o que fez a migration 0027 falhar no replay: o baseline declarava
+> `animals_uuid_key UNIQUE (uuid)` ao lado de `animals_pkey PRIMARY KEY (uuid)`, a
+> constraint nunca nascia, e o `DROP` reclamava de algo inexistente. `tools/dump_schema_nuvem.py`
+> agora emite essas constraints como `ALTER TABLE ADD CONSTRAINT` separado, e
+> `tests/test_dump_baseline.py` trava as duas pontas. Se for **regenerar o baseline**, rode
+> esse teste depois.
+>
+> **Não escreva teste que force duas threads a escrever ao mesmo tempo em SQLite.** O
+> backend serializa escritores: a segunda esbarra no lock e quem estoura o timeout
+> primeiro decide o resultado. Um teste assim entrou no PR #256, passou local e no CI dele,
+> e depois derrubou o CI de um PR **só de documentação** (#266). Corrigido no #268, trocado
+> por dois testes determinísticos. Concorrência real de escrita se prova contra o Postgres,
+> não contra o SQLite da suíte.
+>
+> ### Ferramentas de medição
+>
+> - `tools/medir_paginas.py` — conexões e queries por página, pelo `AppTest`. É o baseline
+>   versionado: use o mesmo método para que a próxima medição seja comparável.
+> - `tools/medir_conexoes.py` — custo de conexão contra o Postgres real, com e sem pool.
+>
+> Ambas somente leitura; a primeira roda em SQLite temporário e nunca toca produção.
 
 ---
 
