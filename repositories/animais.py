@@ -267,9 +267,6 @@ def _seed_animals(con, property_id: str = None):
             ("propriedade", 0), ("propriedade", 0),
             ("nf_gta", 1), ("operador", 1), ("estimado", 1),
         ])
-        # make 1 animal vendido and 1 morto for demo
-        if i == 13: status = "vendido"
-        if i == 14: status = "morto"
 
         # O uuid é gerado AQUI, e não deixado para o backfill: depois da etapa
         # B1.6 as filhas só têm `animal_uuid`, então uma linha semeada sem uuid
