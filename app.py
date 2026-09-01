@@ -1750,6 +1750,97 @@ def _cartao_de_evento(e: dict, correcoes: list[dict]):
                     else:
                         st.error(f"🚫 {r.get('erro')}")
 
+
+def _render_tab_peso(ws):
+    if len(ws)>=2:
+        import numpy as np
+        df_w=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
+        df_w.columns=["Data","Peso (kg)"]; df_w["Data"]=pd.to_datetime(df_w["Data"])
+        x_num=(df_w["Data"]-df_w["Data"].min()).dt.days
+        coef=np.polyfit(x_num,df_w["Peso (kg)"],1)
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=df_w["Data"],y=np.polyval(coef,x_num),
+            mode="lines",name="Tendência",line=dict(dash="dot",color=c["atencao"],width=2),hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=df_w["Data"],y=df_w["Peso (kg)"],
+            mode="lines+markers",name="Pesagens",
+            line=dict(color=c["primaria"],width=2.5),
+            marker=dict(size=10,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
+            hovertemplate="%{x|%d/%m/%Y}<br><b>%{y:.1f} kg</b><extra></extra>"))
+        fig.update_layout(**PLOTLY,height=300,
+            xaxis=dict(gridcolor=c["superficie"],title="Data"),
+            yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"),
+            legend=dict(orientation="h",y=1.08))
+        st.plotly_chart(fig,use_container_width=True)
+    else:
+        st.info("São necessárias ao menos 2 pesagens para exibir o gráfico.")
+    st.subheader("Tabela de Pesagens")
+    if ws:
+        df_wt=pd.DataFrame(ws)[["weigh_date","weight","method","lote_id","operator","notes"]].copy()
+        df_wt["method"]=df_wt["method"].fillna("pesado").map(
+            lambda m: db.WEIGH_METHODS.get(m,m))
+        df_wt.columns=["Data","Peso (kg)","Método","Lote","Operador","Obs"]
+        st.dataframe(df_wt,use_container_width=True,hide_index=True,
+            column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f")})
+
+def _render_tab_med(meds):
+    if meds:
+        for m_ in meds:
+            end_=datetime.strptime(m_["med_date"],"%Y-%m-%d").date()+timedelta(days=m_["withdrawal_days"] or 0)
+            active=m_["withdrawal_days"] and end_>=date.today()
+            bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
+            st.markdown(f'<div class="hist-item" style="{bc}">'
+                f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
+                f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
+                f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
+                f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
+                f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+end_.isoformat()+")" if m_["withdrawal_days"] else ""}'
+                f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
+                f'</span></div>',unsafe_allow_html=True)
+    else:
+        st.info("Nenhum medicamento registrado.")
+
+def _render_tab_mov(movs):
+    if movs:
+        for mv in movs:
+            st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
+                f'<b>{mv.get("from_name") or "Entrada"} → {mv.get("to_name","?")}</b><br>'
+                f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
+                f'{mv["movement_date"]} · {mv["reason"]} · {mv.get("operator") or "—"}'
+                f'</span></div>',unsafe_allow_html=True)
+    else:
+        st.info("Nenhuma movimentação registrada.")
+
+def _render_tab_fin(aid, animal, gain, yield_, cost_total, ul):
+    costs=db.get_animal_costs(aid)
+    prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
+    cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
+    cpu_gain = round(cost_total / prod_gain, 2) if prod_gain > 0 else 0
+    cp1,cp2,cp3 = st.columns(3)
+    cp1.metric("Custo Total",          f"R$ {cost_total:,.2f}",
+               help="Compra + insumos + custeio operacional")
+    cp2.metric(_cost_per_unit_label(), f"R$ {cpu_val:,.2f}" if cpu_val else "—",
+               help="Custo total ÷ peso vivo atual")
+    cp3.metric(f"Custo da Produção (R$/{ul})",
+               f"R$ {cpu_gain:,.2f}" if cpu_gain else "—",
+               help=f"Custo total ÷ {ul} ganhos (produzidos) desde a entrada")
+    if costs:
+        df_c=pd.DataFrame(costs)[["cost_date","cost_type","description","amount"]]
+        df_c.columns=["Data","Tipo","Descrição","Valor (R$)"]
+        st.dataframe(df_c,use_container_width=True,hide_index=True,
+            column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+    # Adicionar custo
+    with st.expander("➕ Adicionar Custo"):
+        with st.form("f_cost",clear_on_submit=True):
+            cc1,cc2,cc3=st.columns(3)
+            with cc1: ct=st.selectbox("Tipo",COST_TYPES)
+            with cc2: val=st.number_input("Valor (R$)",min_value=0.0,step=0.01,format="%.2f")
+            with cc3: cd=st.date_input("Data",value=date.today())
+            desc=st.text_input("Descrição")
+            if st.form_submit_button("Salvar",type="primary",use_container_width=True):
+                db.add_animal_cost(aid,ct,desc,val,cd.strftime("%Y-%m-%d"))
+                st.success("Custo registrado!"); st.rerun()
+
+
 def page_animal():
     aid=st.session_state.animal_detail
     if not aid: st.warning("Nenhum animal selecionado."); return
@@ -1830,93 +1921,16 @@ def page_animal():
         _photo_section(aid, key_prefix="ficha_")
 
     with tl_peso:
-        if len(ws)>=2:
-            import numpy as np
-            df_w=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
-            df_w.columns=["Data","Peso (kg)"]; df_w["Data"]=pd.to_datetime(df_w["Data"])
-            x_num=(df_w["Data"]-df_w["Data"].min()).dt.days
-            coef=np.polyfit(x_num,df_w["Peso (kg)"],1)
-            fig=go.Figure()
-            fig.add_trace(go.Scatter(x=df_w["Data"],y=np.polyval(coef,x_num),
-                mode="lines",name="Tendência",line=dict(dash="dot",color=c["atencao"],width=2),hoverinfo="skip"))
-            fig.add_trace(go.Scatter(x=df_w["Data"],y=df_w["Peso (kg)"],
-                mode="lines+markers",name="Pesagens",
-                line=dict(color=c["primaria"],width=2.5),
-                marker=dict(size=10,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
-                hovertemplate="%{x|%d/%m/%Y}<br><b>%{y:.1f} kg</b><extra></extra>"))
-            fig.update_layout(**PLOTLY,height=300,
-                xaxis=dict(gridcolor=c["superficie"],title="Data"),
-                yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"),
-                legend=dict(orientation="h",y=1.08))
-            st.plotly_chart(fig,use_container_width=True)
-        else:
-            st.info("São necessárias ao menos 2 pesagens para exibir o gráfico.")
-        st.subheader("Tabela de Pesagens")
-        if ws:
-            df_wt=pd.DataFrame(ws)[["weigh_date","weight","method","lote_id","operator","notes"]].copy()
-            df_wt["method"]=df_wt["method"].fillna("pesado").map(
-                lambda m: db.WEIGH_METHODS.get(m,m))
-            df_wt.columns=["Data","Peso (kg)","Método","Lote","Operador","Obs"]
-            st.dataframe(df_wt,use_container_width=True,hide_index=True,
-                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f")})
+        _render_tab_peso(ws)
 
     with tl_med:
-        if meds:
-            for m_ in meds:
-                end_=datetime.strptime(m_["med_date"],"%Y-%m-%d").date()+timedelta(days=m_["withdrawal_days"] or 0)
-                active=m_["withdrawal_days"] and end_>=date.today()
-                bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
-                st.markdown(f'<div class="hist-item" style="{bc}">'
-                    f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
-                    f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
-                    f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                    f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
-                    f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+end_.isoformat()+")" if m_["withdrawal_days"] else ""}'
-                    f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
-                    f'</span></div>',unsafe_allow_html=True)
-        else:
-            st.info("Nenhum medicamento registrado.")
+        _render_tab_med(meds)
 
     with tl_mov:
-        if movs:
-            for mv in movs:
-                st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
-                    f'<b>{mv.get("from_name") or "Entrada"} → {mv.get("to_name","?")}</b><br>'
-                    f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                    f'{mv["movement_date"]} · {mv["reason"]} · {mv.get("operator") or "—"}'
-                    f'</span></div>',unsafe_allow_html=True)
-        else:
-            st.info("Nenhuma movimentação registrada.")
+        _render_tab_mov(movs)
 
     with tl_fin:
-        costs=db.get_animal_costs(aid)
-        prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
-        cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
-        cpu_gain = round(cost_total / prod_gain, 2) if prod_gain > 0 else 0
-        cp1,cp2,cp3 = st.columns(3)
-        cp1.metric("Custo Total",          f"R$ {cost_total:,.2f}",
-                   help="Compra + insumos + custeio operacional")
-        cp2.metric(_cost_per_unit_label(), f"R$ {cpu_val:,.2f}" if cpu_val else "—",
-                   help="Custo total ÷ peso vivo atual")
-        cp3.metric(f"Custo da Produção (R$/{ul})",
-                   f"R$ {cpu_gain:,.2f}" if cpu_gain else "—",
-                   help=f"Custo total ÷ {ul} ganhos (produzidos) desde a entrada")
-        if costs:
-            df_c=pd.DataFrame(costs)[["cost_date","cost_type","description","amount"]]
-            df_c.columns=["Data","Tipo","Descrição","Valor (R$)"]
-            st.dataframe(df_c,use_container_width=True,hide_index=True,
-                column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-        # Adicionar custo
-        with st.expander("➕ Adicionar Custo"):
-            with st.form("f_cost",clear_on_submit=True):
-                cc1,cc2,cc3=st.columns(3)
-                with cc1: ct=st.selectbox("Tipo",COST_TYPES)
-                with cc2: val=st.number_input("Valor (R$)",min_value=0.0,step=0.01,format="%.2f")
-                with cc3: cd=st.date_input("Data",value=date.today())
-                desc=st.text_input("Descrição")
-                if st.form_submit_button("Salvar",type="primary",use_container_width=True):
-                    db.add_animal_cost(aid,ct,desc,val,cd.strftime("%Y-%m-%d"))
-                    st.success("Custo registrado!"); st.rerun()
+        _render_tab_fin(aid, animal, gain, yield_, cost_total, ul)
 
     st.markdown("---")
     qa1,qa2,qa3=st.columns(3)
