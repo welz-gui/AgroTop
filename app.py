@@ -3411,6 +3411,101 @@ def _fin_rateio_de_lote(animals):
 # ══════════════════════════════════════════════════════════════════════════════
 # ESTOQUE DE INSUMOS
 # ══════════════════════════════════════════════════════════════════════════════
+def _render_tab_inventario(insumos):
+    CAT_LABELS={"racao":"Ração","trato":"Trato (volumoso)","medicamento":"Medicamento",
+                "vacina":"Vacina","mineral":"Mineral","outro":"Outro"}
+    cats_present=sorted({i["category"] for i in insumos})
+    fcat_ins=st.selectbox("Filtrar por categoria",
+        ["Todas"]+cats_present,
+        format_func=lambda c:c if c=="Todas" else CAT_LABELS.get(c,c))
+    rows_i=[]
+    for i in insumos:
+        if fcat_ins!="Todas" and i["category"]!=fcat_ins: continue
+        pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 100
+        rows_i.append({"Insumo":i["name"],"Categoria":CAT_LABELS.get(i["category"],i["category"]),
+            "Estoque":i["current_stock"],"Unidade":i["unit"],
+            "Mínimo":i["min_stock"],
+            "Status":"🔴 Crítico" if pct<50 else "🟡 Baixo" if pct<100 else "🟢 OK",
+            "Custo/Un (R$)":i["cost_per_unit"],
+            "Valor Total (R$)":round(i["current_stock"]*i["cost_per_unit"],2)})
+    df_i=pd.DataFrame(rows_i)
+    st.dataframe(df_i,use_container_width=True,hide_index=True,
+        column_config={"Estoque":st.column_config.NumberColumn(format="%.1f"),
+            "Custo/Un (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+            "Valor Total (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+    tot_val=sum(r["Valor Total (R$)"] for r in rows_i)
+    st.metric("Valor Total do Estoque",f"R$ {tot_val:,.2f}")
+
+    # Gráfico % do mínimo
+    df_bar=pd.DataFrame([{"Insumo":r["Insumo"],
+        "% do Mínimo":min(r["Estoque"]/max(r["Mínimo"],0.01)*100,200)} for r in rows_i])
+    fig_e=px.bar(df_bar.sort_values("% do Mínimo"),x="% do Mínimo",y="Insumo",
+        orientation="h",color="% do Mínimo",
+        color_continuous_scale=ESCALA_RUIM_BOM,range_color=[0,200])
+    fig_e.add_vline(x=100,line_dash="dash",line_color=c["atencao"],
+        annotation_text="Mínimo",annotation_position="top")
+    fig_e.update_layout(**PLOTLY,height=280,coloraxis_showscale=False,
+        xaxis=dict(gridcolor=c["superficie"],title="% do Estoque Mínimo"),
+        yaxis=dict(gridcolor=c["superficie"],title=""))
+    st.plotly_chart(fig_e,use_container_width=True)
+
+def _render_tab_entrada_estoque(insumos):
+    with st.form("f_entrada",clear_on_submit=True):
+        ins=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.1f} {x['unit']})")
+        ec1,ec2=st.columns(2)
+        with ec1: qty=st.number_input("Quantidade",min_value=0.01,step=1.0,format="%.2f")
+        with ec2: cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f",
+            value=float(ins["cost_per_unit"]) if ins else 0.0)
+        if st.form_submit_button("✅ Registrar Entrada",type="primary",use_container_width=True):
+            db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"])
+            st.success(f"✅ +{qty:.1f} {ins['unit']} de {ins['name']}"); st.rerun()
+
+def _render_tab_novo_insumo():
+    with st.form("f_new_ins",clear_on_submit=True):
+        ni1,ni2=st.columns(2)
+        with ni1:
+            ni_name=st.text_input("Nome *",placeholder="Ex: Silagem de milho / Massa de soja")
+            ni_cat=st.selectbox("Categoria",
+                ["medicamento","vacina","racao","trato","mineral","outro"],
+                format_func=lambda c:{"racao":"ração","trato":"trato (volumoso)"}.get(c,c),
+                help="'trato' = volumosos como silagem, massa de soja, bagaço de laranja")
+        with ni2:
+            ni_unit=st.selectbox("Unidade",
+                ["kg","ton","saco","ml","mg","g","dose","litro","comprimido"],
+                format_func=lambda u:{"ton":"tonelada (ton)"}.get(u,u))
+            ni_stk=st.number_input("Estoque Inicial",min_value=0.0,step=1.0,format="%.1f")
+        ni_min=st.number_input("Estoque Mínimo (alerta)",min_value=0.0,step=1.0,format="%.1f")
+        ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
+        if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
+            if ni_name:
+                db.add_new_insumo(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
+                st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
+            else:
+                st.error("Nome é obrigatório.")
+
+def _render_tab_previsao_ruptura():
+    st.caption("Dias até faltar cada insumo, no ritmo de consumo **planejado** "
+        "(soma dos planos de trato ativos) — diferente do aviso de "
+        "'abaixo do mínimo' acima, que só olha o saldo de hoje.")
+    previsao = _previsao_estoque()
+    URGENCIA_LABEL = {"critica": "🔴 Crítica", "atencao": "🟡 Atenção",
+                      "ok": "🟢 OK", "sem_dados": "⚪ Sem dados"}
+    criticos = [p for p in previsao if p["urgencia"] == "critica"]
+    if criticos:
+        st.warning(f"⚠️ **{_plural(len(criticos),'insumo','insumos')} em situação crítica:** " +
+            ", ".join(f"**{p['nome']}**" for p in criticos))
+    rows_p = [{
+        "Insumo": p["nome"],
+        "Dias Restantes": _num_br(p["dias_restantes"]) if p["dias_restantes"] is not None else "—",
+        "Data de Ruptura": p["data_ruptura"] or "—",
+        "Comprar Até": p["comprar_ate"] or "—",
+        "Urgência": URGENCIA_LABEL.get(p["urgencia"], p["urgencia"]),
+    } for p in previsao]
+    st.dataframe(pd.DataFrame(rows_p),use_container_width=True,hide_index=True)
+    st.caption("⚪ **Sem dados** = nenhum plano de trato ativo para o insumo, não é erro. "
+        "**Comprar Até** hoje é igual à **Data de Ruptura** — o sistema ainda não guarda "
+        "o prazo de reposição de cada insumo (fica para quando essa coluna existir).")
+
 def page_estoque():
     st.markdown('<div class="page-title">📦 Estoque de Insumos</div>', unsafe_allow_html=True)
     insumos=db.get_all_insumos()
@@ -3422,100 +3517,17 @@ def page_estoque():
     et1,et2,et3,et4,et5=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo",
         "📈 Previsão de Ruptura","🛒 Compra com Nota Fiscal"])
 
-    CAT_LABELS={"racao":"Ração","trato":"Trato (volumoso)","medicamento":"Medicamento",
-                "vacina":"Vacina","mineral":"Mineral","outro":"Outro"}
     with et1:
-        cats_present=sorted({i["category"] for i in insumos})
-        fcat_ins=st.selectbox("Filtrar por categoria",
-            ["Todas"]+cats_present,
-            format_func=lambda c:c if c=="Todas" else CAT_LABELS.get(c,c))
-        rows_i=[]
-        for i in insumos:
-            if fcat_ins!="Todas" and i["category"]!=fcat_ins: continue
-            pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 100
-            rows_i.append({"Insumo":i["name"],"Categoria":CAT_LABELS.get(i["category"],i["category"]),
-                "Estoque":i["current_stock"],"Unidade":i["unit"],
-                "Mínimo":i["min_stock"],
-                "Status":"🔴 Crítico" if pct<50 else "🟡 Baixo" if pct<100 else "🟢 OK",
-                "Custo/Un (R$)":i["cost_per_unit"],
-                "Valor Total (R$)":round(i["current_stock"]*i["cost_per_unit"],2)})
-        df_i=pd.DataFrame(rows_i)
-        st.dataframe(df_i,use_container_width=True,hide_index=True,
-            column_config={"Estoque":st.column_config.NumberColumn(format="%.1f"),
-                "Custo/Un (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Valor Total (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-        tot_val=sum(r["Valor Total (R$)"] for r in rows_i)
-        st.metric("Valor Total do Estoque",f"R$ {tot_val:,.2f}")
-
-        # Gráfico % do mínimo
-        df_bar=pd.DataFrame([{"Insumo":r["Insumo"],
-            "% do Mínimo":min(r["Estoque"]/max(r["Mínimo"],0.01)*100,200)} for r in rows_i])
-        fig_e=px.bar(df_bar.sort_values("% do Mínimo"),x="% do Mínimo",y="Insumo",
-            orientation="h",color="% do Mínimo",
-            color_continuous_scale=ESCALA_RUIM_BOM,range_color=[0,200])
-        fig_e.add_vline(x=100,line_dash="dash",line_color=c["atencao"],
-            annotation_text="Mínimo",annotation_position="top")
-        fig_e.update_layout(**PLOTLY,height=280,coloraxis_showscale=False,
-            xaxis=dict(gridcolor=c["superficie"],title="% do Estoque Mínimo"),
-            yaxis=dict(gridcolor=c["superficie"],title=""))
-        st.plotly_chart(fig_e,use_container_width=True)
+        _render_tab_inventario(insumos)
 
     with et2:
-        with st.form("f_entrada",clear_on_submit=True):
-            ins=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.1f} {x['unit']})")
-            ec1,ec2=st.columns(2)
-            with ec1: qty=st.number_input("Quantidade",min_value=0.01,step=1.0,format="%.2f")
-            with ec2: cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f",
-                value=float(ins["cost_per_unit"]) if ins else 0.0)
-            if st.form_submit_button("✅ Registrar Entrada",type="primary",use_container_width=True):
-                db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"])
-                st.success(f"✅ +{qty:.1f} {ins['unit']} de {ins['name']}"); st.rerun()
+        _render_tab_entrada_estoque(insumos)
 
     with et3:
-        with st.form("f_new_ins",clear_on_submit=True):
-            ni1,ni2=st.columns(2)
-            with ni1:
-                ni_name=st.text_input("Nome *",placeholder="Ex: Silagem de milho / Massa de soja")
-                ni_cat=st.selectbox("Categoria",
-                    ["medicamento","vacina","racao","trato","mineral","outro"],
-                    format_func=lambda c:{"racao":"ração","trato":"trato (volumoso)"}.get(c,c),
-                    help="'trato' = volumosos como silagem, massa de soja, bagaço de laranja")
-            with ni2:
-                ni_unit=st.selectbox("Unidade",
-                    ["kg","ton","saco","ml","mg","g","dose","litro","comprimido"],
-                    format_func=lambda u:{"ton":"tonelada (ton)"}.get(u,u))
-                ni_stk=st.number_input("Estoque Inicial",min_value=0.0,step=1.0,format="%.1f")
-            ni_min=st.number_input("Estoque Mínimo (alerta)",min_value=0.0,step=1.0,format="%.1f")
-            ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
-            if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
-                if ni_name:
-                    db.add_new_insumo(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
-                    st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
-                else:
-                    st.error("Nome é obrigatório.")
+        _render_tab_novo_insumo()
 
     with et4:
-        st.caption("Dias até faltar cada insumo, no ritmo de consumo **planejado** "
-            "(soma dos planos de trato ativos) — diferente do aviso de "
-            "'abaixo do mínimo' acima, que só olha o saldo de hoje.")
-        previsao = _previsao_estoque()
-        URGENCIA_LABEL = {"critica": "🔴 Crítica", "atencao": "🟡 Atenção",
-                          "ok": "🟢 OK", "sem_dados": "⚪ Sem dados"}
-        criticos = [p for p in previsao if p["urgencia"] == "critica"]
-        if criticos:
-            st.warning(f"⚠️ **{_plural(len(criticos),'insumo','insumos')} em situação crítica:** " +
-                ", ".join(f"**{p['nome']}**" for p in criticos))
-        rows_p = [{
-            "Insumo": p["nome"],
-            "Dias Restantes": _num_br(p["dias_restantes"]) if p["dias_restantes"] is not None else "—",
-            "Data de Ruptura": p["data_ruptura"] or "—",
-            "Comprar Até": p["comprar_ate"] or "—",
-            "Urgência": URGENCIA_LABEL.get(p["urgencia"], p["urgencia"]),
-        } for p in previsao]
-        st.dataframe(pd.DataFrame(rows_p),use_container_width=True,hide_index=True)
-        st.caption("⚪ **Sem dados** = nenhum plano de trato ativo para o insumo, não é erro. "
-            "**Comprar Até** hoje é igual à **Data de Ruptura** — o sistema ainda não guarda "
-            "o prazo de reposição de cada insumo (fica para quando essa coluna existir).")
+        _render_tab_previsao_ruptura()
 
     with et5:
         _estoque_compra_com_nota(insumos)
