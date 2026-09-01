@@ -71,6 +71,48 @@ class TestDialetoPostgres(unittest.TestCase):
             """
         )
 
+    def test_executemany_grava_em_lote(self):
+        """`_PGConn` precisa expor `executemany`, não só `execute`.
+
+        Vários pontos do código (importação de dispositivos/pesagens,
+        backfill de uuid/identificadores, confirmação de chegada) trocaram
+        um loop de `execute` por um único `executemany` para ganho de
+        performance. SQLite tem `executemany` nativo, então esse caminho
+        nunca quebrava em CI — só no Postgres real, onde `_PGConn` só
+        proxeava `execute`. Achado ao revisar PRs automatizadas do Jules
+        (2026-09-01): `AttributeError: '_PGConn' object has no attribute
+        'executemany'`.
+        """
+        self._executar(
+            """
+            import uuid
+
+            import database as db
+            from repositories.animais import get_animal
+
+            assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
+            db.init_db()
+            animal_id = "EM" + uuid.uuid4().hex[:10]
+            db.add_animal(
+                animal_id, "Nelore", "M", None, "2026-08-01",
+                300.0, 500.0, 0.0, None, None,
+            )
+            animal_uuid = get_animal(animal_id)["uuid"]
+
+            with db._conn() as con:
+                con.executemany(
+                    "INSERT INTO weighings (animal_uuid,weigh_date,weight) "
+                    "VALUES(?,?,?)",
+                    [(animal_uuid, "2026-08-03", 350.0),
+                     (animal_uuid, "2026-08-10", 360.0)],
+                )
+
+            pesagens = db.get_weighings(animal_id)
+            pesos = {p["weight"] for p in pesagens}
+            assert 350.0 in pesos and 360.0 in pesos, pesagens
+            """
+        )
+
     def test_animal_events_recusa_update_e_delete(self):
         self._executar(
             """
