@@ -131,6 +131,13 @@ class _PGConn:
         cur.execute(_translate(sql), params)
         return cur
 
+    def executemany(self, sql, params_seq):
+        # Sempre escrita (INSERT/UPDATE em lote) — nunca SELECT.
+        self._abre_transacao_se_escrita(sql)
+        cur = self.raw.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.executemany(_translate(sql), params_seq)
+        return cur
+
     def executescript(self, sql):
         self._abre_transacao_se_escrita("")      # script é sempre escrita
         cur = self.raw.cursor()
@@ -279,3 +286,8 @@ def _writes(fn):
         clear_cache()
         return result
     return wrapper
+
+
+def _quote_ident(name: str) -> str:
+    """Escapes an SQL identifier (table name or column name) safely."""
+    return '"' + name.replace('"', '""') + '"'

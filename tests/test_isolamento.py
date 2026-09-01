@@ -13,6 +13,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
+from repositories.conexao import FORCE_SQLITE_ENV
 
 
 class TestIsolamentoDeProducao(unittest.TestCase):
@@ -35,7 +36,7 @@ class TestIsolamentoDeProducao(unittest.TestCase):
 
     def test_variavel_de_isolamento_esta_ativa(self):
         """A proteção vem de tests/__init__.py, não de acaso do ambiente."""
-        self.assertEqual(os.environ.get(db.FORCE_SQLITE_ENV), "1",
+        self.assertEqual(os.environ.get(FORCE_SQLITE_ENV), "1",
                          "AGROTOP_FORCE_SQLITE não está definida — "
                          "tests/__init__.py não foi importado?")
 

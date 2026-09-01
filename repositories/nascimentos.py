@@ -126,15 +126,11 @@ def registrar(mae_uuid: Optional[str], data: str, crias: list[dict], *,
                  observacoes or None))
 
         criadas = []
+        animal_params = []
+
         for c in crias:
             uuid_cria = novo_uuid()
-            con.execute(
-                """INSERT INTO animals
-                   (id,uuid,breed,sex,birth_date,birth_estimated,age_source,
-                    entry_date,entry_weight,current_weight,target_weight,
-                    lote_id,property_id,propriedade_nascimento_id,
-                    mae_uuid,pai_uuid,parto_id,peso_nascimento,origem)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            animal_params.append(
                 (c["id"], uuid_cria, c.get("raca", ""), c.get("sexo", "M"),
                  data, int(data_estimada), "propriedade",
                  data, c.get("peso") or 0, c.get("peso") or 0,
@@ -142,14 +138,30 @@ def registrar(mae_uuid: Optional[str], data: str, crias: list[dict], *,
                  c.get("lote_id"), propriedade_id, propriedade_id,
                  mae_uuid, c.get("pai_uuid"),
                  parto_id if mae_uuid else None,
-                 c.get("peso"), "nascido"))
+                 c.get("peso"), "nascido")
+            )
+
+            criadas.append(uuid_cria)
+
+        con.executemany(
+            """INSERT INTO animals
+               (id,uuid,breed,sex,birth_date,birth_estimated,age_source,
+                entry_date,entry_weight,current_weight,target_weight,
+                lote_id,property_id,propriedade_nascimento_id,
+                mae_uuid,pai_uuid,parto_id,peso_nascimento,origem)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            animal_params
+        )
+
+        for uuid_cria in criadas:
+            observacoes_evt = f"parto {tipo_parto}, {condicao}"
+            if len(crias) > 1:
+                observacoes_evt += f", {len(crias)} crias"
 
             eventos.registrar_em(
                 con, uuid_cria, "nascimento", ocorrido_em=data,
                 usuario_registro=responsavel, propriedade_id=propriedade_id,
-                observacoes=f"parto {tipo_parto}, {condicao}"
-                            + (f", {len(crias)} crias" if len(crias) > 1 else ""))
-            criadas.append(uuid_cria)
+                observacoes=observacoes_evt)
 
     eventos.auditar(
         "registro_de_nascimento", usuario=responsavel,

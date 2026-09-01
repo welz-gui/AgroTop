@@ -1,6 +1,8 @@
 """Modelos Pydantic (schemas) da API Backend AgroTop."""
 
+from dataclasses import dataclass
 from typing import Literal, Optional, Union
+from fastapi import File, Form, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -119,6 +121,12 @@ class PhotoSummary(BaseModel):
     id: int
     taken_date: str
     mime: str
+
+
+@dataclass
+class PhotoUploadInput:
+    arquivo: UploadFile = File(..., description="Arquivo da foto do animal (JPEG ou PNG, até 5 MB)")
+    taken_date: Optional[str] = Form(None, description="Data em que a foto foi tirada")
 
 
 class PhotoUploadOutput(BaseModel):
