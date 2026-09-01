@@ -20,10 +20,9 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 38 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **0044–0060, 0062 e 0063 todas concluídas — a Trilha 1 inteira está
-fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4) · **2 specs
-na fila** — 0061 (mobile: método de pesagem, branch reivindicado, sem PR ainda — não é da
-Trilha 1, achado de teste real) e **0064** (mobile: tela de alertas operacionais, segundo
+(7 de 7 telas) · **0044–0063 todas concluídas — a Trilha 1 inteira está
+fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4) · **1 spec
+na fila** — **0064** (mobile: tela de alertas operacionais, segundo
 item do Tier 1 da [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md), fora
 da Trilha 1 também — API real já mesclada, não precisa mockar) — ver abaixo.
 O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
@@ -219,8 +218,8 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 | — | [0060](0060-mobile-fila-offline.md) — Mobile: fila offline e cache raso de leitura 🏗️ ⚠️médio | — | ✅ [#250](https://github.com/welz-gui/AgroTop/pull/250) | | 2026-08-29 |
 | — | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | ✅ [#255](https://github.com/welz-gui/AgroTop/pull/255) | | 2026-08-30 |
 | — | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | ✅ [#264](https://github.com/welz-gui/AgroTop/pull/264) | | 2026-08-31 |
-| 1 | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | `feat/mobile-metodo-de-pesagem` | 🟡 branch reivindicado, em andamento (sem PR ainda) | | 2026-08-26 |
-| 2 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — API real já mesclada, não precisa mockar | | 2026-08-26 |
+| — | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | ✅ [#269](https://github.com/welz-gui/AgroTop/pull/269) | | 2026-09-01 |
+| 1 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — API real já mesclada, não precisa mockar | | 2026-08-26 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -301,6 +300,17 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 >   atalho de confirmação de um toque para o caso comum — o mobile tinha nascido com o
 >   default oposto (desmarcado), forçando o operador a marcar toda vez.
 >
+> **0061 fechada em 2026-09-01 — [PR #269](https://github.com/welz-gui/AgroTop/pull/269).**
+> A branch nasceu antes de a 0060 (fila offline, PR #250) mesclar em `main`, e as duas
+> tocavam o mesmo `_submit()` de `weighing_page.dart` — a 0060 extraiu `pesoVal`/`dataVal`/
+> `methodVal` como locais reutilizados nos caminhos online e offline; a 0061 trocou `_method`
+> de `TextEditingController` para `String` puro. O merge com `main` teve conflito no trecho
+> extraído, e o auto-merge do git deixou uma linha **fora** dos marcadores de conflito
+> quebrada (`methodVal = _method.text.trim()`, incompatível com `_method` já sendo
+> `String`) — resolvido lendo o arquivo inteiro, não só os blocos `<<<<<<<`/`>>>>>>>`.
+> `flutter analyze` limpo e `flutter test --concurrency=1` (36/36) localmente antes de
+> abrir o PR; CI confirmou os goldens da pesagem.
+
 > **Achado à parte, sem spec associada:** a seleção de medicamento/vacina por protocolo
 > (com dose sugerida por peso e carência) **já existe** de ponta a ponta — mobile
 > (`medication_page.dart`) e servidor (`dose_for_animal`) — mas pareceu quebrada porque a
