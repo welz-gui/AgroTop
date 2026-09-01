@@ -2150,7 +2150,7 @@ def page_lotes():
                 elif db.get_lote(lid):
                     st.error(f"Lote {lid} já existe.")
                 else:
-                    db.add_lote(lid,name,area,cap,notes_l)
+                    db.add_lote(db.LoteData(lid, name, area, cap, notes_l))
                     st.success(f"✅ Lote {lid} criado!"); st.rerun()
 
     with lt3:

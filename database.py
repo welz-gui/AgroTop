@@ -1600,9 +1600,18 @@ def get_lote(lote_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
+@dataclass
+class LoteData:
+    lote_id: str
+    name: str
+    area_ha: float
+    capacity_ua: float
+    notes: str = ""
+    property_id: Optional[int] = None
+
+
 @_writes
-def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
-             property_id=None) -> None:
+def add_lote(data: LoteData) -> None:
     """Cria um piquete. Sem `property_id`, assume a propriedade padrão (§3.4).
 
     Assumir é aceitável enquanto existe uma propriedade só. Com várias, a
@@ -1611,6 +1620,7 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
     que localização ausente.
     """
     with _conn() as con:
+        property_id = data.property_id
         if property_id is None:
             row = con.execute(
                 "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
@@ -1618,7 +1628,7 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
         con.execute(
             "INSERT INTO lotes (id,name,property_id,area_ha,capacity_ua,notes) "
             "VALUES(?,?,?,?,?,?)",
-            (lote_id, name, property_id, area_ha, capacity_ua, notes),
+            (data.lote_id, data.name, property_id, data.area_ha, data.capacity_ua, data.notes),
         )
 
 
