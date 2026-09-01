@@ -2083,7 +2083,8 @@ def admin_apply_changes(table: str, updates: list[dict],
         qpk = _quote_ident(pk)
         # Exclusões
         for pkv in delete_pks:
-            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))
+            # Seguro: qt e qpk são validados via ADMIN_TABLES e PRAGMA e scappados via _quote_ident.
+            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))  # nosec B608
             n_del += 1
         # Atualizações
         for row in updates:
@@ -2092,7 +2093,8 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
-            con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",
+            # Seguro: qt, sets e qpk são validados (k in valid) e scappados via _quote_ident.
+            con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
         # Inserções
@@ -2103,8 +2105,9 @@ def admin_apply_changes(table: str, updates: list[dict],
                 continue
             placeholders = ", ".join("?" for _ in fields)
             cols_str = ", ".join(_quote_ident(k) for k in fields)
+            # Seguro: qt e cols_str são validados (k in valid) e scappados via _quote_ident.
             con.execute(
-                f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",
+                f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))
             n_ins += 1
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
