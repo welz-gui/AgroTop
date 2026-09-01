@@ -54,26 +54,34 @@ def importar_lote(inicio: str, fim: str, *, lote: str,
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
-    criados = pulados = 0
     with _conn() as con:
         existentes = {r["codigo_visual"] for r in con.execute(
             "SELECT codigo_visual FROM dispositivos "
-            "WHERE status NOT IN ('inutilizado','devolvido','cancelado')").fetchall()}
-        for n in numeros:
-            if n in existentes:
-                pulados += 1
-                continue
-            con.execute(
+            "WHERE status NOT IN ('inutilizado','devolvido','cancelado')"
+        ).fetchall()}
+
+        novos = [n for n in numeros if n not in existentes]
+        pulados = len(numeros) - len(novos)
+
+        if novos:
+            params = [
+                (_novo_id(), n, tipo, tecnologia or None, fabricante or None,
+                 fornecedor or None, modelo or None, lote,
+                 data_aquisicao or None, proprietario_id,
+                 propriedade_destino_id)
+                for n in novos
+            ]
+            con.executemany(
                 """INSERT INTO dispositivos
                    (id,codigo_visual,tipo,tecnologia,fabricante,fornecedor,
                     modelo,lote,data_aquisicao,proprietario_id,
                     propriedade_destino_id,status)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'disponivel')""",
-                (_novo_id(), n, tipo, tecnologia or None, fabricante or None,
-                 fornecedor or None, modelo or None, lote,
-                 data_aquisicao or None, proprietario_id,
-                 propriedade_destino_id))
-            criados += 1
+                params
+            )
+            criados = len(novos)
+        else:
+            criados = 0
 
     eventos.auditar("importacao_de_lote_de_dispositivos", usuario=usuario,
                     entidade="dispositivos", entidade_id=lote,
