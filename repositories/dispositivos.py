@@ -20,7 +20,7 @@ from services.dispositivos import expandir_faixa
 from services.estados_dispositivo import conferir_codigos, transicao_permitida
 
 from . import eventos, identificadores
-from .conexao import _cache, _conn, _writes
+from .conexao import _cache, _conn, _writes, _quote_ident
 
 TIPOS = ("brinco_visual", "boton", "conjunto", "outro")
 
@@ -106,12 +106,12 @@ def mudar_status(dispositivo_id: str, novo: str, *, motivo: str = "",
                 "motivo": f"Mudar para '{novo}' exige motivo registrado."}
 
     with _conn() as con:
-        campos = ["status=?"]
+        campos = [f"{_quote_ident('status')}=?"]
         args: list = [novo]
         if novo == "inutilizado":
-            campos.append("motivo_inutilizacao=?"); args.append(motivo.strip())
+            campos.append(f"{_quote_ident('motivo_inutilizacao')}=?"); args.append(motivo.strip())
         if novo in ("devolvido", "inutilizado"):
-            campos.append("data_baixa=?"); args.append(date.today().isoformat())
+            campos.append(f"{_quote_ident('data_baixa')}=?"); args.append(date.today().isoformat())
         args.append(dispositivo_id)
         con.execute(f"UPDATE dispositivos SET {', '.join(campos)} WHERE id=?", args)
 
