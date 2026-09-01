@@ -481,7 +481,8 @@ _SCHEMA_SQL = """
                 protocol_id       INTEGER,
                 created_at        TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
-                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
+                FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
+                FOREIGN KEY (protocol_id) REFERENCES health_protocols(id)
             );
 
             -- Movimentações entre lotes
@@ -514,7 +515,8 @@ _SCHEMA_SQL = """
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
-                FOREIGN KEY (compra_id)   REFERENCES compras(id)
+                FOREIGN KEY (compra_id)   REFERENCES compras(id),
+                FOREIGN KEY (lote_id)     REFERENCES lotes(id)
             );
 
             -- Compra de insumos (Trilha 3, migration 0018): cabeçalho da nota.
@@ -782,7 +784,8 @@ _SCHEMA_SQL = """
                 removido_em    TEXT,
                 motivo_remocao TEXT,
                 aplicado_por   TEXT,
-                created_at     TEXT DEFAULT (datetime('now','localtime'))
+                created_at     TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (animal_uuid) REFERENCES animals(uuid)
             );
             -- §4.2.1 e §4.2.2: um código oficial ou RFID não pode estar ATIVO em
             -- dois animais. O índice parcial permite o mesmo valor no histórico
