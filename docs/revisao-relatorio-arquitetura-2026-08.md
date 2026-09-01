@@ -532,7 +532,7 @@ A 0027 não foi o defeito — foi o primeiro lugar onde o defeito encostou.
 | PR | O quê | Estado |
 |---|---|---|
 | #258 | `DROP CONSTRAINT IF EXISTS` na 0027 | mesclado — trata o sintoma |
-| #263 | UNIQUE redundante com a PK sai do `CREATE TABLE`, no gerador e no baseline; `tests/test_dump_baseline.py` trava os dois | aberto ao escrever isto |
+| #263 | UNIQUE redundante com a PK sai do `CREATE TABLE`, no gerador e no baseline; `tests/test_dump_baseline.py` trava os dois | mesclado |
 
 O `IF EXISTS` continua valendo como guarda barata. A correção de fundo é a segunda:
 `tools/dump_schema_nuvem.py` passa a emitir essas constraints como `ALTER TABLE ADD
