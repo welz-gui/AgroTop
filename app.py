@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
@@ -1417,7 +1418,7 @@ def page_rebanho():
         races=["Todas"]+sorted({a["breed"] for a in animals_all})
         fr=st.selectbox("Raça",races)
     with f3:
-        fcat=st.selectbox("Categoria",["Todas"]+db.AGE_BANDS)
+        fcat=st.selectbox("Categoria",["Todas"]+AGE_BANDS)
     with f4:
         statuses=["Todos","ativo","vendido","morto","carencia"]
         fs=st.selectbox("Status",statuses)
@@ -2191,7 +2192,7 @@ def _fin_precos():
     with st.form("f_precos"):
         st.markdown("**Preço esperado por kg (R$)**")
         novos = {}
-        for band in db.AGE_BANDS:
+        for band in AGE_BANDS:
             c1, c2, c3 = st.columns([2,1,1])
             with c1:
                 st.markdown(f"<div style='padding-top:.55rem'>{band}</div>", unsafe_allow_html=True)
@@ -3162,7 +3163,7 @@ def _fin_simulador(animals):
             help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
         # Mostra os preços em uso
         linhas = []
-        for band in db.AGE_BANDS:
+        for band in AGE_BANDS:
             for sex in ("M","F"):
                 p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
                 if p > 0:
