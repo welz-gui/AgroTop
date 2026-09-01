@@ -83,7 +83,7 @@ from repositories.financeiro import (  # noqa: F401
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
 # Movida para repositories/conexao.py. Reexportada aqui para os chamadores atuais.
 from repositories.conexao import (  # noqa: F401
-    FORCE_SQLITE_ENV, _database_url, _translate, _PGConn, _conn,
+    _database_url, _translate, _PGConn, _conn,
     _cache, clear_cache, _writes, configurar_sqlite,
 )
 import repositories.conexao as _conexao
