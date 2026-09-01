@@ -22,6 +22,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
+from repositories.animais import get_animal  # noqa: E402
 
 HOJE = date.today()
 
@@ -304,7 +305,7 @@ class TestProjecaoAbate(BaseRegras):
         a = self.animal("P1", peso=400.0, alvo=500.0)
         self.pesagem(a, 390.0, _dias_atras(11))
         self.pesagem(a, 400.0, _dias_atras(1))     # GMD = 1,0
-        r = db.projecao_abate(db.get_animal(a))
+        r = db.projecao_abate(get_animal(a))
         self.assertEqual(r["falta"], 100.0)
         self.assertEqual(r["dias"], 100)
         self.assertEqual(r["data"], (HOJE + timedelta(days=100)).isoformat())
@@ -314,18 +315,18 @@ class TestProjecaoAbate(BaseRegras):
         a = self.animal("P2", peso=450.0, alvo=None)
         self.pesagem(a, 440.0, _dias_atras(11))
         self.pesagem(a, 450.0, _dias_atras(1))
-        self.assertEqual(db.projecao_abate(db.get_animal(a))["falta"], 50.0)
+        self.assertEqual(db.projecao_abate(get_animal(a))["falta"], 50.0)
 
     def test_alvo_ja_atingido_zera_os_dias(self):
         a = self.animal("P3", peso=520.0, alvo=500.0)
-        r = db.projecao_abate(db.get_animal(a))
+        r = db.projecao_abate(get_animal(a))
         self.assertEqual(r["dias"], 0)
         self.assertEqual(r["falta"], 0)
         self.assertEqual(r["data"], HOJE.isoformat())
 
     def test_sem_gmd_nao_estima_data(self):
         a = self.animal("P4", peso=400.0, alvo=500.0)  # sem pesagens
-        r = db.projecao_abate(db.get_animal(a))
+        r = db.projecao_abate(get_animal(a))
         self.assertIsNone(r["dias"])
         self.assertIsNone(r["data"])
         self.assertEqual(r["falta"], 100.0)
@@ -338,7 +339,7 @@ class TestProjecaoAbate(BaseRegras):
         a = self.animal("P5", peso=400.0, alvo=500.0)
         self.pesagem(a, 420.0, _dias_atras(11))
         self.pesagem(a, 400.0, _dias_atras(1))
-        r = db.projecao_abate(db.get_animal(a))
+        r = db.projecao_abate(get_animal(a))
         self.assertIsNone(r["dias"])
         self.assertEqual(r["situacao"], "perdendo_peso")
 
@@ -351,7 +352,7 @@ class TestProjecaoAbate(BaseRegras):
         a = self.animal("P6", peso=400.0, alvo=500.0)
         self.pesagem(a, 370.0, _dias_atras(11))
         self.pesagem(a, 400.0, _dias_atras(1))     # GMD = 3,0
-        r = db.projecao_abate(db.get_animal(a))
+        r = db.projecao_abate(get_animal(a))
         self.assertEqual(r["falta"], 100.0)
         self.assertEqual(r["dias"], 34, "arredondou para baixo (round) em vez de ceil")
         self.assertEqual(r["data"], (HOJE + timedelta(days=34)).isoformat())
@@ -364,8 +365,8 @@ class TestProjecaoAbate(BaseRegras):
         a = self.animal("P7", peso=400.0, alvo=500.0)
         self.pesagem(a, 370.0, _dias_atras(11))
         self.pesagem(a, 400.0, _dias_atras(1))
-        individual = db.projecao_abate(db.get_animal(a))
-        bulk = db.projecao_abate_bulk([db.get_animal(a)])[a]["projecao"]
+        individual = db.projecao_abate(get_animal(a))
+        bulk = db.projecao_abate_bulk([get_animal(a)])[a]["projecao"]
         self.assertEqual(individual, bulk)
 
 
@@ -379,7 +380,7 @@ class TestVenda(BaseRegras):
         self.assertEqual(r["custo"], 1000.0)
         self.assertEqual(r["lucro"], 3000.0)
         self.assertEqual(r["n"], 1)
-        self.assertEqual(db.get_animal(a)["status"], "vendido")
+        self.assertEqual(get_animal(a)["status"], "vendido")
 
     def test_venda_por_cabeca_ignora_o_peso(self):
         a = self.animal("V2", peso=400.0)
@@ -475,7 +476,7 @@ class TestObito(BaseRegras):
         r = db.register_death(a, HOJE.isoformat(), "Cobra")
         self.assertTrue(r["ok"])
         self.assertEqual(r["perda"], 1500.50)
-        self.assertEqual(db.get_animal(a)["status"], "morto")
+        self.assertEqual(get_animal(a)["status"], "morto")
 
     def test_obito_guarda_o_peso_do_momento(self):
         a = self.animal("M2", peso=377.0)
@@ -496,11 +497,11 @@ class TestValorEsperadoDeVenda(BaseRegras):
         a = self.animal("E1", peso=400.0, nascimento=nasc, sexo="M")
         db.set_category_price("13 a 24 meses", "M", 12.50)
         db.clear_cache()
-        self.assertEqual(db.expected_sale_value(db.get_animal(a)), 5000.0)
+        self.assertEqual(db.expected_sale_value(get_animal(a)), 5000.0)
 
     def test_sem_preco_cadastrado_o_valor_e_zero(self):
         a = self.animal("E2", peso=400.0, nascimento=None)
-        self.assertEqual(db.expected_sale_value(db.get_animal(a)), 0.0)
+        self.assertEqual(db.expected_sale_value(get_animal(a)), 0.0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -697,8 +698,8 @@ class TestTransferenciaDeAnimais(BaseRegras):
         self.assertEqual(sorted(r["movidos"]), ["T1", "T2"])
         self.assertEqual(r["ja_no_destino"], [])
         self.assertEqual(r["erros"], [])
-        self.assertEqual(db.get_animal(a)["lote_id"], "P2")
-        self.assertEqual(db.get_animal(b)["lote_id"], "P2")
+        self.assertEqual(get_animal(a)["lote_id"], "P2")
+        self.assertEqual(get_animal(b)["lote_id"], "P2")
 
     def test_animal_ja_no_destino_e_pulado_sem_erro(self):
         a = self.animal("T3", lote="P2")
@@ -711,7 +712,7 @@ class TestTransferenciaDeAnimais(BaseRegras):
         r = db.move_animals_bulk([a, "NAO_EXISTE"], "P2", HOJE.isoformat())
         self.assertEqual(r["movidos"], ["T4"])
         self.assertEqual(r["erros"], ["NAO_EXISTE"])
-        self.assertEqual(db.get_animal(a)["lote_id"], "P2")
+        self.assertEqual(get_animal(a)["lote_id"], "P2")
 
     def test_cada_transferencia_grava_animal_movements(self):
         a = self.animal("T5", lote="P1")

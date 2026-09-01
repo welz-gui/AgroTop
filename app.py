@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
@@ -1278,7 +1279,7 @@ def _campo_animal():
     eid=st.session_state.campo_id
     if not eid: st.info("Selecione ou busque um animal para começar."); return
 
-    animal=db.get_animal(eid)
+    animal=get_animal(eid)
     if not animal:
         st.error(f"Animal **{eid}** não encontrado."); return
 
@@ -1866,7 +1867,7 @@ def _render_tab_fin(aid, animal, gain, yield_, cost_total, ul):
 def page_animal():
     aid=st.session_state.animal_detail
     if not aid: st.warning("Nenhum animal selecionado."); return
-    animal=db.get_animal(aid)
+    animal=get_animal(aid)
     if not animal: st.error(f"Animal {aid} não encontrado."); return
 
     if st.button("← Voltar",type="secondary"): _go("rebanho"); st.rerun()
@@ -4381,7 +4382,7 @@ def _cadastro_compra():
         if st.form_submit_button("✅ Cadastrar Animal",type="primary",use_container_width=True):
             errs=[]
             if not aid:             errs.append("ID do animal é obrigatório.")
-            elif db.get_animal(aid):errs.append(f"Animal **{aid}** já existe.")
+            elif get_animal(aid):errs.append(f"Animal **{aid}** já existe.")
             if entry_weight<=0:     errs.append("Peso de entrada deve ser > 0.")
             if age_err:             errs.append(age_err)
             if errs:
