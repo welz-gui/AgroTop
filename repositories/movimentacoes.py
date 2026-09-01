@@ -251,10 +251,14 @@ def confirmar_chegada(movimentacao_id: str, *, data: str, usuario: str,
         # Chegada muda a propriedade do animal — é o efeito da movimentação.
         destino = mov["propriedade_destino_id"]
         chegaram = [u for u in uuids if u not in faltantes]
+        if destino and chegaram:
+            # Batch update property ids for arrived animals
+            con.executemany(
+                "UPDATE animals SET property_id=? WHERE uuid=?",
+                [(destino, u) for u in chegaram]
+            )
+
         for u in chegaram:
-            if destino:
-                con.execute("UPDATE animals SET property_id=? WHERE uuid=?",
-                            (destino, u))
             eventos.registrar_em(
                 con, u, "chegada_confirmada", ocorrido_em=data,
                 usuario_registro=usuario, propriedade_id=destino,
