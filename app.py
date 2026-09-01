@@ -65,7 +65,7 @@ from services.rateio_adaptador import com_dias_no_lote
 from services.rateio import ratear
 from services.gta_adaptador import montar_contexto as gta_montar_contexto
 from services.gta import validar as gta_validar
-from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
+from ui.tema import cores, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
