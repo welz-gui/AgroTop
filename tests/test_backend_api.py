@@ -1461,7 +1461,7 @@ class TestAlertasEndpoint(BackendApiTestCase):
 
         def add_animal(animal_id, weight, target_weight, entry_date):
             db.add_animal(
-                animal_id,
+                db.AnimalData(animal_id,
                 "Nelore",
                 "M",
                 None,
@@ -1471,7 +1471,7 @@ class TestAlertasEndpoint(BackendApiTestCase):
                 0.0,
                 lote_id,
                 None,
-            )
+            ))
 
         add_animal("ALERTA_SUMIDO", 410.0, 500.0, today - timedelta(days=31))
         add_animal("ALERTA_RECENTE", 410.0, 500.0, today)

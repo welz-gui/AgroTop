@@ -33,9 +33,9 @@ class TestAlertaDeCarencia(unittest.TestCase):
         # um animal em carência de propósito (dado real, não erro de setUp),
         # então não dá pra assumir que o primeiro animal "ativo" está limpo.
         add_animal(
-            "TESTE001", "Nelore", "M", "2024-01-01", "2026-01-01",
+            db.AnimalData("TESTE001", "Nelore", "M", "2024-01-01", "2026-01-01",
             300.0, 500.0, 2000.0, lote["id"], None,
-        )
+        ))
         db.clear_cache()
         self.animal = get_animal("TESTE001")
 

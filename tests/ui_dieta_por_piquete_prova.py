@@ -83,8 +83,8 @@ class TestDietaPorPiqueteNaTela(unittest.TestCase):
                             insumo_id=insumo["id"])
         db.clear_cache()
         entrada = (date.today() - timedelta(days=60)).isoformat()
-        db.add_animal("DIETA1", "Nelore", "M", None, entrada,
-                      300.0, 500.0, 1000.0, lote["id"], None)
+        db.add_animal(db.AnimalData("DIETA1", "Nelore", "M", None, entrada,
+                      300.0, 500.0, 1000.0, lote["id"], None))
         db.clear_cache()
 
         insumos_por_id = {i["id"]: i for i in db.get_all_insumos()}
