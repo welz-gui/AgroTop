@@ -44,6 +44,7 @@ from backend_api.schemas import (
     PesagemOutput,
     PesagemRejeitada,
     PhotoSummary,
+    PhotoUploadInput,
     PhotoUploadOutput,
     ProtocoloOutput,
     RefreshInput,
@@ -474,8 +475,7 @@ def movimentar_animais(
 def upload_animal_photo(
     animal_id: str,
     response: Response,
-    arquivo: UploadFile = File(...),
-    taken_date: Optional[str] = Form(None),
+    data: Annotated[PhotoUploadInput, Depends()],
     user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, int]:
@@ -487,14 +487,14 @@ def upload_animal_photo(
             response.status_code = cached["status_code"]
             return cached["response_body"]
 
-    content_type = (arquivo.content_type or "").lower().strip()
+    content_type = (data.arquivo.content_type or "").lower().strip()
     if content_type not in ALLOWED_PHOTO_MIMES:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Tipo de arquivo não suportado. Aceitos: image/jpeg, image/png.",
         )
 
-    content = arquivo.file.read()
+    content = data.arquivo.file.read()
     if len(content) > MAX_PHOTO_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE if hasattr(status, "HTTP_413_CONTENT_TOO_LARGE") else 413,
@@ -509,7 +509,7 @@ def upload_animal_photo(
             animal_id=animal_id,
             image_bytes=content,
             mime=mime,
-            taken_date=taken_date,
+            taken_date=data.taken_date,
             operator=operator,
         )
     except ValueError as exc:
