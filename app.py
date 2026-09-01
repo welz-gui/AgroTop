@@ -9,6 +9,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import folium
+from folium.plugins import Draw as _FoliumDraw
+from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
@@ -26,6 +29,8 @@ from services.geometria import (
     perimetro_metros as geometria_perimetro_m,
     validar as geometria_validar,
 )
+from services.importacao_geometria import ler_geojson, ler_kml
+from services.clima_adaptador import localizacoes_para_previsao
 from services.lotacao import sobrepostos as lotacao_sobrepostos
 from services.sincronizacao import (
     SITUACOES as SITUACOES_SINCRONIZACAO,
@@ -260,6 +265,51 @@ def _fetch_forecast(lat: float, lon: float):
             return json.loads(r.read().decode())
     except Exception:
         return None
+
+
+def _renderizar_previsao_tempo(loc: dict) -> None:
+    """Renderiza os 7 dias de previsão para uma localização resolvida.
+
+    `loc` é um item do que `services/clima_adaptador.py::localizacoes_para_previsao`
+    devolve: `{"lat": float, "lon": float, "propriedades": [{"id","nome"}, ...]}`.
+    """
+    fc = _fetch_forecast(loc["lat"], loc["lon"])
+    if not (fc and "daily" in fc):
+        st.warning("Não foi possível obter a previsão agora (sem internet ou serviço "
+                   "indisponível). Tente novamente em alguns minutos.")
+        return
+
+    d = fc["daily"]
+    df = pd.DataFrame({
+        "Data": pd.to_datetime(d["time"]),
+        "Chuva (mm)": d["precipitation_sum"],
+        "Prob. chuva (%)": d["precipitation_probability_max"],
+        "Mín (°C)": d["temperature_2m_min"],
+        "Máx (°C)": d["temperature_2m_max"],
+    })
+    hoje = df.iloc[0]; amanha = df.iloc[1] if len(df) > 1 else df.iloc[0]
+    mk = st.columns(4)
+    mk[0].metric("Hoje", f"{hoje['Máx (°C)']:.0f}° / {hoje['Mín (°C)']:.0f}°",
+                 help="Máxima / mínima")
+    mk[1].metric("Chuva hoje", f"{hoje['Chuva (mm)']:.0f} mm",
+                 delta=f"{hoje['Prob. chuva (%)']:.0f}% prob.")
+    mk[2].metric("Chuva amanhã", f"{amanha['Chuva (mm)']:.0f} mm",
+                 delta=f"{amanha['Prob. chuva (%)']:.0f}% prob.")
+    mk[3].metric("Chuva prevista (7 dias)", f"{sum(d['precipitation_sum']):.0f} mm")
+
+    fig = px.bar(df, x="Data", y="Chuva (mm)", color="Prob. chuva (%)",
+        color_continuous_scale=[c["texto_secundario"], c["info"], c["info_secundario"]],
+        labels={"Chuva (mm)":"Chuva prevista (mm)"})
+    fig.update_layout(**_layout(height=280, xaxis=dict(gridcolor=c["superficie"]),
+        yaxis=dict(gridcolor=c["superficie"])))
+    st.plotly_chart(fig, use_container_width=True)
+    dfx = df.copy(); dfx["Data"] = dfx["Data"].dt.strftime("%d/%m (%a)")
+    st.dataframe(dfx, use_container_width=True, hide_index=True,
+        column_config={col: st.column_config.NumberColumn(format="%.0f")
+                       for col in ["Chuva (mm)","Prob. chuva (%)","Mín (°C)","Máx (°C)"]})
+    nomes = ", ".join(p["nome"] for p in loc["propriedades"])
+    st.caption(f"Fonte: Open-Meteo · previsão para {nomes} "
+               f"({loc['lat']:.4f}, {loc['lon']:.4f}).")
 
 # ─── Câmera: imagem, QR Code e OCR ───────────────────────────────────────────
 def _compress_image(raw: bytes, max_side: int = 1000, quality: int = 75) -> bytes:
@@ -2079,15 +2129,13 @@ def _render_tab_visao_geral(lotes):
 
         # Perímetro do piquete (migration 0015)
         with st.expander(f"🗺️ Perímetro do {l['name']}"):
-            st.caption("Um vértice por linha, `longitude, latitude` — a ordem do "
-                       "GeoJSON, a mesma da tela de Propriedades. A área é "
-                       "**calculada** do desenho, não digitada — salvar o perímetro "
-                       "atualiza o campo Área do piquete automaticamente.")
-            texto_l = st.text_area(
-                "Vértices", value=_poligono_para_texto(l.get("poligono")),
-                height=120, key=f"lote_poligono_{l['id']}",
-                placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
-                            "-51.2280, -30.0320")
+            st.caption("Desenhe no mapa, importe um arquivo ou edite o texto — os "
+                       "três métodos alimentam o mesmo perímetro, mesma tela de "
+                       "Propriedades. A área é **calculada** do desenho, não "
+                       "digitada — salvar o perímetro atualiza o campo Área do "
+                       "piquete automaticamente.")
+            texto_l = _entrada_de_perimetro(f"lote_poligono_{l['id']}",
+                                            _poligono_para_texto(l.get("poligono")))
 
             anel_l, erro_l, problemas_l = [], "", []
             if texto_l.strip():
@@ -4542,43 +4590,29 @@ def page_clima():
                 db.set_setting("farm_lon", nlon)
                 st.success("📍 Localização salva!"); st.rerun()
 
-        if lat and lon:
-            fc = _fetch_forecast(float(lat), float(lon))
-            if fc and "daily" in fc:
-                d = fc["daily"]
-                df = pd.DataFrame({
-                    "Data": pd.to_datetime(d["time"]),
-                    "Chuva (mm)": d["precipitation_sum"],
-                    "Prob. chuva (%)": d["precipitation_probability_max"],
-                    "Mín (°C)": d["temperature_2m_min"],
-                    "Máx (°C)": d["temperature_2m_max"],
-                })
-                hoje = df.iloc[0]; amanha = df.iloc[1] if len(df) > 1 else df.iloc[0]
-                mk = st.columns(4)
-                mk[0].metric("Hoje", f"{hoje['Máx (°C)']:.0f}° / {hoje['Mín (°C)']:.0f}°",
-                             help="Máxima / mínima")
-                mk[1].metric("Chuva hoje", f"{hoje['Chuva (mm)']:.0f} mm",
-                             delta=f"{hoje['Prob. chuva (%)']:.0f}% prob.")
-                mk[2].metric("Chuva amanhã", f"{amanha['Chuva (mm)']:.0f} mm",
-                             delta=f"{amanha['Prob. chuva (%)']:.0f}% prob.")
-                mk[3].metric("Chuva prevista (7 dias)", f"{sum(d['precipitation_sum']):.0f} mm")
+        propriedades_ativas = db.propriedades.listar()
+        localizacoes = localizacoes_para_previsao(
+            propriedades_ativas,
+            float(lat) if lat else None,
+            float(lon) if lon else None,
+        )
 
-                fig = px.bar(df, x="Data", y="Chuva (mm)", color="Prob. chuva (%)",
-                    color_continuous_scale=[c["texto_secundario"], c["info"], c["info_secundario"]],
-                    labels={"Chuva (mm)":"Chuva prevista (mm)"})
-                fig.update_layout(**_layout(height=280, xaxis=dict(gridcolor=c["superficie"]),
-                    yaxis=dict(gridcolor=c["superficie"])))
-                st.plotly_chart(fig, use_container_width=True)
-                dfx = df.copy(); dfx["Data"] = dfx["Data"].dt.strftime("%d/%m (%a)")
-                st.dataframe(dfx, use_container_width=True, hide_index=True,
-                    column_config={c: st.column_config.NumberColumn(format="%.0f")
-                                   for col in ["Chuva (mm)","Prob. chuva (%)","Mín (°C)","Máx (°C)"]})
-                st.caption("Fonte: Open-Meteo · a mesma previsão vale para todos os piquetes da fazenda.")
-            else:
-                st.warning("Não foi possível obter a previsão agora (sem internet ou serviço "
-                           "indisponível). Tente novamente em alguns minutos.")
-        else:
+        if not localizacoes:
             st.info("Defina a **localização da fazenda** acima para ver a previsão do tempo.")
+        elif len(localizacoes) == 1:
+            # Uma só coordenada resolvida — não há o que separar por aba,
+            # mesmo comportamento de sempre (spec 0046: não gera ruído
+            # dividindo o que é, na prática, a mesma previsão).
+            _renderizar_previsao_tempo(localizacoes[0])
+        else:
+            # Propriedades em coordenadas diferentes (ADR 0004: um produtor
+            # pode ter mais de uma) — uma aba por localização, agrupando
+            # quem cai na mesma coordenada.
+            abas = st.tabs([" / ".join(p["nome"] for p in loc["propriedades"])
+                            for loc in localizacoes])
+            for aba, loc in zip(abas, localizacoes):
+                with aba:
+                    _renderizar_previsao_tempo(loc)
 
     # ── Registrar chuva (por piquete) ─────────────────────────────────────────
     with ct2:
@@ -5975,6 +6009,104 @@ def _poligono_para_texto(geojson_txt):
     return "\n".join(f"{lon}, {lat}" for lon, lat in anel)
 
 
+# Centro default do mapa quando não há nenhum ponto de referência ainda —
+# mesmo par usado nos campos de latitude/longitude da página de Clima.
+_MAPA_CENTRO_PADRAO = (-15.60000, -56.10000)  # (lat, lon)
+
+
+def _entrada_de_perimetro(key_prefix: str, valor_inicial: str) -> str:
+    """Widget de entrada de perímetro com três métodos: mapa, arquivo, texto.
+
+    Devolve o texto de vértices no formato `longitude, latitude` por linha —
+    o mesmo que `_ler_poligono` já espera. Desenhar no mapa ou importar um
+    arquivo só preenche esse texto; toda validação, cálculo de área e
+    gravação continuam no código que já existia (Trilha 2, item 1 e a metade
+    de "importar arquivo" que a spec 0045 deixou pronta sem tela).
+    """
+    # Sem sufixo — é a mesma chave que o `text_area` sempre usou (`lote_poligono_{id}`,
+    # `prop_poligono_{id}`), pra não quebrar teste nem estado salvo de sessões antigas.
+    texto_key = key_prefix
+    if texto_key not in st.session_state:
+        st.session_state[texto_key] = valor_inicial
+
+    tab_mapa, tab_arquivo, tab_manual = st.tabs(
+        ["🗺️ Desenhar no mapa", "📄 Importar arquivo", "✏️ Editar texto"])
+
+    with tab_mapa:
+        anel_atual = []
+        try:
+            anel_atual = _ler_poligono(st.session_state[texto_key])
+        except ValueError:
+            pass  # mapa mostra vazio; o erro já aparece fora deste widget
+
+        if anel_atual:
+            # Média simples dos vértices — só para centralizar o mapa, não
+            # precisa (nem pode: `geometria_centroide` recusa polígono
+            # inválido) do centroide geométrico de verdade.
+            centro_lon = sum(v[0] for v in anel_atual) / len(anel_atual)
+            centro_lat = sum(v[1] for v in anel_atual) / len(anel_atual)
+            zoom = 15
+        else:
+            centro_lat, centro_lon = _MAPA_CENTRO_PADRAO
+            zoom = 4
+        m = folium.Map(location=[centro_lat, centro_lon], zoom_start=zoom)
+        if anel_atual:
+            folium.Polygon(
+                locations=[(lat, lon) for lon, lat in anel_atual],
+                color=c["primaria"], weight=3, fill=True, fill_opacity=0.15,
+            ).add_to(m)
+        _FoliumDraw(
+            export=False,
+            draw_options={"polygon": True, "polyline": False, "circle": False,
+                          "rectangle": False, "marker": False,
+                          "circlemarker": False},
+            edit_options={"edit": True, "remove": True},
+        ).add_to(m)
+        st.caption("Desenhe um polígono com o controle no canto do mapa. Se "
+                   "desenhar mais de um, vale o último.")
+        resultado = st_folium(m, height=350, key=f"{key_prefix}_mapa",
+                              returned_objects=["last_active_drawing"])
+        desenho = (resultado or {}).get("last_active_drawing")
+        if desenho and desenho.get("geometry", {}).get("type") == "Polygon":
+            coords = desenho["geometry"]["coordinates"][0]
+            if len(coords) > 1 and coords[0] == coords[-1]:
+                coords = coords[:-1]  # GeoJSON fecha o anel repetindo o 1º ponto
+            novo_texto = "\n".join(f"{lon}, {lat}" for lon, lat in coords)
+            if novo_texto != st.session_state[texto_key]:
+                st.session_state[texto_key] = novo_texto
+                st.rerun()
+
+    with tab_arquivo:
+        st.caption("Aceita GeoJSON (`.geojson`/`.json`) ou KML (`.kml`) com um único "
+                   "polígono — mesmo parser usado na importação de CSV de pesagens, "
+                   "adaptado para perímetro (spec 0045).")
+        arquivo = st.file_uploader(
+            "Arquivo de perímetro", type=["geojson", "json", "kml"],
+            key=f"{key_prefix}_arquivo")
+        if arquivo is not None:
+            try:
+                conteudo = arquivo.read().decode("utf-8")
+                anel = (ler_kml(conteudo) if arquivo.name.lower().endswith(".kml")
+                       else ler_geojson(conteudo))
+            except (ValueError, UnicodeDecodeError) as e:
+                st.error(f"🚫 {e}")
+            else:
+                novo_texto = "\n".join(f"{lon}, {lat}" for lon, lat in anel)
+                if novo_texto != st.session_state[texto_key]:
+                    st.session_state[texto_key] = novo_texto
+                    st.success(f"✅ {len(anel)} vértices lidos de {arquivo.name}.")
+                    st.rerun()
+
+    with tab_manual:
+        st.caption("Um vértice por linha, `longitude, latitude` — a ordem do GeoJSON. "
+                   "Editar aqui também atualiza o mapa acima.")
+        st.text_area("Vértices", key=texto_key, height=140,
+                     placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
+                                 "-51.2280, -30.0320")
+
+    return st.session_state[texto_key]
+
+
 def page_propriedades():
     """Hierarquia Organização → Produtor → Propriedade (PNIB §3).
 
@@ -6045,15 +6177,13 @@ def _propriedades_editar(props):
 
     st.markdown("---")
     st.markdown("**Perímetro da propriedade**")
-    st.caption("Um vértice por linha, no formato `longitude, latitude` — a ordem "
-               "do GeoJSON. A área é **calculada**, não digitada: área digitada "
-               "e perímetro desenhado divergem com o tempo, e aí ninguém sabe "
-               "qual dos dois vale.")
+    st.caption("Desenhe no mapa, importe um arquivo ou edite o texto — os três "
+               "métodos alimentam o mesmo perímetro. A área é **calculada**, não "
+               "digitada: área digitada e perímetro desenhado divergem com o "
+               "tempo, e aí ninguém sabe qual dos dois vale.")
 
-    texto = st.text_area("Vértices", value=_poligono_para_texto(p.get("poligono")),
-                         height=140, key="prop_poligono",
-                         placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
-                                     "-51.2280, -30.0320")
+    texto = _entrada_de_perimetro(f"prop_poligono_{p['id']}",
+                                  _poligono_para_texto(p.get("poligono")))
 
     anel, erro_leitura, problemas = [], "", []
     if texto.strip():

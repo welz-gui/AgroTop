@@ -12,3 +12,5 @@ pytesseract>=0.3.10
 pyproj>=3.6.0
 shapely>=2.0.0
 hypothesis>=6.0.0
+folium>=0.19.0
+streamlit-folium>=0.24.0
