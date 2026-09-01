@@ -23,7 +23,7 @@ from dataclasses import dataclass
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
 from services.constantes import (  # noqa: F401
-    CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT, AGE_BANDS,
+    CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT,
 )
 from services.zootecnia import (  # noqa: F401
     _months_between, get_age_months, get_age_category, get_age_display,
