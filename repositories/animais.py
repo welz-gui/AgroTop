@@ -181,14 +181,21 @@ def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manej
     não gera um evento de mudança de piquete que não mudou nada).
     """
     movidos, ja_no_destino, erros = [], [], []
+    animal_states = {}
     with _conn() as con:
+        chunk_size = 900
+        for i in range(0, len(animal_ids), chunk_size):
+            chunk = animal_ids[i:i + chunk_size]
+            placeholders = ",".join(["?"] * len(chunk))
+            rows = con.execute(f"SELECT id, lote_id FROM animals WHERE id IN ({placeholders})", chunk).fetchall()
+            for row in rows:
+                animal_states[row["id"]] = row["lote_id"]
+
         for animal_id in animal_ids:
-            row = con.execute(
-                "SELECT lote_id FROM animals WHERE id=?", (animal_id,)).fetchone()
-            if row is None:
+            if animal_id not in animal_states:
                 erros.append(animal_id)
                 continue
-            if row["lote_id"] == to_lote_id:
+            if animal_states[animal_id] == to_lote_id:
                 ja_no_destino.append(animal_id)
                 continue
             _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason,
