@@ -176,6 +176,36 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 > por dois testes determinísticos. Concorrência real de escrita se prova contra o Postgres,
 > não contra o SQLite da suíte.
 >
+> ### ⚠️ Conclusão contra estado velho é o erro mais caro deste repositório
+>
+> Quatro incidentes distintos em cinco dias, todos com a mesma forma: alguém
+> concluiu contra um estado que já não era o estado atual. A `main` andou dez
+> vezes num único dia (quatro sessões em paralelo), então isto não é azar, é o
+> ambiente normal aqui.
+>
+> | O que aconteceu | Como se manifestou |
+> |---|---|
+> | Relatório de arquitetura sem acesso ao repositório | propôs construir `services/`, `repositories/`, FastAPI e Flutter — tudo já existia |
+> | Auditoria de índices sem uso | refez a análise que a `0028` já tinha fechado, e propôs numerar o resultado como `0026`, número ocupado desde julho |
+> | Agente parou por "colisão" na 0064 | comparou a árvore dele, parada num commit velho, contra a `main` atual — os 27 commits que outras sessões mesclaram no meio apareceram como se fossem dele. Não havia colisão: nenhum dos 27 tocou os arquivos dele |
+> | Patch avulso migrando `add_animal` para `AnimalData` | apresentado sem commit-base; na `main` daquele momento a classe não existia, e quando a refatoração (#303) mesclou o patch virou redundante |
+>
+> **Antes de agir sobre qualquer análise, patch ou relatório:**
+>
+> 1. `git fetch && git log --oneline -1 origin/main` — e confira contra **esse**
+>    commit, não contra o que estava lá quando a análise foi escrita.
+> 2. Diff de branch é `git diff origin/main...SUA_BRANCH` (três pontos). Com dois
+>    pontos você vê o resto do repositório andando e acha que é colisão sua.
+> 3. Antes de numerar migration, `ls supabase/migrations/ | tail -3`.
+> 4. **Conte os pontos de chamada.** O patch do `AnimalData` cobria 4 de 5 —
+>    e o quinto estava em `test_dialeto_postgres.py`, que só roda no job
+>    PostgreSQL do CI (`@unittest.skipUnless(AGROTOP_TEST_POSTGRES)`). Não teria
+>    falhado localmente.
+>
+> **Análise sem commit-base declarado não é acionável.** Se você produzir uma,
+> escreva contra qual commit ela vale — foi a informação que faltou nos quatro
+> casos acima.
+>
 > ### Ferramentas de medição
 >
 > - `tools/medir_paginas.py` — conexões e queries por página, pelo `AppTest`. É o baseline
