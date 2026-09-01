@@ -186,7 +186,7 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 > | O que aconteceu | Como se manifestou |
 > |---|---|
 > | Relatório de arquitetura sem acesso ao repositório | propôs construir `services/`, `repositories/`, FastAPI e Flutter — tudo já existia |
-> | Auditoria de índices sem uso | refez a análise que a `0028` já tinha fechado, e propôs numerar o resultado como `0026`, número ocupado desde julho |
+> | Auditoria de índices sem uso | refez a análise que a `0028` já tinha fechado, e propôs numerar o resultado como `0026`, número ocupado desde 27/08 |
 > | Agente parou por "colisão" na 0064 | comparou a árvore dele, parada num commit velho, contra a `main` atual — os 27 commits que outras sessões mesclaram no meio apareceram como se fossem dele. Não havia colisão: nenhum dos 27 tocou os arquivos dele |
 > | Patch avulso migrando `add_animal` para `AnimalData` | apresentado sem commit-base; na `main` daquele momento a classe não existia, e quando a refatoração (#303) mesclou o patch virou redundante |
 >
