@@ -57,10 +57,10 @@ class TestDialetoPostgres(unittest.TestCase):
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "PG" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "M", None, "2026-08-01",
                 300.0, 500.0, 0.0, None, None,
-            )
+            ))
             db.add_weighing(animal_id, 345.0, "2026-08-02", operator="CI")
 
             animal = get_animal(animal_id)
@@ -93,10 +93,10 @@ class TestDialetoPostgres(unittest.TestCase):
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "EM" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "M", None, "2026-08-01",
                 300.0, 500.0, 0.0, None, None,
-            )
+            ))
             animal_uuid = get_animal(animal_id)["uuid"]
 
             with db._conn() as con:
@@ -125,10 +125,10 @@ class TestDialetoPostgres(unittest.TestCase):
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "EV" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "F", None, "2026-08-01",
                 280.0, 480.0, 0.0, None, None,
-            )
+            ))
             with db._conn() as con:
                 evento = con.execute(
                     "SELECT e.id FROM animal_events e "
@@ -170,10 +170,10 @@ class TestDialetoPostgres(unittest.TestCase):
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "SY" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "F", None, "2026-08-01",
                 280.0, 480.0, 0.0, None, None,
-            )
+            ))
             animal_uuid = get_animal(animal_id)["uuid"]
             evento_id = eventos.do_animal(animal_uuid)[0]["id"]
 
@@ -213,10 +213,10 @@ class TestDialetoPostgres(unittest.TestCase):
             assert db.USE_PG, "o subprocesso não selecionou PostgreSQL"
             db.init_db()
             animal_id = "SZ" + uuid.uuid4().hex[:10]
-            db.add_animal(
+            db.add_animal(db.AnimalData(
                 animal_id, "Nelore", "M", None, "2026-08-01",
                 300.0, 500.0, 0.0, None, None,
-            )
+            ))
             animal_uuid = get_animal(animal_id)["uuid"]
             evento_id = eventos.do_animal(animal_uuid)[0]["id"]
             eventos.registrar_situacao(evento_id, "enviado", usuario="CI")

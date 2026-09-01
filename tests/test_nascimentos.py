@@ -36,8 +36,8 @@ class BaseB3(unittest.TestCase):
         self.mae = self._criar_femea_adulta("MAE1")
 
     def _criar_femea_adulta(self, brinco):
-        db.add_animal(brinco, "Nelore", "F", _dias_atras(1800), _dias_atras(400),
-                      400.0, 500.0, 3000.0, None, None)
+        db.add_animal(db.AnimalData(brinco, "Nelore", "F", _dias_atras(1800), _dias_atras(400),
+                      400.0, 500.0, 3000.0, None, None))
         db.clear_cache()
         return [a for a in db.get_all_animals(status=None)
                 if a["id"] == brinco][0]["uuid"]
@@ -206,8 +206,8 @@ class TestPendencias(BaseB3):
     """§7.3: o sistema precisa saber o que falta, não só registrar certo."""
 
     def test_lista_animal_nascido_sem_mae(self):
-        db.add_animal("SM", "Nelore", "M", _dias_atras(100), _dias_atras(100),
-                      40.0, 500.0, 0.0, None, None)
+        db.add_animal(db.AnimalData("SM", "Nelore", "M", _dias_atras(100), _dias_atras(100),
+                      40.0, 500.0, 0.0, None, None))
         con = sqlite3.connect(db.DB_PATH)
         con.execute("UPDATE animals SET origem='nascido' WHERE id='SM'")
         con.commit(); con.close()
