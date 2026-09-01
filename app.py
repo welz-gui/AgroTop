@@ -621,7 +621,28 @@ def page_dashboard():
     if not animals:
         st.info("Nenhum animal cadastrado. Use **Cadastrar Animal** para começar."); return
 
-    # KPIs
+    _dash_kpis(stats, animals)
+
+    st.markdown("---")
+
+    _dash_alerts(alerts)
+
+    col_main, col_side = st.columns([3,2])
+
+    with col_main:
+        _dash_chart_evolucao_peso()
+
+    with col_side:
+        _dash_chart_por_raca(animals)
+        _dash_chart_gmd(animals)
+
+    _dash_summary_table(animals)
+
+    _dash_conformidade()
+    _dash_completude()
+
+
+def _dash_kpis(stats, animals):
     # Produção na unidade configurada
     if _use_arroba():
         prod_label = "🏷️ @ Ganhas"
@@ -640,87 +661,90 @@ def page_dashboard():
     k[5].metric("♂ Machos",      stats.males)
     k[6].metric("♀ Fêmeas",      stats.females)
 
-    st.markdown("---")
 
+def _dash_alerts(alerts):
     # Alertas resumidos
     n_sum = len(alerts["sumidos"]); n_car = len(alerts["carencia"]); n_pro = len(alerts["prontos"])
     if n_sum or n_car or n_pro:
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
             st.markdown(f"""<div class="card-red">
-                <b style="color:{c["perigo"]}">🔴 {n_sum} Sumidos</b><br>
-                <span style="color:{c["texto_secundario"]};font-size:.85rem">Sem pesagem há +30 dias</span>
+                <b style="color:{c['perigo']}">🔴 {n_sum} Sumidos</b><br>
+                <span style="color:{c['texto_secundario']};font-size:.85rem">Sem pesagem há +30 dias</span>
             </div>""", unsafe_allow_html=True)
         with ac2:
             st.markdown(f"""<div class="card-yellow">
-                <b style="color:{c["atencao"]}">🟡 {n_car} Em Carência</b><br>
-                <span style="color:{c["texto_secundario"]};font-size:.85rem">Não podem ser abatidos</span>
+                <b style="color:{c['atencao']}">🟡 {n_car} Em Carência</b><br>
+                <span style="color:{c['texto_secundario']};font-size:.85rem">Não podem ser abatidos</span>
             </div>""", unsafe_allow_html=True)
         with ac3:
             st.markdown(f"""<div class="card-green">
-                <b style="color:{c["primaria"]}">🟢 {n_pro} Prontos para Abate</b><br>
-                <span style="color:{c["texto_secundario"]};font-size:.85rem">Peso-alvo atingido</span>
+                <b style="color:{c['primaria']}">🟢 {n_pro} Prontos para Abate</b><br>
+                <span style="color:{c['texto_secundario']};font-size:.85rem">Peso-alvo atingido</span>
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
 
-    col_main, col_side = st.columns([3,2])
 
-    with col_main:
-        st.subheader("📈 Evolução de Peso do Rebanho")
-        raw = db.get_all_weighings()
-        if raw:
-            df_all = pd.DataFrame(raw)
-            df_all["weigh_date"] = pd.to_datetime(df_all["weigh_date"])
-            df_avg = (df_all.groupby("weigh_date")["weight"]
-                      .mean().reset_index()
-                      .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
-            df_all = df_all.sort_values(["animal_id", "weigh_date"])
-            fig = px.line(
-                df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
-                color_discrete_sequence=[c["borda"]]
-            )
-            fig.update_traces(
-                showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
-                hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
-            )
-            fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
-                mode="lines+markers",name="Média do Rebanho",
-                line=dict(width=3,color=c["primaria"]),
-                marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
-                hovertemplate="<b>Média</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"))
-            fig.update_layout(**PLOTLY,height=350,
-                legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1),
-                xaxis=dict(gridcolor=c["superficie"],title="Data"),
-                yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"))
-            st.plotly_chart(fig, use_container_width=True)
+def _dash_chart_evolucao_peso():
+    st.subheader("📈 Evolução de Peso do Rebanho")
+    raw = db.get_all_weighings()
+    if raw:
+        df_all = pd.DataFrame(raw)
+        df_all["weigh_date"] = pd.to_datetime(df_all["weigh_date"])
+        df_avg = (df_all.groupby("weigh_date")["weight"]
+                  .mean().reset_index()
+                  .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
+        df_all = df_all.sort_values(["animal_id", "weigh_date"])
+        fig = px.line(
+            df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
+            color_discrete_sequence=[c["borda"]]
+        )
+        fig.update_traces(
+            showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
+            hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
+        )
+        fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
+            mode="lines+markers",name="Média do Rebanho",
+            line=dict(width=3,color=c["primaria"]),
+            marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
+            hovertemplate="<b>Média</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"))
+        fig.update_layout(**PLOTLY,height=350,
+            legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1),
+            xaxis=dict(gridcolor=c["superficie"],title="Data"),
+            yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"))
+        st.plotly_chart(fig, use_container_width=True)
 
-    with col_side:
-        st.subheader("🥧 Por Raça")
-        df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
-        df_br.columns=["Raça","Qtd"]
-        fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
-            color_discrete_sequence=SERIES)
-        fig_p.update_layout(**_layout(height=240,margin=dict(l=0,r=0,t=10,b=10),
-            legend=dict(orientation="h",yanchor="bottom",y=-0.2)))
-        fig_p.update_traces(textposition="inside",textinfo="percent+label")
-        st.plotly_chart(fig_p, use_container_width=True)
 
-        st.subheader("📊 GMD por Animal")
-        a_ids = [a["id"] for a in animals]
-        gmd_batch = db.calculate_gmd_bulk(a_ids)
-        gmd_data=[{"ID":a["id"],"GMD":gmd_batch.get(a["id"])} for a in animals]
-        df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
-        if not df_g.empty:
-            fig_g=px.bar(df_g,x="GMD",y="ID",orientation="h",color="GMD",
-                color_continuous_scale=ESCALA_RUIM_BOM,
-                labels={"GMD":"kg/dia"})
-            fig_g.add_vline(x=0,line_dash="dash",line_color=c["borda_suave"])
-            fig_g.update_layout(**PLOTLY,height=max(180,len(df_g)*27),
-                coloraxis_showscale=False,
-                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title=""))
-            st.plotly_chart(fig_g, use_container_width=True)
+def _dash_chart_por_raca(animals):
+    st.subheader("🥧 Por Raça")
+    df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
+    df_br.columns=["Raça","Qtd"]
+    fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
+        color_discrete_sequence=SERIES)
+    fig_p.update_layout(**_layout(height=240,margin=dict(l=0,r=0,t=10,b=10),
+        legend=dict(orientation="h",yanchor="bottom",y=-0.2)))
+    fig_p.update_traces(textposition="inside",textinfo="percent+label")
+    st.plotly_chart(fig_p, use_container_width=True)
 
-    # Tabela resumo
+
+def _dash_chart_gmd(animals):
+    st.subheader("📊 GMD por Animal")
+    a_ids = [a["id"] for a in animals]
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
+    gmd_data=[{"ID":a["id"],"GMD":gmd_batch.get(a["id"])} for a in animals]
+    df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
+    if not df_g.empty:
+        fig_g=px.bar(df_g,x="GMD",y="ID",orientation="h",color="GMD",
+            color_continuous_scale=ESCALA_RUIM_BOM,
+            labels={"GMD":"kg/dia"})
+        fig_g.add_vline(x=0,line_dash="dash",line_color=c["borda_suave"])
+        fig_g.update_layout(**PLOTLY,height=max(180,len(df_g)*27),
+            coloraxis_showscale=False,
+            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title=""))
+        st.plotly_chart(fig_g, use_container_width=True)
+
+
+def _dash_summary_table(animals):
     st.markdown("---"); st.subheader("📋 Resumo Rápido")
     rows=[]
     ul = _unit_label()
@@ -746,9 +770,6 @@ def page_dashboard():
         column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
             gain_col:st.column_config.NumberColumn(format=fmt_gain),
             "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
-
-    _dash_conformidade()
-    _dash_completude()
 
 
 _FAIXA_CONFORMIDADE = {
