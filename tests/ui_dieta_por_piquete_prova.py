@@ -75,7 +75,7 @@ class TestDietaPorPiqueteNaTela(unittest.TestCase):
         from services.dieta import custo_por_cabeca_dia
 
         lote = db.get_all_lotes()[0]
-        db.add_new_insumo("Ração Prova Dieta", "racao", "kg", 500.0, 50.0, 2.0)
+        db.add_new_insumo(db.InsumoCreate("Ração Prova Dieta", "racao", "kg", 500.0, 50.0, 2.0))
         db.clear_cache()
         insumo = next(i for i in db.get_all_insumos()
                       if i["name"] == "Ração Prova Dieta")

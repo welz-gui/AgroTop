@@ -95,7 +95,7 @@ class TestLancamentosFinanceirosNaTela(unittest.TestCase):
         """O defeito que a integração evitou: se `get_insumo_compras` filtrasse
         por `type='compra'` (como a spec 0034 supunha), NENHUMA compra real
         apareceria — é sempre `type='entrada'` + `reason='compra'`."""
-        db.add_new_insumo("Sal Prova Financeiro", "trato", "kg", 0.0, 10.0, 4.0)
+        db.add_new_insumo(db.InsumoCreate("Sal Prova Financeiro", "trato", "kg", 0.0, 10.0, 4.0))
         db.clear_cache()
         insumo = next(i for i in db.get_all_insumos()
                       if i["name"] == "Sal Prova Financeiro")
