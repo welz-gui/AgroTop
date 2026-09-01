@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../app.dart';
@@ -6,6 +6,7 @@ import '../models.dart';
 import '../offline_queue.dart';
 import '../shallow_cache.dart';
 import 'animal_photo_section.dart';
+import 'alerts_page.dart';
 import 'csv_import_page.dart';
 import 'feeding_page.dart';
 import 'medication_page.dart';
@@ -39,8 +40,7 @@ class AnimalsPage extends StatefulWidget {
   State<AnimalsPage> createState() => _AnimalsPageState();
 }
 
-class _AnimalsPageState extends State<AnimalsPage>
-    with WidgetsBindingObserver {
+class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
   static const _pageSize = 50;
 
   final _animals = <AnimalSummary>[];
@@ -54,6 +54,7 @@ class _AnimalsPageState extends State<AnimalsPage>
   bool _selecting = false;
   final _selectedIds = <String>{};
   int? _pendingFeedings;
+  int? _alertCount;
   int _pendingQueueCount = 0;
   String? _cachedTime;
 
@@ -65,6 +66,7 @@ class _AnimalsPageState extends State<AnimalsPage>
     _shallowCache = widget.shallowCache;
     _load(reset: true);
     _loadPendingFeedings();
+    _loadAlertCount();
     _loadPendingQueueCount();
   }
 
@@ -121,6 +123,15 @@ class _AnimalsPageState extends State<AnimalsPage>
       }
     } catch (_) {
       // A lista de animais continua útil sem a contagem de trato.
+    }
+  }
+
+  Future<void> _loadAlertCount() async {
+    try {
+      final alerts = await widget.api.getOperationalAlerts();
+      if (mounted) setState(() => _alertCount = alerts.total);
+    } catch (_) {
+      // A lista de animais continua útil sem a contagem de alertas.
     }
   }
 
@@ -265,6 +276,16 @@ class _AnimalsPageState extends State<AnimalsPage>
     if (mounted) _loadPendingFeedings();
   }
 
+  Future<void> _openAlerts() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) =>
+            AlertsPage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+      ),
+    );
+    if (mounted) _loadAlertCount();
+  }
+
   Future<void> _openCsvImport() => Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) =>
@@ -278,6 +299,7 @@ class _AnimalsPageState extends State<AnimalsPage>
       title: const Text('Animais ativos'),
       actions: [
         ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
+        _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
         _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
         IconButton(
           key: const ValueKey('open-csv-import'),
@@ -452,9 +474,7 @@ class _AnimalsPageState extends State<AnimalsPage>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.expand_more),
-                label: Text(
-                  _loadingMore ? 'Carregando…' : 'Carregar mais',
-                ),
+                label: Text(_loadingMore ? 'Carregando…' : 'Carregar mais'),
               ),
             ),
         ],
@@ -559,6 +579,52 @@ class _FeedingButton extends StatelessWidget {
   );
 }
 
+class _AlertsButton extends StatelessWidget {
+  const _AlertsButton({required this.alertCount, required this.onPressed});
+
+  final int? alertCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      IconButton(
+        key: const ValueKey('open-alerts'),
+        onPressed: onPressed,
+        tooltip: 'Alertas operacionais',
+        icon: const Icon(Icons.notifications_outlined),
+      ),
+      if (alertCount != null && alertCount! > 0)
+        Positioned(
+          right: 5,
+          top: 4,
+          child: Semantics(
+            label: '$alertCount alertas operacionais',
+            child: Container(
+              key: const ValueKey('alerts-badge'),
+              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$alertCount',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onError,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
 class AnimalDetailPage extends StatefulWidget {
   const AnimalDetailPage({
     super.key,
@@ -633,8 +699,8 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
 
   String _metric(double? value, String suffix, {int decimals = 1}) =>
       value == null
-          ? 'Sem dados'
-          : '${value.toStringAsFixed(decimals)} $suffix';
+      ? 'Sem dados'
+      : '${value.toStringAsFixed(decimals)} $suffix';
 
   String _value(Object? value) => value?.toString() ?? 'Não informado';
 

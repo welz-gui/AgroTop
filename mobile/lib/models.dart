@@ -388,3 +388,177 @@ class PendingFeeding {
     ultimaConfirmacao: ultimaConfirmacao,
   );
 }
+
+class OperationalAlerts {
+  const OperationalAlerts({
+    required this.sumidos,
+    required this.carencia,
+    required this.prontosParaAbate,
+    required this.estoqueBaixo,
+    required this.baixoDesempenho,
+  });
+
+  final List<MissingAnimalAlert> sumidos;
+  final List<WithdrawalAlert> carencia;
+  final List<SlaughterAlert> prontosParaAbate;
+  final List<LowStockAlert> estoqueBaixo;
+  final List<LowPerformanceAlert> baixoDesempenho;
+
+  int get total =>
+      sumidos.length +
+      carencia.length +
+      prontosParaAbate.length +
+      estoqueBaixo.length +
+      baixoDesempenho.length;
+
+  factory OperationalAlerts.fromJson(
+    Map<String, dynamic> json,
+  ) => OperationalAlerts(
+    sumidos: (json['sumidos'] as List<dynamic>? ?? const [])
+        .map(
+          (item) => MissingAnimalAlert.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(growable: false),
+    carencia: (json['carencia'] as List<dynamic>? ?? const [])
+        .map((item) => WithdrawalAlert.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false),
+    prontosParaAbate: (json['prontos_para_abate'] as List<dynamic>? ?? const [])
+        .map((item) => SlaughterAlert.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false),
+    estoqueBaixo: (json['estoque_baixo'] as List<dynamic>? ?? const [])
+        .map((item) => LowStockAlert.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false),
+    baixoDesempenho: (json['baixo_desempenho'] as List<dynamic>? ?? const [])
+        .map(
+          (item) => LowPerformanceAlert.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(growable: false),
+  );
+}
+
+class MissingAnimalAlert {
+  const MissingAnimalAlert({
+    required this.animalId,
+    required this.breed,
+    required this.pesoAtual,
+    required this.diasSemPesagem,
+    this.loteId,
+  });
+
+  final String animalId;
+  final String breed;
+  final String? loteId;
+  final double pesoAtual;
+  final int diasSemPesagem;
+
+  factory MissingAnimalAlert.fromJson(Map<String, dynamic> json) =>
+      MissingAnimalAlert(
+        animalId: json['animal_id'] as String,
+        breed: json['breed'] as String,
+        loteId: json['lote_id'] as String?,
+        pesoAtual: (json['peso_atual'] as num).toDouble(),
+        diasSemPesagem: (json['dias_sem_pesagem'] as num).toInt(),
+      );
+}
+
+class WithdrawalAlert {
+  const WithdrawalAlert({
+    required this.animalId,
+    required this.breed,
+    required this.carenciaAte,
+    required this.diasRestantes,
+  });
+
+  final String animalId;
+  final String breed;
+  final String carenciaAte;
+  final int diasRestantes;
+
+  factory WithdrawalAlert.fromJson(Map<String, dynamic> json) =>
+      WithdrawalAlert(
+        animalId: json['animal_id'] as String,
+        breed: json['breed'] as String,
+        carenciaAte: json['carencia_ate'] as String,
+        diasRestantes: (json['dias_restantes'] as num).toInt(),
+      );
+}
+
+class SlaughterAlert {
+  const SlaughterAlert({
+    required this.animalId,
+    required this.breed,
+    required this.pesoAtual,
+    required this.pesoAlvo,
+    required this.arrobas,
+  });
+
+  final String animalId;
+  final String breed;
+  final double pesoAtual;
+  final double pesoAlvo;
+  final double arrobas;
+
+  factory SlaughterAlert.fromJson(Map<String, dynamic> json) => SlaughterAlert(
+    animalId: json['animal_id'] as String,
+    breed: json['breed'] as String,
+    pesoAtual: (json['peso_atual'] as num).toDouble(),
+    pesoAlvo: (json['peso_alvo'] as num).toDouble(),
+    arrobas: (json['arrobas'] as num).toDouble(),
+  );
+}
+
+class LowStockAlert {
+  const LowStockAlert({
+    required this.insumoId,
+    required this.nome,
+    required this.estoqueAtual,
+    required this.estoqueMinimo,
+    required this.unidade,
+  });
+
+  final int insumoId;
+  final String nome;
+  final double estoqueAtual;
+  final double estoqueMinimo;
+  final String unidade;
+
+  factory LowStockAlert.fromJson(Map<String, dynamic> json) => LowStockAlert(
+    insumoId: (json['insumo_id'] as num).toInt(),
+    nome: json['nome'] as String,
+    estoqueAtual: (json['estoque_atual'] as num).toDouble(),
+    estoqueMinimo: (json['estoque_minimo'] as num).toDouble(),
+    unidade: json['unidade'] as String,
+  );
+}
+
+class LowPerformanceAlert {
+  const LowPerformanceAlert({
+    required this.animalId,
+    required this.breed,
+    required this.pesoAtual,
+    required this.gmd,
+    required this.gmdReferencia,
+    this.loteId,
+  });
+
+  final String animalId;
+  final String breed;
+  final String? loteId;
+  final double pesoAtual;
+  final double gmd;
+  final double gmdReferencia;
+
+  factory LowPerformanceAlert.fromJson(Map<String, dynamic> json) =>
+      LowPerformanceAlert(
+        animalId: json['animal_id'] as String,
+        breed: json['breed'] as String,
+        loteId: json['lote_id'] as String?,
+        pesoAtual: (json['peso_atual'] as num).toDouble(),
+        gmd: (json['gmd'] as num).toDouble(),
+        gmdReferencia:
+            (json['meta'
+                        '_gmd']
+                    as num)
+                .toDouble(),
+      );
+}
