@@ -12,7 +12,6 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
-import sqlite3
 import hashlib
 import random
 from datetime import datetime, date, timedelta
@@ -20,11 +19,20 @@ from contextlib import contextmanager
 from typing import Optional
 from dataclasses import dataclass
 
+@dataclass
+class InsumoCreate:
+    name: str
+    category: str
+    unit: str
+    initial_stock: float
+    min_stock: float
+    cost_per_unit: float
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
 from services.constantes import (  # noqa: F401
-    CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT, AGE_BANDS,
+    CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT,
 )
 from services.zootecnia import (  # noqa: F401
     _months_between, get_age_months, get_age_category, get_age_display,
@@ -83,15 +91,13 @@ from repositories.financeiro import (  # noqa: F401
 # ─── Camada de conexão (Fase A2) ─────────────────────────────────────────────
 # Movida para repositories/conexao.py. Reexportada aqui para os chamadores atuais.
 from repositories.conexao import (  # noqa: F401
-    FORCE_SQLITE_ENV, _database_url, _translate, _PGConn, _conn,
+    _database_url, _translate, _PGConn, _conn,
     _cache, clear_cache, _writes, configurar_sqlite,
 )
 import repositories.conexao as _conexao
+from repositories.conexao import _quote_ident
 
 
-def _quote_ident(name: str) -> str:
-    """Escapes an SQL identifier (table name or column name) safely."""
-    return '"' + name.replace('"', '""') + '"'
 
 
 def __getattr__(name):
@@ -1094,8 +1100,9 @@ def _backfill_uuids(con) -> int:
     from repositories.animais import novo_uuid
 
     sem = con.execute("SELECT id FROM animals WHERE uuid IS NULL").fetchall()
-    for row in sem:
-        con.execute("UPDATE animals SET uuid=? WHERE id=?", (novo_uuid(), row["id"]))
+    if sem:
+        updates = [(novo_uuid(), row["id"]) for row in sem]
+        con.executemany("UPDATE animals SET uuid=? WHERE id=?", updates)
     return len(sem)
 
 
@@ -1131,9 +1138,10 @@ def _backfill_animal_uuid(con) -> int:
               "animal_photos", "deaths", "sales", "insumo_transactions"):
         if "animal_id" not in _colunas(con, t):
             continue
+        qt = _quote_ident(t)
         cur = con.execute(
-            f"UPDATE {t} SET animal_uuid = ("
-            f"  SELECT a.uuid FROM animals a WHERE a.id = {t}.animal_id"
+            f"UPDATE {qt} SET animal_uuid = ("
+            f"  SELECT a.uuid FROM animals a WHERE a.id = {qt}.animal_id"
             f") WHERE animal_uuid IS NULL AND animal_id IS NOT NULL"
         )
         total += getattr(cur, "rowcount", 0) or 0
@@ -1592,9 +1600,18 @@ def get_lote(lote_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
+@dataclass
+class LoteData:
+    lote_id: str
+    name: str
+    area_ha: float
+    capacity_ua: float
+    notes: str = ""
+    property_id: Optional[int] = None
+
+
 @_writes
-def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
-             property_id=None) -> None:
+def add_lote(data: LoteData) -> None:
     """Cria um piquete. Sem `property_id`, assume a propriedade padrão (§3.4).
 
     Assumir é aceitável enquanto existe uma propriedade só. Com várias, a
@@ -1603,6 +1620,7 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
     que localização ausente.
     """
     with _conn() as con:
+        property_id = data.property_id
         if property_id is None:
             row = con.execute(
                 "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
@@ -1610,7 +1628,7 @@ def add_lote(lote_id, name, area_ha, capacity_ua, notes="",
         con.execute(
             "INSERT INTO lotes (id,name,property_id,area_ha,capacity_ua,notes) "
             "VALUES(?,?,?,?,?,?)",
-            (lote_id, name, property_id, area_ha, capacity_ua, notes),
+            (data.lote_id, data.name, property_id, data.area_ha, data.capacity_ua, data.notes),
         )
 
 
@@ -1694,11 +1712,11 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
 
 
 @_writes
-def add_new_insumo(name, category, unit, initial_stock, min_stock, cost_per_unit) -> None:
+def add_new_insumo(insumo: InsumoCreate) -> None:
     with _conn() as con:
         con.execute(
             "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit) VALUES(?,?,?,?,?,?)",
-            (name, category, unit, initial_stock, min_stock, cost_per_unit),
+            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit),
         )
 
 # ─── Custos por Animal ───────────────────────────────────────────────────────
@@ -2083,7 +2101,8 @@ def admin_apply_changes(table: str, updates: list[dict],
         qpk = _quote_ident(pk)
         # Exclusões
         for pkv in delete_pks:
-            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))
+            # Seguro: qt e qpk são validados via ADMIN_TABLES e PRAGMA e scappados via _quote_ident.
+            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))  # nosec B608
             n_del += 1
         # Atualizações
         for row in updates:
@@ -2092,7 +2111,8 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
-            con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",
+            # Seguro: qt, sets e qpk são validados (k in valid) e scappados via _quote_ident.
+            con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
         # Inserções
@@ -2103,8 +2123,9 @@ def admin_apply_changes(table: str, updates: list[dict],
                 continue
             placeholders = ", ".join("?" for _ in fields)
             cols_str = ", ".join(_quote_ident(k) for k in fields)
+            # Seguro: qt e cols_str são validados (k in valid) e scappados via _quote_ident.
             con.execute(
-                f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",
+                f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))
             n_ins += 1
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
