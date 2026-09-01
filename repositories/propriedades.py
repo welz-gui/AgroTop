@@ -128,13 +128,15 @@ def atualizar(property_id: str, **campos) -> bool:
     transferência de titularidade, que é evento regulatório (§8) e não edição
     de cadastro — vai na etapa B6.
     """
+    from database import _quote_ident
+
     permitidos = {"nome", "codigo_oficial", "municipio", "uf", "endereco",
                   "latitude", "longitude", "poligono", "atividade",
                   "situacao", "inicio", "encerramento"}
     campos = {k: v for k, v in campos.items() if k in permitidos}
     if not campos:
         return False
-    sets = ", ".join(f"{k}=?" for k in campos)
+    sets = ", ".join(f"{_quote_ident(k)}=?" for k in campos)
     with _conn() as con:
         con.execute(f"UPDATE properties SET {sets} WHERE id=?",
                     (*campos.values(), property_id))
@@ -171,6 +173,8 @@ def _backfill_property_id(con) -> int:
     a que pertence cada animal seria inventar localização, e localização errada
     num sistema de rastreabilidade é pior que localização ausente.
     """
+    from database import _quote_ident
+
     props = con.execute("SELECT id FROM properties").fetchall()
     if len(props) != 1:
         return 0
@@ -178,7 +182,8 @@ def _backfill_property_id(con) -> int:
 
     total = 0
     for tabela in ("animals", "lotes"):
+        qt = _quote_ident(tabela)
         cur = con.execute(
-            f"UPDATE {tabela} SET property_id=? WHERE property_id IS NULL", (prid,))
+            f"UPDATE {qt} SET property_id=? WHERE property_id IS NULL", (prid,))
         total += getattr(cur, "rowcount", 0) or 0
     return total

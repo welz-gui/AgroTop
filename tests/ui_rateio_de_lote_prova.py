@@ -108,7 +108,7 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
         lotes = db.get_all_lotes()
         origem, destino = lotes[0], lotes[1] if len(lotes) > 1 else lotes[0]
         if origem["id"] == destino["id"]:
-            db.add_lote("RATDEST", "Piquete destino de prova", 5.0, 10.0)
+            db.add_lote(db.LoteData("RATDEST", "Piquete destino de prova", 5.0, 10.0))
             db.clear_cache()
             destino = db.get_all_lotes()[-1]
 
@@ -134,7 +134,7 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
         self.assertEqual(resultado[0]["dias_no_lote"], 15)
 
     def test_piquete_sem_animais_nao_quebra(self):
-        db.add_lote("RATVAZIO", "Piquete vazio de prova rateio", 5.0, 10.0)
+        db.add_lote(db.LoteData("RATVAZIO", "Piquete vazio de prova rateio", 5.0, 10.0))
         db.clear_cache()
         at = self._tela()  # não pode estourar
         rotulos = [t.label for t in at.tabs]

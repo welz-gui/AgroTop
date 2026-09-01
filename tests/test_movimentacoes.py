@@ -20,8 +20,37 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from repositories import eventos, movimentacoes, propriedades  # noqa: E402
+from services import movimentacao as srv_movimentacao  # noqa: E402
 
 HOJE = date.today().isoformat()
+
+
+class TestPodeLiberar(unittest.TestCase):
+    """Testa a função pura pode_liberar que avalia problemas de movimentação."""
+
+    def test_lista_vazia_pode_liberar(self):
+        self.assertTrue(srv_movimentacao.pode_liberar([]))
+
+    def test_somente_alerta_pode_liberar(self):
+        problemas = [{"gravidade": "alerta", "codigo": "SEM_GTA"}]
+        self.assertTrue(srv_movimentacao.pode_liberar(problemas))
+
+        problemas_multiplos = [
+            {"gravidade": "alerta", "codigo": "SEM_GTA"},
+            {"gravidade": "alerta", "codigo": "OUTRO_ALERTA"}
+        ]
+        self.assertTrue(srv_movimentacao.pode_liberar(problemas_multiplos))
+
+    def test_bloqueio_impede_liberacao(self):
+        problemas = [{"gravidade": "bloqueio", "codigo": "ANIMAL_MORTO"}]
+        self.assertFalse(srv_movimentacao.pode_liberar(problemas))
+
+    def test_bloqueio_e_alerta_impede_liberacao(self):
+        problemas = [
+            {"gravidade": "alerta", "codigo": "SEM_GTA"},
+            {"gravidade": "bloqueio", "codigo": "ANIMAL_MORTO"}
+        ]
+        self.assertFalse(srv_movimentacao.pode_liberar(problemas))
 
 
 class BaseB6(unittest.TestCase):

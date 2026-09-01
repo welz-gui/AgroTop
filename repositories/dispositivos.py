@@ -20,7 +20,7 @@ from services.dispositivos import expandir_faixa
 from services.estados_dispositivo import conferir_codigos, transicao_permitida
 
 from . import eventos, identificadores
-from .conexao import _cache, _conn, _writes
+from .conexao import _cache, _conn, _writes, _quote_ident
 
 TIPOS = ("brinco_visual", "boton", "conjunto", "outro")
 
@@ -54,26 +54,34 @@ def importar_lote(inicio: str, fim: str, *, lote: str,
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
-    criados = pulados = 0
     with _conn() as con:
         existentes = {r["codigo_visual"] for r in con.execute(
             "SELECT codigo_visual FROM dispositivos "
-            "WHERE status NOT IN ('inutilizado','devolvido','cancelado')").fetchall()}
-        for n in numeros:
-            if n in existentes:
-                pulados += 1
-                continue
-            con.execute(
+            "WHERE status NOT IN ('inutilizado','devolvido','cancelado')"
+        ).fetchall()}
+
+        novos = [n for n in numeros if n not in existentes]
+        pulados = len(numeros) - len(novos)
+
+        if novos:
+            params = [
+                (_novo_id(), n, tipo, tecnologia or None, fabricante or None,
+                 fornecedor or None, modelo or None, lote,
+                 data_aquisicao or None, proprietario_id,
+                 propriedade_destino_id)
+                for n in novos
+            ]
+            con.executemany(
                 """INSERT INTO dispositivos
                    (id,codigo_visual,tipo,tecnologia,fabricante,fornecedor,
                     modelo,lote,data_aquisicao,proprietario_id,
                     propriedade_destino_id,status)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'disponivel')""",
-                (_novo_id(), n, tipo, tecnologia or None, fabricante or None,
-                 fornecedor or None, modelo or None, lote,
-                 data_aquisicao or None, proprietario_id,
-                 propriedade_destino_id))
-            criados += 1
+                params
+            )
+            criados = len(novos)
+        else:
+            criados = 0
 
     eventos.auditar("importacao_de_lote_de_dispositivos", usuario=usuario,
                     entidade="dispositivos", entidade_id=lote,
@@ -105,13 +113,15 @@ def mudar_status(dispositivo_id: str, novo: str, *, motivo: str = "",
         return {"ok": False, "de": atual, "para": novo, **v,
                 "motivo": f"Mudar para '{novo}' exige motivo registrado."}
 
+    from database import _quote_ident
+
     with _conn() as con:
-        campos = ["status=?"]
+        campos = [f"{_quote_ident('status')}=?"]
         args: list = [novo]
         if novo == "inutilizado":
-            campos.append("motivo_inutilizacao=?"); args.append(motivo.strip())
+            campos.append(f"{_quote_ident('motivo_inutilizacao')}=?"); args.append(motivo.strip())
         if novo in ("devolvido", "inutilizado"):
-            campos.append("data_baixa=?"); args.append(date.today().isoformat())
+            campos.append(f"{_quote_ident('data_baixa')}=?"); args.append(date.today().isoformat())
         args.append(dispositivo_id)
         con.execute(f"UPDATE dispositivos SET {', '.join(campos)} WHERE id=?", args)
 
@@ -287,24 +297,30 @@ def importar_arquivo(itens: list[dict], *, lote: str,
     prontos e arbitrários; a garantia de não duplicar já foi decidida antes
     desta função ser chamada.
     """
-    criados = 0
     with _conn() as con:
+        values = []
         for item in itens:
             tipo = item.get("tipo") or ""
             if tipo not in TIPOS:
                 tipo = "brinco_visual"
-            con.execute(
+            values.append(
+                (_novo_id(), item["codigo_visual"],
+                 item.get("codigo_eletronico") or None, tipo,
+                 item.get("fabricante") or None, item.get("modelo") or None,
+                 lote, item.get("data_fabricacao") or None,
+                 proprietario_id, propriedade_destino_id)
+            )
+
+        if values:
+            con.executemany(
                 """INSERT INTO dispositivos
                    (id,codigo_visual,codigo_eletronico,tipo,fabricante,modelo,
                     lote,data_fabricacao,proprietario_id,propriedade_destino_id,
                     status)
                    VALUES(?,?,?,?,?,?,?,?,?,?,'disponivel')""",
-                (_novo_id(), item["codigo_visual"],
-                 item.get("codigo_eletronico") or None, tipo,
-                 item.get("fabricante") or None, item.get("modelo") or None,
-                 lote, item.get("data_fabricacao") or None,
-                 proprietario_id, propriedade_destino_id))
-            criados += 1
+                values
+            )
+        criados = len(values)
 
     eventos.auditar("importacao_de_arquivo_de_dispositivos", usuario=usuario,
                     entidade="dispositivos", entidade_id=lote,
