@@ -287,24 +287,30 @@ def importar_arquivo(itens: list[dict], *, lote: str,
     prontos e arbitrários; a garantia de não duplicar já foi decidida antes
     desta função ser chamada.
     """
-    criados = 0
     with _conn() as con:
+        values = []
         for item in itens:
             tipo = item.get("tipo") or ""
             if tipo not in TIPOS:
                 tipo = "brinco_visual"
-            con.execute(
+            values.append(
+                (_novo_id(), item["codigo_visual"],
+                 item.get("codigo_eletronico") or None, tipo,
+                 item.get("fabricante") or None, item.get("modelo") or None,
+                 lote, item.get("data_fabricacao") or None,
+                 proprietario_id, propriedade_destino_id)
+            )
+
+        if values:
+            con.executemany(
                 """INSERT INTO dispositivos
                    (id,codigo_visual,codigo_eletronico,tipo,fabricante,modelo,
                     lote,data_fabricacao,proprietario_id,propriedade_destino_id,
                     status)
                    VALUES(?,?,?,?,?,?,?,?,?,?,'disponivel')""",
-                (_novo_id(), item["codigo_visual"],
-                 item.get("codigo_eletronico") or None, tipo,
-                 item.get("fabricante") or None, item.get("modelo") or None,
-                 lote, item.get("data_fabricacao") or None,
-                 proprietario_id, propriedade_destino_id))
-            criados += 1
+                values
+            )
+        criados = len(values)
 
     eventos.auditar("importacao_de_arquivo_de_dispositivos", usuario=usuario,
                     entidade="dispositivos", entidade_id=lote,
