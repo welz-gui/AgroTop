@@ -1130,9 +1130,10 @@ def _backfill_animal_uuid(con) -> int:
               "animal_photos", "deaths", "sales", "insumo_transactions"):
         if "animal_id" not in _colunas(con, t):
             continue
+        qt = _quote_ident(t)
         cur = con.execute(
-            f"UPDATE {t} SET animal_uuid = ("
-            f"  SELECT a.uuid FROM animals a WHERE a.id = {t}.animal_id"
+            f"UPDATE {qt} SET animal_uuid = ("
+            f"  SELECT a.uuid FROM animals a WHERE a.id = {qt}.animal_id"
             f") WHERE animal_uuid IS NULL AND animal_id IS NOT NULL"
         )
         total += getattr(cur, "rowcount", 0) or 0

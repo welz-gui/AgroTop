@@ -105,13 +105,15 @@ def mudar_status(dispositivo_id: str, novo: str, *, motivo: str = "",
         return {"ok": False, "de": atual, "para": novo, **v,
                 "motivo": f"Mudar para '{novo}' exige motivo registrado."}
 
+    from database import _quote_ident
+
     with _conn() as con:
-        campos = ["status=?"]
+        campos = [f"{_quote_ident('status')}=?"]
         args: list = [novo]
         if novo == "inutilizado":
-            campos.append("motivo_inutilizacao=?"); args.append(motivo.strip())
+            campos.append(f"{_quote_ident('motivo_inutilizacao')}=?"); args.append(motivo.strip())
         if novo in ("devolvido", "inutilizado"):
-            campos.append("data_baixa=?"); args.append(date.today().isoformat())
+            campos.append(f"{_quote_ident('data_baixa')}=?"); args.append(date.today().isoformat())
         args.append(dispositivo_id)
         con.execute(f"UPDATE dispositivos SET {', '.join(campos)} WHERE id=?", args)
 
