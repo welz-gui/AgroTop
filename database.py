@@ -12,7 +12,6 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
-import hashlib
 import random
 from datetime import datetime, date, timedelta
 from typing import Optional
