@@ -127,6 +127,59 @@ Não inclua `DATABASE_URL` em mensagens de teste ou log: ela contém a senha do 
 
 ## Histórico de decisões aplicadas
 
+> **Leia esta seção antes de auditar schema.** Ela existe porque três análises
+> independentes já chegaram, com semanas de diferença, às mesmas perguntas — e
+> uma delas refez trabalho que já estava feito. Se a sua conclusão está aqui,
+> ela já foi decidida: confirme a data e siga em frente.
+
+- **Índices com `idx_scan = 0` não são candidatos a remoção neste banco**
+  (decidido em 2026-08-31, reafirmado em 2026-09-01). O Performance Advisor do
+  Supabase sinaliza ~50 índices sem uso em `public.*`, e vai continuar
+  sinalizando. **Isso não prova que são inúteis** — prova que o banco tem 14
+  animais e 42 pesagens, e abaixo desse volume o planner prefere seq scan quase
+  sempre. Cada índice custa 8–16 kB.
+  A `0028_remove_indices_nao_usados_grupo1.sql` **já removeu os dois únicos com
+  evidência objetiva** (`idx_weighings_date` e `idx_pluvio_lote`: existe irmão
+  composto na mesma tabela já em uso, e nenhum dos dois sustentava FK).
+  **Não refaça essa auditoria** antes de haver volume real — sugestão: quando
+  alguma das tabelas passar de ~1.000 linhas. Quatro índices sem FK
+  (`idx_ident_animal`, `idx_medications_protocol`, `idx_insumo_trans_lote`,
+  `idx_insumo_trans_reason`) ficaram em "revisar depois"; os três primeiros
+  saíram dessa lista com a 0029, que declarou as FKs que eles sustentam.
+
+- **`UNIQUE` sobre as mesmas colunas da PRIMARY KEY nunca vai inline num
+  `CREATE TABLE`** (2026-08-31, [PR #263](https://github.com/welz-gui/AgroTop/pull/263)).
+  O PostgreSQL **descarta a constraint em silêncio** — sem erro, sem aviso. Foi
+  a causa raiz da falha da `0027` no replay: o baseline declarava
+  `animals_uuid_key UNIQUE (uuid)` ao lado de `animals_pkey PRIMARY KEY (uuid)`,
+  a constraint nunca nascia, e o `DROP CONSTRAINT` reclamava de algo inexistente.
+  Sintoma tapado com `IF EXISTS` no [#258](https://github.com/welz-gui/AgroTop/pull/258);
+  causa corrigida no `tools/dump_schema_nuvem.py`, que agora emite essas
+  constraints como `ALTER TABLE ADD CONSTRAINT` separado.
+  **Ao regenerar o baseline (passo 3 do checklist acima), rode
+  `tests/test_dump_baseline.py`** — é o guarda que pega a reincidência.
+  O `test_schema_local_nao_divergiu_da_producao` não pega: ele compara colunas,
+  não constraints.
+
+- **`animals_uuid_key` foi removida de produção em 2026-08-28**
+  (`migrations/0027_remove_indice_duplicado_animals.sql`). Era `UNIQUE (uuid)`
+  redundante com `animals_pkey PRIMARY KEY (uuid)`, remanescente de antes da
+  0017. A remoção exigiu derrubar e recriar 14 FKs, porque todas dependiam dela.
+  Houve uma decisão anterior de **não** fazer isso (não valia recriar 14 FKs por
+  um índice redundante) — **essa decisão foi revertida** e a migration aplicada.
+  Não reabra sem motivo novo.
+
+- **Três FKs declaradas** (`migrations/0029_fks_faltantes.sql`, 2026-09-01):
+  `animal_identifiers.animal_uuid → animals(uuid)`,
+  `medications.protocol_id → health_protocols(id)` e
+  `insumo_transactions.lote_id → lotes(id)`. As três colunas apontavam para
+  outra tabela só por convenção do código. A primeira é a que importa: o AgroTop
+  existe para rastreabilidade PNIB, e identificador apontando para animal
+  inexistente é a classe de erro que o sistema deveria tornar impossível.
+  Verificado sem órfãos antes de aplicar (14/0, 24/0, 2/0 linhas/órfãos).
+  Sem `ON DELETE`, igual às FKs irmãs: apagar animal com identificador passa a
+  ser recusado, que é o correto num sistema onde histórico não some.
+
 - **RLS nas 11 tabelas da Fase B + limpeza de heranças do Supabase Auth**
   (`migrations/0014_rls_nas_tabelas_da_fase_b.sql`, aplicada em 2026-08-05). O linter
   do Supabase acusou `rls_disabled_in_public` em `animal_identifiers`, `animal_events`,
