@@ -109,7 +109,7 @@ class TestDietaPorPiqueteNaTela(unittest.TestCase):
         vazio = next((l for l in lotes
                      if not db.get_all_animals(status="ativo", lote_id=l["id"])), None)
         if vazio is None:
-            db.add_lote("PVAZIO", "Piquete vazio de prova", 5.0, 10.0)
+            db.add_lote(db.LoteData("PVAZIO", "Piquete vazio de prova", 5.0, 10.0))
             db.clear_cache()
             vazio = db.get_all_lotes()[-1]
 
