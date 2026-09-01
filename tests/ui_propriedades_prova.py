@@ -72,7 +72,7 @@ class TestTelaPropriedades(unittest.TestCase):
         return achados[0]
 
     def _com_poligono(self, at, texto):
-        self._por_chave(at.text_area, "prop_poligono").set_value(texto)
+        self._por_chave(at.text_area, f"prop_poligono_{self.prop['id']}").set_value(texto)
         at.run()
         return at
 
