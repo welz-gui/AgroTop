@@ -12,7 +12,6 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
-import sqlite3
 import hashlib
 import random
 from datetime import datetime, date, timedelta
