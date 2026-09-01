@@ -1161,12 +1161,12 @@ def _backfill_identificadores(con) -> int:
         "  SELECT 1 FROM animal_identifiers i "
         "  WHERE i.animal_uuid = a.uuid AND i.tipo = 'manejo' AND i.status = 'ativo')"
     ).fetchall()
-    for row in faltando:
-        con.execute(
+    if faltando:
+        con.executemany(
             "INSERT INTO animal_identifiers "
             "(animal_uuid,tipo,valor,status,aplicado_por) "
             "VALUES(?,'manejo',?,'ativo','migração ADR 0004')",
-            (row["uuid"], row["id"]),
+            [(row["uuid"], row["id"]) for row in faltando],
         )
     return len(faltando)
 
