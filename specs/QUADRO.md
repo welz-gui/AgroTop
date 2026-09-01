@@ -26,8 +26,10 @@ na fila** — 0065/0066 (mobile: tela de brincos, terceiro item do Tier 1 da
 [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) e 0067/0068 (mobile:
 criar lote, quarto item do Tier 1) — pares API+mobile, mesmo padrão de toda a Trilha 1,
 nenhuma fora da Trilha 1 propriamente dita — ver abaixo.
-O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
-é integração de UI, trabalho do mantenedor (R31), não spec de agente.
+**Trilha 2 fechada em 2026-09-01** ([PR #313](https://github.com/welz-gui/AgroTop/pull/313),
+mantenedor, sem spec) — "desenhar no mapa", "importar arquivo" e localização por
+propriedade na previsão do tempo, as três ligadas. Só falta o item 4 (GPS caminhando o
+perímetro, mobile) — desbloqueado desde que a Trilha 1 fechou, mas ainda sem spec escrita.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
