@@ -19,6 +19,15 @@ from contextlib import contextmanager
 from typing import Optional
 from dataclasses import dataclass
 
+@dataclass
+class InsumoCreate:
+    name: str
+    category: str
+    unit: str
+    initial_stock: float
+    min_stock: float
+    cost_per_unit: float
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
@@ -1693,11 +1702,11 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
 
 
 @_writes
-def add_new_insumo(name, category, unit, initial_stock, min_stock, cost_per_unit) -> None:
+def add_new_insumo(insumo: InsumoCreate) -> None:
     with _conn() as con:
         con.execute(
             "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit) VALUES(?,?,?,?,?,?)",
-            (name, category, unit, initial_stock, min_stock, cost_per_unit),
+            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit),
         )
 
 # ─── Custos por Animal ───────────────────────────────────────────────────────

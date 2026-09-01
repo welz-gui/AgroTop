@@ -3525,7 +3525,8 @@ def page_estoque():
             ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
             if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
                 if ni_name:
-                    db.add_new_insumo(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
+                    insumo_data = db.InsumoCreate(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
+                    db.add_new_insumo(insumo_data)
                     st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
                 else:
                     st.error("Nome é obrigatório.")

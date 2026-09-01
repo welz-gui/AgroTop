@@ -50,7 +50,7 @@ class TestPrevisaoDeEstoqueNaTela(unittest.TestCase):
         cls.lote_id = db.get_all_lotes()[0]["id"]
 
     def _insumo(self, nome, unit="kg", saldo=100.0, minimo=20.0):
-        db.add_new_insumo(nome, "trato", unit, saldo, minimo, 2.0)
+        db.add_new_insumo(db.InsumoCreate(nome, "trato", unit, saldo, minimo, 2.0))
         db.clear_cache()
         return next(i for i in db.get_all_insumos() if i["name"] == nome)
 
