@@ -445,3 +445,109 @@ pós-hibernação (seção 5.5). Esse número não mudou e nenhuma das três cor
 - A validação do caminho de **escrita** em Postgres cabe ao CI, que roda a suíte inteira
   contra um Postgres efêmero. Não foi exercitada localmente: só há Postgres de produção
   aqui, e nenhuma medição justifica escrever nele.
+
+---
+
+# 11. Causa raiz da falha da migration 0027
+
+*Adicionado em 2026-08-31. Não estava no escopo dos relatórios externos — apareceu porque
+o CI do PR desta revisão foi o primeiro a rodar depois que a cadeia de migrations passou a
+ser replayada por inteiro.*
+
+## 11.1 Como apareceu
+
+O CI do PR #256 (seções 9 e 10) morreu **antes de qualquer teste rodar**, no passo que
+aplica as migrations num Postgres efêmero:
+
+```text
+psql:supabase/migrations/0027_remove_indice_duplicado_animals.sql:86:
+ERROR:  constraint "animals_uuid_key" of relation "animals" does not exist
+```
+
+Não era do PR: a `main` já estava vermelha pelo mesmo motivo. O commit que expôs o
+problema foi justamente o que passou a **aplicar todas as migrations** no Postgres
+efêmero — antes disso, a divergência existia e ficava invisível.
+
+## 11.2 Os dois fatos que não fechavam
+
+A leitura do repositório dizia que a constraint deveria existir:
+
+- `0000_baseline_producao.sql` **declara** `CONSTRAINT animals_uuid_key UNIQUE (uuid)`;
+- nenhuma migration entre a 0007 e a 0026 a remove;
+- e o log mostrava as **14 FKs para `animals(uuid)` sendo removidas sem erro** nas linhas
+  imediatamente anteriores — ou seja, havia FKs apontando para aquela coluna.
+
+Três leituras estáticas seguidas não resolveram. O que resolveu foi medir.
+
+## 11.3 O diagnóstico
+
+Docker estava indisponível na máquina, mas **o CI já é o Postgres efêmero** — é a
+reprodução, de graça e configurada. Uma branch descartável instrumentou o workflow para
+tirar um retrato de `pg_constraint` e `pg_indexes` logo depois do baseline.
+
+Resultado, num PG16 limpo:
+
+```text
+animals_id_key | u | UNIQUE (id)
+animals_pkey   | p | PRIMARY KEY (uuid)
+```
+
+**`animals_uuid_key` não existe** — apesar de o baseline declará-la. Os índices confirmam:
+nenhum com esse nome.
+
+## 11.4 A causa
+
+Quando um `CREATE TABLE` declara `PRIMARY KEY (uuid)` e `UNIQUE (uuid)` sobre a **mesma
+coluna**, o PostgreSQL descarta a segunda **em silêncio** — sem erro, sem aviso:
+
+```sql
+CREATE TABLE animals (
+    ...
+    CONSTRAINT animals_pkey     PRIMARY KEY (uuid),
+    CONSTRAINT animals_uuid_key UNIQUE (uuid)   -- nunca nasce
+);
+```
+
+Isso explica os dois fatos de uma vez: o `DROP CONSTRAINT` reclamava de algo que nunca
+chegou a existir, e as 14 FKs saíram sem erro porque existiam — amarradas a
+`animals_pkey`.
+
+Em produção a constraint existe porque foi construída **em passos**: a 0002 criou
+`idx_animals_uuid`, a 0005 promoveu o índice a UNIQUE com `ADD CONSTRAINT ... USING
+INDEX`, e só a 0017 tornou `uuid` a chave primária. Por `ALTER TABLE` separado o Postgres
+cria normalmente; é a declaração inline junto da PK que ele engole.
+
+## 11.5 O problema real não era a 0027
+
+> **O baseline descrevia um schema que não reproduzia.**
+
+Qualquer migration futura que dependesse de uma constraint redundante com a PK divergiria
+do mesmo jeito, em silêncio. E o guarda que deveria pegar isso não pega:
+`test_schema_local_nao_divergiu_da_producao` compara **colunas**, não constraints.
+
+A 0027 não foi o defeito — foi o primeiro lugar onde o defeito encostou.
+
+## 11.6 Correções
+
+| PR | O quê | Estado |
+|---|---|---|
+| #258 | `DROP CONSTRAINT IF EXISTS` na 0027 | mesclado — trata o sintoma |
+| #263 | UNIQUE redundante com a PK sai do `CREATE TABLE`, no gerador e no baseline; `tests/test_dump_baseline.py` trava os dois | mesclado |
+
+O `IF EXISTS` continua valendo como guarda barata. A correção de fundo é a segunda:
+`tools/dump_schema_nuvem.py` passa a emitir essas constraints como `ALTER TABLE ADD
+CONSTRAINT` separado, e o baseline em disco foi corrigido cirurgicamente — o snapshot de
+2026-08-19 continua representando o mesmo estado de produção, agora replayável.
+
+## 11.7 O que isto reforça
+
+O §52 da Revisão 2 propõe **medir → identificar → alterar → medir de novo**. Esta seção é
+o mesmo princípio aplicado a schema, e com a mesma lição da seção 10.5: a leitura atenta
+do código deu três explicações plausíveis e nenhuma correta. O que fechou foi consultar o
+catálogo do banco.
+
+Vale registrar também o custo de não medir: a hipótese inicial anotada no commit do #258
+(as FKs nascerem amarradas a `animals_pkey`) estava **certa no fato e errada na
+consequência** — concluía que a constraint ficaria sem referências, quando na verdade ela
+não é criada. Uma hipótese quase certa produziu a correção certa pelo motivo errado, e o
+motivo errado é o que teria deixado o problema de fundo passar.
