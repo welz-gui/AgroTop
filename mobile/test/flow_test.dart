@@ -31,6 +31,65 @@ http.Response _json(Object body, {int status = 200}) => http.Response(
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
 
+Map<String, dynamic> _alertsResponse({required bool empty}) {
+  if (empty) {
+    return {
+      'sumidos': [],
+      'carencia': [],
+      'prontos_para_abate': [],
+      'estoque_baixo': [],
+      'baixo_desempenho': [],
+    };
+  }
+  return {
+    'sumidos': [
+      {
+        'animal_id': 'BR0099',
+        'breed': 'Nelore',
+        'lote_id': 'P01',
+        'peso_atual': 401.2,
+        'dias_sem_pesagem': 38,
+      },
+    ],
+    'carencia': [
+      {
+        'animal_id': 'BR0098',
+        'breed': 'Angus',
+        'carencia_ate': '2026-09-19',
+        'dias_restantes': 19,
+      },
+    ],
+    'prontos_para_abate': [
+      {
+        'animal_id': 'BR0097',
+        'breed': 'Nelore',
+        'peso_atual': 510.0,
+        'peso_alvo': 500.0,
+        'arrobas': 17.68,
+      },
+    ],
+    'estoque_baixo': [
+      {
+        'insumo_id': 8,
+        'nome': 'Sal mineral',
+        'estoque_atual': 5.0,
+        'estoque_minimo': 10.0,
+        'unidade': 'kg',
+      },
+    ],
+    'baixo_desempenho': [
+      {
+        'animal_id': 'BR0096',
+        'breed': 'Brahman',
+        'lote_id': 'P02',
+        'peso_atual': 355.0,
+        'gmd': 0.31,
+        'meta_gmd': 0.5,
+      },
+    ],
+  };
+}
+
 Uint8List _testPhoto() {
   final photo = image_lib.Image(width: 1200, height: 800);
   for (var y = 0; y < photo.height; y++) {
@@ -73,6 +132,7 @@ void main() {
       var movementRequests = 0;
       var medicationRequests = 0;
       var protocolosRequests = 0;
+      var alertsRequests = 0;
       String? carenciaAte;
       final aplicacoes = <Map<String, dynamic>>[];
       var currentLote = 'P01';
@@ -133,6 +193,10 @@ void main() {
         }
         if (request.method == 'GET' && request.url.path == '/trato/pendentes') {
           return _json([]);
+        }
+        if (request.method == 'GET' && request.url.path == '/alertas') {
+          alertsRequests++;
+          return _json(_alertsResponse(empty: alertsRequests >= 3));
         }
         if (request.method == 'GET' && request.url.path == '/animais/BR0001') {
           return _json({
@@ -270,7 +334,37 @@ void main() {
       await tester.tap(find.text('Entrar'));
       await tester.pumpAndSettle();
       expect(find.text('BR0001'), findsOneWidget);
-      expect(refreshRequests, 2);
+      expect(refreshRequests, 3);
+      expect(find.byKey(const ValueKey('alerts-badge')), findsOneWidget);
+      expect(find.text('5'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('open-alerts')));
+      await tester.pumpAndSettle();
+      expect(find.text('🔴 Animais Sumidos (1)'), findsOneWidget);
+      expect(find.text('🟡 Em Período de Carência (1)'), findsOneWidget);
+      expect(find.text('🟢 Prontos para Abate (1)'), findsOneWidget);
+      expect(find.text('📦 Estoque Abaixo do Mínimo (1)'), findsOneWidget);
+      expect(find.text('📉 Baixo Desempenho (1)'), findsOneWidget);
+      expect(find.text('BR0099 — Nelore'), findsOneWidget);
+      expect(find.text('Sal mineral'), findsOneWidget);
+
+      final refresh = tester
+          .state<RefreshIndicatorState>(
+            find.byKey(const ValueKey('alerts-refresh')),
+          )
+          .show();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await refresh;
+      await tester.pumpAndSettle();
+      expect(find.text('✅ Nenhum animal sumido.'), findsOneWidget);
+      expect(find.text('✅ Nenhum animal em carência.'), findsOneWidget);
+      expect(
+        find.text('✅ Todos os insumos com estoque adequado.'),
+        findsOneWidget,
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       await tester.enterText(
         find.byKey(const ValueKey('animal-search')),
@@ -446,6 +540,55 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('falha ao carregar alertas não bloqueia a lista de animais', (
+    tester,
+  ) async {
+    final store = MemoryTokenStore()
+      ..tokens = const StoredTokens(
+        accessToken: 'access-live',
+        refreshToken: 'refresh-valid',
+      );
+    final api = ApiClient(
+      tokenStore: store,
+      baseUrl: 'http://mock.local',
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/animais') {
+          return _json([
+            {
+              'id': 'BR0001',
+              'breed': 'Nelore',
+              'current_weight': 382.4,
+              'status': 'ativo',
+            },
+          ]);
+        }
+        if (request.method == 'GET' && request.url.path == '/trato/pendentes') {
+          return _json([]);
+        }
+        if (request.method == 'GET' && request.url.path == '/alertas') {
+          return _json({'detail': 'indisponível'}, status: 503);
+        }
+        return _json({'detail': 'Não encontrado'}, status: 404);
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimalsPage(
+          api: api,
+          themeMode: ThemeMode.light,
+          onThemeChanged: (_) {},
+          onUnauthorized: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('BR0001'), findsOneWidget);
+    expect(find.byKey(const ValueKey('open-alerts')), findsOneWidget);
+    expect(find.byKey(const ValueKey('alerts-badge')), findsNothing);
   });
 
   testWidgets('foto é comprimida, enviada por multipart e aparece na galeria', (

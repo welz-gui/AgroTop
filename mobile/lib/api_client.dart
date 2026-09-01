@@ -190,6 +190,20 @@ class ApiClient {
         .toList(growable: false);
   }
 
+  Future<OperationalAlerts> getOperationalAlerts() async {
+    final response = await _authorized(
+      (headers) => _http.get(Uri.parse('$baseUrl/alertas'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar os alertas operacionais.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return OperationalAlerts.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<void> confirmFeeding(
     int planId, {
     required String situation,
