@@ -8,6 +8,7 @@ import 'package:agrotop_mobile/models.dart';
 import 'package:agrotop_mobile/offline_queue.dart';
 import 'package:agrotop_mobile/shallow_cache.dart';
 import 'package:agrotop_mobile/screens/animal_photo_section.dart';
+import 'package:agrotop_mobile/screens/alerts_page.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
@@ -37,10 +38,70 @@ http.Response _json(Object body, {int status = 200}) => http.Response(
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
 
+Map<String, dynamic> _alertsResponse({required bool withItems}) {
+  if (!withItems) {
+    return {
+      'sumidos': [],
+      'carencia': [],
+      'prontos_para_abate': [],
+      'estoque_baixo': [],
+      'baixo_desempenho': [],
+    };
+  }
+  return {
+    'sumidos': [
+      {
+        'animal_id': 'BR0099',
+        'breed': 'Nelore',
+        'lote_id': 'P01',
+        'peso_atual': 401.2,
+        'dias_sem_pesagem': 38,
+      },
+    ],
+    'carencia': [
+      {
+        'animal_id': 'BR0098',
+        'breed': 'Angus',
+        'carencia_ate': '2026-09-19',
+        'dias_restantes': 19,
+      },
+    ],
+    'prontos_para_abate': [
+      {
+        'animal_id': 'BR0097',
+        'breed': 'Nelore',
+        'peso_atual': 510.0,
+        'peso_alvo': 500.0,
+        'arrobas': 17.68,
+      },
+    ],
+    'estoque_baixo': [
+      {
+        'insumo_id': 8,
+        'nome': 'Sal mineral',
+        'estoque_atual': 5.0,
+        'estoque_minimo': 10.0,
+        'unidade': 'kg',
+      },
+    ],
+    'baixo_desempenho': [
+      {
+        'animal_id': 'BR0096',
+        'breed': 'Brahman',
+        'lote_id': 'P02',
+        'peso_atual': 355.0,
+        'gmd': 0.31,
+        'meta_gmd': 0.5,
+      },
+    ],
+  };
+}
+
 MockClient _client({
   String? carenciaAte,
   List<Map<String, dynamic>>? aplicacoes,
   bool allFeedingsConfirmed = false,
+  Map<String, dynamic>? alerts,
 }) => MockClient((request) async {
   if (request.method == 'POST' && request.url.path == '/auth/login') {
     return _json({
@@ -55,6 +116,9 @@ MockClient _client({
         'role': 'admin',
       },
     });
+  }
+  if (request.method == 'GET' && request.url.path == '/alertas') {
+    return _json(alerts ?? _alertsResponse(withItems: false));
   }
   if (request.url.path == '/animais') {
     return _json([
@@ -570,6 +634,74 @@ void main() {
     }
   });
 
+  testWidgets('alertas vazios e com itens são cobertos nos três temas', (
+    tester,
+  ) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final mode in ThemeMode.values) {
+      for (final withItems in [false, true]) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: _client(alerts: _alertsResponse(withItems: withItems)),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: AlertsPage(api: api, onUnauthorized: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            withItems ? '🔴 Animais Sumidos (1)' : '🔴 Animais Sumidos (0)',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text('📉 Baixo Desempenho (${withItems ? 1 : 0})'),
+          findsOneWidget,
+        );
+        if (withItems) {
+          expect(find.text('BR0099 — Nelore'), findsOneWidget);
+          expect(find.text('Sal mineral'), findsOneWidget);
+        } else {
+          expect(find.text('✅ Nenhum animal sumido.'), findsOneWidget);
+          expect(
+            find.text('✅ Todos os insumos com estoque adequado.'),
+            findsOneWidget,
+          );
+        }
+
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${withItems ? '17-alertas-com-itens' : '16-alertas-vazios'}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    }
+  });
+
   testWidgets(
     'indicador de pendências na fila offline (vazia e com itens) nos três temas',
     (tester) async {
@@ -618,7 +750,10 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          expect(find.byKey(const ValueKey('sync-queue-button')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('sync-queue-button')),
+            findsOneWidget,
+          );
           if (withPending) {
             expect(
               find.byKey(const ValueKey('pending-queue-badge')),
@@ -647,80 +782,79 @@ void main() {
     },
   );
 
-  testWidgets(
-    'banner de dados cacheados desatualizados nos três temas',
-    (tester) async {
-      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
-      if (captureGoldens) await loadAppFonts();
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('banner de dados cacheados desatualizados nos três temas', (
+    tester,
+  ) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      for (final mode in ThemeMode.values) {
-        SharedPreferences.setMockInitialValues({});
-        final prefs = await SharedPreferences.getInstance();
-        final shallowCache = ShallowCache(prefs);
-        await shallowCache.saveAnimals([
-          const AnimalSummary(
-            id: 'BR0001',
-            breed: 'Nelore',
-            sex: 'M',
-            currentWeight: 382.4,
-            loteId: 'P01',
-          ),
-        ]);
+    for (final mode in ThemeMode.values) {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final shallowCache = ShallowCache(prefs);
+      await shallowCache.saveAnimals([
+        const AnimalSummary(
+          id: 'BR0001',
+          breed: 'Nelore',
+          sex: 'M',
+          currentWeight: 382.4,
+          loteId: 'P01',
+        ),
+      ]);
 
-        final store = GoldenTokenStore()
-          ..tokens = const StoredTokens(
-            accessToken: 'access-live',
-            refreshToken: 'refresh-valid',
-          );
-        // Cliente que simula falha de conexão
-        final api = ApiClient(
-          tokenStore: store,
-          baseUrl: 'http://mock.local',
-          httpClient: MockClient((request) async {
-            throw http.ClientException('Conexão indisponível');
-          }),
+      final store = GoldenTokenStore()
+        ..tokens = const StoredTokens(
+          accessToken: 'access-live',
+          refreshToken: 'refresh-valid',
         );
+      // Cliente que simula falha de conexão
+      final api = ApiClient(
+        tokenStore: store,
+        baseUrl: 'http://mock.local',
+        httpClient: MockClient((request) async {
+          throw http.ClientException('Conexão indisponível');
+        }),
+      );
 
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: AppThemes.light,
-            darkTheme: AppThemes.dark,
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppThemes.light,
+          darkTheme: AppThemes.dark,
+          themeMode: mode,
+          home: AnimalsPage(
+            api: api,
             themeMode: mode,
-            home: AnimalsPage(
-              api: api,
-              themeMode: mode,
-              onThemeChanged: (_) {},
-              onUnauthorized: () {},
-              shallowCache: shallowCache,
-              offlineQueue: OfflineQueue(storage: MemoryQueueStorage()),
-            ),
+            onThemeChanged: (_) {},
+            onUnauthorized: () {},
+            shallowCache: shallowCache,
+            offlineQueue: OfflineQueue(storage: MemoryQueueStorage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('offline-cache-banner')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('pode estar desatualizado'), findsOneWidget);
+      expect(find.text('BR0001'), findsOneWidget);
+
+      if (captureGoldens) {
+        await expectLater(
+          find.byType(MaterialApp),
+          matchesGoldenFile(
+            'goldens/${mode.name}-15-cache-desatualizado-banner.png',
           ),
         );
-        await tester.pumpAndSettle();
-
-        expect(
-          find.byKey(const ValueKey('offline-cache-banner')),
-          findsOneWidget,
-        );
-        expect(find.textContaining('pode estar desatualizado'), findsOneWidget);
-        expect(find.text('BR0001'), findsOneWidget);
-
-        if (captureGoldens) {
-          await expectLater(
-            find.byType(MaterialApp),
-            matchesGoldenFile(
-              'goldens/${mode.name}-15-cache-desatualizado-banner.png',
-            ),
-          );
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
       }
-    },
-  );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
 }
