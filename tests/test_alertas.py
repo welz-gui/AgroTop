@@ -18,7 +18,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
-from repositories.animais import add_animal  # noqa: E402
+from repositories.animais import add_animal, get_animal  # noqa: E402
 from repositories.sanidade import add_medication  # noqa: E402
 
 
@@ -37,7 +37,7 @@ class TestAlertaDeCarencia(unittest.TestCase):
             300.0, 500.0, 2000.0, lote["id"], None,
         )
         db.clear_cache()
-        self.animal = db.get_animal("TESTE001")
+        self.animal = get_animal("TESTE001")
 
     def test_animal_em_carencia_aparece_no_alerta(self):
         animal_id = self.animal["id"]
@@ -49,7 +49,7 @@ class TestAlertaDeCarencia(unittest.TestCase):
 
         # A mudança de status é o mecanismo real que causava o bug — confirma
         # que o cenário de teste é o mesmo que acontece em produção.
-        atualizado = db.get_animal(animal_id)
+        atualizado = get_animal(animal_id)
         self.assertEqual(atualizado["status"], "carencia")
 
         alertas = db.get_alert_animals()
