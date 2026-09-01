@@ -13,7 +13,7 @@ gravação em voo da outra — perda de dado silenciosa, com dois usuários
 simultâneos (escritório e curral), que é o uso normal do AgroTop.
 
 Por isso cada `with _conn()` tem de receber uma conexão só sua, emprestada e
-devolvida. `test_rollback_de_uma_thread_nao_derruba_a_outra` é o teste que
+devolvida. `test_conexoes_simultaneas_sao_objetos_distintos` é o teste que
 falha se alguém "simplificar" o pool para uma conexão compartilhada.
 
 ⚠️ A suíte roda em SQLite, que **não** é agrupado de propósito (ver
@@ -26,7 +26,6 @@ import os
 import sqlite3
 import sys
 import tempfile
-import threading
 import unittest
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,53 +64,47 @@ class TestSemanticaDeTransacao(unittest.TestCase):
     def tearDown(self):
         conexao.fechar_pool()
 
-    def test_rollback_de_uma_thread_nao_derruba_a_outra(self):
-        """O teste central: transações de sessões diferentes não se cruzam.
+    def test_conexoes_simultaneas_sao_objetos_distintos(self):
+        """A garantia estrutural: dois `_conn()` abertos ao mesmo tempo nunca
+        são a MESMA conexão.
 
-        A thread B falha e faz rollback enquanto a thread A está no meio da
-        sua gravação. Se as duas dividissem a conexão, o `INSERT` de A sumiria.
+        É isto que impede o rollback de uma sessão de abortar a gravação em voo
+        de outra. Compartilhar uma conexão faria os dois blocos receberem o
+        mesmo objeto — e é exatamente o que este teste recusa.
+        """
+        with conexao._conn() as primeira:
+            with conexao._conn() as segunda:
+                self.assertIsNot(primeira, segunda,
+                                 "dois `with _conn()` simultâneos receberam a "
+                                 "MESMA conexão — o rollback de um desfaria o "
+                                 "trabalho do outro")
+
+    def test_rollback_nao_desfaz_o_que_outra_conexao_gravou(self):
+        """O efeito observável da garantia acima, sem depender de corrida.
+
+        A versão anterior deste teste punha duas threads escrevendo ao mesmo
+        tempo e era **flaky**: o SQLite serializa escritores, então a segunda
+        thread esbarrava no lock e quem estourasse o timeout primeiro decidia o
+        resultado. Passou local e no CI do PR que o introduziu, e quebrou depois
+        num PR só de documentação. Um teste que às vezes exercita o que promete
+        é pior que um determinístico que exercita menos.
         """
         with conexao._conn() as con:
             con.execute("CREATE TABLE prova_pool (marca TEXT)")
+        with conexao._conn() as con:
+            con.execute("INSERT INTO prova_pool VALUES ('a')")
 
-        b_entrou = threading.Event()
-        a_gravou = threading.Event()
-        erros = []
-
-        def escritor_a():
-            try:
-                with conexao._conn() as con:
-                    con.execute("INSERT INTO prova_pool VALUES ('a')")
-                    b_entrou.wait(timeout=5)      # deixa B falhar no meio
-                    a_gravou.set()
-            except Exception as exc:              # pragma: no cover
-                erros.append(("a", exc))
-
-        def escritor_b_que_falha():
-            try:
-                with conexao._conn() as con:
-                    con.execute("INSERT INTO prova_pool VALUES ('b')")
-                    b_entrou.set()
-                    raise RuntimeError("falha proposital: força o rollback de B")
-            except RuntimeError:
-                pass
-            except Exception as exc:              # pragma: no cover
-                erros.append(("b", exc))
-
-        ta = threading.Thread(target=escritor_a)
-        tb = threading.Thread(target=escritor_b_que_falha)
-        ta.start(); tb.start()
-        ta.join(timeout=10); tb.join(timeout=10)
-
-        self.assertEqual(erros, [], f"thread quebrou: {erros}")
-        self.assertTrue(a_gravou.is_set(), "a thread A não concluiu")
+        with self.assertRaises(RuntimeError):
+            with conexao._conn() as con:
+                con.execute("INSERT INTO prova_pool VALUES ('b')")
+                raise RuntimeError("falha proposital: força o rollback")
 
         with conexao._conn() as con:
             marcas = [r[0] for r in con.execute(
-                "SELECT marca FROM prova_pool").fetchall()]
+                "SELECT marca FROM prova_pool ORDER BY marca").fetchall()]
         self.assertEqual(marcas, ["a"],
-                         "o rollback de B levou junto a gravação de A — o pool "
-                         "está compartilhando conexão entre sessões")
+                         "ou o rollback levou junto a gravação anterior, ou a "
+                         "gravação que falhou sobreviveu")
 
     def test_erro_de_negocio_nao_impede_o_uso_seguinte(self):
         """Uma exceção comum não pode deixar a camada de dados inutilizável."""
