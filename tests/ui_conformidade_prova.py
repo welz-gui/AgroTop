@@ -35,6 +35,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
+from repositories.animais import get_animal  # noqa: E402
 
 try:
     from streamlit.testing.v1 import AppTest
@@ -114,7 +115,7 @@ class TestConformidadeNaTela(unittest.TestCase):
         """Prova a peça nova (com_divergencia): sem ela, a dimensão nunca
         veria uma divergência real."""
         aid = db.get_all_animals(status="ativo")[0]["id"]
-        animal = db.get_animal(aid)
+        animal = get_animal(aid)
         db.dispositivos.importar_lote("DVCONF001", "DVCONF001", lote="prova-conformidade")
         db.clear_cache()
         d = db.dispositivos.por_codigo("DVCONF001")

@@ -12,6 +12,8 @@ import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from repositories.animais import get_animal
+from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
@@ -64,7 +66,7 @@ from services.rateio_adaptador import com_dias_no_lote
 from services.rateio import ratear
 from services.gta_adaptador import montar_contexto as gta_montar_contexto
 from services.gta import validar as gta_validar
-from ui.tema import cores, css_variaveis, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
+from ui.tema import cores, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -620,7 +622,28 @@ def page_dashboard():
     if not animals:
         st.info("Nenhum animal cadastrado. Use **Cadastrar Animal** para começar."); return
 
-    # KPIs
+    _dash_kpis(stats, animals)
+
+    st.markdown("---")
+
+    _dash_alerts(alerts)
+
+    col_main, col_side = st.columns([3,2])
+
+    with col_main:
+        _dash_chart_evolucao_peso()
+
+    with col_side:
+        _dash_chart_por_raca(animals)
+        _dash_chart_gmd(animals)
+
+    _dash_summary_table(animals)
+
+    _dash_conformidade()
+    _dash_completude()
+
+
+def _dash_kpis(stats, animals):
     # Produção na unidade configurada
     if _use_arroba():
         prod_label = "🏷️ @ Ganhas"
@@ -639,87 +662,90 @@ def page_dashboard():
     k[5].metric("♂ Machos",      stats.males)
     k[6].metric("♀ Fêmeas",      stats.females)
 
-    st.markdown("---")
 
+def _dash_alerts(alerts):
     # Alertas resumidos
     n_sum = len(alerts["sumidos"]); n_car = len(alerts["carencia"]); n_pro = len(alerts["prontos"])
     if n_sum or n_car or n_pro:
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
             st.markdown(f"""<div class="card-red">
-                <b style="color:{c["perigo"]}">🔴 {n_sum} Sumidos</b><br>
-                <span style="color:{c["texto_secundario"]};font-size:.85rem">Sem pesagem há +30 dias</span>
+                <b style="color:{c['perigo']}">🔴 {n_sum} Sumidos</b><br>
+                <span style="color:{c['texto_secundario']};font-size:.85rem">Sem pesagem há +30 dias</span>
             </div>""", unsafe_allow_html=True)
         with ac2:
             st.markdown(f"""<div class="card-yellow">
-                <b style="color:{c["atencao"]}">🟡 {n_car} Em Carência</b><br>
-                <span style="color:{c["texto_secundario"]};font-size:.85rem">Não podem ser abatidos</span>
+                <b style="color:{c['atencao']}">🟡 {n_car} Em Carência</b><br>
+                <span style="color:{c['texto_secundario']};font-size:.85rem">Não podem ser abatidos</span>
             </div>""", unsafe_allow_html=True)
         with ac3:
             st.markdown(f"""<div class="card-green">
-                <b style="color:{c["primaria"]}">🟢 {n_pro} Prontos para Abate</b><br>
-                <span style="color:{c["texto_secundario"]};font-size:.85rem">Peso-alvo atingido</span>
+                <b style="color:{c['primaria']}">🟢 {n_pro} Prontos para Abate</b><br>
+                <span style="color:{c['texto_secundario']};font-size:.85rem">Peso-alvo atingido</span>
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
 
-    col_main, col_side = st.columns([3,2])
 
-    with col_main:
-        st.subheader("📈 Evolução de Peso do Rebanho")
-        raw = db.get_all_weighings()
-        if raw:
-            df_all = pd.DataFrame(raw)
-            df_all["weigh_date"] = pd.to_datetime(df_all["weigh_date"])
-            df_avg = (df_all.groupby("weigh_date")["weight"]
-                      .mean().reset_index()
-                      .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
-            df_all = df_all.sort_values(["animal_id", "weigh_date"])
-            fig = px.line(
-                df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
-                color_discrete_sequence=[c["borda"]]
-            )
-            fig.update_traces(
-                showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
-                hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
-            )
-            fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
-                mode="lines+markers",name="Média do Rebanho",
-                line=dict(width=3,color=c["primaria"]),
-                marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
-                hovertemplate="<b>Média</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"))
-            fig.update_layout(**PLOTLY,height=350,
-                legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1),
-                xaxis=dict(gridcolor=c["superficie"],title="Data"),
-                yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"))
-            st.plotly_chart(fig, use_container_width=True)
+def _dash_chart_evolucao_peso():
+    st.subheader("📈 Evolução de Peso do Rebanho")
+    raw = db.get_all_weighings()
+    if raw:
+        df_all = pd.DataFrame(raw)
+        df_all["weigh_date"] = pd.to_datetime(df_all["weigh_date"])
+        df_avg = (df_all.groupby("weigh_date")["weight"]
+                  .mean().reset_index()
+                  .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
+        df_all = df_all.sort_values(["animal_id", "weigh_date"])
+        fig = px.line(
+            df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
+            color_discrete_sequence=[c["borda"]]
+        )
+        fig.update_traces(
+            showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
+            hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
+        )
+        fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
+            mode="lines+markers",name="Média do Rebanho",
+            line=dict(width=3,color=c["primaria"]),
+            marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
+            hovertemplate="<b>Média</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"))
+        fig.update_layout(**PLOTLY,height=350,
+            legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1),
+            xaxis=dict(gridcolor=c["superficie"],title="Data"),
+            yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"))
+        st.plotly_chart(fig, use_container_width=True)
 
-    with col_side:
-        st.subheader("🥧 Por Raça")
-        df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
-        df_br.columns=["Raça","Qtd"]
-        fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
-            color_discrete_sequence=SERIES)
-        fig_p.update_layout(**_layout(height=240,margin=dict(l=0,r=0,t=10,b=10),
-            legend=dict(orientation="h",yanchor="bottom",y=-0.2)))
-        fig_p.update_traces(textposition="inside",textinfo="percent+label")
-        st.plotly_chart(fig_p, use_container_width=True)
 
-        st.subheader("📊 GMD por Animal")
-        a_ids = [a["id"] for a in animals]
-        gmd_batch = db.calculate_gmd_bulk(a_ids)
-        gmd_data=[{"ID":a["id"],"GMD":gmd_batch.get(a["id"])} for a in animals]
-        df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
-        if not df_g.empty:
-            fig_g=px.bar(df_g,x="GMD",y="ID",orientation="h",color="GMD",
-                color_continuous_scale=ESCALA_RUIM_BOM,
-                labels={"GMD":"kg/dia"})
-            fig_g.add_vline(x=0,line_dash="dash",line_color=c["borda_suave"])
-            fig_g.update_layout(**PLOTLY,height=max(180,len(df_g)*27),
-                coloraxis_showscale=False,
-                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title=""))
-            st.plotly_chart(fig_g, use_container_width=True)
+def _dash_chart_por_raca(animals):
+    st.subheader("🥧 Por Raça")
+    df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
+    df_br.columns=["Raça","Qtd"]
+    fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
+        color_discrete_sequence=SERIES)
+    fig_p.update_layout(**_layout(height=240,margin=dict(l=0,r=0,t=10,b=10),
+        legend=dict(orientation="h",yanchor="bottom",y=-0.2)))
+    fig_p.update_traces(textposition="inside",textinfo="percent+label")
+    st.plotly_chart(fig_p, use_container_width=True)
 
-    # Tabela resumo
+
+def _dash_chart_gmd(animals):
+    st.subheader("📊 GMD por Animal")
+    a_ids = [a["id"] for a in animals]
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
+    gmd_data=[{"ID":a["id"],"GMD":gmd_batch.get(a["id"])} for a in animals]
+    df_g=pd.DataFrame([r for r in gmd_data if r["GMD"] is not None]).sort_values("GMD")
+    if not df_g.empty:
+        fig_g=px.bar(df_g,x="GMD",y="ID",orientation="h",color="GMD",
+            color_continuous_scale=ESCALA_RUIM_BOM,
+            labels={"GMD":"kg/dia"})
+        fig_g.add_vline(x=0,line_dash="dash",line_color=c["borda_suave"])
+        fig_g.update_layout(**PLOTLY,height=max(180,len(df_g)*27),
+            coloraxis_showscale=False,
+            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title=""))
+        st.plotly_chart(fig_g, use_container_width=True)
+
+
+def _dash_summary_table(animals):
     st.markdown("---"); st.subheader("📋 Resumo Rápido")
     rows=[]
     ul = _unit_label()
@@ -745,9 +771,6 @@ def page_dashboard():
         column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
             gain_col:st.column_config.NumberColumn(format=fmt_gain),
             "GMD (kg/dia)":st.column_config.NumberColumn(format="%.3f")})
-
-    _dash_conformidade()
-    _dash_completude()
 
 
 _FAIXA_CONFORMIDADE = {
@@ -1256,7 +1279,7 @@ def _campo_animal():
     eid=st.session_state.campo_id
     if not eid: st.info("Selecione ou busque um animal para começar."); return
 
-    animal=db.get_animal(eid)
+    animal=get_animal(eid)
     if not animal:
         st.error(f"Animal **{eid}** não encontrado."); return
 
@@ -1417,7 +1440,7 @@ def page_rebanho():
         races=["Todas"]+sorted({a["breed"] for a in animals_all})
         fr=st.selectbox("Raça",races)
     with f3:
-        fcat=st.selectbox("Categoria",["Todas"]+db.AGE_BANDS)
+        fcat=st.selectbox("Categoria",["Todas"]+AGE_BANDS)
     with f4:
         statuses=["Todos","ativo","vendido","morto","carencia"]
         fs=st.selectbox("Status",statuses)
@@ -1750,10 +1773,101 @@ def _cartao_de_evento(e: dict, correcoes: list[dict]):
                     else:
                         st.error(f"🚫 {r.get('erro')}")
 
+
+def _render_tab_peso(ws):
+    if len(ws)>=2:
+        import numpy as np
+        df_w=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
+        df_w.columns=["Data","Peso (kg)"]; df_w["Data"]=pd.to_datetime(df_w["Data"])
+        x_num=(df_w["Data"]-df_w["Data"].min()).dt.days
+        coef=np.polyfit(x_num,df_w["Peso (kg)"],1)
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=df_w["Data"],y=np.polyval(coef,x_num),
+            mode="lines",name="Tendência",line=dict(dash="dot",color=c["atencao"],width=2),hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=df_w["Data"],y=df_w["Peso (kg)"],
+            mode="lines+markers",name="Pesagens",
+            line=dict(color=c["primaria"],width=2.5),
+            marker=dict(size=10,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
+            hovertemplate="%{x|%d/%m/%Y}<br><b>%{y:.1f} kg</b><extra></extra>"))
+        fig.update_layout(**PLOTLY,height=300,
+            xaxis=dict(gridcolor=c["superficie"],title="Data"),
+            yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"),
+            legend=dict(orientation="h",y=1.08))
+        st.plotly_chart(fig,use_container_width=True)
+    else:
+        st.info("São necessárias ao menos 2 pesagens para exibir o gráfico.")
+    st.subheader("Tabela de Pesagens")
+    if ws:
+        df_wt=pd.DataFrame(ws)[["weigh_date","weight","method","lote_id","operator","notes"]].copy()
+        df_wt["method"]=df_wt["method"].fillna("pesado").map(
+            lambda m: db.WEIGH_METHODS.get(m,m))
+        df_wt.columns=["Data","Peso (kg)","Método","Lote","Operador","Obs"]
+        st.dataframe(df_wt,use_container_width=True,hide_index=True,
+            column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f")})
+
+def _render_tab_med(meds):
+    if meds:
+        for m_ in meds:
+            end_=datetime.strptime(m_["med_date"],"%Y-%m-%d").date()+timedelta(days=m_["withdrawal_days"] or 0)
+            active=m_["withdrawal_days"] and end_>=date.today()
+            bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
+            st.markdown(f'<div class="hist-item" style="{bc}">'
+                f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
+                f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
+                f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
+                f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
+                f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+end_.isoformat()+")" if m_["withdrawal_days"] else ""}'
+                f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
+                f'</span></div>',unsafe_allow_html=True)
+    else:
+        st.info("Nenhum medicamento registrado.")
+
+def _render_tab_mov(movs):
+    if movs:
+        for mv in movs:
+            st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
+                f'<b>{mv.get("from_name") or "Entrada"} → {mv.get("to_name","?")}</b><br>'
+                f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
+                f'{mv["movement_date"]} · {mv["reason"]} · {mv.get("operator") or "—"}'
+                f'</span></div>',unsafe_allow_html=True)
+    else:
+        st.info("Nenhuma movimentação registrada.")
+
+def _render_tab_fin(aid, animal, gain, yield_, cost_total, ul):
+    costs=db.get_animal_costs(aid)
+    prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
+    cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
+    cpu_gain = round(cost_total / prod_gain, 2) if prod_gain > 0 else 0
+    cp1,cp2,cp3 = st.columns(3)
+    cp1.metric("Custo Total",          f"R$ {cost_total:,.2f}",
+               help="Compra + insumos + custeio operacional")
+    cp2.metric(_cost_per_unit_label(), f"R$ {cpu_val:,.2f}" if cpu_val else "—",
+               help="Custo total ÷ peso vivo atual")
+    cp3.metric(f"Custo da Produção (R$/{ul})",
+               f"R$ {cpu_gain:,.2f}" if cpu_gain else "—",
+               help=f"Custo total ÷ {ul} ganhos (produzidos) desde a entrada")
+    if costs:
+        df_c=pd.DataFrame(costs)[["cost_date","cost_type","description","amount"]]
+        df_c.columns=["Data","Tipo","Descrição","Valor (R$)"]
+        st.dataframe(df_c,use_container_width=True,hide_index=True,
+            column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+    # Adicionar custo
+    with st.expander("➕ Adicionar Custo"):
+        with st.form("f_cost",clear_on_submit=True):
+            cc1,cc2,cc3=st.columns(3)
+            with cc1: ct=st.selectbox("Tipo",COST_TYPES)
+            with cc2: val=st.number_input("Valor (R$)",min_value=0.0,step=0.01,format="%.2f")
+            with cc3: cd=st.date_input("Data",value=date.today())
+            desc=st.text_input("Descrição")
+            if st.form_submit_button("Salvar",type="primary",use_container_width=True):
+                db.add_animal_cost(aid,ct,desc,val,cd.strftime("%Y-%m-%d"))
+                st.success("Custo registrado!"); st.rerun()
+
+
 def page_animal():
     aid=st.session_state.animal_detail
     if not aid: st.warning("Nenhum animal selecionado."); return
-    animal=db.get_animal(aid)
+    animal=get_animal(aid)
     if not animal: st.error(f"Animal {aid} não encontrado."); return
 
     if st.button("← Voltar",type="secondary"): _go("rebanho"); st.rerun()
@@ -1830,93 +1944,16 @@ def page_animal():
         _photo_section(aid, key_prefix="ficha_")
 
     with tl_peso:
-        if len(ws)>=2:
-            import numpy as np
-            df_w=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
-            df_w.columns=["Data","Peso (kg)"]; df_w["Data"]=pd.to_datetime(df_w["Data"])
-            x_num=(df_w["Data"]-df_w["Data"].min()).dt.days
-            coef=np.polyfit(x_num,df_w["Peso (kg)"],1)
-            fig=go.Figure()
-            fig.add_trace(go.Scatter(x=df_w["Data"],y=np.polyval(coef,x_num),
-                mode="lines",name="Tendência",line=dict(dash="dot",color=c["atencao"],width=2),hoverinfo="skip"))
-            fig.add_trace(go.Scatter(x=df_w["Data"],y=df_w["Peso (kg)"],
-                mode="lines+markers",name="Pesagens",
-                line=dict(color=c["primaria"],width=2.5),
-                marker=dict(size=10,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
-                hovertemplate="%{x|%d/%m/%Y}<br><b>%{y:.1f} kg</b><extra></extra>"))
-            fig.update_layout(**PLOTLY,height=300,
-                xaxis=dict(gridcolor=c["superficie"],title="Data"),
-                yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"),
-                legend=dict(orientation="h",y=1.08))
-            st.plotly_chart(fig,use_container_width=True)
-        else:
-            st.info("São necessárias ao menos 2 pesagens para exibir o gráfico.")
-        st.subheader("Tabela de Pesagens")
-        if ws:
-            df_wt=pd.DataFrame(ws)[["weigh_date","weight","method","lote_id","operator","notes"]].copy()
-            df_wt["method"]=df_wt["method"].fillna("pesado").map(
-                lambda m: db.WEIGH_METHODS.get(m,m))
-            df_wt.columns=["Data","Peso (kg)","Método","Lote","Operador","Obs"]
-            st.dataframe(df_wt,use_container_width=True,hide_index=True,
-                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f")})
+        _render_tab_peso(ws)
 
     with tl_med:
-        if meds:
-            for m_ in meds:
-                end_=datetime.strptime(m_["med_date"],"%Y-%m-%d").date()+timedelta(days=m_["withdrawal_days"] or 0)
-                active=m_["withdrawal_days"] and end_>=date.today()
-                bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
-                st.markdown(f'<div class="hist-item" style="{bc}">'
-                    f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
-                    f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
-                    f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                    f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
-                    f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+end_.isoformat()+")" if m_["withdrawal_days"] else ""}'
-                    f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
-                    f'</span></div>',unsafe_allow_html=True)
-        else:
-            st.info("Nenhum medicamento registrado.")
+        _render_tab_med(meds)
 
     with tl_mov:
-        if movs:
-            for mv in movs:
-                st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
-                    f'<b>{mv.get("from_name") or "Entrada"} → {mv.get("to_name","?")}</b><br>'
-                    f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                    f'{mv["movement_date"]} · {mv["reason"]} · {mv.get("operator") or "—"}'
-                    f'</span></div>',unsafe_allow_html=True)
-        else:
-            st.info("Nenhuma movimentação registrada.")
+        _render_tab_mov(movs)
 
     with tl_fin:
-        costs=db.get_animal_costs(aid)
-        prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
-        cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
-        cpu_gain = round(cost_total / prod_gain, 2) if prod_gain > 0 else 0
-        cp1,cp2,cp3 = st.columns(3)
-        cp1.metric("Custo Total",          f"R$ {cost_total:,.2f}",
-                   help="Compra + insumos + custeio operacional")
-        cp2.metric(_cost_per_unit_label(), f"R$ {cpu_val:,.2f}" if cpu_val else "—",
-                   help="Custo total ÷ peso vivo atual")
-        cp3.metric(f"Custo da Produção (R$/{ul})",
-                   f"R$ {cpu_gain:,.2f}" if cpu_gain else "—",
-                   help=f"Custo total ÷ {ul} ganhos (produzidos) desde a entrada")
-        if costs:
-            df_c=pd.DataFrame(costs)[["cost_date","cost_type","description","amount"]]
-            df_c.columns=["Data","Tipo","Descrição","Valor (R$)"]
-            st.dataframe(df_c,use_container_width=True,hide_index=True,
-                column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-        # Adicionar custo
-        with st.expander("➕ Adicionar Custo"):
-            with st.form("f_cost",clear_on_submit=True):
-                cc1,cc2,cc3=st.columns(3)
-                with cc1: ct=st.selectbox("Tipo",COST_TYPES)
-                with cc2: val=st.number_input("Valor (R$)",min_value=0.0,step=0.01,format="%.2f")
-                with cc3: cd=st.date_input("Data",value=date.today())
-                desc=st.text_input("Descrição")
-                if st.form_submit_button("Salvar",type="primary",use_container_width=True):
-                    db.add_animal_cost(aid,ct,desc,val,cd.strftime("%Y-%m-%d"))
-                    st.success("Custo registrado!"); st.rerun()
+        _render_tab_fin(aid, animal, gain, yield_, cost_total, ul)
 
     st.markdown("---")
     qa1,qa2,qa3=st.columns(3)
@@ -1970,155 +2007,163 @@ def page_lotes():
     lt1,lt2,lt3=st.tabs(["📋 Visão Geral","➕ Novo Lote","🔀 Transferir Animais"])
 
     with lt1:
-        for l in lotes:
-            ua  = l["total_ua"] or 0
-            cap = l["capacity_ua"] or 0
-            has_cap = cap > 0
-            pct = min(ua/cap*100, 100) if has_cap else 0
-            bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
-            status_badge={"ativo":'<span class="badge-green">Ativo</span>',
-                "descanso":'<span class="badge-yellow">Descanso</span>',
-                "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
-            dias_ocup=""
-            if l.get("last_entry_date") and l.get("last_exit_date"):
-                d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
-                d1=datetime.strptime(l["last_exit_date"],"%Y-%m-%d").date()
-                dias_ocup=f"Última ocupação: {abs((d1-d0).days)} dias"
-            elif l.get("last_entry_date"):
-                d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
-                dias_ocup=f"Em ocupação há {(date.today()-d0).days} dias"
-
-            # Ocupação: só mostra % quando há capacidade definida (> 0)
-            if has_cap:
-                ocup_txt = f"{ua:.1f} / {cap:.0f} UA ({pct:.0f}%)"
-                cap_txt  = f"Cap. {cap:.0f} UA"
-                barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
-                         f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
-            else:
-                ocup_txt = f"{ua:.1f} UA · sem capacidade definida"
-                cap_txt  = "Sem capacidade de pasto (curral/manejo)"
-                barra = ""
-
-            st.markdown(f"""
-            <div class="card">
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
-                <div>
-                  <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
-                  <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
-                    {l['area_ha']} ha · {cap_txt} · {dias_ocup}
-                  </div>
-                </div>
-                <div style="text-align:right">
-                  <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
-                  <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
-                </div>
-              </div>
-              {barra}
-            </div>""",unsafe_allow_html=True)
-
-            # Lista de animais do lote
-            with st.expander(f"Ver animais do {l['name']}"):
-                anilist=db.get_all_animals(lote_id=l["id"])
-                if anilist:
-                    a_ids = [a["id"] for a in anilist]
-                    gmd_batch = db.calculate_gmd_bulk(a_ids)
-                    rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
-                        "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
-                    st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
-                        column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                            "GMD":st.column_config.NumberColumn(format="%.3f")})
-                else:
-                    st.caption("Nenhum animal neste lote.")
-
-            # Perímetro do piquete (migration 0015)
-            with st.expander(f"🗺️ Perímetro do {l['name']}"):
-                st.caption("Um vértice por linha, `longitude, latitude` — a ordem do "
-                           "GeoJSON, a mesma da tela de Propriedades. A área é "
-                           "**calculada** do desenho, não digitada — salvar o perímetro "
-                           "atualiza o campo Área do piquete automaticamente.")
-                texto_l = st.text_area(
-                    "Vértices", value=_poligono_para_texto(l.get("poligono")),
-                    height=120, key=f"lote_poligono_{l['id']}",
-                    placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
-                                "-51.2280, -30.0320")
-
-                anel_l, erro_l, problemas_l = [], "", []
-                if texto_l.strip():
-                    try:
-                        anel_l = _ler_poligono(texto_l)
-                    except ValueError as e:
-                        erro_l = str(e)
-                    else:
-                        problemas_l = geometria_validar(anel_l)
-
-                if erro_l:
-                    st.error(f"🚫 {erro_l}")
-                for prob in problemas_l:
-                    st.error(f"🚫 {prob}")
-
-                if anel_l and not problemas_l:
-                    area_desenhada = geometria_area_ha(anel_l)
-                    diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
-                    gl1, gl2 = st.columns(2)
-                    gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
-                               help="É o que vai gravar no campo Área ao salvar.")
-                    gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
-                               delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
-                                     if diverge else None))
-                elif not texto_l.strip() and l.get("poligono"):
-                    st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
-                               "último valor calculado, editável à mão (Trilha 2: "
-                               "piquete sem geometria continua funcionando).")
-
-                pode_l = not erro_l and not problemas_l
-                if st.button("💾 Salvar perímetro", disabled=not pode_l,
-                             key=f"lote_poligono_salvar_{l['id']}"):
-                    novo = (json.dumps({"type": "Polygon",
-                                        "coordinates": [[list(v) for v in anel_l]]})
-                           if anel_l else None)
-                    db.set_lote_poligono(l["id"], novo)
-                    if novo:
-                        st.success(f"✅ Perímetro salvo — Área atualizada para "
-                                  f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
-                    else:
-                        st.success("✅ Perímetro removido.")
-                    st.rerun()
-
-        # Gráfico UA por Lote
-        if lotes:
-            df_lot=pd.DataFrame([{"Lote":f"{l['id']}·{l['name'][:8]}",
-                "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
-            fig_l=go.Figure()
-            fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
-                marker_color=c["borda"])
-            fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
-                marker_color=c["primaria"])
-            fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
-                legend=dict(orientation="h",y=1.1),
-                xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
-            st.plotly_chart(fig_l,use_container_width=True)
+        _render_tab_visao_geral(lotes)
 
     with lt2:
-        with st.form("f_lote",clear_on_submit=True):
-            nl1,nl2=st.columns(2)
-            with nl1:
-                lid=st.text_input("ID do Lote *",placeholder="Ex: P06").strip().upper()
-                name=st.text_input("Nome *",placeholder="Ex: Piquete Sul 2")
-            with nl2:
-                area=st.number_input("Área (ha)",min_value=0.0,step=0.5,format="%.1f")
-                cap=st.number_input("Capacidade (UA)",min_value=0.0,step=1.0,format="%.0f")
-            notes_l=st.text_area("Obs.",height=60)
-            if st.form_submit_button("✅ Criar Lote",type="primary",use_container_width=True):
-                if not lid or not name:
-                    st.error("ID e Nome são obrigatórios.")
-                elif db.get_lote(lid):
-                    st.error(f"Lote {lid} já existe.")
-                else:
-                    db.add_lote(lid,name,area,cap,notes_l)
-                    st.success(f"✅ Lote {lid} criado!"); st.rerun()
+        _render_tab_novo_lote()
 
     with lt3:
         _lotes_transferir_animais(lotes)
+
+
+def _render_tab_visao_geral(lotes):
+    for l in lotes:
+        ua  = l["total_ua"] or 0
+        cap = l["capacity_ua"] or 0
+        has_cap = cap > 0
+        pct = min(ua/cap*100, 100) if has_cap else 0
+        bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
+        status_badge={"ativo":'<span class="badge-green">Ativo</span>',
+            "descanso":'<span class="badge-yellow">Descanso</span>',
+            "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
+        dias_ocup=""
+        if l.get("last_entry_date") and l.get("last_exit_date"):
+            d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
+            d1=datetime.strptime(l["last_exit_date"],"%Y-%m-%d").date()
+            dias_ocup=f"Última ocupação: {abs((d1-d0).days)} dias"
+        elif l.get("last_entry_date"):
+            d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
+            dias_ocup=f"Em ocupação há {(date.today()-d0).days} dias"
+
+        # Ocupação: só mostra % quando há capacidade definida (> 0)
+        if has_cap:
+            ocup_txt = f"{ua:.1f} / {cap:.0f} UA ({pct:.0f}%)"
+            cap_txt  = f"Cap. {cap:.0f} UA"
+            barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
+                     f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
+        else:
+            ocup_txt = f"{ua:.1f} UA · sem capacidade definida"
+            cap_txt  = "Sem capacidade de pasto (curral/manejo)"
+            barra = ""
+
+        st.markdown(f"""
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
+            <div>
+              <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
+              <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
+                {l['area_ha']} ha · {cap_txt} · {dias_ocup}
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
+              <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
+            </div>
+          </div>
+          {barra}
+        </div>""",unsafe_allow_html=True)
+
+        # Lista de animais do lote
+        with st.expander(f"Ver animais do {l['name']}"):
+            anilist=db.get_all_animals(lote_id=l["id"])
+            if anilist:
+                a_ids = [a["id"] for a in anilist]
+                gmd_batch = db.calculate_gmd_bulk(a_ids)
+                rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
+                    "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
+                st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
+                    column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                        "GMD":st.column_config.NumberColumn(format="%.3f")})
+            else:
+                st.caption("Nenhum animal neste lote.")
+
+        # Perímetro do piquete (migration 0015)
+        with st.expander(f"🗺️ Perímetro do {l['name']}"):
+            st.caption("Um vértice por linha, `longitude, latitude` — a ordem do "
+                       "GeoJSON, a mesma da tela de Propriedades. A área é "
+                       "**calculada** do desenho, não digitada — salvar o perímetro "
+                       "atualiza o campo Área do piquete automaticamente.")
+            texto_l = st.text_area(
+                "Vértices", value=_poligono_para_texto(l.get("poligono")),
+                height=120, key=f"lote_poligono_{l['id']}",
+                placeholder="-51.2300, -30.0300\n-51.2280, -30.0300\n"
+                            "-51.2280, -30.0320")
+
+            anel_l, erro_l, problemas_l = [], "", []
+            if texto_l.strip():
+                try:
+                    anel_l = _ler_poligono(texto_l)
+                except ValueError as e:
+                    erro_l = str(e)
+                else:
+                    problemas_l = geometria_validar(anel_l)
+
+            if erro_l:
+                st.error(f"🚫 {erro_l}")
+            for prob in problemas_l:
+                st.error(f"🚫 {prob}")
+
+            if anel_l and not problemas_l:
+                area_desenhada = geometria_area_ha(anel_l)
+                diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
+                gl1, gl2 = st.columns(2)
+                gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
+                           help="É o que vai gravar no campo Área ao salvar.")
+                gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
+                           delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
+                                 if diverge else None))
+            elif not texto_l.strip() and l.get("poligono"):
+                st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
+                           "último valor calculado, editável à mão (Trilha 2: "
+                           "piquete sem geometria continua funcionando).")
+
+            pode_l = not erro_l and not problemas_l
+            if st.button("💾 Salvar perímetro", disabled=not pode_l,
+                         key=f"lote_poligono_salvar_{l['id']}"):
+                novo = (json.dumps({"type": "Polygon",
+                                    "coordinates": [[list(v) for v in anel_l]]})
+                       if anel_l else None)
+                db.set_lote_poligono(l["id"], novo)
+                if novo:
+                    st.success(f"✅ Perímetro salvo — Área atualizada para "
+                              f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
+                else:
+                    st.success("✅ Perímetro removido.")
+                st.rerun()
+
+    # Gráfico UA por Lote
+    if lotes:
+        df_lot=pd.DataFrame([{"Lote":f"{l['id']}·{l['name'][:8]}",
+            "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
+        fig_l=go.Figure()
+        fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
+            marker_color=c["borda"])
+        fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
+            marker_color=c["primaria"])
+        fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
+            legend=dict(orientation="h",y=1.1),
+            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
+        st.plotly_chart(fig_l,use_container_width=True)
+
+
+def _render_tab_novo_lote():
+    with st.form("f_lote",clear_on_submit=True):
+        nl1,nl2=st.columns(2)
+        with nl1:
+            lid=st.text_input("ID do Lote *",placeholder="Ex: P06").strip().upper()
+            name=st.text_input("Nome *",placeholder="Ex: Piquete Sul 2")
+        with nl2:
+            area=st.number_input("Área (ha)",min_value=0.0,step=0.5,format="%.1f")
+            cap=st.number_input("Capacidade (UA)",min_value=0.0,step=1.0,format="%.0f")
+        notes_l=st.text_area("Obs.",height=60)
+        if st.form_submit_button("✅ Criar Lote",type="primary",use_container_width=True):
+            if not lid or not name:
+                st.error("ID e Nome são obrigatórios.")
+            elif db.get_lote(lid):
+                st.error(f"Lote {lid} já existe.")
+            else:
+                db.add_lote(db.LoteData(lid, name, area, cap, notes_l))
+                st.success(f"✅ Lote {lid} criado!"); st.rerun()
 
 
 def _lotes_transferir_animais(lotes):
@@ -2191,7 +2236,7 @@ def _fin_precos():
     with st.form("f_precos"):
         st.markdown("**Preço esperado por kg (R$)**")
         novos = {}
-        for band in db.AGE_BANDS:
+        for band in AGE_BANDS:
             c1, c2, c3 = st.columns([2,1,1])
             with c1:
                 st.markdown(f"<div style='padding-top:.55rem'>{band}</div>", unsafe_allow_html=True)
@@ -3162,7 +3207,7 @@ def _fin_simulador(animals):
             help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
         # Mostra os preços em uso
         linhas = []
-        for band in db.AGE_BANDS:
+        for band in AGE_BANDS:
             for sex in ("M","F"):
                 p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
                 if p > 0:
@@ -3411,6 +3456,102 @@ def _fin_rateio_de_lote(animals):
 # ══════════════════════════════════════════════════════════════════════════════
 # ESTOQUE DE INSUMOS
 # ══════════════════════════════════════════════════════════════════════════════
+def _render_tab_inventario(insumos):
+    CAT_LABELS={"racao":"Ração","trato":"Trato (volumoso)","medicamento":"Medicamento",
+                "vacina":"Vacina","mineral":"Mineral","outro":"Outro"}
+    cats_present=sorted({i["category"] for i in insumos})
+    fcat_ins=st.selectbox("Filtrar por categoria",
+        ["Todas"]+cats_present,
+        format_func=lambda c:c if c=="Todas" else CAT_LABELS.get(c,c))
+    rows_i=[]
+    for i in insumos:
+        if fcat_ins!="Todas" and i["category"]!=fcat_ins: continue
+        pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 100
+        rows_i.append({"Insumo":i["name"],"Categoria":CAT_LABELS.get(i["category"],i["category"]),
+            "Estoque":i["current_stock"],"Unidade":i["unit"],
+            "Mínimo":i["min_stock"],
+            "Status":"🔴 Crítico" if pct<50 else "🟡 Baixo" if pct<100 else "🟢 OK",
+            "Custo/Un (R$)":i["cost_per_unit"],
+            "Valor Total (R$)":round(i["current_stock"]*i["cost_per_unit"],2)})
+    df_i=pd.DataFrame(rows_i)
+    st.dataframe(df_i,use_container_width=True,hide_index=True,
+        column_config={"Estoque":st.column_config.NumberColumn(format="%.1f"),
+            "Custo/Un (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+            "Valor Total (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+    tot_val=sum(r["Valor Total (R$)"] for r in rows_i)
+    st.metric("Valor Total do Estoque",f"R$ {tot_val:,.2f}")
+
+    # Gráfico % do mínimo
+    df_bar=pd.DataFrame([{"Insumo":r["Insumo"],
+        "% do Mínimo":min(r["Estoque"]/max(r["Mínimo"],0.01)*100,200)} for r in rows_i])
+    fig_e=px.bar(df_bar.sort_values("% do Mínimo"),x="% do Mínimo",y="Insumo",
+        orientation="h",color="% do Mínimo",
+        color_continuous_scale=ESCALA_RUIM_BOM,range_color=[0,200])
+    fig_e.add_vline(x=100,line_dash="dash",line_color=c["atencao"],
+        annotation_text="Mínimo",annotation_position="top")
+    fig_e.update_layout(**PLOTLY,height=280,coloraxis_showscale=False,
+        xaxis=dict(gridcolor=c["superficie"],title="% do Estoque Mínimo"),
+        yaxis=dict(gridcolor=c["superficie"],title=""))
+    st.plotly_chart(fig_e,use_container_width=True)
+
+def _render_tab_entrada_estoque(insumos):
+    with st.form("f_entrada",clear_on_submit=True):
+        ins=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.1f} {x['unit']})")
+        ec1,ec2=st.columns(2)
+        with ec1: qty=st.number_input("Quantidade",min_value=0.01,step=1.0,format="%.2f")
+        with ec2: cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f",
+            value=float(ins["cost_per_unit"]) if ins else 0.0)
+        if st.form_submit_button("✅ Registrar Entrada",type="primary",use_container_width=True):
+            db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"])
+            st.success(f"✅ +{qty:.1f} {ins['unit']} de {ins['name']}"); st.rerun()
+
+def _render_tab_novo_insumo():
+    with st.form("f_new_ins",clear_on_submit=True):
+        ni1,ni2=st.columns(2)
+        with ni1:
+            ni_name=st.text_input("Nome *",placeholder="Ex: Silagem de milho / Massa de soja")
+            ni_cat=st.selectbox("Categoria",
+                ["medicamento","vacina","racao","trato","mineral","outro"],
+                format_func=lambda c:{"racao":"ração","trato":"trato (volumoso)"}.get(c,c),
+                help="'trato' = volumosos como silagem, massa de soja, bagaço de laranja")
+        with ni2:
+            ni_unit=st.selectbox("Unidade",
+                ["kg","ton","saco","ml","mg","g","dose","litro","comprimido"],
+                format_func=lambda u:{"ton":"tonelada (ton)"}.get(u,u))
+            ni_stk=st.number_input("Estoque Inicial",min_value=0.0,step=1.0,format="%.1f")
+        ni_min=st.number_input("Estoque Mínimo (alerta)",min_value=0.0,step=1.0,format="%.1f")
+        ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
+        if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
+            if ni_name:
+                insumo_data = db.InsumoCreate(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
+                db.add_new_insumo(insumo_data)
+                st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
+            else:
+                st.error("Nome é obrigatório.")
+
+def _render_tab_previsao_ruptura():
+    st.caption("Dias até faltar cada insumo, no ritmo de consumo **planejado** "
+        "(soma dos planos de trato ativos) — diferente do aviso de "
+        "'abaixo do mínimo' acima, que só olha o saldo de hoje.")
+    previsao = _previsao_estoque()
+    URGENCIA_LABEL = {"critica": "🔴 Crítica", "atencao": "🟡 Atenção",
+                      "ok": "🟢 OK", "sem_dados": "⚪ Sem dados"}
+    criticos = [p for p in previsao if p["urgencia"] == "critica"]
+    if criticos:
+        st.warning(f"⚠️ **{_plural(len(criticos),'insumo','insumos')} em situação crítica:** " +
+            ", ".join(f"**{p['nome']}**" for p in criticos))
+    rows_p = [{
+        "Insumo": p["nome"],
+        "Dias Restantes": _num_br(p["dias_restantes"]) if p["dias_restantes"] is not None else "—",
+        "Data de Ruptura": p["data_ruptura"] or "—",
+        "Comprar Até": p["comprar_ate"] or "—",
+        "Urgência": URGENCIA_LABEL.get(p["urgencia"], p["urgencia"]),
+    } for p in previsao]
+    st.dataframe(pd.DataFrame(rows_p),use_container_width=True,hide_index=True)
+    st.caption("⚪ **Sem dados** = nenhum plano de trato ativo para o insumo, não é erro. "
+        "**Comprar Até** hoje é igual à **Data de Ruptura** — o sistema ainda não guarda "
+        "o prazo de reposição de cada insumo (fica para quando essa coluna existir).")
+
 def page_estoque():
     st.markdown('<div class="page-title">📦 Estoque de Insumos</div>', unsafe_allow_html=True)
     insumos=db.get_all_insumos()
@@ -3422,100 +3563,17 @@ def page_estoque():
     et1,et2,et3,et4,et5=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo",
         "📈 Previsão de Ruptura","🛒 Compra com Nota Fiscal"])
 
-    CAT_LABELS={"racao":"Ração","trato":"Trato (volumoso)","medicamento":"Medicamento",
-                "vacina":"Vacina","mineral":"Mineral","outro":"Outro"}
     with et1:
-        cats_present=sorted({i["category"] for i in insumos})
-        fcat_ins=st.selectbox("Filtrar por categoria",
-            ["Todas"]+cats_present,
-            format_func=lambda c:c if c=="Todas" else CAT_LABELS.get(c,c))
-        rows_i=[]
-        for i in insumos:
-            if fcat_ins!="Todas" and i["category"]!=fcat_ins: continue
-            pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 100
-            rows_i.append({"Insumo":i["name"],"Categoria":CAT_LABELS.get(i["category"],i["category"]),
-                "Estoque":i["current_stock"],"Unidade":i["unit"],
-                "Mínimo":i["min_stock"],
-                "Status":"🔴 Crítico" if pct<50 else "🟡 Baixo" if pct<100 else "🟢 OK",
-                "Custo/Un (R$)":i["cost_per_unit"],
-                "Valor Total (R$)":round(i["current_stock"]*i["cost_per_unit"],2)})
-        df_i=pd.DataFrame(rows_i)
-        st.dataframe(df_i,use_container_width=True,hide_index=True,
-            column_config={"Estoque":st.column_config.NumberColumn(format="%.1f"),
-                "Custo/Un (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Valor Total (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
-        tot_val=sum(r["Valor Total (R$)"] for r in rows_i)
-        st.metric("Valor Total do Estoque",f"R$ {tot_val:,.2f}")
-
-        # Gráfico % do mínimo
-        df_bar=pd.DataFrame([{"Insumo":r["Insumo"],
-            "% do Mínimo":min(r["Estoque"]/max(r["Mínimo"],0.01)*100,200)} for r in rows_i])
-        fig_e=px.bar(df_bar.sort_values("% do Mínimo"),x="% do Mínimo",y="Insumo",
-            orientation="h",color="% do Mínimo",
-            color_continuous_scale=ESCALA_RUIM_BOM,range_color=[0,200])
-        fig_e.add_vline(x=100,line_dash="dash",line_color=c["atencao"],
-            annotation_text="Mínimo",annotation_position="top")
-        fig_e.update_layout(**PLOTLY,height=280,coloraxis_showscale=False,
-            xaxis=dict(gridcolor=c["superficie"],title="% do Estoque Mínimo"),
-            yaxis=dict(gridcolor=c["superficie"],title=""))
-        st.plotly_chart(fig_e,use_container_width=True)
+        _render_tab_inventario(insumos)
 
     with et2:
-        with st.form("f_entrada",clear_on_submit=True):
-            ins=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.1f} {x['unit']})")
-            ec1,ec2=st.columns(2)
-            with ec1: qty=st.number_input("Quantidade",min_value=0.01,step=1.0,format="%.2f")
-            with ec2: cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f",
-                value=float(ins["cost_per_unit"]) if ins else 0.0)
-            if st.form_submit_button("✅ Registrar Entrada",type="primary",use_container_width=True):
-                db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"])
-                st.success(f"✅ +{qty:.1f} {ins['unit']} de {ins['name']}"); st.rerun()
+        _render_tab_entrada_estoque(insumos)
 
     with et3:
-        with st.form("f_new_ins",clear_on_submit=True):
-            ni1,ni2=st.columns(2)
-            with ni1:
-                ni_name=st.text_input("Nome *",placeholder="Ex: Silagem de milho / Massa de soja")
-                ni_cat=st.selectbox("Categoria",
-                    ["medicamento","vacina","racao","trato","mineral","outro"],
-                    format_func=lambda c:{"racao":"ração","trato":"trato (volumoso)"}.get(c,c),
-                    help="'trato' = volumosos como silagem, massa de soja, bagaço de laranja")
-            with ni2:
-                ni_unit=st.selectbox("Unidade",
-                    ["kg","ton","saco","ml","mg","g","dose","litro","comprimido"],
-                    format_func=lambda u:{"ton":"tonelada (ton)"}.get(u,u))
-                ni_stk=st.number_input("Estoque Inicial",min_value=0.0,step=1.0,format="%.1f")
-            ni_min=st.number_input("Estoque Mínimo (alerta)",min_value=0.0,step=1.0,format="%.1f")
-            ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
-            if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
-                if ni_name:
-                    db.add_new_insumo(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
-                    st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
-                else:
-                    st.error("Nome é obrigatório.")
+        _render_tab_novo_insumo()
 
     with et4:
-        st.caption("Dias até faltar cada insumo, no ritmo de consumo **planejado** "
-            "(soma dos planos de trato ativos) — diferente do aviso de "
-            "'abaixo do mínimo' acima, que só olha o saldo de hoje.")
-        previsao = _previsao_estoque()
-        URGENCIA_LABEL = {"critica": "🔴 Crítica", "atencao": "🟡 Atenção",
-                          "ok": "🟢 OK", "sem_dados": "⚪ Sem dados"}
-        criticos = [p for p in previsao if p["urgencia"] == "critica"]
-        if criticos:
-            st.warning(f"⚠️ **{_plural(len(criticos),'insumo','insumos')} em situação crítica:** " +
-                ", ".join(f"**{p['nome']}**" for p in criticos))
-        rows_p = [{
-            "Insumo": p["nome"],
-            "Dias Restantes": _num_br(p["dias_restantes"]) if p["dias_restantes"] is not None else "—",
-            "Data de Ruptura": p["data_ruptura"] or "—",
-            "Comprar Até": p["comprar_ate"] or "—",
-            "Urgência": URGENCIA_LABEL.get(p["urgencia"], p["urgencia"]),
-        } for p in previsao]
-        st.dataframe(pd.DataFrame(rows_p),use_container_width=True,hide_index=True)
-        st.caption("⚪ **Sem dados** = nenhum plano de trato ativo para o insumo, não é erro. "
-            "**Comprar Até** hoje é igual à **Data de Ruptura** — o sistema ainda não guarda "
-            "o prazo de reposição de cada insumo (fica para quando essa coluna existir).")
+        _render_tab_previsao_ruptura()
 
     with et5:
         _estoque_compra_com_nota(insumos)
@@ -4324,7 +4382,7 @@ def _cadastro_compra():
         if st.form_submit_button("✅ Cadastrar Animal",type="primary",use_container_width=True):
             errs=[]
             if not aid:             errs.append("ID do animal é obrigatório.")
-            elif db.get_animal(aid):errs.append(f"Animal **{aid}** já existe.")
+            elif get_animal(aid):errs.append(f"Animal **{aid}** já existe.")
             if entry_weight<=0:     errs.append("Peso de entrada deve ser > 0.")
             if age_err:             errs.append(age_err)
             if errs:

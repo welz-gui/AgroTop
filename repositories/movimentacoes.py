@@ -234,10 +234,11 @@ def confirmar_chegada(movimentacao_id: str, *, data: str, usuario: str,
             (movimentacao_id,)).fetchall()]
 
         faltantes = [u for u in uuids if recebidos is not None and u not in recebidos]
-        for u in faltantes:
-            con.execute(
+        if faltantes:
+            con.executemany(
                 "UPDATE movimentacao_animais SET divergencia='nao_recebido' "
-                "WHERE movimentacao_id=? AND animal_uuid=?", (movimentacao_id, u))
+                "WHERE movimentacao_id=? AND animal_uuid=?",
+                [(movimentacao_id, u) for u in faltantes])
 
         status = "concluida" if not faltantes else "divergente"
         con.execute(
@@ -251,10 +252,10 @@ def confirmar_chegada(movimentacao_id: str, *, data: str, usuario: str,
         # Chegada muda a propriedade do animal — é o efeito da movimentação.
         destino = mov["propriedade_destino_id"]
         chegaram = [u for u in uuids if u not in faltantes]
+        if destino and chegaram:
+            con.executemany("UPDATE animals SET property_id=? WHERE uuid=?",
+                            [(destino, u) for u in chegaram])
         for u in chegaram:
-            if destino:
-                con.execute("UPDATE animals SET property_id=? WHERE uuid=?",
-                            (destino, u))
             eventos.registrar_em(
                 con, u, "chegada_confirmada", ocorrido_em=data,
                 usuario_registro=usuario, propriedade_id=destino,

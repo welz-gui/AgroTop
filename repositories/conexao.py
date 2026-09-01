@@ -279,3 +279,8 @@ def _writes(fn):
         clear_cache()
         return result
     return wrapper
+
+
+def _quote_ident(name: str) -> str:
+    """Escapes an SQL identifier (table name or column name) safely."""
+    return '"' + name.replace('"', '""') + '"'
