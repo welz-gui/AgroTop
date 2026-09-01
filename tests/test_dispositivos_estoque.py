@@ -44,8 +44,8 @@ class BaseB7(unittest.TestCase):
         """
         BaseB7._seq += 1
         brinco = f"NOVO{BaseB7._seq}"
-        db.add_animal(brinco, "Nelore", "M", None, "2026-01-01",
-                      300.0, 500.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData(brinco, "Nelore", "M", None, "2026-01-01",
+                      300.0, 500.0, 1000.0, None, None))
         db.clear_cache()
         uuid = [a for a in db.get_all_animals(status=None)
                 if a["id"] == brinco][0]["uuid"]

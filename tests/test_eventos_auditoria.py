@@ -217,8 +217,8 @@ class TestOperacoesGeramEvento(BaseEventos):
 
     def test_cadastro_gera_dois_eventos(self):
         """Cadastro e identificação interna são eventos distintos no §6.1."""
-        db.add_animal("EV1", "Nelore", "M", None, "2026-07-01",
-                      300.0, 500.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("EV1", "Nelore", "M", None, "2026-07-01",
+                      300.0, 500.0, 1000.0, None, None))
         novo = [a for a in db.get_all_animals(status=None) if a["id"] == "EV1"][0]
         tipos = self._tipos(novo["uuid"])
         self.assertIn("cadastro_inicial", tipos)

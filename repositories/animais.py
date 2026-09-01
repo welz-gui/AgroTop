@@ -8,10 +8,33 @@ Sem Streamlit no topo do módulo.
 import random
 import uuid as _uuid
 from datetime import date, timedelta
+from dataclasses import dataclass
 from typing import Optional
 
 from . import eventos
 from .conexao import _cache, _conn, _writes
+
+
+@dataclass
+class AnimalData:
+    animal_id: str
+    breed: str
+    sex: str
+    birth_date: str | None
+    entry_date: str
+    entry_weight: float
+    target_weight: float | None
+    purchase_price: float | None
+    lote_id: str | None
+    fornecedor_id: int | None
+    notes: str = ""
+    birth_estimated: int = 0
+    age_source: str = "propriedade"
+    nf_number: str = ""
+    gta_number: str = ""
+    weight_method: str = "pesado"
+    purchase_mode: str = "cabeca"
+    property_id: str | None = None
 
 
 def uuid_de(con, animal_id: str) -> str | None:
@@ -67,25 +90,20 @@ def get_animal(animal_id: str) -> Optional[dict]:
 
 
 @_writes
-def add_animal(animal_id, breed, sex, birth_date, entry_date,
-               entry_weight, target_weight, purchase_price,
-               lote_id, fornecedor_id, notes="",
-               birth_estimated=0, age_source="propriedade",
-               nf_number="", gta_number="", weight_method="pesado",
-               purchase_mode="cabeca", property_id=None) -> None:
+def add_animal(data: AnimalData) -> None:
     _uuid_novo = novo_uuid()
     with _conn() as con:
         # ADR 0004 · B4: o animal nasce numa propriedade (§3.4). Sem escolha
         # explícita, herda a do piquete; sem piquete, a propriedade padrão.
         # É o que permite a B4.3 exigir a coluna depois.
-        if property_id is None and lote_id:
+        if data.property_id is None and data.lote_id:
             r = con.execute(
-                "SELECT property_id FROM lotes WHERE id=?", (lote_id,)).fetchone()
-            property_id = r["property_id"] if r else None
-        if property_id is None:
+                "SELECT property_id FROM lotes WHERE id=?", (data.lote_id,)).fetchone()
+            data.property_id = r["property_id"] if r else None
+        if data.property_id is None:
             r = con.execute(
                 "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
-            property_id = r["id"] if r else None
+            data.property_id = r["id"] if r else None
 
         con.execute(
             """INSERT INTO animals
@@ -93,36 +111,36 @@ def add_animal(animal_id, breed, sex, birth_date, entry_date,
                 gta_number,entry_date,entry_weight,current_weight,target_weight,
                 purchase_price,purchase_mode,lote_id,property_id,fornecedor_id,notes)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (animal_id, _uuid_novo, breed, sex, birth_date or None,
-             int(birth_estimated), age_source,
-             nf_number or None, gta_number or None, entry_date,
-             entry_weight, entry_weight, target_weight, purchase_price,
-             purchase_mode, lote_id or None, property_id,
-             fornecedor_id or None, notes),
+            (data.animal_id, _uuid_novo, data.breed, data.sex, data.birth_date or None,
+             int(data.birth_estimated), data.age_source,
+             data.nf_number or None, data.gta_number or None, data.entry_date,
+             data.entry_weight, data.entry_weight, data.target_weight, data.purchase_price,
+             data.purchase_mode, data.lote_id or None, data.property_id,
+             data.fornecedor_id or None, data.notes),
         )
         con.execute(
             "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
-            (_uuid_novo, entry_weight, entry_date, lote_id or None,
-             "Cadastro", weight_method),
+            (_uuid_novo, data.entry_weight, data.entry_date, data.lote_id or None,
+             "Cadastro", data.weight_method),
         )
         # Registra custo de compra apenas para animais adquiridos
-        if age_source != "propriedade" and purchase_price and purchase_price > 0:
+        if data.age_source != "propriedade" and data.purchase_price and data.purchase_price > 0:
             con.execute(
                 "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-                (_uuid_novo, "compra", "Valor de compra", purchase_price,
-                 entry_date),
+                (_uuid_novo, "compra", "Valor de compra", data.purchase_price,
+                 data.entry_date),
             )
-        if lote_id:
+        if data.lote_id:
             con.execute(
                 "INSERT INTO animal_movements (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?)",
-                (_uuid_novo, None, lote_id, entry_date, "entrada", "Cadastro"),
+                (_uuid_novo, None, data.lote_id, data.entry_date, "entrada", "Cadastro"),
             )
         eventos.registrar_em(con, _uuid_novo, "cadastro_inicial",
-                             ocorrido_em=entry_date,
-                             observacoes=f"{breed}, {entry_weight} kg")
+                             ocorrido_em=data.entry_date,
+                             observacoes=f"{data.breed}, {data.entry_weight} kg")
         eventos.registrar_em(con, _uuid_novo, "identificacao_interna",
-                             ocorrido_em=entry_date,
-                             observacoes=f"brinco {animal_id}")
+                             ocorrido_em=data.entry_date,
+                             observacoes=f"brinco {data.animal_id}")
 
 
 def _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes) -> None:

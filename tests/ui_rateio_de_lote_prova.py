@@ -73,12 +73,12 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
         animal_costs, não só a função pura."""
         lote = db.get_all_lotes()[0]
         entrada = (date.today() - timedelta(days=90)).isoformat()
-        db.add_animal("RAT1", "Nelore", "M", None, entrada, 300.0, 500.0, 0.0,
-                      lote["id"], None)
-        db.add_animal("RAT2", "Nelore", "M", None, entrada, 300.0, 500.0, 0.0,
-                      lote["id"], None)
-        db.add_animal("RAT3", "Nelore", "M", None, entrada, 300.0, 500.0, 0.0,
-                      lote["id"], None)
+        db.add_animal(db.AnimalData("RAT1", "Nelore", "M", None, entrada, 300.0, 500.0, 0.0,
+                      lote["id"], None))
+        db.add_animal(db.AnimalData("RAT2", "Nelore", "M", None, entrada, 300.0, 500.0, 0.0,
+                      lote["id"], None))
+        db.add_animal(db.AnimalData("RAT3", "Nelore", "M", None, entrada, 300.0, 500.0, 0.0,
+                      lote["id"], None))
         db.clear_cache()
         # pesos desiguais, de propósito — é o que faz "peso" divergir de "igual"
         db.add_weighing("RAT1", 200.0, date.today().isoformat())
@@ -113,8 +113,8 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
             destino = db.get_all_lotes()[-1]
 
         entrada_rebanho = (date.today() - timedelta(days=200)).isoformat()
-        db.add_animal("RATMOV", "Nelore", "M", None, entrada_rebanho,
-                      300.0, 500.0, 0.0, origem["id"], None)
+        db.add_animal(db.AnimalData("RATMOV", "Nelore", "M", None, entrada_rebanho,
+                      300.0, 500.0, 0.0, origem["id"], None))
         db.clear_cache()
         data_movimento = (date.today() - timedelta(days=15)).isoformat()
         db.move_animal("RATMOV", destino["id"], data_movimento)

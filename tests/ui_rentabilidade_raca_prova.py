@@ -95,8 +95,8 @@ class TestRentabilidadePorRacaNaTela(unittest.TestCase):
         depender da ordem alfabética de execução dos métodos da classe."""
         entrada = (date.today() - timedelta(days=120)).isoformat()
         hoje = date.today().isoformat()
-        db.add_animal("RACA3", "Brangus", "M", None, entrada,
-                      320.0, 480.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("RACA3", "Brangus", "M", None, entrada,
+                      320.0, 480.0, 1000.0, None, None))
         db.clear_cache()
         db.register_sale(["RACA3"], hoje, "abate", "cabeca", 3500.0)
         db.clear_cache()
@@ -124,8 +124,8 @@ class TestRentabilidadePorRacaNaTela(unittest.TestCase):
         virar margem NEGATIVA, não 0.0 por clamping."""
         entrada = (date.today() - timedelta(days=90)).isoformat()
         hoje = date.today().isoformat()
-        db.add_animal("RACA2", "Angus", "F", None, entrada,
-                      300.0, 450.0, 1000.0, None, None)
+        db.add_animal(db.AnimalData("RACA2", "Angus", "F", None, entrada,
+                      300.0, 450.0, 1000.0, None, None))
         db.add_animal_cost("RACA2", "operacional", "trato caro", 5000.0, hoje)
         db.clear_cache()
         db.register_sale(["RACA2"], hoje, "abate", "cabeca", 100.0)
