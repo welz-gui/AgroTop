@@ -1093,8 +1093,9 @@ def _backfill_uuids(con) -> int:
     from repositories.animais import novo_uuid
 
     sem = con.execute("SELECT id FROM animals WHERE uuid IS NULL").fetchall()
-    for row in sem:
-        con.execute("UPDATE animals SET uuid=? WHERE id=?", (novo_uuid(), row["id"]))
+    if sem:
+        updates = [(novo_uuid(), row["id"]) for row in sem]
+        con.executemany("UPDATE animals SET uuid=? WHERE id=?", updates)
     return len(sem)
 
 
