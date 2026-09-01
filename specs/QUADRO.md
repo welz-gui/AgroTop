@@ -20,11 +20,12 @@ baixo** — a ordem é prioridade, não sugestão.
 (`.github/workflows/mobile-ci.yml`, antes inexistente — ver histórico da 0047 abaixo) ·
 38 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
-(7 de 7 telas) · **0044–0063 todas concluídas — a Trilha 1 inteira está
-fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4) · **1 spec
-na fila** — **0064** (mobile: tela de alertas operacionais, segundo
-item do Tier 1 da [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md), fora
-da Trilha 1 também — API real já mesclada, não precisa mockar) — ver abaixo.
+(7 de 7 telas) · **0044–0064 todas concluídas — a Trilha 1 inteira está
+fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4) · **4 specs
+na fila** — 0065/0066 (mobile: tela de brincos, terceiro item do Tier 1 da
+[ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) e 0067/0068 (mobile:
+criar lote, quarto item do Tier 1) — pares API+mobile, mesmo padrão de toda a Trilha 1,
+nenhuma fora da Trilha 1 propriamente dita — ver abaixo.
 O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na previsão do tempo)
 é integração de UI, trabalho do mantenedor (R31), não spec de agente.
 
@@ -302,7 +303,11 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 | — | [0062](0062-mobile-confirmacao-rapida-de-trato.md) — Mobile: confirmação rápida de trato 🏗️ | — | ✅ [#255](https://github.com/welz-gui/AgroTop/pull/255) | | 2026-08-30 |
 | — | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | ✅ [#264](https://github.com/welz-gui/AgroTop/pull/264) | | 2026-08-31 |
 | — | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | ✅ [#269](https://github.com/welz-gui/AgroTop/pull/269) | | 2026-09-01 |
-| 1 | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | 🟢 disponível — API real já mesclada, não precisa mockar | | 2026-08-26 |
+| — | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | ✅ [#309](https://github.com/welz-gui/AgroTop/pull/309) | | 2026-09-01 |
+| 1 | [0065](0065-api-dispositivos-busca-e-mudanca-de-status.md) — API: busca de dispositivo por código e mudança de status 🏗️ | — | 🟢 disponível | | 2026-09-01 |
+| 2 | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | 🟡 depende da 0065 mesclar (ou teste contra mock) | | 2026-09-01 |
+| 3 | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | 🟢 disponível | | 2026-09-01 |
+| 4 | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | 🟡 depende da 0067 mesclar (ou teste contra mock) | | 2026-09-01 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -411,6 +416,24 @@ O restante da Trilha 2 ("desenhar no mapa", localização por propriedade na pre
 > expor isso pela API pede mover esse contexto antes, trabalho de outra spec. Mesmo padrão
 > API-antes-de-mobile de sempre: 0063 (API) não tem dependência, 0064 (mobile) pode ser
 > pega em paralelo contra mock, mas testar contra a API real espera a 0063 mesclar.
+>
+> **0064 fechada em 2026-09-01 — [PR #309](https://github.com/welz-gui/AgroTop/pull/309).**
+> Campo a campo contra `backend_api/schemas.py` (as 5 categorias, todos os nomes de JSON
+> conferem 1:1), goldens conferidos como PNGs reais (29–51 kB, variando com o conteúdo, não
+> placeholder), e nenhum limiar reimplementado no client — bateu os 7 critérios da spec sem
+> retrabalho. **Fecha o primeiro item do Tier 1 da ADR 0007.**
+>
+> **0065/0066 e 0067/0068 escritas em 2026-09-01 — terceiro e quarto itens do Tier 1 da
+> ADR 0007** (o segundo, `page_brincos`, virou dois pares porque o padrão de toda a Trilha 1
+> é API+mobile separados, não uma spec só): 0065/0066 cobrem só a aba "📋 Inventário" de
+> `page_brincos` (buscar dispositivo por código, ver situação, mudar situação pela máquina
+> de estados do §5.2 — `services/estados_dispositivo.py`, já pronta e testada). As outras
+> três abas de `page_brincos` (aplicar em animal, importar lote, importar arquivo) ficam de
+> fora de propósito — são operação em lote/cadastro, não a "conferência física" que a ADR
+> justifica para esta fatia. 0067/0068 cobrem só "criar lote" de `page_lotes` — a
+> transferência de animais entre lotes **já está coberta** pela 0048/0049, não é retrabalho.
+> Mesmo padrão API-antes-de-mobile: 0065/0067 sem dependência, 0066/0068 podem ser pegas em
+> paralelo contra mock.
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
