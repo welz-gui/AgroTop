@@ -86,11 +86,9 @@ from repositories.conexao import (  # noqa: F401
     _cache, clear_cache, _writes, configurar_sqlite,
 )
 import repositories.conexao as _conexao
+from repositories.conexao import _quote_ident
 
 
-def _quote_ident(name: str) -> str:
-    """Escapes an SQL identifier (table name or column name) safely."""
-    return '"' + name.replace('"', '""') + '"'
 
 
 def __getattr__(name):

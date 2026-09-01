@@ -20,7 +20,7 @@ from services.dispositivos import expandir_faixa
 from services.estados_dispositivo import conferir_codigos, transicao_permitida
 
 from . import eventos, identificadores
-from .conexao import _cache, _conn, _writes
+from .conexao import _cache, _conn, _writes, _quote_ident
 
 TIPOS = ("brinco_visual", "boton", "conjunto", "outro")
 
