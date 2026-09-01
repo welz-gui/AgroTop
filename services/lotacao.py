@@ -143,23 +143,7 @@ def avaliar_lotacao(
     return resultado
 
 
-def sobrepostos(piquetes: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Pares de piquetes cujos polígonos se cruzam.
-
-    Projeta todos os piquetes válidos em uma única zona UTM (a do primeiro
-    piquete válido) para evitar falsas sobreposições decorrentes de origens
-    UTM distintas. Sobreposições menores que 1% da área do menor piquete
-    são ignoradas para evitar falso alarme por bordas que encostam.
-
-    `piquetes`: [{"id": str, "anel": [(lon, lat), ...]}, ...]
-
-    Retorna [{"a": str, "b": str, "area_sobreposta_ha": float,
-              "pct_do_menor": float}, ...], do maior ao menor.
-    """
-    if not piquetes or len(piquetes) < 2:
-        return []
-
-    # Validar e coletar piquetes válidos
+def _obter_piquetes_validos(piquetes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     validos: list[dict[str, Any]] = []
     for p in piquetes:
         anel = p.get("anel", [])
@@ -181,16 +165,13 @@ def sobrepostos(piquetes: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "centro_y": c.y,
             "zona": zona,
         })
+    return validos
 
-    if len(validos) < 2:
-        return []
 
-    # CRS comum baseado no primeiro piquete válido
+def _projetar_piquetes(validos: list[dict[str, Any]]) -> list[dict[str, Any]]:
     primeiro = validos[0]
     crs_comum = _obter_utm_crs(primeiro["centro_x"], primeiro["centro_y"])
-    zona_comum = primeiro["zona"]
 
-    # Projetar todos no CRS comum
     poligonos_projetados = []
     for item in validos:
         poly_proj = _projetar_poligono_no_crs(item["anel"], crs_comum)
@@ -199,51 +180,82 @@ def sobrepostos(piquetes: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "poly": poly_proj,
             "zona": item["zona"],
         })
+    return poligonos_projetados
+
+
+def _avaliar_par_sobreposto(p1: dict[str, Any], p2: dict[str, Any]) -> dict[str, Any] | None:
+    # Se a diferença de zonas for maior que 1, estão distantes demais para comparar
+    if abs(p1["zona"] - p2["zona"]) > 1:
+        return None
+
+    poly1 = p1["poly"]
+    poly2 = p2["poly"]
+
+    if not poly1.intersects(poly2):
+        return None
+
+    inter = poly1.intersection(poly2)
+    area_inter_m2 = float(inter.area)
+    if area_inter_m2 <= 0.0:
+        return None
+
+    area1 = float(poly1.area)
+    area2 = float(poly2.area)
+    menor_area = min(area1, area2)
+
+    if menor_area <= 0.0:
+        return None
+
+    pct_do_menor = (area_inter_m2 / menor_area) * 100.0
+
+    # Desconsiderar sobreposição < 1% do menor piquete (bordas encostando)
+    if pct_do_menor < 1.0:
+        return None
+
+    area_sobreposta_ha = area_inter_m2 / 10_000.0
+
+    return {
+        "a": p1["id"],
+        "b": p2["id"],
+        "area_sobreposta_ha": round(area_sobreposta_ha, 4),
+        "pct_do_menor": round(pct_do_menor, 2),
+    }
+
+
+def sobrepostos(piquetes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Pares de piquetes cujos polígonos se cruzam.
+
+    Projeta todos os piquetes válidos em uma única zona UTM (a do primeiro
+    piquete válido) para evitar falsas sobreposições decorrentes de origens
+    UTM distintas. Sobreposições menores que 1% da área do menor piquete
+    são ignoradas para evitar falso alarme por bordas que encostam.
+
+    `piquetes`: [{"id": str, "anel": [(lon, lat), ...]}, ...]
+
+    Retorna [{"a": str, "b": str, "area_sobreposta_ha": float,
+              "pct_do_menor": float}, ...], do maior ao menor.
+    """
+    if not piquetes or len(piquetes) < 2:
+        return []
+
+    validos = _obter_piquetes_validos(piquetes)
+
+    if len(validos) < 2:
+        return []
+
+    poligonos_projetados = _projetar_piquetes(validos)
 
     resultados: list[dict[str, Any]] = []
     n = len(poligonos_projetados)
 
     for i in range(n):
         for j in range(i + 1, n):
-            p1 = poligonos_projetados[i]
-            p2 = poligonos_projetados[j]
-
-            # Se a diferença de zonas for maior que 1, estão distantes demais para comparar
-            if abs(p1["zona"] - p2["zona"]) > 1:
-                continue
-
-            poly1 = p1["poly"]
-            poly2 = p2["poly"]
-
-            if not poly1.intersects(poly2):
-                continue
-
-            inter = poly1.intersection(poly2)
-            area_inter_m2 = float(inter.area)
-            if area_inter_m2 <= 0.0:
-                continue
-
-            area1 = float(poly1.area)
-            area2 = float(poly2.area)
-            menor_area = min(area1, area2)
-
-            if menor_area <= 0.0:
-                continue
-
-            pct_do_menor = (area_inter_m2 / menor_area) * 100.0
-
-            # Desconsiderar sobreposição < 1% do menor piquete (bordas encostando)
-            if pct_do_menor < 1.0:
-                continue
-
-            area_sobreposta_ha = area_inter_m2 / 10_000.0
-
-            resultados.append({
-                "a": p1["id"],
-                "b": p2["id"],
-                "area_sobreposta_ha": round(area_sobreposta_ha, 4),
-                "pct_do_menor": round(pct_do_menor, 2),
-            })
+            resultado = _avaliar_par_sobreposto(
+                poligonos_projetados[i],
+                poligonos_projetados[j]
+            )
+            if resultado:
+                resultados.append(resultado)
 
     # Ordenar do maior ao menor por área sobreposta em hectares
     resultados.sort(key=lambda r: r["area_sobreposta_ha"], reverse=True)
