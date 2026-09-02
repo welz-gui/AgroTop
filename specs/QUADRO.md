@@ -21,15 +21,16 @@ baixo** — a ordem é prioridade, não sugestão.
 38 tabelas em produção, todas com RLS (políticas explícitas de negação para
 `anon`/`authenticated` desde a migration 0024) · **Fase B 100% ligada à interface**
 (7 de 7 telas) · **0044–0064 todas concluídas — a Trilha 1 inteira está
-fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4) · **4 specs
+fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4) · **6 specs
 na fila** — 0065/0066 (mobile: tela de brincos, terceiro item do Tier 1 da
 [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) e 0067/0068 (mobile:
 criar lote, quarto item do Tier 1) — pares API+mobile, mesmo padrão de toda a Trilha 1,
 nenhuma fora da Trilha 1 propriamente dita — ver abaixo.
 **Trilha 2 fechada em 2026-09-01** ([PR #313](https://github.com/welz-gui/AgroTop/pull/313),
 mantenedor, sem spec) — "desenhar no mapa", "importar arquivo" e localização por
-propriedade na previsão do tempo, as três ligadas. Só falta o item 4 (GPS caminhando o
-perímetro, mobile) — desbloqueado desde que a Trilha 1 fechou, mas ainda sem spec escrita.
+propriedade na previsão do tempo, as três ligadas. **0069/0070 (API + mobile: demarcação de
+perímetro por GPS) fecham o item 4, o último da Trilha 2** — escritas em 2026-09-01,
+desbloqueadas desde que a Trilha 1 fechou.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -310,6 +311,8 @@ perímetro, mobile) — desbloqueado desde que a Trilha 1 fechou, mas ainda sem 
 | 2 | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | 🟡 depende da 0065 mesclar (ou teste contra mock) | | 2026-09-01 |
 | 3 | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | 🟢 disponível | | 2026-09-01 |
 | 4 | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | 🟡 depende da 0067 mesclar (ou teste contra mock) | | 2026-09-01 |
+| 5 | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | 🟢 disponível | | 2026-09-01 |
+| 6 | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | 🟡 depende da 0069 mesclar (ou teste contra mock) | | 2026-09-01 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -436,6 +439,17 @@ perímetro, mobile) — desbloqueado desde que a Trilha 1 fechou, mas ainda sem 
 > transferência de animais entre lotes **já está coberta** pela 0048/0049, não é retrabalho.
 > Mesmo padrão API-antes-de-mobile: 0065/0067 sem dependência, 0066/0068 podem ser pegas em
 > paralelo contra mock.
+>
+> **0069/0070 escritas em 2026-09-01 — item 4 da Trilha 2 (ROADMAP §5), não do
+> Tier 1 da ADR 0007** (a paridade admin-mobile é outra iniciativa; GPS é o último item que
+> faltava pra fechar a Trilha 2 por completo). Escopo deliberadamente restrito a "marcar
+> ponto a ponto, parado em cada canto" — não rastreamento contínuo andando: GPS de celular
+> tem ruído de alguns metros, e um rastro contínuo ao longo de uma cerca reta sairia
+> serrilhado, pior que a área digitada que já existe hoje. Zero cálculo (área, perímetro,
+> validação de polígono) no cliente — tudo em `services/geometria.py`, já pronto e testado
+> desde a etapa B. `mobile/pubspec.yaml` ainda não tem pacote de geolocalização — a 0070
+> precisa adicionar um (`geolocator` ou equivalente), mesmo padrão de quando a 0056 (QR)
+> adicionou `mobile_scanner`.
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),

@@ -518,8 +518,12 @@ autoria e horário registrados, e o resultado aparece no web.
    `page_clima`: uma coordenada resolvida só continua sem aba extra (não gera ruído — é a
    mesma previsão de sempre), mais de uma abre uma aba por localização, agrupando
    propriedades que caem na mesma coordenada.
-4. ⬜ Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1, etapa 2,
-   que já fechou — desbloqueado, mas **sem spec escrita ainda**). Único item que resta
+4. 🟡 Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1,
+   etapa 2, que já fechou — desbloqueado). **Specs escritas em 2026-09-01, disponíveis:**
+   [0069](specs/0069-api-perimetro-do-piquete-por-pontos.md) (API — recebe uma lista de
+   pontos, valida e grava com `services/geometria.py`, mesma função pura que o web já usa)
+   e [0070](specs/0070-mobile-demarcacao-de-perimetro-por-gps.md) (mobile — marcar um ponto
+   por vez, parado em cada canto da cerca, não rastreamento contínuo). Único item que resta
    nesta trilha.
 
 **Técnico:** **PostGIS 3.3.7 está disponível** no projeto (não instalado, **e não foi
@@ -534,7 +538,7 @@ desenhar/importar), reavaliar a extensão nesse momento, não antes.
 
 **Pronto quando:** cada piquete tem polígono, a área exibida vem da geometria, e piquete sem
 polígono continua funcionando como hoje. *(Cumprido — itens 1, 2 e 3 fechados. Falta só o
-item 4, GPS no mobile, sem spec escrita ainda.)*
+item 4, GPS no mobile — specs 0069/0070 escritas, na fila.)*
 
 ---
 
