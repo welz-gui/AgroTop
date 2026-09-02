@@ -26,6 +26,9 @@ class MockApiServer {
   final List<bool> csvImportConfirmations = [];
   int feedingRequests = 0;
   int postFeedingRequests = 0;
+  int postLoteRequests = 0;
+  Map<String, dynamic>? lastCreateLoteBody;
+  final Set<String> existingLoteIds = {'P01', 'P02', 'P03'};
   int deviceLookupRequests = 0;
   int deviceStatusRequests = 0;
   Map<String, dynamic>? lastDeviceStatusBody;
@@ -452,6 +455,26 @@ class MockApiServer {
             'animais_ativos': _countAnimals('P03'),
           },
         ]);
+        return;
+      }
+      if (request.method == 'POST' && path == '/lotes') {
+        postLoteRequests++;
+        final body = await _body(request);
+        lastCreateLoteBody = body;
+        final loteId = body['id'] as String?;
+        if (loteId != null && existingLoteIds.contains(loteId)) {
+          await _json(request, 409, {'detail': 'Lote $loteId já existe.'});
+          return;
+        }
+        if (loteId != null) {
+          existingLoteIds.add(loteId);
+        }
+        await _json(request, 201, {
+          'id': loteId ?? 'P99',
+          'nome': body['nome'] ?? '',
+          'capacidade_ua': (body['capacidade_ua'] as num?)?.toDouble() ?? 0.0,
+          'animais_ativos': 0,
+        });
         return;
       }
       if (request.method == 'POST' && path == '/animais/movimentar') {

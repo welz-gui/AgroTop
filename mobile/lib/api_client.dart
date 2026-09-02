@@ -173,6 +173,40 @@ class ApiClient {
         .toList(growable: false);
   }
 
+  Future<LoteSummary> createLote({
+    required String id,
+    required String name,
+    required double areaHa,
+    required double capacityUa,
+    String notes = '',
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl/lotes'),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'id': id,
+          'nome': name,
+          'area_ha': areaHa,
+          'capacidade_ua': capacityUa,
+          'observacoes': notes,
+        }),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 201) {
+      throw ApiException(
+        _message(body, 'Não foi possível criar o lote.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return LoteSummary.fromJson(body as Map<String, dynamic>);
+  }
+
+
   Future<List<PendingFeeding>> listPendingFeedings() async {
     final response = await _authorized(
       (headers) =>
