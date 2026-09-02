@@ -25,8 +25,11 @@ fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4)
 na fila** — 0065/0066 (mobile: tela de brincos, terceiro item do Tier 1 da
 [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) e 0067/0068 (mobile:
 criar lote, quarto item do Tier 1) — pares API+mobile, mesmo padrão de toda a Trilha 1,
-nenhuma fora da Trilha 1 propriamente dita — ver abaixo. **0065 fechada em 2026-09-02**
-([PR #316](https://github.com/welz-gui/AgroTop/pull/316)) — 0066 livre, já contra API real.
+nenhuma fora da Trilha 1 propriamente dita — ver abaixo. **0065/0066/0067 fechadas em
+2026-09-02** ([PR #316](https://github.com/welz-gui/AgroTop/pull/316),
+[#318](https://github.com/welz-gui/AgroTop/pull/318),
+[#319](https://github.com/welz-gui/AgroTop/pull/319)) — só falta a 0068, livre, já contra
+API real.
 **Trilha 2 fechada em 2026-09-01** ([PR #313](https://github.com/welz-gui/AgroTop/pull/313),
 mantenedor, sem spec) — "desenhar no mapa", "importar arquivo" e localização por
 propriedade na previsão do tempo, as três ligadas. **0069/0070 (API + mobile: demarcação de
@@ -309,9 +312,9 @@ desbloqueadas desde que a Trilha 1 fechou.
 | — | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | ✅ [#269](https://github.com/welz-gui/AgroTop/pull/269) | | 2026-09-01 |
 | — | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | ✅ [#309](https://github.com/welz-gui/AgroTop/pull/309) | | 2026-09-01 |
 | — | [0065](0065-api-dispositivos-busca-e-mudanca-de-status.md) — API: busca de dispositivo por código e mudança de status 🏗️ | — | ✅ [#316](https://github.com/welz-gui/AgroTop/pull/316) | | 2026-09-02 |
-| 2 | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | 🟢 disponível (0065 já mesclada) | | 2026-09-01 |
-| 3 | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | 🟢 disponível | | 2026-09-01 |
-| 4 | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | 🟡 depende da 0067 mesclar (ou teste contra mock) | | 2026-09-01 |
+| — | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | ✅ [#318](https://github.com/welz-gui/AgroTop/pull/318) | | 2026-09-02 |
+| — | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | ✅ [#319](https://github.com/welz-gui/AgroTop/pull/319) | | 2026-09-02 |
+| 4 | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | 🟢 disponível (0067 já mesclada) | | 2026-09-01 |
 | 5 | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | 🟢 disponível | | 2026-09-01 |
 | 6 | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | 🟡 depende da 0069 mesclar (ou teste contra mock) | | 2026-09-01 |
 
@@ -449,8 +452,23 @@ desbloqueadas desde que a Trilha 1 fechou.
 > `exige_autorizacao=true` (desvio deliberado da list comprehension literal do
 > `app.py::_brincos_inventario`, que a própria spec já previa e justificava — o cliente
 > mobile decide o que fazer com essa informação). Os 9 critérios têm teste com prova real
-> (consulta de novo após mudar status, motivo gravado no banco quando exigido). **0066 está
-> livre para qualquer agente, já contra a API real.**
+> (consulta de novo após mudar status, motivo gravado no banco quando exigido).
+>
+> **0066 fechada em 2026-09-02 — [PR #318](https://github.com/welz-gui/AgroTop/pull/318).**
+> Ponto de entrada no `AppBar` de `AnimalsPage` (`Icons.sell_outlined`, sem badge), busca
+> por código, rótulos de estado/tipo conferidos byte a byte contra `app.py::_ESTADO_BRINCO`/
+> `_TIPO_BRINCO` (hardcoded no Dart, mesmo padrão da 0061), transição que exige motivo
+> bloqueia o botão de confirmar até preencher, transição que exige autorização aparece
+> desabilitada com explicação em vez de escondida. Máquina de estados nunca reimplementada —
+> só consome `transicoes_permitidas` do servidor. 12 goldens reais (10–29 KB) nos três
+> temas, `build-apk` do CI (que roda `flutter analyze`+`test`+`build`) verde.
+>
+> **0067 fechada em 2026-09-02 — [PR #319](https://github.com/welz-gui/AgroTop/pull/319).**
+> `POST /lotes`, zero lógica nova (`database.py::add_lote`/`get_lote`), checagem de
+> duplicidade movida da UI pro endpoint (409 antes de tentar inserir), `property_id` nunca
+> exposto no corpo (deixa o default assumir a propriedade única, confirmado em teste
+> consultando a tabela `lotes` depois). Os 6 critérios com teste real. **0068 está livre
+> para qualquer agente, já contra a API real.**
 >
 > **0069/0070 escritas em 2026-09-01 — item 4 da Trilha 2 (ROADMAP §5), não do
 > Tier 1 da ADR 0007** (a paridade admin-mobile é outra iniciativa; GPS é o último item que
