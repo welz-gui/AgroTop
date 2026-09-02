@@ -10,6 +10,7 @@ from datetime import date
 from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -31,6 +32,7 @@ from backend_api.schemas import (
     AlertasOutput,
     CarenciaOutput,
     ConfirmarTratoInput,
+    DispositivoOutput,
     ImportarPesagensOutput,
     LoginInput,
     LogoutInput,
@@ -39,6 +41,8 @@ from backend_api.schemas import (
     MedicamentosOutput,
     MovimentarInput,
     MovimentarOutput,
+    MudarStatusDispositivoInput,
+    MudarStatusDispositivoOutput,
     PesagemAceita,
     PesagemInput,
     PesagemOutput,
@@ -66,6 +70,7 @@ from database import (
     get_photos,
 )
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
+from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import add_weighing, calculate_gmd, get_weighings_batch
 from repositories.sanidade import (
     add_medication,
@@ -74,6 +79,7 @@ from repositories.sanidade import (
     get_protocols,
     get_withdrawal_end,
 )
+from services.estados_dispositivo import estados, transicao_permitida
 from services.importacao import parse_pesagens
 from services.qualidade import avaliar_pesagem
 from services.zootecnia import calculate_gmd_total
@@ -733,3 +739,62 @@ def register_medicamento(
     if idempotency_key:
         store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
     return out
+
+
+@app.get("/dispositivos/{codigo_visual}", response_model=DispositivoOutput)
+def get_dispositivo(
+    codigo_visual: str,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Busca dispositivo ativo pelo código visual e lista transições permitidas."""
+    dispositivo = por_codigo(codigo_visual)
+    if dispositivo is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dispositivo não encontrado.",
+        )
+
+    atual = dispositivo["status"]
+    transicoes = []
+    for e in estados():
+        if e != atual:
+            t = transicao_permitida(atual, e)
+            if t["permitida"] or t.get("exige_autorizacao"):
+                transicoes.append({
+                    "para": e,
+                    "exige_motivo": bool(t.get("exige_motivo")),
+                    "exige_autorizacao": bool(t.get("exige_autorizacao")),
+                })
+
+    return {
+        "id": str(dispositivo["id"]),
+        "codigo_visual": dispositivo["codigo_visual"],
+        "tipo": dispositivo["tipo"],
+        "status": dispositivo["status"],
+        "lote": dispositivo.get("lote"),
+        "transicoes_permitidas": transicoes,
+    }
+
+
+@app.post(
+    "/dispositivos/{id}/status",
+    response_model=MudarStatusDispositivoOutput,
+)
+def change_dispositivo_status(
+    id: str,
+    data: MudarStatusDispositivoInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> Any:
+    """Muda o estado do dispositivo passando pela máquina de estados."""
+    usuario = user.get("username") or user.get("name") or ""
+    r = mudar_status(
+        id,
+        data.novo_status,
+        motivo=data.motivo or "",
+        usuario=usuario,
+        tem_autorizacao=False,
+    )
+    if not r.get("ok"):
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=r)
+    return {"ok": True, "de": r["de"], "para": r["para"]}
+

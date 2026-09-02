@@ -1543,7 +1543,147 @@ class TestAlertasEndpoint(BackendApiTestCase):
         self.assertNotIn("ALERTA_SEM_GMD", desempenho)
 
 
+class TestDispositivosAPI(BackendApiTestCase):
+    def _headers(self):
+        token = self._get_access_token()
+        return {"Authorization": f"Bearer {token}"}
+
+    def _criar_dispositivo(self, codigo_visual="BR-9001", tipo="brinco_visual", status="disponivel", lote="L01"):
+        disp_id = f"disp-{codigo_visual}"
+        with _conn() as con:
+            con.execute(
+                """INSERT INTO dispositivos
+                   (id, codigo_visual, tipo, status, lote)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (disp_id, codigo_visual, tipo, status, lote),
+            )
+        return disp_id
+
+    def test_get_dispositivo_sem_token_retorna_401(self):
+        """Critério 1: GET /dispositivos/{codigo} sem token -> 401."""
+        res = self.client.get("/dispositivos/BR-9001")
+        self.assertEqual(res.status_code, 401)
+
+    def test_get_dispositivo_inexistente_retorna_404(self):
+        """Critério 2: GET /dispositivos/{codigo} com código inexistente -> 404."""
+        res = self.client.get("/dispositivos/CODIGO_INEXISTENTE_999", headers=self._headers())
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()["detail"], "Dispositivo não encontrado.")
+
+    def test_get_dispositivo_inutilizado_retorna_404(self):
+        """Critério 3: GET /dispositivos/{codigo} com dispositivo inutilizado -> 404."""
+        self._criar_dispositivo(codigo_visual="BR-INUT-01", status="inutilizado")
+        res = self.client.get("/dispositivos/BR-INUT-01", headers=self._headers())
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()["detail"], "Dispositivo não encontrado.")
+
+    def test_get_dispositivo_valido_retorna_contrato_e_transicoes(self):
+        """Critério 4: GET /dispositivos/{codigo} devolve os campos do contrato e transicoes_permitidas."""
+        disp_id_disp = self._criar_dispositivo(codigo_visual="BR-DISP-01", status="disponivel", lote="LOTE-A")
+        res_disp = self.client.get("/dispositivos/BR-DISP-01", headers=self._headers())
+        self.assertEqual(res_disp.status_code, 200)
+        data_disp = res_disp.json()
+
+        self.assertEqual(data_disp["id"], disp_id_disp)
+        self.assertEqual(data_disp["codigo_visual"], "BR-DISP-01")
+        self.assertEqual(data_disp["tipo"], "brinco_visual")
+        self.assertEqual(data_disp["status"], "disponivel")
+        self.assertEqual(data_disp["lote"], "LOTE-A")
+
+        transicoes_disp = data_disp["transicoes_permitidas"]
+        destinos_disp = [t["para"] for t in transicoes_disp]
+        # Destinos esperados a partir de "disponivel"
+        esperados_disp = ["reservado", "aplicado", "perdido", "danificado", "inutilizado", "devolvido", "bloqueado_orgao"]
+        for esperado in esperados_disp:
+            self.assertIn(esperado, destinos_disp)
+        self.assertNotIn("disponivel", destinos_disp)
+        self.assertNotIn("recebido", destinos_disp)
+
+        # Checa flags de motivo para transições específicas
+        inut_meta = next(t for t in transicoes_disp if t["para"] == "inutilizado")
+        self.assertTrue(inut_meta["exige_motivo"])
+        self.assertFalse(inut_meta["exige_autorizacao"])
+
+        res_meta = next(t for t in transicoes_disp if t["para"] == "reservado")
+        self.assertFalse(res_meta["exige_motivo"])
+        self.assertFalse(res_meta["exige_autorizacao"])
+
+        # Teste com segundo estado de origem: "aplicado"
+        disp_id_app = self._criar_dispositivo(codigo_visual="BR-APP-01", status="aplicado")
+        res_app = self.client.get("/dispositivos/BR-APP-01", headers=self._headers())
+        self.assertEqual(res_app.status_code, 200)
+        data_app = res_app.json()
+        destinos_app = [t["para"] for t in data_app["transicoes_permitidas"]]
+        self.assertCountEqual(destinos_app, ["perdido", "danificado", "substituido", "inutilizado"])
+
+    def test_post_status_transicao_permitida_sem_motivo(self):
+        """Critério 5: POST /dispositivos/{id}/status com transição permitida -> 200 e muda o status."""
+        disp_id = self._criar_dispositivo(codigo_visual="BR-MUD-01", status="disponivel")
+        res = self.client.post(
+            f"/dispositivos/{disp_id}/status",
+            json={"novo_status": "reservado"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"ok": True, "de": "disponivel", "para": "reservado"})
+
+        # Confirma consultando novamente
+        res_get = self.client.get("/dispositivos/BR-MUD-01", headers=self._headers())
+        self.assertEqual(res_get.status_code, 200)
+        self.assertEqual(res_get.json()["status"], "reservado")
+
+    def test_post_status_exige_motivo_sem_motivo_recusado_400(self):
+        """Critério 6: POST /dispositivos/{id}/status para estado que exige motivo sem motivo -> 400 e não altera."""
+        disp_id = self._criar_dispositivo(codigo_visual="BR-MOT-01", status="disponivel")
+        res = self.client.post(
+            f"/dispositivos/{disp_id}/status",
+            json={"novo_status": "inutilizado", "motivo": None},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 400)
+        data = res.json()
+        self.assertFalse(data["ok"])
+        self.assertIn("exige motivo", data.get("motivo", ""))
+
+        # Confirma que o dispositivo não mudou
+        res_get = self.client.get("/dispositivos/BR-MOT-01", headers=self._headers())
+        self.assertEqual(res_get.status_code, 200)
+        self.assertEqual(res_get.json()["status"], "disponivel")
+
+    def test_post_status_exige_motivo_com_motivo_grava_e_retorna_200(self):
+        """Critério 7: POST /dispositivos/{id}/status para estado com motivo -> 200 e grava motivo."""
+        disp_id = self._criar_dispositivo(codigo_visual="BR-MOT-02", status="disponivel")
+        res = self.client.post(
+            f"/dispositivos/{disp_id}/status",
+            json={"novo_status": "inutilizado", "motivo": "Brinco quebrou no aplicador"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"ok": True, "de": "disponivel", "para": "inutilizado"})
+
+        # Confirma no banco que motivo_inutilizacao e status foram gravados
+        with _conn() as con:
+            row = con.execute("SELECT status, motivo_inutilizacao, data_baixa FROM dispositivos WHERE id=?", (disp_id,)).fetchone()
+            self.assertEqual(row["status"], "inutilizado")
+            self.assertEqual(row["motivo_inutilizacao"], "Brinco quebrou no aplicador")
+            self.assertIsNotNone(row["data_baixa"])
+
+    def test_post_status_transicao_nao_permitida_retorna_400(self):
+        """Critério 8: POST /dispositivos/{id}/status com transição não permitida -> 400 e indica definitivo."""
+        disp_id = self._criar_dispositivo(codigo_visual="BR-DEF-01", status="inutilizado")
+        res = self.client.post(
+            f"/dispositivos/{disp_id}/status",
+            json={"novo_status": "disponivel"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 400)
+        data = res.json()
+        self.assertFalse(data["ok"])
+        self.assertIn("definitivo", data.get("motivo", ""))
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
+
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""
         with patch.dict(os.environ, {"AGROTOP_API_SECRET": "curto"}):
