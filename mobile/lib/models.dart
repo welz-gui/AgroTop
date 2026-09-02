@@ -562,3 +562,67 @@ class LowPerformanceAlert {
                 .toDouble(),
       );
 }
+
+class DeviceLookup {
+  const DeviceLookup({
+    required this.id,
+    required this.codigoVisual,
+    required this.tipo,
+    required this.status,
+    required this.transicoesPermitidas,
+    this.lote,
+  });
+
+  final String id;
+  final String codigoVisual;
+  final String tipo;
+  final String status;
+  final String? lote;
+  final List<DeviceTransition> transicoesPermitidas;
+
+  factory DeviceLookup.fromJson(Map<String, dynamic> json) => DeviceLookup(
+    id: json['id'] as String,
+    codigoVisual: json['codigo_visual'] as String,
+    tipo: json['tipo'] as String,
+    status: json['status'] as String,
+    lote: json['lote'] as String?,
+    transicoesPermitidas:
+        (json['transicoes_permitidas'] as List<dynamic>? ?? const [])
+            .map(
+              (item) => DeviceTransition.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(growable: false),
+  );
+}
+
+class DeviceTransition {
+  const DeviceTransition({
+    required this.para,
+    required this.exigeMotivo,
+    required this.exigeAutorizacao,
+  });
+
+  final String para;
+  final bool exigeMotivo;
+  final bool exigeAutorizacao;
+
+  factory DeviceTransition.fromJson(Map<String, dynamic> json) =>
+      DeviceTransition(
+        para: json['para'] as String,
+        exigeMotivo: json['exige_motivo'] as bool,
+        exigeAutorizacao: json['exige_autorizacao'] as bool,
+      );
+}
+
+class DeviceStatusUpdate {
+  const DeviceStatusUpdate({required this.de, required this.para});
+
+  final String de;
+  final String para;
+
+  factory DeviceStatusUpdate.fromJson(Map<String, dynamic> json) =>
+      DeviceStatusUpdate(
+        de: json['de'] as String,
+        para: json['para'] as String,
+      );
+}

@@ -204,6 +204,46 @@ class ApiClient {
     return OperationalAlerts.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<DeviceLookup?> findDevice(String codigoVisual) async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse('$baseUrl/dispositivos/${Uri.encodeComponent(codigoVisual)}'),
+        headers: headers,
+      ),
+    );
+    if (response.statusCode == 404) return null;
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível buscar o dispositivo.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return DeviceLookup.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<DeviceStatusUpdate> updateDeviceStatus(
+    String id, {
+    required String novoStatus,
+    String? motivo,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl/dispositivos/${Uri.encodeComponent(id)}/status'),
+        headers: {...headers, 'Content-Type': 'application/json'},
+        body: jsonEncode({'novo_status': novoStatus, 'motivo': motivo}),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível mudar a situação do dispositivo.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return DeviceStatusUpdate.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<void> confirmFeeding(
     int planId, {
     required String situation,

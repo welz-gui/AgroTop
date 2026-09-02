@@ -100,6 +100,22 @@ void main() {
         'baixar_estoque': true,
         'notas': 'Restante amanhã',
       });
+      final device = await api.findDevice('BR-100');
+      expect(device!.codigoVisual, 'BR-100');
+      expect(device.transicoesPermitidas, hasLength(2));
+      final deviceUpdate = await api.updateDeviceStatus(
+        device.id,
+        novoStatus: 'disponivel',
+      );
+      expect(deviceUpdate.de, 'recebido');
+      expect(deviceUpdate.para, 'disponivel');
+      expect(server.deviceLookupRequests, 1);
+      expect(server.deviceStatusRequests, 1);
+      expect(server.lastDeviceStatusBody, {
+        'novo_status': 'disponivel',
+        'motivo': null,
+      });
+      expect(await api.findDevice('BR-404'), isNull);
       final before = await api.getAnimal('BR0001');
       expect(before.currentWeight, 382.4);
 
