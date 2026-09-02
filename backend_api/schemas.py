@@ -99,6 +99,17 @@ class LoteSummary(BaseModel):
     animais_ativos: int
 
 
+class CriarLoteInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    id: str = Field(..., min_length=1, description="Identificador do lote/piquete (ex: P07)")
+    nome: str = Field(..., min_length=1, description="Nome do piquete/lote")
+    area_ha: float = Field(..., ge=0, description="Área em hectares (>= 0)")
+    capacidade_ua: float = Field(..., ge=0, description="Capacidade em UA (>= 0)")
+    observacoes: str = Field(default="", description="Observações opcionais")
+
+
+
 class MovimentarInput(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
 

@@ -1682,7 +1682,123 @@ class TestDispositivosAPI(BackendApiTestCase):
         self.assertIn("definitivo", data.get("motivo", ""))
 
 
+class TestCriarLoteEndpoint(BackendApiTestCase):
+    def _headers(self):
+        token = self._get_access_token()
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_post_lotes_sem_token_retorna_401(self):
+        """Critério 1: POST /lotes sem token -> 401."""
+        res = self.client.post(
+            "/lotes",
+            json={"id": "P99", "nome": "Piquete Novo", "area_ha": 15.0, "capacidade_ua": 20.0},
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_post_lotes_corpo_valido_retorna_201_e_aparece_em_get_lotes(self):
+        """Critério 2: Corpo válido -> 201, lote aparece depois em GET /lotes."""
+        headers = self._headers()
+        payload = {
+            "id": "P99",
+            "nome": "Piquete Novo",
+            "area_ha": 15.5,
+            "capacidade_ua": 25.0,
+            "observacoes": "Piquete reformado",
+        }
+        res = self.client.post("/lotes", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(
+            res.json(),
+            {"id": "P99", "nome": "Piquete Novo", "capacidade_ua": 25.0, "animais_ativos": 0},
+        )
+
+        res_get = self.client.get("/lotes", headers=headers)
+        self.assertEqual(res_get.status_code, 200)
+        lote_ids = {l["id"]: l for l in res_get.json()}
+        self.assertIn("P99", lote_ids)
+        self.assertEqual(lote_ids["P99"]["nome"], "Piquete Novo")
+        self.assertEqual(lote_ids["P99"]["capacidade_ua"], 25.0)
+        self.assertEqual(lote_ids["P99"]["animais_ativos"], 0)
+
+    def test_post_lotes_id_duplicado_retorna_409_e_nao_altera_existente(self):
+        """Critério 3: id repetido de lote existente -> 409, não cria nem altera o existente."""
+        headers = self._headers()
+        # "P01" já existe no seed
+        lote_original = db.get_lote("P01")
+        self.assertIsNotNone(lote_original)
+        nome_original = lote_original["name"]
+
+        payload = {
+            "id": "P01",
+            "nome": "Nome Alterado Falso",
+            "area_ha": 99.0,
+            "capacidade_ua": 99.0,
+        }
+        res = self.client.post("/lotes", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.json()["detail"], "Lote P01 já existe.")
+
+        # Confirma que não foi alterado
+        lote_depois = db.get_lote("P01")
+        self.assertEqual(lote_depois["name"], nome_original)
+
+    def test_post_lotes_validacao_schema_retorna_422(self):
+        """Critério 4: id/nome vazio, ou area_ha/capacidade_ua negativo -> 422."""
+        headers = self._headers()
+
+        # id vazio
+        res = self.client.post(
+            "/lotes",
+            json={"id": "", "nome": "Lote", "area_ha": 10.0, "capacidade_ua": 10.0},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 422)
+
+        # nome vazio
+        res = self.client.post(
+            "/lotes",
+            json={"id": "P98", "nome": "  ", "area_ha": 10.0, "capacidade_ua": 10.0},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 422)
+
+        # area_ha negativo
+        res = self.client.post(
+            "/lotes",
+            json={"id": "P98", "nome": "Lote", "area_ha": -5.0, "capacidade_ua": 10.0},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 422)
+
+        # capacidade_ua negativo
+        res = self.client.post(
+            "/lotes",
+            json={"id": "P98", "nome": "Lote", "area_ha": 10.0, "capacidade_ua": -2.0},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 422)
+
+    def test_post_lotes_recebe_property_id_padrao(self):
+        """Critério 5: Lote criado sem property_id recebe a propriedade padrão."""
+        headers = self._headers()
+        payload = {
+            "id": "P88",
+            "nome": "Piquete Padrão",
+            "area_ha": 12.0,
+            "capacidade_ua": 18.0,
+        }
+        res = self.client.post("/lotes", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 201)
+
+        with _conn() as con:
+            row = con.execute("SELECT property_id FROM lotes WHERE id='P88'").fetchone()
+            prop_default = con.execute("SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
+            self.assertIsNotNone(row["property_id"])
+            self.assertEqual(row["property_id"], prop_default["id"])
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
+
 
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""

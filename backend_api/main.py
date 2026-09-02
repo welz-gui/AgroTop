@@ -32,6 +32,7 @@ from backend_api.schemas import (
     AlertasOutput,
     CarenciaOutput,
     ConfirmarTratoInput,
+    CriarLoteInput,
     DispositivoOutput,
     ImportarPesagensOutput,
     LoginInput,
@@ -58,12 +59,15 @@ from backend_api.schemas import (
     UserSummary,
 )
 from database import (
+    LoteData,
     add_feeding_check,
+    add_lote,
     add_photo,
     check_low_stock,
     get_alert_animals,
     get_all_lotes,
     get_gmd_target,
+    get_lote,
     get_low_performance,
     get_pending_feedings,
     get_photo_image,
@@ -443,6 +447,41 @@ def list_lotes(
         }
         for l in all_lotes
     ]
+
+
+@app.post(
+    "/lotes",
+    response_model=LoteSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_lote(
+    data: CriarLoteInput,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Cria um novo piquete/lote."""
+    if get_lote(data.id) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Lote {data.id} já existe.",
+        )
+
+    add_lote(
+        LoteData(
+            lote_id=data.id,
+            name=data.nome,
+            area_ha=data.area_ha,
+            capacity_ua=data.capacidade_ua,
+            notes=data.observacoes,
+        )
+    )
+
+    return {
+        "id": data.id,
+        "nome": data.nome,
+        "capacidade_ua": data.capacidade_ua,
+        "animais_ativos": 0,
+    }
+
 
 
 @app.post("/animais/movimentar", response_model=MovimentarOutput)
