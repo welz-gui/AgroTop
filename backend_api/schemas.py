@@ -263,3 +263,34 @@ class AlertasOutput(BaseModel):
     estoque_baixo: list[AlertaEstoqueBaixoOutput]
     baixo_desempenho: list[AlertaBaixoDesempenhoOutput]
 
+
+class TransicaoPermitida(BaseModel):
+    para: str
+    exige_motivo: bool
+    exige_autorizacao: bool
+
+
+class DispositivoOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    codigo_visual: str
+    tipo: str
+    status: str
+    lote: Optional[str] = None
+    transicoes_permitidas: list[TransicaoPermitida]
+
+
+class MudarStatusDispositivoInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    novo_status: str
+    motivo: Optional[str] = None
+
+
+class MudarStatusDispositivoOutput(BaseModel):
+    ok: bool
+    de: str
+    para: str
+
+
