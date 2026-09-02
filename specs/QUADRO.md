@@ -25,7 +25,8 @@ fechada**, exceto Bluetooth (hardware, não delegável por definição, etapa 4)
 na fila** — 0065/0066 (mobile: tela de brincos, terceiro item do Tier 1 da
 [ADR 0007](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)) e 0067/0068 (mobile:
 criar lote, quarto item do Tier 1) — pares API+mobile, mesmo padrão de toda a Trilha 1,
-nenhuma fora da Trilha 1 propriamente dita — ver abaixo.
+nenhuma fora da Trilha 1 propriamente dita — ver abaixo. **0065 fechada em 2026-09-02**
+([PR #316](https://github.com/welz-gui/AgroTop/pull/316)) — 0066 livre, já contra API real.
 **Trilha 2 fechada em 2026-09-01** ([PR #313](https://github.com/welz-gui/AgroTop/pull/313),
 mantenedor, sem spec) — "desenhar no mapa", "importar arquivo" e localização por
 propriedade na previsão do tempo, as três ligadas. **0069/0070 (API + mobile: demarcação de
@@ -307,8 +308,8 @@ desbloqueadas desde que a Trilha 1 fechou.
 | — | [0063](0063-api-alertas-operacionais.md) — API: alertas operacionais 🏗️ | — | ✅ [#264](https://github.com/welz-gui/AgroTop/pull/264) | | 2026-08-31 |
 | — | [0061](0061-mobile-metodo-de-pesagem-selecionavel.md) — Mobile: método de pesagem selecionável 🏗️ | — | ✅ [#269](https://github.com/welz-gui/AgroTop/pull/269) | | 2026-09-01 |
 | — | [0064](0064-mobile-tela-de-alertas-operacionais.md) — Mobile: tela de alertas operacionais 🏗️ | — | ✅ [#309](https://github.com/welz-gui/AgroTop/pull/309) | | 2026-09-01 |
-| 1 | [0065](0065-api-dispositivos-busca-e-mudanca-de-status.md) — API: busca de dispositivo por código e mudança de status 🏗️ | — | 🟢 disponível | | 2026-09-01 |
-| 2 | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | 🟡 depende da 0065 mesclar (ou teste contra mock) | | 2026-09-01 |
+| — | [0065](0065-api-dispositivos-busca-e-mudanca-de-status.md) — API: busca de dispositivo por código e mudança de status 🏗️ | — | ✅ [#316](https://github.com/welz-gui/AgroTop/pull/316) | | 2026-09-02 |
+| 2 | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | 🟢 disponível (0065 já mesclada) | | 2026-09-01 |
 | 3 | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | 🟢 disponível | | 2026-09-01 |
 | 4 | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | 🟡 depende da 0067 mesclar (ou teste contra mock) | | 2026-09-01 |
 | 5 | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | 🟢 disponível | | 2026-09-01 |
@@ -439,6 +440,17 @@ desbloqueadas desde que a Trilha 1 fechou.
 > transferência de animais entre lotes **já está coberta** pela 0048/0049, não é retrabalho.
 > Mesmo padrão API-antes-de-mobile: 0065/0067 sem dependência, 0066/0068 podem ser pegas em
 > paralelo contra mock.
+>
+> **0065 fechada em 2026-09-02 — [PR #316](https://github.com/welz-gui/AgroTop/pull/316).**
+> `GET /dispositivos/{codigo_visual}` + `POST /dispositivos/{id}/status`, zero lógica nova
+> (`repositories/dispositivos.py::por_codigo`/`mudar_status` +
+> `services/estados_dispositivo.py`). Revisado campo a campo contra a máquina de estados: a
+> API inclui `bloqueado_orgao → disponivel` em `transicoes_permitidas` com
+> `exige_autorizacao=true` (desvio deliberado da list comprehension literal do
+> `app.py::_brincos_inventario`, que a própria spec já previa e justificava — o cliente
+> mobile decide o que fazer com essa informação). Os 9 critérios têm teste com prova real
+> (consulta de novo após mudar status, motivo gravado no banco quando exigido). **0066 está
+> livre para qualquer agente, já contra a API real.**
 >
 > **0069/0070 escritas em 2026-09-01 — item 4 da Trilha 2 (ROADMAP §5), não do
 > Tier 1 da ADR 0007** (a paridade admin-mobile é outra iniciativa; GPS é o último item que
