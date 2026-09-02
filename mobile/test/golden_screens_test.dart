@@ -10,6 +10,7 @@ import 'package:agrotop_mobile/shallow_cache.dart';
 import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:agrotop_mobile/screens/alerts_page.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
+import 'package:agrotop_mobile/screens/devices_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
 import 'package:flutter/material.dart';
@@ -855,6 +856,89 @@ void main() {
       }
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('tela de brincos cobre busca e motivo nos três temas', (
+    tester,
+  ) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final mode in ThemeMode.values) {
+      for (final view in ['vazia', 'nao-encontrado', 'encontrado', 'motivo']) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.url.path.endsWith('BR-404')) {
+              return _json({'detail': 'Ausente'}, status: 404);
+            }
+            return _json({
+              'id': 'device-1',
+              'codigo_visual': 'BR-100',
+              'tipo': 'brinco_visual',
+              'status': 'recebido',
+              'lote': 'Lote Norte',
+              'transicoes_permitidas': [
+                {
+                  'para': view == 'motivo' ? 'danificado' : 'disponivel',
+                  'exige_motivo': view == 'motivo',
+                  'exige_autorizacao': false,
+                },
+              ],
+            });
+          }),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: DevicesPage(api: api, onUnauthorized: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (view != 'vazia') {
+          await tester.enterText(
+            find.byKey(const ValueKey('device-code-field')),
+            view == 'nao-encontrado' ? 'BR-404' : 'BR-100',
+          );
+          await tester.tap(find.byKey(const ValueKey('search-device')));
+          await tester.pumpAndSettle();
+        }
+        if (view == 'motivo') {
+          await tester.tap(
+            find.byKey(const ValueKey('device-transition-danificado')),
+          );
+          await tester.pumpAndSettle();
+        }
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${switch (view) {
+                'vazia' => '18-brincos-vazia',
+                'nao-encontrado' => '19-brincos-nao-encontrado',
+                'encontrado' => '20-brincos-encontrado',
+                _ => '21-brincos-motivo',
+              }}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
     }
   });
 }

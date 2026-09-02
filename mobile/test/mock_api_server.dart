@@ -26,6 +26,10 @@ class MockApiServer {
   final List<bool> csvImportConfirmations = [];
   int feedingRequests = 0;
   int postFeedingRequests = 0;
+  int deviceLookupRequests = 0;
+  int deviceStatusRequests = 0;
+  Map<String, dynamic>? lastDeviceStatusBody;
+  String deviceStatus = 'recebido';
   bool failNextFeedingConfirmation = false;
   Map<String, dynamic>? lastFeedingBody;
   int? lastPhotoUploadSize;
@@ -181,6 +185,48 @@ class MockApiServer {
       if (request.method == 'GET' && path == '/trato/pendentes') {
         feedingRequests++;
         await _json(request, 200, _feedings);
+        return;
+      }
+      if (request.method == 'GET' && path.startsWith('/dispositivos/')) {
+        deviceLookupRequests++;
+        final code = Uri.decodeComponent(
+          path.substring('/dispositivos/'.length),
+        );
+        if (code == 'BR-404') {
+          await _json(request, 404, {'detail': 'Dispositivo não encontrado'});
+          return;
+        }
+        await _json(request, 200, {
+          'id': 'device-1',
+          'codigo_visual': 'BR-100',
+          'tipo': 'brinco_visual',
+          'status': deviceStatus,
+          'lote': 'Lote Norte',
+          'transicoes_permitidas': deviceStatus == 'recebido'
+              ? [
+                  {
+                    'para': 'disponivel',
+                    'exige_motivo': false,
+                    'exige_autorizacao': false,
+                  },
+                  {
+                    'para': 'danificado',
+                    'exige_motivo': true,
+                    'exige_autorizacao': false,
+                  },
+                ]
+              : [],
+        });
+        return;
+      }
+      if (request.method == 'POST' && path == '/dispositivos/device-1/status') {
+        deviceStatusRequests++;
+        final body = await _body(request);
+        lastDeviceStatusBody = body;
+        final next = body['novo_status'] as String;
+        final previous = deviceStatus;
+        deviceStatus = next;
+        await _json(request, 200, {'ok': true, 'de': previous, 'para': next});
         return;
       }
       if (request.method == 'POST' &&

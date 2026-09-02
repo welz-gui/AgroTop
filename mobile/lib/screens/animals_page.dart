@@ -8,6 +8,7 @@ import '../shallow_cache.dart';
 import 'animal_photo_section.dart';
 import 'alerts_page.dart';
 import 'csv_import_page.dart';
+import 'devices_page.dart';
 import 'feeding_page.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
@@ -286,6 +287,13 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     if (mounted) _loadAlertCount();
   }
 
+  Future<void> _openDevices() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) =>
+          DevicesPage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+    ),
+  );
+
   Future<void> _openCsvImport() => Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) =>
@@ -299,6 +307,12 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
       title: const Text('Animais ativos'),
       actions: [
         ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
+        IconButton(
+          key: const ValueKey('open-devices'),
+          onPressed: _openDevices,
+          tooltip: 'Brincos e dispositivos',
+          icon: const Icon(Icons.sell_outlined),
+        ),
         _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
         _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
         IconButton(
