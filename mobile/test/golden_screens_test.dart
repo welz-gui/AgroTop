@@ -10,6 +10,7 @@ import 'package:agrotop_mobile/shallow_cache.dart';
 import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:agrotop_mobile/screens/alerts_page.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
+import 'package:agrotop_mobile/screens/create_lote_page.dart';
 import 'package:agrotop_mobile/screens/devices_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
@@ -806,6 +807,7 @@ void main() {
           loteId: 'P01',
         ),
       ]);
+      await prefs.setString('cache_animais_list_time', '2026-08-29T10:00:00.000');
 
       final store = GoldenTokenStore()
         ..tokens = const StoredTokens(
@@ -941,4 +943,81 @@ void main() {
       }
     }
   });
+
+  testWidgets('tela de criar lote cobre formulário vazio e erro de duplicidade nos três temas', (
+    tester,
+  ) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final mode in ThemeMode.values) {
+      for (final view in ['vazio', 'duplicado']) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.method == 'POST' && request.url.path == '/lotes') {
+              return _json({'detail': 'Lote P01 já existe.'}, status: 409);
+            }
+            return _json({});
+          }),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: CreateLotePage(api: api, onUnauthorized: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (view == 'duplicado') {
+          await tester.enterText(
+            find.byKey(const ValueKey('lote-id-field')),
+            'P01',
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('lote-name-field')),
+            'Piquete Central',
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('lote-area-field')),
+            '25.0',
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('lote-capacity-field')),
+            '30.0',
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('lote-notes-field')),
+            'Pasto principal',
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('save-lote-button')));
+          await tester.pumpAndSettle();
+        }
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${view == 'vazio' ? '22-criar-lote-vazio' : '23-criar-lote-duplicado'}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    }
+  });
 }
+
