@@ -147,6 +147,41 @@ Não inclua `DATABASE_URL` em mensagens de teste ou log: ela contém a senha do 
   `idx_insumo_trans_reason`) ficaram em "revisar depois"; os três primeiros
   saíram dessa lista com a 0029, que declarou as FKs que eles sustentam.
 
+  **A prova, medida em 2026-09-03** (4ª auditoria, arquivada). O contador
+  `idx_scan` mede escolha do planner, não uso pelo código — e a diferença é
+  demonstrável:
+
+  | Índice | `idx_scan` | Consulta no código |
+  |---|---:|---|
+  | `idx_animals_status` | **0** | **sim** — `WHERE a.status='ativo'`; `get_all_animals(status=…)` é chamado 16× só no `app.py` |
+  | `idx_contas_pagar_status` | 0 | só via `WHERE id=? AND status='aberto'` — quem resolve é a PK; o índice `(status, vencimento)` não atende |
+  | `idx_contas_receber_status` | 0 | idem |
+  | `idx_eventos_tipo` | 0 | nenhuma |
+  | `idx_eventos_sincronizacao` | 0 | nenhuma |
+  | `idx_audit_entidade` | 0 | nenhuma |
+  | `idx_evsinc_situacao` | 0 | nenhuma |
+  | `idx_insumo_trans_reason` | 0 | nenhuma |
+  | `idx_regras_vigencia` | 0 | nenhuma |
+  | `idx_regras_evento` | 0 | nenhuma |
+
+  `idx_animals_status` é a demonstração: **zero scans apesar de sustentar o
+  filtro mais quente do app**, que roda todo dia. Com 14 linhas o planner faz
+  seq scan de qualquer jeito. Se `idx_scan = 0` fosse prova de inutilidade,
+  esse índice seria o primeiro a cair — e é o que menos deve cair.
+
+  Os três índices que sustentam as FKs da 0029 (`idx_ident_animal`,
+  `idx_medications_protocol`, `idx_insumo_trans_lote`) também estão com
+  `idx_scan = 0`. Continuam necessários: a verificação de integridade
+  referencial vai usá-los quando houver volume.
+
+  **Escala do "problema":** 67 índices com `idx_scan = 0`, **784 kB no total**.
+  As estatísticas não foram zeradas (`stats_reset` = 2026-07-15, anterior ao
+  projeto), então os contadores cobrem a vida inteira do banco.
+
+  **Quando reavaliar de verdade:** não pelo lint. Rode `EXPLAIN ANALYZE` nas
+  consultas reais — o levantamento de código acima já diz quais são — depois
+  que alguma tabela passar de ~1.000 linhas.
+
 - **`UNIQUE` sobre as mesmas colunas da PRIMARY KEY nunca vai inline num
   `CREATE TABLE`** (2026-08-31, [PR #263](https://github.com/welz-gui/AgroTop/pull/263)).
   O PostgreSQL **descarta a constraint em silêncio** — sem erro, sem aviso. Foi
