@@ -29,6 +29,9 @@ class MockApiServer {
   int postLoteRequests = 0;
   Map<String, dynamic>? lastCreateLoteBody;
   final Set<String> existingLoteIds = {'P01', 'P02', 'P03'};
+  int postPerimetroRequests = 0;
+  Map<String, dynamic>? lastPerimetroBody;
+  bool simulatePerimetroError = false;
   int deviceLookupRequests = 0;
   int deviceStatusRequests = 0;
   Map<String, dynamic>? lastDeviceStatusBody;
@@ -474,6 +477,36 @@ class MockApiServer {
           'nome': body['nome'] ?? '',
           'capacidade_ua': (body['capacidade_ua'] as num?)?.toDouble() ?? 0.0,
           'animais_ativos': 0,
+        });
+        return;
+      }
+      final perimetroMatch = RegExp(r'^/lotes/([^/]+)/perimetro$').firstMatch(path);
+      if (request.method == 'POST' && perimetroMatch != null) {
+        postPerimetroRequests++;
+        final loteId = Uri.decodeComponent(perimetroMatch.group(1)!);
+        final body = await _body(request);
+        lastPerimetroBody = body;
+        final pontos = body['pontos'] as List<dynamic>? ?? [];
+        if (loteId == 'P-404' || (!existingLoteIds.contains(loteId) && !['P01', 'P02', 'P03'].contains(loteId))) {
+          await _json(request, 404, {'detail': 'Piquete não encontrado.'});
+          return;
+        }
+        if (pontos.length < 3) {
+          await _json(request, 422, {
+            'detail': ['Polígono precisa de pelo menos 3 vértices.'],
+          });
+          return;
+        }
+        if (simulatePerimetroError) {
+          await _json(request, 422, {
+            'detail': ['Polígono auto-interceptante.'],
+          });
+          return;
+        }
+        await _json(request, 200, {
+          'ok': true,
+          'area_ha': 12.5,
+          'perimetro_m': 1420.0,
         });
         return;
       }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../api_client.dart';
 import '../app.dart';
@@ -14,6 +15,7 @@ import 'feeding_page.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
 import 'offline_cache_banner.dart';
+import 'perimeter_gps_page.dart';
 import 'qr_scanner_page.dart';
 import 'sync_report_dialog.dart';
 import 'weighing_page.dart';
@@ -28,6 +30,9 @@ class AnimalsPage extends StatefulWidget {
     this.qrScannerBuilder,
     this.offlineQueue,
     this.shallowCache,
+    this.gpsPositionProvider,
+    this.gpsPermissionRequester,
+    this.gpsPermissionChecker,
   });
 
   final ApiClient api;
@@ -37,6 +42,9 @@ class AnimalsPage extends StatefulWidget {
   final QrScannerBuilder? qrScannerBuilder;
   final OfflineQueue? offlineQueue;
   final ShallowCache? shallowCache;
+  final Future<PositionPoint> Function()? gpsPositionProvider;
+  final Future<LocationPermission> Function()? gpsPermissionRequester;
+  final Future<LocationPermission> Function()? gpsPermissionChecker;
 
   @override
   State<AnimalsPage> createState() => _AnimalsPageState();
@@ -302,6 +310,18 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> _openPerimeterGps() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => PerimeterGpsPage(
+        api: widget.api,
+        onUnauthorized: widget.onUnauthorized,
+        positionProvider: widget.gpsPositionProvider,
+        permissionRequester: widget.gpsPermissionRequester,
+        permissionChecker: widget.gpsPermissionChecker,
+      ),
+    ),
+  );
+
   Future<void> _openCsvImport() => Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) =>
@@ -314,35 +334,55 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     appBar: AppBar(
       title: const Text('Animais ativos'),
       actions: [
-        ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
-        IconButton(
-          key: const ValueKey('open-create-lote'),
-          onPressed: _openCreateLote,
-          tooltip: 'Novo lote',
-          icon: const Icon(Icons.add_location_alt_outlined),
-        ),
-        IconButton(
-          key: const ValueKey('open-devices'),
-          onPressed: _openDevices,
-          tooltip: 'Brincos e dispositivos',
-          icon: const Icon(Icons.sell_outlined),
-        ),
-        _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
-        _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
-        IconButton(
-          key: const ValueKey('open-csv-import'),
-          onPressed: _openCsvImport,
-          tooltip: 'Importar pesagens',
-          icon: const Icon(Icons.upload_file_outlined),
-        ),
-        _SyncQueueButton(
-          pendingCount: _pendingQueueCount,
-          onPressed: () => _syncQueue(manual: true),
-        ),
-        IconButton(
-          onPressed: _logout,
-          tooltip: 'Sair',
-          icon: const Icon(Icons.logout),
+        IconButtonTheme(
+          data: IconButtonThemeData(
+            style: IconButton.styleFrom(
+              minimumSize: const Size(32, 32),
+              padding: const EdgeInsets.all(4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
+              IconButton(
+                key: const ValueKey('open-perimeter-gps'),
+                onPressed: _openPerimeterGps,
+                tooltip: 'Demarcar perímetro',
+                icon: const Icon(Icons.location_on_outlined),
+              ),
+              IconButton(
+                key: const ValueKey('open-create-lote'),
+                onPressed: _openCreateLote,
+                tooltip: 'Novo lote',
+                icon: const Icon(Icons.add_location_alt_outlined),
+              ),
+              IconButton(
+                key: const ValueKey('open-devices'),
+                onPressed: _openDevices,
+                tooltip: 'Brincos e dispositivos',
+                icon: const Icon(Icons.sell_outlined),
+              ),
+              _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
+              _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
+              IconButton(
+                key: const ValueKey('open-csv-import'),
+                onPressed: _openCsvImport,
+                tooltip: 'Importar pesagens',
+                icon: const Icon(Icons.upload_file_outlined),
+              ),
+              _SyncQueueButton(
+                pendingCount: _pendingQueueCount,
+                onPressed: () => _syncQueue(manual: true),
+              ),
+              IconButton(
+                onPressed: _logout,
+                tooltip: 'Sair',
+                icon: const Icon(Icons.logout),
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -535,23 +575,25 @@ class _SyncQueueButton extends StatelessWidget {
         Positioned(
           right: 5,
           top: 4,
-          child: Semantics(
-            label: '$pendingCount pendências na fila offline',
-            child: Container(
-              key: const ValueKey('pending-queue-badge'),
-              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$pendingCount',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          child: IgnorePointer(
+            child: Semantics(
+              label: '$pendingCount pendências na fila offline',
+              child: Container(
+                key: const ValueKey('pending-queue-badge'),
+                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$pendingCount',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -581,23 +623,25 @@ class _FeedingButton extends StatelessWidget {
         Positioned(
           right: 5,
           top: 4,
-          child: Semantics(
-            label: '$pendingCount pendências de trato',
-            child: Container(
-              key: const ValueKey('pending-feeding-badge'),
-              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$pendingCount',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onError,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          child: IgnorePointer(
+            child: Semantics(
+              label: '$pendingCount pendências de trato',
+              child: Container(
+                key: const ValueKey('pending-feeding-badge'),
+                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$pendingCount',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onError,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -627,23 +671,25 @@ class _AlertsButton extends StatelessWidget {
         Positioned(
           right: 5,
           top: 4,
-          child: Semantics(
-            label: '$alertCount alertas operacionais',
-            child: Container(
-              key: const ValueKey('alerts-badge'),
-              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$alertCount',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onError,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+          child: IgnorePointer(
+            child: Semantics(
+              label: '$alertCount alertas operacionais',
+              child: Container(
+                key: const ValueKey('alerts-badge'),
+                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$alertCount',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onError,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

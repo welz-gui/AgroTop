@@ -152,6 +152,32 @@ class LoteSummary {
   );
 }
 
+class PerimetroResult {
+  const PerimetroResult({
+    required this.ok,
+    required this.areaHa,
+    required this.perimetroM,
+  });
+
+  final bool ok;
+  final double areaHa;
+  final double perimetroM;
+
+  factory PerimetroResult.fromJson(Map<String, dynamic> json) => PerimetroResult(
+    ok: json['ok'] as bool? ?? true,
+    areaHa: (json['area_ha'] as num).toDouble(),
+    perimetroM: (json['perimetro_m'] as num).toDouble(),
+  );
+}
+
+class PositionPoint {
+  const PositionPoint({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+}
+
+
 class MovementResult {
   const MovementResult({
     required this.movidos,
