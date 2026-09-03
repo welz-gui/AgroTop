@@ -30,14 +30,14 @@ ADR 0007 inteiro concluído** ([PR #316](https://github.com/welz-gui/AgroTop/pul
 [#318](https://github.com/welz-gui/AgroTop/pull/318),
 [#319](https://github.com/welz-gui/AgroTop/pull/319),
 [#321](https://github.com/welz-gui/AgroTop/pull/321), 2026-09-02/03).
-**Trilha 2 fechada em 2026-09-01** ([PR #313](https://github.com/welz-gui/AgroTop/pull/313),
-mantenedor, sem spec) — "desenhar no mapa", "importar arquivo" e localização por
-propriedade na previsão do tempo, as três ligadas. **0069 fechada em 2026-09-03**
-([PR #322](https://github.com/welz-gui/AgroTop/pull/322)) — só falta a **0070** (mobile:
-demarcação de perímetro por GPS), livre, já contra a API real, único item aberto da
-Trilha 2. Uma tentativa em 2026-09-03 não conseguiu prosseguir por falta de Docker/toolchain
-Flutter local — reivindicou, verificou e liberou sem abrir PR (comportamento correto, ver
-critério 7 da spec 0070).
+**Trilha 2 fechada por completo em 2026-09-03** — os 4 itens do ROADMAP §5:
+itens 1-3 via [PR #313](https://github.com/welz-gui/AgroTop/pull/313) (mantenedor, sem
+spec, 2026-09-01) — "desenhar no mapa", "importar arquivo" e localização por propriedade
+na previsão do tempo; item 4 (GPS) via [PR #322](https://github.com/welz-gui/AgroTop/pull/322)
+(API) e [#325](https://github.com/welz-gui/AgroTop/pull/325) (mobile). Uma primeira
+tentativa na 0070 não conseguiu prosseguir por falta de Docker/toolchain Flutter local —
+reivindicou, verificou e liberou sem abrir PR (comportamento correto, ver critério 7 da
+spec 0070); uma segunda tentativa, com o ambiente certo, entregou.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -319,7 +319,7 @@ critério 7 da spec 0070).
 | — | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | ✅ [#319](https://github.com/welz-gui/AgroTop/pull/319) | | 2026-09-02 |
 | — | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | ✅ [#321](https://github.com/welz-gui/AgroTop/pull/321) | | 2026-09-03 |
 | — | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | ✅ [#322](https://github.com/welz-gui/AgroTop/pull/322) | | 2026-09-03 |
-| 6 | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | 🟢 disponível (0069 já mesclada) — precisa de Docker/toolchain Flutter completo pros goldens | | 2026-09-01 |
+| — | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | ✅ [#325](https://github.com/welz-gui/AgroTop/pull/325) | | 2026-09-03 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -497,6 +497,7 @@ critério 7 da spec 0070).
 > validação de polígono) no cliente — tudo em `services/geometria.py`, já pronto e testado
 > desde a etapa B. `mobile/pubspec.yaml` ainda não tem pacote de geolocalização — a 0070
 > precisa adicionar um (`geolocator` ou equivalente), mesmo padrão de quando a 0056 (QR)
+> adicionou `mobile_scanner`.
 >
 > **0069 fechada em 2026-09-03 — [PR #322](https://github.com/welz-gui/AgroTop/pull/322).**
 > `POST /lotes/{lote_id}/perimetro`, zero lógica nova (`services/geometria.py::validar`/
@@ -504,9 +505,20 @@ critério 7 da spec 0070).
 > Valida antes de gravar (422 preserva o polígono anterior, confirmado em teste), resposta
 > usa a geometria persistida relida do banco, não recalcula por fora. Os 7 critérios com
 > teste real, comparando área/perímetro contra `services.geometria` calculado
-> independentemente. **0070 está livre, já contra a API real — só falta quem tenha
-> Docker/toolchain Flutter completo pra gerar os goldens de verdade.**
-> adicionou `mobile_scanner`.
+> independentemente.
+>
+> **0070 fechada em 2026-09-03 — [PR #325](https://github.com/welz-gui/AgroTop/pull/325) —
+> Trilha 2 inteira concluída.** Botões marcar/desfazer/recomeçar vértice, preview
+> (`CustomPaint`) que só normaliza coordenadas pro canvas — confirmado que não reimplementa
+> `area_hectares`/centroide/shoelace no Dart. GPS e permissões injetáveis
+> (`positionProvider`/`permissionRequester`/`permissionChecker`) para teste sem hardware,
+> mesmo espírito de como `ApiClient` já é injetado. Salvar desabilitado com menos de 3
+> pontos, erro 422 preserva os pontos marcados na tela, pontos enviados como `[lon, lat]`
+> confirmado em teste. 9 goldens reais (30-34 KB) nos 3 cenários × 3 temas. Precisou
+> compactar o `AppBar` de `AnimalsPage` pra caber o 6º ícone (`IconButtonTheme` +
+> dimensões menores) — por isso goldens de outras telas que mostram essa AppBar
+> (`02-lista`, `13/14/15-fila-offline`/`cache`) também mudaram, mudança explicada e
+> revisada, não é o mistério sem explicação da PR #321.
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),

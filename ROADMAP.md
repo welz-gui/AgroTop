@@ -483,7 +483,7 @@ autoria e horário registrados, e o resultado aparece no web.
 
 ---
 
-### Trilha 2 — Geometria dos piquetes e GPS
+### Trilha 2 — Geometria dos piquetes e GPS ✅ CONCLUÍDA em 2026-09-03
 
 **Prioridade do usuário: alta.** Menor colisão entre as trilhas — boa primeira candidata.
 
@@ -518,13 +518,13 @@ autoria e horário registrados, e o resultado aparece no web.
    `page_clima`: uma coordenada resolvida só continua sem aba extra (não gera ruído — é a
    mesma previsão de sempre), mais de uma abre uma aba por localização, agrupando
    propriedades que caem na mesma coordenada.
-4. 🟡 Demarcação por **GPS caminhando o perímetro** — no mobile (depende da Trilha 1,
-   etapa 2, que já fechou — desbloqueado). **Specs escritas em 2026-09-01, disponíveis:**
-   [0069](specs/0069-api-perimetro-do-piquete-por-pontos.md) (API — recebe uma lista de
-   pontos, valida e grava com `services/geometria.py`, mesma função pura que o web já usa)
-   e [0070](specs/0070-mobile-demarcacao-de-perimetro-por-gps.md) (mobile — marcar um ponto
-   por vez, parado em cada canto da cerca, não rastreamento contínuo). Único item que resta
-   nesta trilha.
+4. 🟢 Demarcação por **GPS caminhando o perímetro** — **fechado em 2026-09-03.**
+   [Spec 0069](specs/0069-api-perimetro-do-piquete-por-pontos.md)/[PR #322](https://github.com/welz-gui/AgroTop/pull/322)
+   entregou `POST /lotes/{lote_id}/perimetro` (recebe uma lista de pontos, valida e grava
+   com `services/geometria.py`, mesma função pura que o web já usa) e
+   [spec 0070](specs/0070-mobile-demarcacao-de-perimetro-por-gps.md)/[PR #325](https://github.com/welz-gui/AgroTop/pull/325)
+   entregou a tela mobile — marcar um ponto por vez, parado em cada canto da cerca, sem
+   rastreamento contínuo, preview local sem recalcular geometria no cliente.
 
 **Técnico:** **PostGIS 3.3.7 está disponível** no projeto (não instalado, **e não foi
 necessário até aqui**) — a geometria roda via `pyproj`/`shapely` em Python puro, sobre
@@ -537,8 +537,7 @@ desenhar/importar), reavaliar a extensão nesse momento, não antes.
 - NDVI **não** entra nesta trilha (ver Trilha 4).
 
 **Pronto quando:** cada piquete tem polígono, a área exibida vem da geometria, e piquete sem
-polígono continua funcionando como hoje. *(Cumprido — itens 1, 2 e 3 fechados. Falta só o
-item 4, GPS no mobile — specs 0069/0070 escritas, na fila.)*
+polígono continua funcionando como hoje. *(Cumprido — os 4 itens fechados em 2026-09-03.)*
 
 ---
 
