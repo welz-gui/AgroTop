@@ -4,11 +4,12 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-08-21 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilha 3
-(Estoque → Financeiro → Nutrição) CONCLUÍDA · Fase B 100% ligada à interface (7 de 7) ·
-29 de 29 services usados** · fila de specs vazia (0) · Trilha 2 (geometria dos piquetes,
-parcial) em andamento, sem spec — trabalho direto do mantenedor. Próximos: Trilha 1
-(API + mobile) e o restante da Trilha 2 — ver seção 5
+Última atualização: 2026-09-03 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
+(API + mobile, exceto Bluetooth — hardware, não delegável), 2 (geometria/GPS) e 3
+(Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** ·
+fila de specs em `specs/QUADRO.md` zerada de 0001 a 0070 · **Trilha 4 (Inteligência) é a
+única fronteira aberta**, primeiras specs (0071/0072 — recomendações do motor de regras no
+mobile) escritas em 2026-09-03 — ver seção 5
 
 ---
 
@@ -727,6 +728,16 @@ esperado → alerta de margem; carência ultrapassando data de embarque → bloq
 **Isto não é prêmio de consolação do machine learning.** É barato, explicável, dá valor
 agora — **e força a definir exatamente as features que um modelo usaria depois.** É
 engenharia de features feita antes da hora.
+
+**Status em 2026-09-03:** as seis regras iniciais (`estoque_insuficiente`,
+`piquete_acima_da_capacidade`, `carencia_impede_abate`, `pronto_para_venda`,
+`gmd_abaixo_da_meta`, `margem_em_risco` — não a de NDVI, que depende da integração de
+satélite, ainda não construída) **já existem e já estão em produção no web** desde a
+[spec 0011](specs/0011-motor-de-regras.md)/[PR #29](https://github.com/welz-gui/AgroTop/pull/29)
+(`services/recomendacoes.py::avaliar`, função pura, consumida por
+`app.py::_alertas_operacionais`). Faltava só o mobile — **specs
+[0071](specs/0071-api-recomendacoes-motor-de-regras.md)/[0072](specs/0072-mobile-recomendacoes-do-motor-de-regras.md)
+escritas em 2026-09-03, disponíveis**, primeiras specs desta trilha.
 
 **Modelos estatísticos — gatilho de dados, não de calendário**
 O limitante não é número de linhas: com 150–200 animais pesados a cada 30–60 dias são
