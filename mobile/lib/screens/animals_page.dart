@@ -7,6 +7,7 @@ import '../offline_queue.dart';
 import '../shallow_cache.dart';
 import 'animal_photo_section.dart';
 import 'alerts_page.dart';
+import 'create_lote_page.dart';
 import 'csv_import_page.dart';
 import 'devices_page.dart';
 import 'feeding_page.dart';
@@ -294,6 +295,13 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> _openCreateLote() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) =>
+          CreateLotePage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+    ),
+  );
+
   Future<void> _openCsvImport() => Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) =>
@@ -307,6 +315,12 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
       title: const Text('Animais ativos'),
       actions: [
         ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
+        IconButton(
+          key: const ValueKey('open-create-lote'),
+          onPressed: _openCreateLote,
+          tooltip: 'Novo lote',
+          icon: const Icon(Icons.add_location_alt_outlined),
+        ),
         IconButton(
           key: const ValueKey('open-devices'),
           onPressed: _openDevices,
