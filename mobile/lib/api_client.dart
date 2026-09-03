@@ -206,6 +206,30 @@ class ApiClient {
     return LoteSummary.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<PerimetroResult> savePerimetro(
+    String loteId, {
+    required List<List<double>> pontos,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl/lotes/${Uri.encodeComponent(loteId)}/perimetro'),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'pontos': pontos}),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível salvar o perímetro.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return PerimetroResult.fromJson(body as Map<String, dynamic>);
+  }
+
 
   Future<List<PendingFeeding>> listPendingFeedings() async {
     final response = await _authorized(
@@ -616,9 +640,14 @@ class ApiClient {
     if (body is! Map<String, dynamic>) return fallback;
     final detail = body['detail'];
     if (detail is String) return detail;
-    if (detail is List && detail.isNotEmpty && detail.first is Map) {
-      final message = (detail.first as Map)['msg'];
-      if (message is String) return message;
+    if (detail is List && detail.isNotEmpty) {
+      if (detail.first is String) {
+        return detail.map((e) => e.toString()).join('\n');
+      }
+      if (detail.first is Map) {
+        final message = (detail.first as Map)['msg'];
+        if (message is String) return message;
+      }
     }
     return fallback;
   }

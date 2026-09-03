@@ -14,8 +14,10 @@ import 'package:agrotop_mobile/screens/create_lote_page.dart';
 import 'package:agrotop_mobile/screens/devices_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
+import 'package:agrotop_mobile/screens/perimeter_gps_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -1019,5 +1021,99 @@ void main() {
       }
     }
   });
+
+  testWidgets(
+      'tela de demarcação de perímetro por GPS cobre vazio, preview e erro nos três temas',
+      (tester) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final mode in ThemeMode.values) {
+      for (final view in ['vazio', 'preview', 'erro']) {
+        int pointIndex = 0;
+        final fixedPoints = [
+          const PositionPoint(latitude: -20.1000, longitude: -48.1000),
+          const PositionPoint(latitude: -20.2000, longitude: -48.1000),
+          const PositionPoint(latitude: -20.2000, longitude: -48.2000),
+          const PositionPoint(latitude: -20.1000, longitude: -48.2000),
+        ];
+
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.method == 'GET' && request.url.path == '/lotes') {
+              return _json([
+                {'id': 'P01', 'nome': 'Piquete Central', 'animais_ativos': 10},
+                {'id': 'P02', 'nome': 'Piquete da Represa', 'animais_ativos': 5},
+              ]);
+            }
+            if (request.method == 'POST' && request.url.path.endsWith('/perimetro')) {
+              return _json({
+                'detail': ['Polígono auto-interceptante.'],
+              }, status: 422);
+            }
+            return _json({});
+          }),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: PerimeterGpsPage(
+              api: api,
+              onUnauthorized: () {},
+              permissionChecker: () async => LocationPermission.always,
+              positionProvider: () async => fixedPoints[pointIndex++ % fixedPoints.length],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        if (view != 'vazio') {
+          final markButton = find.byKey(const ValueKey('mark-point-button'));
+          for (int i = 0; i < 4; i++) {
+            await tester.tap(markButton);
+            await tester.pumpAndSettle();
+          }
+        }
+
+        if (view == 'erro') {
+          final saveButton = find.byKey(const ValueKey('save-perimeter-button'));
+          await tester.ensureVisible(saveButton);
+          await tester.tap(saveButton);
+          await tester.pumpAndSettle();
+        }
+
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${switch (view) {
+                'vazio' => '24-perimetro-vazio',
+                'preview' => '25-perimetro-preview',
+                _ => '26-perimetro-invalido',
+              }}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    }
+  });
 }
+
 
