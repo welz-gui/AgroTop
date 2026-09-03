@@ -32,9 +32,12 @@ ADR 0007 inteiro concluído** ([PR #316](https://github.com/welz-gui/AgroTop/pul
 [#321](https://github.com/welz-gui/AgroTop/pull/321), 2026-09-02/03).
 **Trilha 2 fechada em 2026-09-01** ([PR #313](https://github.com/welz-gui/AgroTop/pull/313),
 mantenedor, sem spec) — "desenhar no mapa", "importar arquivo" e localização por
-propriedade na previsão do tempo, as três ligadas. **0069/0070 (API + mobile: demarcação de
-perímetro por GPS) fecham o item 4, o último da Trilha 2** — escritas em 2026-09-01,
-desbloqueadas desde que a Trilha 1 fechou.
+propriedade na previsão do tempo, as três ligadas. **0069 fechada em 2026-09-03**
+([PR #322](https://github.com/welz-gui/AgroTop/pull/322)) — só falta a **0070** (mobile:
+demarcação de perímetro por GPS), livre, já contra a API real, único item aberto da
+Trilha 2. Uma tentativa em 2026-09-03 não conseguiu prosseguir por falta de Docker/toolchain
+Flutter local — reivindicou, verificou e liberou sem abrir PR (comportamento correto, ver
+critério 7 da spec 0070).
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -315,8 +318,8 @@ desbloqueadas desde que a Trilha 1 fechou.
 | — | [0066](0066-mobile-tela-de-brincos.md) — Mobile: tela de brincos e dispositivos 🏗️ | — | ✅ [#318](https://github.com/welz-gui/AgroTop/pull/318) | | 2026-09-02 |
 | — | [0067](0067-api-criar-lote.md) — API: criar lote 🏗️ | — | ✅ [#319](https://github.com/welz-gui/AgroTop/pull/319) | | 2026-09-02 |
 | — | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | ✅ [#321](https://github.com/welz-gui/AgroTop/pull/321) | | 2026-09-03 |
-| 5 | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | 🟢 disponível | | 2026-09-01 |
-| 6 | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | 🟡 depende da 0069 mesclar (ou teste contra mock) | | 2026-09-01 |
+| — | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | ✅ [#322](https://github.com/welz-gui/AgroTop/pull/322) | | 2026-09-03 |
+| 6 | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | 🟢 disponível (0069 já mesclada) — precisa de Docker/toolchain Flutter completo pros goldens | | 2026-09-01 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -494,6 +497,15 @@ desbloqueadas desde que a Trilha 1 fechou.
 > validação de polígono) no cliente — tudo em `services/geometria.py`, já pronto e testado
 > desde a etapa B. `mobile/pubspec.yaml` ainda não tem pacote de geolocalização — a 0070
 > precisa adicionar um (`geolocator` ou equivalente), mesmo padrão de quando a 0056 (QR)
+>
+> **0069 fechada em 2026-09-03 — [PR #322](https://github.com/welz-gui/AgroTop/pull/322).**
+> `POST /lotes/{lote_id}/perimetro`, zero lógica nova (`services/geometria.py::validar`/
+> `perimetro_metros` + `database.py::set_lote_poligono`, que já deriva e grava `area_ha`).
+> Valida antes de gravar (422 preserva o polígono anterior, confirmado em teste), resposta
+> usa a geometria persistida relida do banco, não recalcula por fora. Os 7 critérios com
+> teste real, comparando área/perímetro contra `services.geometria` calculado
+> independentemente. **0070 está livre, já contra a API real — só falta quem tenha
+> Docker/toolchain Flutter completo pra gerar os goldens de verdade.**
 > adicionou `mobile_scanner`.
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
