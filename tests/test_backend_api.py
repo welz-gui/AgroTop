@@ -6,6 +6,7 @@ sanidade/carência e fotos dos animais.
 """
 
 import inspect
+import json
 import os
 import tempfile
 import unittest
@@ -34,6 +35,7 @@ from repositories.animais import get_all_animals, get_animal
 from repositories.conexao import _conn, configurar_sqlite
 from repositories.pesagens import get_weighings
 from repositories.sanidade import add_medication, get_withdrawal_end
+from services.geometria import area_hectares, perimetro_metros, validar
 
 
 class BackendApiTestCase(unittest.TestCase):
@@ -1797,8 +1799,102 @@ class TestCriarLoteEndpoint(BackendApiTestCase):
             self.assertEqual(row["property_id"], prop_default["id"])
 
 
-class TestSecurityAndIsolation(unittest.TestCase):
+class TestSalvarPerimetroLoteEndpoint(BackendApiTestCase):
+    pontos_validos = [
+        [-56.0000, -15.0000],
+        [-55.9900, -15.0000],
+        [-55.9900, -15.0100],
+        [-56.0000, -15.0100],
+    ]
 
+    def _headers(self):
+        token = self._get_access_token()
+        return {"Authorization": f"Bearer {token}"}
+
+    def _salvar_poligono_conhecido(self):
+        poligono = json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [[-56.0, -15.0], [-55.99, -15.0], [-55.99, -15.01]]
+                ],
+            }
+        )
+        self.assertTrue(db.set_lote_poligono("P01", poligono))
+        return poligono
+
+    def test_post_perimetro_sem_token_retorna_401(self):
+        """Critério 1: POST sem token é recusado."""
+        res = self.client.post(
+            "/lotes/P01/perimetro", json={"pontos": self.pontos_validos}
+        )
+        self.assertEqual(res.status_code, 401)
+
+    def test_post_perimetro_lote_inexistente_retorna_404(self):
+        """Critério 2: o lote precisa existir antes da gravação."""
+        res = self.client.post(
+            "/lotes/AUSENTE/perimetro",
+            json={"pontos": self.pontos_validos},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 404)
+
+    def test_post_perimetro_valido_grava_area_e_geometria(self):
+        """Critérios 3 e 6: resposta e persistência usam a geometria existente."""
+        res = self.client.post(
+            "/lotes/P01/perimetro",
+            json={"pontos": self.pontos_validos},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 200)
+
+        anel = [tuple(ponto) for ponto in self.pontos_validos]
+        resposta = res.json()
+        self.assertEqual(resposta["ok"], True)
+        self.assertAlmostEqual(resposta["area_ha"], area_hectares(anel), places=2)
+        self.assertAlmostEqual(resposta["perimetro_m"], perimetro_metros(anel), places=6)
+
+        lote = db.get_lote("P01")
+        self.assertAlmostEqual(float(lote["area_ha"]), area_hectares(anel), places=2)
+        self.assertEqual(json.loads(lote["poligono"])["coordinates"][0], self.pontos_validos)
+
+    def test_post_perimetro_com_poucos_pontos_retorna_422_sem_gravar(self):
+        """Critério 4: a validação existente recusa e preserva a geometria anterior."""
+        poligono_anterior = self._salvar_poligono_conhecido()
+        pontos_invalidos = [[-56.0, -15.0], [-55.99, -15.0]]
+
+        res = self.client.post(
+            "/lotes/P01/perimetro",
+            json={"pontos": pontos_invalidos},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(
+            res.json()["detail"], validar([tuple(ponto) for ponto in pontos_invalidos])
+        )
+        self.assertEqual(db.get_lote("P01")["poligono"], poligono_anterior)
+
+    def test_post_perimetro_auto_interceptante_retorna_422_sem_gravar(self):
+        """Critério 5: a gravata é recusada pela validação de geometria existente."""
+        poligono_anterior = self._salvar_poligono_conhecido()
+        gravata = [
+            [-56.0, -15.0],
+            [-55.99, -15.01],
+            [-55.99, -15.0],
+            [-56.0, -15.01],
+        ]
+
+        res = self.client.post(
+            "/lotes/P01/perimetro",
+            json={"pontos": gravata},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(res.json()["detail"], validar([tuple(ponto) for ponto in gravata]))
+        self.assertEqual(db.get_lote("P01")["poligono"], poligono_anterior)
+
+
+class TestSecurityAndIsolation(unittest.TestCase):
 
     def test_secret_inseguro_rejeitado(self):
         """Critério de segurança: Secret com menos de 32 caracteres levanta erro."""

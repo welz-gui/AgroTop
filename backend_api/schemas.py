@@ -109,6 +109,17 @@ class CriarLoteInput(BaseModel):
     observacoes: str = Field(default="", description="Observações opcionais")
 
 
+class SalvarPerimetroInput(BaseModel):
+    pontos: list[tuple[float, float]] = Field(
+        ..., description="Vértices [longitude, latitude] do perímetro"
+    )
+
+
+class PerimetroOutput(BaseModel):
+    ok: bool
+    area_ha: float
+    perimetro_m: float
+
 
 class MovimentarInput(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)

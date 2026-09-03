@@ -6,6 +6,7 @@ reaproveitando a camada de serviços e repositórios existente.
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Annotated, Any, Optional
 
@@ -48,12 +49,14 @@ from backend_api.schemas import (
     PesagemInput,
     PesagemOutput,
     PesagemRejeitada,
+    PerimetroOutput,
     PhotoSummary,
     PhotoUploadInput,
     PhotoUploadOutput,
     ProtocoloOutput,
     RefreshInput,
     RefreshOutput,
+    SalvarPerimetroInput,
     TokenOutput,
     TratoPendenteOutput,
     UserSummary,
@@ -72,6 +75,7 @@ from database import (
     get_pending_feedings,
     get_photo_image,
     get_photos,
+    set_lote_poligono,
 )
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
 from repositories.dispositivos import mudar_status, por_codigo
@@ -85,6 +89,7 @@ from repositories.sanidade import (
 )
 from services.estados_dispositivo import estados, transicao_permitida
 from services.importacao import parse_pesagens
+from services.geometria import perimetro_metros, validar
 from services.qualidade import avaliar_pesagem
 from services.zootecnia import calculate_gmd_total
 
@@ -482,6 +487,45 @@ def create_lote(
         "animais_ativos": 0,
     }
 
+
+@app.post(
+    "/lotes/{lote_id}/perimetro",
+    response_model=PerimetroOutput,
+)
+def salvar_perimetro_lote(
+    lote_id: str,
+    data: SalvarPerimetroInput,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Valida e grava o perímetro informado pelo cliente em EPSG:4326."""
+    if get_lote(lote_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lote não encontrado.",
+        )
+
+    anel = [(longitude, latitude) for longitude, latitude in data.pontos]
+    problemas = validar(anel)
+    if problemas:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=problemas,
+        )
+
+    poligono_geojson = json.dumps(
+        {
+            "type": "Polygon",
+            "coordinates": [[[longitude, latitude] for longitude, latitude in anel]],
+        }
+    )
+    set_lote_poligono(lote_id, poligono_geojson)
+    lote_atualizado = get_lote(lote_id)
+
+    return {
+        "ok": True,
+        "area_ha": float(lote_atualizado["area_ha"]),
+        "perimetro_m": perimetro_metros(anel),
+    }
 
 
 @app.post("/animais/movimentar", response_model=MovimentarOutput)
