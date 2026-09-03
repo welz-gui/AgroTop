@@ -38,6 +38,9 @@ na previsão do tempo; item 4 (GPS) via [PR #322](https://github.com/welz-gui/Ag
 tentativa na 0070 não conseguiu prosseguir por falta de Docker/toolchain Flutter local —
 reivindicou, verificou e liberou sem abrir PR (comportamento correto, ver critério 7 da
 spec 0070); uma segunda tentativa, com o ambiente certo, entregou.
+**Trilha 1, 2 e 3 do ROADMAP inteiramente fechadas — só resta a Trilha 4 (Inteligência),
+que não tinha nenhuma spec escrita até 2026-09-03. 0071/0072 (recomendações do motor de
+regras no mobile) são as primeiras — ver nota abaixo.**
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -320,6 +323,8 @@ spec 0070); uma segunda tentativa, com o ambiente certo, entregou.
 | — | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | ✅ [#321](https://github.com/welz-gui/AgroTop/pull/321) | | 2026-09-03 |
 | — | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | ✅ [#322](https://github.com/welz-gui/AgroTop/pull/322) | | 2026-09-03 |
 | — | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | ✅ [#325](https://github.com/welz-gui/AgroTop/pull/325) | | 2026-09-03 |
+| 1 | [0071](0071-api-recomendacoes-motor-de-regras.md) — API: expor as recomendações do motor de regras 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-09-03 |
+| 2 | [0072](0072-mobile-recomendacoes-do-motor-de-regras.md) — Mobile: recomendações do motor de regras 🏗️ | — | 🟡 depende da 0071 mesclar (ou teste contra mock) | | 2026-09-03 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -519,6 +524,26 @@ spec 0070); uma segunda tentativa, com o ambiente certo, entregou.
 > dimensões menores) — por isso goldens de outras telas que mostram essa AppBar
 > (`02-lista`, `13/14/15-fila-offline`/`cache`) também mudaram, mudança explicada e
 > revisada, não é o mistério sem explicação da PR #321.
+>
+> **0071/0072 escritas em 2026-09-03 — primeiras specs da Trilha 4 (ROADMAP §5.4,
+> Inteligência).** Com as Trilhas 1, 2 e 3 fechadas, a fila zerou (todas as specs de 0001 a
+> 0070 concluídas) — a Trilha 4 é a única fronteira aberta que resta, e não tinha nenhuma
+> spec escrita. Em vez de partir do zero (motor de regras, relatórios, NDVI, modelos —
+> tudo prosa no ROADMAP, nada especificado), o achado foi que **o motor de regras já
+> existe e já está em produção, só no web**: `services/recomendacoes.py::avaliar` (spec
+> 0011, PR #29) é consumido por `app.py::_alertas_operacionais` desde então, mas nunca foi
+> exposto pela API — e a própria [spec 0063](0063-api-alertas-operacionais.md) já tinha
+> registrado por quê: o contexto que o motor consome (`app.py::_contexto_recomendacoes`)
+> mora dentro do `app.py`, que o `backend_api/` não importa. **0071 faz exatamente essa
+> relocação** (mecânica, sem mudar lógica — `_contexto_recomendacoes`/
+> `_custo_medio_por_arroba`/`_consumo_diario_por_insumo` de `app.py` para
+> `database.py::contexto_recomendacoes()`) e expõe `GET /recomendacoes`; **0072** acrescenta
+> a seção "🧭 Recomendações" à tela de alertas do mobile (spec 0064), na mesma ordem e
+> agrupamento por severidade do web. É a única spec de API desta sessão inteira que precisa
+> tocar `app.py` — motivo documentado na própria spec 0071, não é exceção silenciosa.
+> Relatórios (lucro por raça, correlação chuva × GMD — adaptadores já prontos desde a
+> Trilha 3) e NDVI (desbloqueado pela Trilha 2, polígonos agora existem) continuam como
+> próximos candidatos óbvios da Trilha 4, ainda sem spec.
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
