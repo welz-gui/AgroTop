@@ -1894,6 +1894,124 @@ class TestSalvarPerimetroLoteEndpoint(BackendApiTestCase):
         self.assertEqual(db.get_lote("P01")["poligono"], poligono_anterior)
 
 
+class TestRecomendacoesApi(BackendApiTestCase):
+
+    def test_recomendacoes_sem_token_retorna_401(self):
+        """Critério 1: GET /recomendacoes sem token -> 401."""
+        res = self.client.get("/recomendacoes")
+        self.assertEqual(res.status_code, 401)
+
+    def test_recomendacoes_fazenda_limpa_retorna_200_lista_vazia(self):
+        """Critério 2: Fazenda limpa sem pendências retorna 200 e lista vazia."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with _conn() as con:
+            con.execute("PRAGMA foreign_keys = OFF")
+            con.execute("DELETE FROM feeding_checks")
+            con.execute("DELETE FROM feeding_plans")
+            con.execute("DELETE FROM medications")
+            con.execute("DELETE FROM weighings")
+            con.execute("DELETE FROM animal_movements")
+            con.execute("DELETE FROM animal_photos")
+            con.execute("DELETE FROM animal_costs")
+            con.execute("DELETE FROM animal_events")
+            con.execute("DELETE FROM animals")
+            con.execute("DELETE FROM lotes")
+            con.execute("DELETE FROM insumos")
+            con.execute("PRAGMA foreign_keys = ON")
+        db.clear_cache()
+
+        res = self.client.get("/recomendacoes", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), [])
+
+    def test_recomendacoes_dispara_regras_com_paridade_direta(self):
+        """Critério 3: Dispara regras reais e confere paridade com services.recomendacoes.avaliar."""
+        from services.recomendacoes import avaliar as avaliar_recomendacoes
+
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with _conn() as con:
+            con.execute("PRAGMA foreign_keys = OFF")
+            con.execute("DELETE FROM feeding_checks")
+            con.execute("DELETE FROM feeding_plans")
+            con.execute("DELETE FROM medications")
+            con.execute("DELETE FROM weighings")
+            con.execute("DELETE FROM animal_movements")
+            con.execute("DELETE FROM animal_photos")
+            con.execute("DELETE FROM animal_costs")
+            con.execute("DELETE FROM animal_events")
+            con.execute("DELETE FROM animals")
+            con.execute("DELETE FROM lotes")
+            con.execute("DELETE FROM insumos")
+            con.execute("PRAGMA foreign_keys = ON")
+
+            con.execute(
+                "INSERT INTO lotes (id, name, property_id, capacity_ua) VALUES (?, ?, ?, ?)",
+                ("L01", "Pasto 1", "PROP1", 10.0),
+            )
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (1, "Ração Confinamento", "nutricao", "kg", 10.0, 50.0, 2.5),
+            )
+            con.execute(
+                "INSERT INTO feeding_plans (id, lote_id, product_name, insumo_id, quantity, unit, frequency, active) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (1, "L01", "Ração Confinamento", 1, 10.0, "kg", "diario", 1),
+            )
+            from repositories.animais import novo_uuid
+            a_uuid = novo_uuid()
+            con.execute(
+                "INSERT INTO animals (uuid, id, breed, sex, birth_date, entry_date, entry_weight, current_weight, target_weight, status, lote_id, property_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (a_uuid, "BOV001", "Nelore", "M", "2024-01-01", "2024-01-01", 300.0, 310.0, 500.0, "ativo", "L01", "PROP1"),
+            )
+        d1 = (date.today() - timedelta(days=100)).isoformat()
+        d2 = date.today().isoformat()
+        db.add_weighing("BOV001", 300.0, d1)
+        db.add_weighing("BOV001", 310.0, d2)
+        db.clear_cache()
+
+        contexto_direto = db.contexto_recomendacoes()
+        esperado = avaliar_recomendacoes(contexto_direto)
+        self.assertGreaterEqual(len(esperado), 2)
+
+        res = self.client.get("/recomendacoes", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        dados_api = res.json()
+        self.assertEqual(dados_api, esperado)
+        regras_retornadas = {r["regra"] for r in dados_api}
+        self.assertIn("estoque_insuficiente", regras_retornadas)
+        self.assertIn("gmd_abaixo_da_meta", regras_retornadas)
+        for r in dados_api:
+            self.assertIn("motivo", r)
+            self.assertIn("dados", r)
+            self.assertIn("acao", r)
+            self.assertIn("titulo", r)
+            self.assertIn("severidade", r)
+
+    def test_database_contexto_recomendacoes_isolado(self):
+        """Critério 4: database.contexto_recomendacoes devolve estrutura esperada sem a API."""
+        ctx = db.contexto_recomendacoes()
+        self.assertIsInstance(ctx, dict)
+        chaves_esperadas = {"animais", "lotes", "insumos", "preco_arroba", "custo_por_arroba", "hoje"}
+        self.assertEqual(set(ctx.keys()), chaves_esperadas)
+        self.assertIsInstance(ctx["animais"], list)
+        self.assertIsInstance(ctx["lotes"], list)
+        self.assertIsInstance(ctx["insumos"], list)
+        self.assertIsInstance(ctx["hoje"], str)
+
+    def test_app_py_funcoes_relocadas_removidas(self):
+        """Critério 5: app.py não define mais as funções relocadas."""
+        import app as app_mod
+        self.assertFalse(hasattr(app_mod, "_contexto_recomendacoes"))
+        self.assertFalse(hasattr(app_mod, "_custo_medio_por_arroba"))
+        self.assertFalse(hasattr(app_mod, "_consumo_diario_por_insumo"))
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
 
     def test_secret_inseguro_rejeitado(self):

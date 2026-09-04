@@ -3732,25 +3732,6 @@ def _estoque_compra_com_nota(insumos):
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERTAS
 # ══════════════════════════════════════════════════════════════════════════════
-def _consumo_diario_por_insumo() -> dict:
-    """Consumo diário previsto de cada insumo, somando os planos de trato ativos.
-
-    É consumo **planejado**, não realizado — que é justamente o que a regra de
-    estoque precisa: ela pergunta se o saldo cobre os próximos dias de trato.
-
-    Delega a `services.previsao_estoque_adaptador.consumo_diario_planejado`
-    (spec 0039) em vez de calcular aqui. Antes a conta era feita inline, com
-    `_FREQ_POR_DIA.get(p.get("frequency"), 1.0)` — frequência desconhecida
-    (ex.: "quinzenal") caía no default `1.0` e virava consumo diário
-    inventado (o defeito real da primeira tentativa da spec, PR 101).
-    Ligar o adaptador aqui fecha o mesmo defeito neste consumidor: frequência
-    fora de {"diario","semanal","mensal"} agora é ignorada, não vira 1×/dia.
-    """
-    insumos_por_id = {i["id"]: i for i in db.get_all_insumos()}
-    planos_ativos = db.get_feeding_plans(active_only=True)
-    return consumo_diario_planejado(insumos_por_id, planos_ativos, db.convert_quantity)
-
-
 def _previsao_estoque() -> list[dict]:
     """Previsão de ruptura por insumo — dias restantes, data de ruptura, urgência.
 
@@ -3760,74 +3741,9 @@ def _previsao_estoque() -> list[dict]:
     já trata como "desconhecido", não como erro.
     """
     insumos = db.get_all_insumos()
-    consumo = _consumo_diario_por_insumo()
+    consumo = db._consumo_diario_por_insumo()
     montados = previsao_estoque_montar_insumos(insumos, consumo)
     return previsao_estoque_prever(montados, date.today().isoformat())
-
-
-def _contexto_recomendacoes() -> dict:
-    """Monta o retrato da fazenda que o motor de regras consome.
-
-    O motor é função pura e não toca banco (R31) — quem apura é aqui.
-    """
-    consumo = _consumo_diario_por_insumo()
-    hoje = date.today()
-
-    animais = []
-    animais_brutos = db.get_all_animals(status="ativo")
-    a_ids = [a["id"] for a in animais_brutos]
-    wd_batch = db.get_withdrawal_end_batch(a_ids)
-    gmd_batch = db.calculate_gmd_bulk(a_ids)
-    for a in animais_brutos:
-        fim = wd_batch.get(a["id"])
-        animais.append({
-            "id": a["id"],
-            "peso": a.get("current_weight"),
-            "peso_alvo": a.get("target_weight"),
-            "gmd": gmd_batch.get(a["id"]),
-            "lote_id": a.get("lote_id"),
-            "carencia_ate": fim.isoformat() if fim and fim >= hoje else None,
-        })
-
-    lotes = [{"id": l["id"],
-              "capacidade_ua": l.get("capacity_ua"),
-              "ua_atual": l.get("total_ua")}
-             for l in db.get_all_lotes()]
-
-    insumos = [{"id": i["id"], "nome": i["name"],
-                "saldo": i.get("current_stock"),
-                "consumo_diario": consumo.get(i["id"], 0.0)}
-               for i in db.get_all_insumos()]
-
-    return {
-        "animais": animais,
-        "lotes": lotes,
-        "insumos": insumos,
-        "preco_arroba": _to_float(db.get_setting("preco_arroba")),
-        "custo_por_arroba": _custo_medio_por_arroba(),
-        "hoje": hoje.isoformat(),
-    }
-
-
-def _to_float(v):
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _custo_medio_por_arroba():
-    """Custo médio por arroba do rebanho ativo, ou None se não der para apurar."""
-    ativos = db.get_all_animals(status="ativo")
-    if not ativos:
-        return None
-    custo = arrobas = 0.0
-    costs = db._costs_by_animal()
-    for a in ativos:
-        custo += costs.get(a["id"], 0.0) or 0
-        arrobas += db.kg_to_arrobas(a["current_weight"],
-                                    a.get("carcass_yield") or 0.52) or 0
-    return round(custo / arrobas, 2) if arrobas else None
 
 
 _GRAVIDADE_CARD = {"alta": "card-red", "media": "card-yellow", "baixa": "card-green"}
@@ -3917,7 +3833,7 @@ def _alertas_operacionais():
     st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "
                "motivo e os números que a dispararam.")
     try:
-        recs = avaliar_recomendacoes(_contexto_recomendacoes())
+        recs = avaliar_recomendacoes(db.contexto_recomendacoes())
     except Exception as e:   # regra nova com dado faltando não pode derrubar a página
         recs = []
         st.warning(f"Não foi possível avaliar as recomendações: {e}")

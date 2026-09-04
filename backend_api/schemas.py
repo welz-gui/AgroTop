@@ -1,7 +1,7 @@
 """Modelos Pydantic (schemas) da API Backend AgroTop."""
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 from fastapi import File, Form, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -314,5 +314,17 @@ class MudarStatusDispositivoOutput(BaseModel):
     ok: bool
     de: str
     para: str
+
+
+class RecomendacaoItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    regra: str
+    severidade: Literal["alta", "media", "baixa"]
+    titulo: str
+    motivo: str
+    dados: dict[str, Any]
+    acao: str
+
 
 
