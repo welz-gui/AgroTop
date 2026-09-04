@@ -42,7 +42,9 @@ spec 0070); uma segunda tentativa, com o ambiente certo, entregou.
 que não tinha nenhuma spec escrita até 2026-09-03. 0071/0072 (recomendações do motor de
 regras no mobile) são as primeiras — ver nota abaixo.** **Além disso, 0073-0078 abrem o
 Tier 2 da ADR 0007 (paridade admin no mobile, só leitura: estoque, resumo do dashboard,
-relatórios) — desbloqueado agora que o Tier 1 fechou por completo.**
+relatórios) — desbloqueado agora que o Tier 1 fechou por completo.** **0071/0072 fechadas
+em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
+[#331](https://github.com/welz-gui/AgroTop/pull/331)) — 0073 (Tier 2, estoque) livre agora.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -325,9 +327,9 @@ relatórios) — desbloqueado agora que o Tier 1 fechou por completo.**
 | — | [0068](0068-mobile-criar-lote.md) — Mobile: criar lote 🏗️ | — | ✅ [#321](https://github.com/welz-gui/AgroTop/pull/321) | | 2026-09-03 |
 | — | [0069](0069-api-perimetro-do-piquete-por-pontos.md) — API: perímetro do piquete por pontos (GPS) 🏗️ | — | ✅ [#322](https://github.com/welz-gui/AgroTop/pull/322) | | 2026-09-03 |
 | — | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | ✅ [#325](https://github.com/welz-gui/AgroTop/pull/325) | | 2026-09-03 |
-| 1 | [0071](0071-api-recomendacoes-motor-de-regras.md) — API: expor as recomendações do motor de regras 🏗️ ⚠️médio | — | 🟢 disponível | | 2026-09-03 |
-| 2 | [0072](0072-mobile-recomendacoes-do-motor-de-regras.md) — Mobile: recomendações do motor de regras 🏗️ | — | 🟡 depende da 0071 mesclar (ou teste contra mock) | | 2026-09-03 |
-| 3 | [0073](0073-api-estoque-inventario-e-previsao.md) — API: inventário de estoque e previsão de ruptura 🏗️ ⚠️médio | — | 🔴 bloqueada — depende da 0071 mesclar (reaproveita função relocada por ela) | | 2026-09-03 |
+| — | [0071](0071-api-recomendacoes-motor-de-regras.md) — API: expor as recomendações do motor de regras 🏗️ ⚠️médio | — | ✅ [#330](https://github.com/welz-gui/AgroTop/pull/330) | | 2026-09-04 |
+| — | [0072](0072-mobile-recomendacoes-do-motor-de-regras.md) — Mobile: recomendações do motor de regras 🏗️ | — | ✅ [#331](https://github.com/welz-gui/AgroTop/pull/331) | | 2026-09-04 |
+| 3 | [0073](0073-api-estoque-inventario-e-previsao.md) — API: inventário de estoque e previsão de ruptura 🏗️ ⚠️médio | — | 🟢 disponível (0071 já mesclada) | | 2026-09-03 |
 | 4 | [0074](0074-mobile-tela-de-estoque.md) — Mobile: tela de estoque (inventário e previsão) 🏗️ | — | 🟡 depende da 0073 mesclar (ou teste contra mock) | | 2026-09-03 |
 | 5 | [0075](0075-api-dashboard-resumo.md) — API: resumo do dashboard (KPIs) 🏗️ | — | 🟢 disponível | | 2026-09-03 |
 | 6 | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | 🟡 depende da 0075 mesclar (ou teste contra mock) | | 2026-09-03 |
@@ -565,6 +567,22 @@ relatórios) — desbloqueado agora que o Tier 1 fechou por completo.**
 > só consulta de campo, ajustar estoque/comprar/exportar continua sendo tarefa de mesa
 > (ADR 0007 §2.3/§2.4). Conferido contra `backend_api/main.py` antes de escrever: nenhum
 > dos três já tinha endpoint (`/estoque`, `/dashboard`, `/relatorios` não existiam).
+>
+> **0071 fechada em 2026-09-04 — [PR #330](https://github.com/welz-gui/AgroTop/pull/330).**
+> Relocação mecânica confirmada bit a bit (`contexto_recomendacoes()` pública,
+> `_consumo_diario_por_insumo`/`_custo_medio_por_arroba` privadas, mesmo padrão da spec),
+> endpoint repassa a lista sem filtrar/reordenar. Teste de paridade dispara regras de
+> verdade (`estoque_insuficiente`, `gmd_abaixo_da_meta`) e compara API vs. chamada direta a
+> `services.recomendacoes.avaliar` — prova real. Um teste extra confirma via `hasattr` que
+> `app.py` não define mais as três funções relocadas. **0073 está livre agora.**
+>
+> **0072 fechada em 2026-09-04 — [PR #331](https://github.com/welz-gui/AgroTop/pull/331).**
+> Seção "🧭 Recomendações" ordenada por severidade no cliente, carregamento paralelo com
+> `Future.wait` e falha independente entre alertas e recomendações (testado nas duas
+> direções). Investigação nos goldens que mudaram fora do escopo desta spec
+> (`04-pesagem`, `05-destino`, `10-sanidade-medicamento`) achou a causa: um campo de data
+> (`date.today()` de fixture) 2 dias mais recente que a última rodada de goldens —
+> inofensivo, nada a ver com o mistério sem explicação da PR #321.
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
