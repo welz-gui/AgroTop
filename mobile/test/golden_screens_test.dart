@@ -101,11 +101,45 @@ Map<String, dynamic> _alertsResponse({required bool withItems}) {
   };
 }
 
+List<Map<String, dynamic>> _recomendacoesResponse({required bool withItems}) {
+  if (!withItems) {
+    return [];
+  }
+  return [
+    {
+      'regra': 'estoque_insuficiente',
+      'severidade': 'alta',
+      'titulo': 'Estoque crítico de ração',
+      'motivo': 'O lote P01 ficará sem ração em 2 dias com o consumo atual.',
+      'acao': 'Repor estoque de Ração Confinamento imediatamente.',
+      'dados': {'lote_id': 'P01', 'dias_restantes': 2},
+    },
+    {
+      'regra': 'gmd_abaixo_da_meta',
+      'severidade': 'media',
+      'titulo': 'GMD abaixo da meta no lote P02',
+      'motivo': 'O ganho médio diário está 20% abaixo do esperado.',
+      'acao': 'Ajustar suplementação.',
+      'dados': {'lote_id': 'P02'},
+    },
+    {
+      'regra': 'carencia_impede_abate',
+      'severidade': 'baixa',
+      'titulo': 'Atenção ao calendário sanitário',
+      'motivo':
+          'Animais do lote P03 entram em período de carência na próxima semana.',
+      'acao': 'Revisar programação de abates.',
+      'dados': {'lote_id': 'P03'},
+    },
+  ];
+}
+
 MockClient _client({
   String? carenciaAte,
   List<Map<String, dynamic>>? aplicacoes,
   bool allFeedingsConfirmed = false,
   Map<String, dynamic>? alerts,
+  List<Map<String, dynamic>>? recomendacoes,
 }) => MockClient((request) async {
   if (request.method == 'POST' && request.url.path == '/auth/login') {
     return _json({
@@ -123,6 +157,9 @@ MockClient _client({
   }
   if (request.method == 'GET' && request.url.path == '/alertas') {
     return _json(alerts ?? _alertsResponse(withItems: false));
+  }
+  if (request.method == 'GET' && request.url.path == '/recomendacoes') {
+    return _json(recomendacoes ?? _recomendacoesResponse(withItems: false));
   }
   if (request.url.path == '/animais') {
     return _json([
@@ -658,7 +695,10 @@ void main() {
         final api = ApiClient(
           tokenStore: store,
           baseUrl: 'http://mock.local',
-          httpClient: _client(alerts: _alertsResponse(withItems: withItems)),
+          httpClient: _client(
+            alerts: _alertsResponse(withItems: withItems),
+            recomendacoes: _recomendacoesResponse(withItems: withItems),
+          ),
         );
         await tester.pumpWidget(
           MaterialApp(
@@ -671,21 +711,20 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(
-          find.text(
-            withItems ? '🔴 Animais Sumidos (1)' : '🔴 Animais Sumidos (0)',
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.text('📉 Baixo Desempenho (${withItems ? 1 : 0})'),
-          findsOneWidget,
-        );
         if (withItems) {
+          expect(find.text('🧭 Recomendações (3)'), findsOneWidget);
+          expect(find.text('Estoque crítico de ração'), findsOneWidget);
+          expect(find.text('🔴 Animais Sumidos (1)'), findsOneWidget);
           expect(find.text('BR0099 — Nelore'), findsOneWidget);
-          expect(find.text('Sal mineral'), findsOneWidget);
         } else {
+          expect(find.text('🧭 Recomendações (0)'), findsOneWidget);
+          expect(
+            find.text('✅ Nenhuma recomendação no momento.'),
+            findsOneWidget,
+          );
+          expect(find.text('🔴 Animais Sumidos (0)'), findsOneWidget);
           expect(find.text('✅ Nenhum animal sumido.'), findsOneWidget);
+          expect(find.text('📉 Baixo Desempenho (0)'), findsOneWidget);
           expect(
             find.text('✅ Todos os insumos com estoque adequado.'),
             findsOneWidget,
@@ -699,6 +738,17 @@ void main() {
               'goldens/${mode.name}-${withItems ? '17-alertas-com-itens' : '16-alertas-vazios'}.png',
             ),
           );
+        }
+
+        if (withItems) {
+          final baixoDesempenho = find.text('📉 Baixo Desempenho (1)');
+          await tester.scrollUntilVisible(
+            baixoDesempenho,
+            300,
+            scrollable: find.byType(Scrollable).first,
+          );
+          expect(baixoDesempenho, findsOneWidget);
+          expect(find.text('Sal mineral'), findsOneWidget);
         }
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();

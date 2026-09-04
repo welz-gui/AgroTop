@@ -652,3 +652,45 @@ class DeviceStatusUpdate {
         para: json['para'] as String,
       );
 }
+
+class RecomendacaoItem {
+  const RecomendacaoItem({
+    required this.regra,
+    required this.severidade,
+    required this.titulo,
+    required this.motivo,
+    required this.dados,
+    this.acao,
+  });
+
+  final String regra;
+  final String severidade;
+  final String titulo;
+  final String motivo;
+  final Map<String, dynamic> dados;
+  final String? acao;
+
+  factory RecomendacaoItem.fromJson(Map<String, dynamic> json) =>
+      RecomendacaoItem(
+        regra: json['regra'] as String,
+        severidade: json['severidade'] as String,
+        titulo: json['titulo'] as String,
+        motivo: json['motivo'] as String,
+        dados: json['dados'] is Map<String, dynamic>
+            ? json['dados'] as Map<String, dynamic>
+            : (json['dados'] as Map?)?.cast<String, dynamic>() ?? const {},
+        acao: json['acao'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'regra': regra,
+    'severidade': severidade,
+    'titulo': titulo,
+    'motivo': motivo,
+    'dados': dados,
+    if (acao != null) 'acao': acao,
+  };
+}
+
+typedef Recomendacao = RecomendacaoItem;
+
