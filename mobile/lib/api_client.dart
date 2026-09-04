@@ -262,6 +262,23 @@ class ApiClient {
     return OperationalAlerts.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<List<RecomendacaoItem>> getRecomendacoes() async {
+    final response = await _authorized(
+      (headers) =>
+          _http.get(Uri.parse('$baseUrl/recomendacoes'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar as recomendações.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((item) => RecomendacaoItem.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   Future<DeviceLookup?> findDevice(String codigoVisual) async {
     final response = await _authorized(
       (headers) => _http.get(

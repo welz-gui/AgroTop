@@ -84,6 +84,34 @@ class MockApiServer {
     },
   ];
 
+  int recomendacoesRequests = 0;
+  List<Map<String, dynamic>> recomendacoes = [
+    {
+      'regra': 'estoque_insuficiente',
+      'severidade': 'alta',
+      'titulo': 'Estoque crítico de ração',
+      'motivo': 'O estoque de Ração Confinamento acaba em 2 dias.',
+      'dados': {'dias_restantes': 2},
+      'acao': 'Providenciar compra urgente de ração.',
+    },
+    {
+      'regra': 'gmd_abaixo_da_meta',
+      'severidade': 'media',
+      'titulo': 'GMD abaixo da meta no lote L01',
+      'motivo': 'Animais do lote L01 ganharam 0.35 kg/dia vs meta de 0.60 kg/dia.',
+      'dados': {'gmd_medio': 0.35, 'meta': 0.60},
+      'acao': 'Avaliar suplementação e pasto.',
+    },
+    {
+      'regra': 'piquete_acima_da_capacidade',
+      'severidade': 'baixa',
+      'titulo': 'Lotação próxima do limite',
+      'motivo': 'Pasto 2 está com 9.5 UA vs capacidade de 10.0 UA.',
+      'dados': {'ua': 9.5, 'capacidade': 10.0},
+      'acao': null,
+    },
+  ];
+
   String get baseUrl => 'http://${_server.address.address}:${_server.port}';
 
   static Future<MockApiServer> start() async =>
@@ -185,6 +213,12 @@ class MockApiServer {
           ],
           'gravadas': confirmar == 'true' ? 1 : 0,
         });
+        return;
+      }
+
+      if (request.method == 'GET' && path == '/recomendacoes') {
+        recomendacoesRequests++;
+        await _json(request, 200, recomendacoes);
         return;
       }
 

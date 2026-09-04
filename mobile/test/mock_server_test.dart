@@ -195,6 +195,10 @@ void main() {
       expect(weighing.status, 'success');
       final after = await api.getAnimal('BR0001');
       expect(after.currentWeight, 401.2);
+      final recs = await api.getRecomendacoes();
+      expect(server.recomendacoesRequests, 1);
+      expect(recs, hasLength(3));
+      expect(recs.first.severidade, 'alta');
       await api.logout();
     }, PassthroughHttpOverrides());
   });
