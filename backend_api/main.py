@@ -54,6 +54,7 @@ from backend_api.schemas import (
     PhotoUploadInput,
     PhotoUploadOutput,
     ProtocoloOutput,
+    RecomendacaoItem,
     RefreshInput,
     RefreshOutput,
     SalvarPerimetroInput,
@@ -67,6 +68,7 @@ from database import (
     add_lote,
     add_photo,
     check_low_stock,
+    contexto_recomendacoes,
     get_alert_animals,
     get_all_lotes,
     get_gmd_target,
@@ -91,6 +93,7 @@ from services.estados_dispositivo import estados, transicao_permitida
 from services.importacao import parse_pesagens
 from services.geometria import perimetro_metros, validar
 from services.qualidade import avaliar_pesagem
+from services.recomendacoes import avaliar as avaliar_recomendacoes
 from services.zootecnia import calculate_gmd_total
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -880,4 +883,19 @@ def change_dispositivo_status(
     if not r.get("ok"):
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=r)
     return {"ok": True, "de": r["de"], "para": r["para"]}
+
+
+@app.get(
+    "/recomendacoes",
+    response_model=list[RecomendacaoItem],
+    summary="Recomendações técnicas do motor de regras",
+    tags=["Alertas"],
+)
+def get_recomendacoes(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Exponibiliza as recomendações avaliadas pelo motor de regras."""
+    contexto = contexto_recomendacoes()
+    return avaliar_recomendacoes(contexto)
+
 

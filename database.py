@@ -46,6 +46,7 @@ from services.estados_animal import (  # noqa: F401
     transicao_permitida, estados_finais,
 )
 from services.importacao import parse_pesagens  # noqa: F401
+from services.previsao_estoque_adaptador import consumo_diario_planejado  # noqa: F401
 
 # ─── Reexportação da camada de dados (Fase A2, fatia 3) ──────────────────────
 # As consultas migraram para repositories/<agregado>.py. Reexportadas aqui para
@@ -2604,3 +2605,80 @@ def get_latest_photo(animal_id: str):
 def delete_photo(photo_id: int) -> None:
     with _conn() as con:
         con.execute("DELETE FROM animal_photos WHERE id=?", (photo_id,))
+
+
+# ─── Contexto de Recomendações (Spec 0071) ───────────────────────────────────
+
+
+def _consumo_diario_por_insumo() -> dict:
+    """Consumo diário previsto de cada insumo, somando os planos de trato ativos."""
+    insumos_por_id = {i["id"]: i for i in get_all_insumos()}
+    planos_ativos = get_feeding_plans(active_only=True)
+    return consumo_diario_planejado(insumos_por_id, planos_ativos, convert_quantity)
+
+
+def _custo_medio_por_arroba() -> Optional[float]:
+    """Custo médio por arroba do rebanho ativo, ou None se não der para apurar."""
+    ativos = get_all_animals(status="ativo")
+    if not ativos:
+        return None
+    custo = arrobas = 0.0
+    costs = _costs_by_animal()
+    for a in ativos:
+        custo += costs.get(a["id"], 0.0) or 0
+        arrobas += kg_to_arrobas(a["current_weight"],
+                                 a.get("carcass_yield") or 0.52) or 0
+    return round(custo / arrobas, 2) if arrobas else None
+
+
+def contexto_recomendacoes() -> dict:
+    """Monta o retrato da fazenda que o motor de regras consome.
+
+    O motor é função pura e não toca banco (R31) — quem apura é aqui.
+    """
+    consumo = _consumo_diario_por_insumo()
+    hoje = date.today()
+
+    animais = []
+    animais_brutos = get_all_animals(status="ativo")
+    a_ids = [a["id"] for a in animais_brutos]
+    wd_batch = get_withdrawal_end_batch(a_ids)
+    gmd_batch = calculate_gmd_bulk(a_ids)
+    for a in animais_brutos:
+        fim = wd_batch.get(a["id"])
+        animais.append({
+            "id": a["id"],
+            "peso": a.get("current_weight"),
+            "peso_alvo": a.get("target_weight"),
+            "gmd": gmd_batch.get(a["id"]),
+            "lote_id": a.get("lote_id"),
+            "carencia_ate": fim.isoformat() if fim and fim >= hoje else None,
+        })
+
+    lotes = [{"id": l["id"],
+              "capacidade_ua": l.get("capacity_ua"),
+              "ua_atual": l.get("total_ua")}
+             for l in get_all_lotes()]
+
+    insumos = [{"id": i["id"], "nome": i["name"],
+                "saldo": i.get("current_stock"),
+                "consumo_diario": consumo.get(i["id"], 0.0)}
+               for i in get_all_insumos()]
+
+    preco_arroba_val = get_setting("preco_arroba")
+    preco_arroba = None
+    if preco_arroba_val is not None:
+        try:
+            preco_arroba = float(preco_arroba_val)
+        except (TypeError, ValueError):
+            preco_arroba = None
+
+    return {
+        "animais": animais,
+        "lotes": lotes,
+        "insumos": insumos,
+        "preco_arroba": preco_arroba,
+        "custo_por_arroba": _custo_medio_por_arroba(),
+        "hoje": hoje.isoformat(),
+    }
+
