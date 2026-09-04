@@ -3581,7 +3581,7 @@ def _render_tab_previsao_ruptura():
     st.caption("Dias até faltar cada insumo, no ritmo de consumo **planejado** "
         "(soma dos planos de trato ativos) — diferente do aviso de "
         "'abaixo do mínimo' acima, que só olha o saldo de hoje.")
-    previsao = _previsao_estoque()
+    previsao = db.previsao_estoque()
     URGENCIA_LABEL = {"critica": "🔴 Crítica", "atencao": "🟡 Atenção",
                       "ok": "🟢 OK", "sem_dados": "⚪ Sem dados"}
     criticos = [p for p in previsao if p["urgencia"] == "critica"]
@@ -3732,20 +3732,6 @@ def _estoque_compra_com_nota(insumos):
 # ══════════════════════════════════════════════════════════════════════════════
 # ALERTAS
 # ══════════════════════════════════════════════════════════════════════════════
-def _previsao_estoque() -> list[dict]:
-    """Previsão de ruptura por insumo — dias restantes, data de ruptura, urgência.
-
-    Liga `services/previsao_estoque.py::prever` (nunca chamado até aqui) através
-    do adaptador da spec 0039. `prazo_reposicao_dias` não existe no schema ainda
-    (fora do escopo daquela spec) — todo insumo entra com prazo 0, que `prever()`
-    já trata como "desconhecido", não como erro.
-    """
-    insumos = db.get_all_insumos()
-    consumo = db._consumo_diario_por_insumo()
-    montados = previsao_estoque_montar_insumos(insumos, consumo)
-    return previsao_estoque_prever(montados, date.today().isoformat())
-
-
 _GRAVIDADE_CARD = {"alta": "card-red", "media": "card-yellow", "baixa": "card-green"}
 
 

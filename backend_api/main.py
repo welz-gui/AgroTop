@@ -36,6 +36,7 @@ from backend_api.schemas import (
     CriarLoteInput,
     DispositivoOutput,
     ImportarPesagensOutput,
+    InsumoInventarioOutput,
     LoginInput,
     LogoutInput,
     LoteSummary,
@@ -53,6 +54,7 @@ from backend_api.schemas import (
     PhotoSummary,
     PhotoUploadInput,
     PhotoUploadOutput,
+    PrevisaoEstoqueOutput,
     ProtocoloOutput,
     RecomendacaoItem,
     RefreshInput,
@@ -77,6 +79,8 @@ from database import (
     get_pending_feedings,
     get_photo_image,
     get_photos,
+    inventario_estoque,
+    previsao_estoque,
     set_lote_poligono,
 )
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
@@ -897,5 +901,32 @@ def get_recomendacoes(
     """Exponibiliza as recomendações avaliadas pelo motor de regras."""
     contexto = contexto_recomendacoes()
     return avaliar_recomendacoes(contexto)
+
+
+@app.get(
+    "/estoque",
+    response_model=list[InsumoInventarioOutput],
+    summary="Inventário de estoque",
+    tags=["Estoque"],
+)
+def get_estoque(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Retorna o inventário completo de insumos com status e valor total."""
+    return inventario_estoque()
+
+
+@app.get(
+    "/estoque/previsao",
+    response_model=list[PrevisaoEstoqueOutput],
+    summary="Previsão de ruptura de estoque",
+    tags=["Estoque"],
+)
+def get_estoque_previsao(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Retorna a previsão de ruptura para cada insumo."""
+    return previsao_estoque()
+
 
 

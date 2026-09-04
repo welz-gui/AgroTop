@@ -2682,3 +2682,55 @@ def contexto_recomendacoes() -> dict:
         "hoje": hoje.isoformat(),
     }
 
+
+# ─── Estoque e Previsão de Ruptura (Spec 0073) ────────────────────────────────
+
+
+def inventario_estoque() -> list[dict]:
+    """Retorna a lista de insumos com status de estoque e valor total apurados."""
+    insumos = get_all_insumos()
+    resultado = []
+    for i in insumos:
+        current_stock = float(i.get("current_stock") or 0.0)
+        min_stock = float(i.get("min_stock") or 0.0)
+        cost_per_unit = float(i.get("cost_per_unit") or 0.0)
+        pct = (current_stock / min_stock * 100) if min_stock else 100.0
+        status = "critico" if pct < 50 else "baixo" if pct < 100 else "ok"
+        valor_total = round(current_stock * cost_per_unit, 2)
+        resultado.append({
+            "id": int(i["id"]),
+            "nome": str(i["name"]),
+            "categoria": str(i["category"]),
+            "estoque_atual": current_stock,
+            "estoque_minimo": min_stock,
+            "unidade": str(i["unit"]),
+            "custo_unitario": cost_per_unit,
+            "valor_total": valor_total,
+            "status": status,
+        })
+    return resultado
+
+
+def previsao_estoque() -> list[dict]:
+    """Previsão de ruptura por insumo — dias restantes, data de ruptura, urgência.
+
+    Liga `services/previsao_estoque.py::prever` através do adaptador da spec 0039.
+    `prazo_reposicao_dias` não existe no schema ainda (fora do escopo daquela spec)
+    — todo insumo entra com prazo 0, que `prever()` já trata como "desconhecido",
+    não como erro.
+    """
+    from services.previsao_estoque import prever as previsao_estoque_prever
+    from services.previsao_estoque_adaptador import (
+        montar_insumos as previsao_estoque_montar_insumos,
+    )
+
+    insumos = get_all_insumos()
+    consumo = _consumo_diario_por_insumo()
+    montados = previsao_estoque_montar_insumos(insumos, consumo)
+    resultado = previsao_estoque_prever(montados, date.today().isoformat())
+    for item in resultado:
+        if "id" in item and "insumo_id" not in item:
+            item["insumo_id"] = item["id"]
+    return resultado
+
+
