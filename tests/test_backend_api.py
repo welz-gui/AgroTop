@@ -2012,6 +2012,110 @@ class TestRecomendacoesApi(BackendApiTestCase):
         self.assertFalse(hasattr(app_mod, "_consumo_diario_por_insumo"))
 
 
+class TestDashboardResumoEndpoint(BackendApiTestCase):
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def test_dashboard_resumo_sem_token_retorna_401(self):
+        response = self.client.get("/dashboard/resumo")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_dashboard_resumo_vazio_repassa_zeros(self):
+        with (
+            patch.object(
+                main_mod,
+                "get_rebanho_stats",
+                return_value=db.AnimalStats(),
+            ),
+            patch.object(
+                main_mod,
+                "get_alert_animals",
+                return_value={"sumidos": [], "carencia": [], "prontos": []},
+            ),
+        ):
+            response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "total_animais": 0,
+                "peso_medio_kg": 0.0,
+                "gmd_medio_kg_dia": 0.0,
+                "arrobas_produzidas": 0.0,
+                "lotacao_ua_ha": 0.0,
+                "machos": 0,
+                "femeas": 0,
+                "alertas": {
+                    "sumidos": 0,
+                    "carencia": 0,
+                    "prontos_para_abate": 0,
+                },
+            },
+        )
+
+    def test_dashboard_resumo_adapta_apenas_fontes_existentes(self):
+        stats = db.AnimalStats(
+            total=7,
+            avg_weight=412.3,
+            avg_gmd=0.651,
+            arrobas_prod=23.4,
+            lotacao_ua_ha=1.25,
+            males=4,
+            females=3,
+        )
+        alertas = {
+            "sumidos": [{"id": "A"}],
+            "carencia": [{"id": "B"}] * 2,
+            "prontos": [{"id": "C"}] * 3,
+        }
+        with (
+            patch.object(main_mod, "get_rebanho_stats", return_value=stats),
+            patch.object(main_mod, "get_alert_animals", return_value=alertas),
+        ):
+            response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(
+            data["alertas"],
+            {
+                "sumidos": len(alertas["sumidos"]),
+                "carencia": len(alertas["carencia"]),
+                "prontos_para_abate": len(alertas["prontos"]),
+            },
+        )
+        self.assertEqual(data["peso_medio_kg"], stats.avg_weight)
+        self.assertEqual(data["gmd_medio_kg_dia"], stats.avg_gmd)
+        self.assertEqual(data["arrobas_produzidas"], stats.arrobas_prod)
+        self.assertEqual(data["lotacao_ua_ha"], stats.lotacao_ua_ha)
+
+    def test_dashboard_resumo_confere_com_fontes_reais(self):
+        stats = db.get_rebanho_stats()
+        alertas = db.get_alert_animals()
+
+        response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["total_animais"], stats.total)
+        self.assertEqual(data["peso_medio_kg"], stats.avg_weight)
+        self.assertEqual(data["gmd_medio_kg_dia"], stats.avg_gmd)
+        self.assertEqual(data["arrobas_produzidas"], stats.arrobas_prod)
+        self.assertEqual(data["lotacao_ua_ha"], stats.lotacao_ua_ha)
+        self.assertEqual(data["machos"], stats.males)
+        self.assertEqual(data["femeas"], stats.females)
+        self.assertEqual(
+            data["alertas"],
+            {
+                "sumidos": len(alertas["sumidos"]),
+                "carencia": len(alertas["carencia"]),
+                "prontos_para_abate": len(alertas["prontos"]),
+            },
+        )
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
 
     def test_secret_inseguro_rejeitado(self):
