@@ -34,6 +34,7 @@ from backend_api.schemas import (
     CarenciaOutput,
     ConfirmarTratoInput,
     CriarLoteInput,
+    DashboardResumoOutput,
     DispositivoOutput,
     ImportarPesagensOutput,
     LoginInput,
@@ -77,6 +78,7 @@ from database import (
     get_pending_feedings,
     get_photo_image,
     get_photos,
+    get_rebanho_stats,
     set_lote_poligono,
 )
 from repositories.animais import get_all_animals, get_animal, move_animals_bulk
@@ -115,6 +117,28 @@ app.add_middleware(SlowAPIMiddleware)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "app": "AgroTop Backend API"}
+
+
+@app.get("/dashboard/resumo", response_model=DashboardResumoOutput)
+def dashboard_resumo(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    stats = get_rebanho_stats()
+    alertas = get_alert_animals()
+    return {
+        "total_animais": stats.total,
+        "peso_medio_kg": stats.avg_weight,
+        "gmd_medio_kg_dia": stats.avg_gmd,
+        "arrobas_produzidas": stats.arrobas_prod,
+        "lotacao_ua_ha": stats.lotacao_ua_ha,
+        "machos": stats.males,
+        "femeas": stats.females,
+        "alertas": {
+            "sumidos": len(alertas["sumidos"]),
+            "carencia": len(alertas["carencia"]),
+            "prontos_para_abate": len(alertas["prontos"]),
+        },
+    }
 
 
 @app.get("/alertas", response_model=AlertasOutput)
