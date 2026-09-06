@@ -76,6 +76,21 @@ def get_all_animals(status: Optional[str] = "ativo",
         return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
+def count_animals(status: Optional[str] = "ativo",
+                  lote_id: Optional[str] = None,
+                  breed: Optional[str] = None) -> int:
+    sql  = "SELECT COUNT(*) FROM animals a WHERE 1=1"
+    args: list = []
+    if status:
+        sql += " AND a.status=?"; args.append(status)
+    if lote_id:
+        sql += " AND a.lote_id=?"; args.append(lote_id)
+    if breed:
+        sql += " AND a.breed=?"; args.append(breed)
+    with _conn() as con:
+        return con.execute(sql, args).fetchone()[0]
+
+
 def get_animal(animal_id: str) -> Optional[dict]:
     with _conn() as con:
         row = con.execute(

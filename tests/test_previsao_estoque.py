@@ -1,5 +1,5 @@
 import unittest
-from services.previsao_estoque import prever
+from services.previsao_estoque import prever, _safe_int
 
 
 class TestPrevisaoEstoque(unittest.TestCase):
@@ -165,6 +165,67 @@ class TestPrevisaoEstoque(unittest.TestCase):
     def test_entrada_vazia_e_invalida(self):
         self.assertEqual(prever([], self.hoje), [])
         self.assertEqual(prever(None, self.hoje), [])
+        self.assertEqual(prever([123, "not_dict"], self.hoje), [])
+
+    def test_hoje_invalido_usa_hoje_atual(self):
+        # A data inválida acionará o fallback para date.today()
+        insumos = [
+            {
+                "id": 1,
+                "nome": "Sal",
+                "saldo": 100.0,
+                "consumo_diario": 10.0,
+                "estoque_minimo": 10.0,
+                "prazo_reposicao_dias": 0,
+            }
+        ]
+        res = prever(insumos, "data_invalida")
+        self.assertEqual(len(res), 1)
+        from datetime import date, timedelta
+        # 10 dias restantes
+        data_ruptura = (date.today() + timedelta(days=10)).isoformat()
+        self.assertEqual(res[0]["data_ruptura"], data_ruptura)
+
+    def test_urgencia_critica_sem_consumo_diario_mas_com_estoque_minimo(self):
+        insumos = [
+            {
+                "id": 1,
+                "nome": "Sal",
+                "saldo": 5.0,  # abaixo do estoque minimo
+                "consumo_diario": 0.0,
+                "estoque_minimo": 10.0,
+                "prazo_reposicao_dias": 0,
+            }
+        ]
+        res = prever(insumos, self.hoje)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["urgencia"], "critica")
+
+    def test_safe_float(self):
+        from services.previsao_estoque import _safe_float
+        self.assertEqual(_safe_float(None), 0.0)
+        self.assertEqual(_safe_float(None, default=1.5), 1.5)
+        self.assertEqual(_safe_float(2), 2.0)
+        self.assertEqual(_safe_float("2.5"), 2.5)
+        self.assertEqual(_safe_float("abc"), 0.0)
+        self.assertEqual(_safe_float("abc", default=2.0), 2.0)
+        self.assertEqual(_safe_float([]), 0.0)
+
+    def test_safe_int(self):
+        from services.previsao_estoque import _safe_int
+        self.assertEqual(_safe_int(None), 0)
+        self.assertEqual(_safe_int(None, default=5), 5)
+        self.assertEqual(_safe_int(2), 2)
+        self.assertEqual(_safe_int("3"), 3)
+        self.assertEqual(_safe_int("abc"), 0)
+        self.assertEqual(_safe_int("abc", default=2), 2)
+        self.assertEqual(_safe_int([]), 0)
+
+    def test_safe_int_error_paths(self):
+        self.assertEqual(_safe_int("abc"), 0)
+        self.assertEqual(_safe_int([]), 0)
+        self.assertEqual(_safe_int({}, 5), 5)
+        self.assertEqual(_safe_int("12.34"), 0)
 
 
 if __name__ == "__main__":

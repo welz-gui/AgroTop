@@ -17,6 +17,7 @@ import 'movement_page.dart';
 import 'offline_cache_banner.dart';
 import 'perimeter_gps_page.dart';
 import 'qr_scanner_page.dart';
+import 'stock_page.dart';
 import 'sync_report_dialog.dart';
 import 'weighing_page.dart';
 
@@ -329,6 +330,13 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> _openStock() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) =>
+          StockPage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -363,6 +371,12 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
                 onPressed: _openDevices,
                 tooltip: 'Brincos e dispositivos',
                 icon: const Icon(Icons.sell_outlined),
+              ),
+              IconButton(
+                key: const ValueKey('open-stock'),
+                onPressed: _openStock,
+                tooltip: 'Estoque',
+                icon: const Icon(Icons.inventory_2_outlined),
               ),
               _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
               _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),

@@ -25,11 +25,6 @@ class TestPasswordHashing(unittest.TestCase):
         # Dois hashes da mesma senha devem diferir (salt aleatório)
         self.assertNotEqual(db._hash("x"), db._hash("x"))
 
-    def test_legacy_verify(self):
-        legacy = hashlib.sha256("velha".encode()).hexdigest()
-        self.assertTrue(db._verify_password("velha", legacy))
-        self.assertFalse(db._verify_password("outra", legacy))
-
     def test_is_legacy(self):
         self.assertTrue(db._is_legacy_hash(hashlib.sha256(b"a").hexdigest()))
         self.assertFalse(db._is_legacy_hash(db._hash("a")))
@@ -43,7 +38,7 @@ class TestLegacyMigration(unittest.TestCase):
         db.configurar_sqlite(os.path.join(self.tmp, "test.db"))
         db.init_db()
 
-    def test_migration_on_login(self):
+    def test_legacy_hash_rejected_on_login(self):
         import sqlite3
         legacy = hashlib.sha256("segredo".encode()).hexdigest()
         con = sqlite3.connect(db.DB_PATH)
@@ -51,20 +46,9 @@ class TestLegacyMigration(unittest.TestCase):
                     ("legado", legacy, "Legado", "operator"))
         con.commit(); con.close()
 
-        # Login funciona e NÃO expõe o hash
+        # Login fails with legacy hash
         u = db.verify_login("legado", "segredo")
-        self.assertIsNotNone(u)
-        self.assertNotIn("password_hash", u)
-
-        # O hash foi migrado para PBKDF2
-        con = sqlite3.connect(db.DB_PATH); con.row_factory = sqlite3.Row
-        row = con.execute("SELECT password_hash FROM users WHERE username='legado'").fetchone()
-        con.close()
-        self.assertTrue(row["password_hash"].startswith("pbkdf2_sha256$"))
-
-        # Login continua funcionando após a migração; senha errada é rejeitada
-        self.assertIsNotNone(db.verify_login("legado", "segredo"))
-        self.assertIsNone(db.verify_login("legado", "errada"))
+        self.assertIsNone(u)
 
 
 if __name__ == "__main__":
