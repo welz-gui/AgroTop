@@ -694,3 +694,89 @@ class RecomendacaoItem {
 
 typedef Recomendacao = RecomendacaoItem;
 
+class InsumoInventario {
+  const InsumoInventario({
+    required this.id,
+    required this.nome,
+    required this.categoria,
+    required this.estoqueAtual,
+    required this.estoqueMinimo,
+    required this.unidade,
+    required this.custoUnitario,
+    required this.valorTotal,
+    required this.status,
+  });
+
+  final int id;
+  final String nome;
+  final String categoria;
+  final double estoqueAtual;
+  final double estoqueMinimo;
+  final String unidade;
+  final double custoUnitario;
+  final double valorTotal;
+  final String status;
+
+  factory InsumoInventario.fromJson(Map<String, dynamic> json) =>
+      InsumoInventario(
+        id: (json['id'] as num).toInt(),
+        nome: json['nome'] as String,
+        categoria: json['categoria'] as String,
+        estoqueAtual: (json['estoque_atual'] as num).toDouble(),
+        estoqueMinimo: (json['estoque_minimo'] as num).toDouble(),
+        unidade: json['unidade'] as String,
+        custoUnitario: (json['custo_unitario'] as num).toDouble(),
+        valorTotal: (json['valor_total'] as num).toDouble(),
+        status: json['status'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'nome': nome,
+    'categoria': categoria,
+    'estoque_atual': estoqueAtual,
+    'estoque_minimo': estoqueMinimo,
+    'unidade': unidade,
+    'custo_unitario': custoUnitario,
+    'valor_total': valorTotal,
+    'status': status,
+  };
+}
+
+class PrevisaoEstoqueItem {
+  const PrevisaoEstoqueItem({
+    required this.insumoId,
+    required this.nome,
+    required this.diasRestantes,
+    required this.dataRuptura,
+    required this.comprarAte,
+    required this.urgencia,
+  });
+
+  final int insumoId;
+  final String nome;
+  final double? diasRestantes;
+  final String? dataRuptura;
+  final String? comprarAte;
+  final String urgencia;
+
+  factory PrevisaoEstoqueItem.fromJson(Map<String, dynamic> json) =>
+      PrevisaoEstoqueItem(
+        insumoId: (json['insumo_id'] as num).toInt(),
+        nome: json['nome'] as String,
+        diasRestantes: (json['dias_restantes'] as num?)?.toDouble(),
+        dataRuptura: json['data_ruptura'] as String?,
+        comprarAte: json['comprar_ate'] as String?,
+        urgencia: json['urgencia'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'insumo_id': insumoId,
+    'nome': nome,
+    'dias_restantes': diasRestantes,
+    'data_ruptura': dataRuptura,
+    'comprar_ate': comprarAte,
+    'urgencia': urgencia,
+  };
+}
+

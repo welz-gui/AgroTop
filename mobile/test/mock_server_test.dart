@@ -199,6 +199,15 @@ void main() {
       expect(server.recomendacoesRequests, 1);
       expect(recs, hasLength(3));
       expect(recs.first.severidade, 'alta');
+      final inventario = await api.getEstoqueInventario();
+      expect(server.estoqueRequests, 1);
+      expect(inventario, hasLength(3));
+      expect(inventario.first.nome, 'Sal Mineral 80');
+      expect(inventario.first.status, 'ok');
+      final previsao = await api.getEstoquePrevisao();
+      expect(server.previsaoRequests, 1);
+      expect(previsao, hasLength(4));
+      expect(previsao.any((item) => item.urgencia == 'sem_dados'), isTrue);
       await api.logout();
     }, PassthroughHttpOverrides());
   });
