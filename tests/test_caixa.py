@@ -1,6 +1,8 @@
 import unittest
+from datetime import date
 
 from services.caixa import (
+    _date_or_none,
     _lançamento_valido,
     em_aberto,
     fluxo_de_caixa,
@@ -9,7 +11,7 @@ from services.caixa import (
 
 
 class TestCaixa(unittest.TestCase):
-    def test_resultado_por_competencia_soma_receita_e_despesa_e_calcula_resultado(self):
+    def test_resultado_por_competencia_soma_receita_e_despesa(self):
         lancamentos = [
             {
                 "tipo": "receita",
@@ -160,6 +162,19 @@ class TestCaixa(unittest.TestCase):
         self.assertFalse(_lançamento_valido({
             "competencia": "invalid-date",
         }))
+
+    def test_date_or_none_returns_date_for_valid_string(self):
+        resultado = _date_or_none("2026-03-15")
+        self.assertEqual(resultado, date(2026, 3, 15))
+
+    def test_date_or_none_returns_none_for_empty_string(self):
+        self.assertIsNone(_date_or_none(""))
+        self.assertIsNone(_date_or_none(None))
+
+    def test_date_or_none_returns_none_for_invalid_string(self):
+        self.assertIsNone(_date_or_none("invalid-date"))
+        self.assertIsNone(_date_or_none("2026-15-03"))
+        self.assertIsNone(_date_or_none("2026/03/15"))
 
 
 if __name__ == "__main__":
