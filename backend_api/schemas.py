@@ -327,4 +327,30 @@ class RecomendacaoItem(BaseModel):
     acao: str
 
 
+class InsumoInventarioOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    nome: str
+    categoria: str
+    estoque_atual: float
+    estoque_minimo: float
+    unidade: str
+    custo_unitario: float
+    valor_total: float
+    status: Literal["critico", "baixo", "ok"]
+
+
+class PrevisaoEstoqueOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    insumo_id: int
+    nome: str
+    dias_restantes: Optional[float] = None
+    data_ruptura: Optional[str] = None
+    comprar_ate: Optional[str] = None
+    urgencia: Literal["critica", "atencao", "ok", "sem_dados"]
+
+
+
 

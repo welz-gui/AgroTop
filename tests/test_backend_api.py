@@ -2011,6 +2011,236 @@ class TestRecomendacoesApi(BackendApiTestCase):
         self.assertFalse(hasattr(app_mod, "_custo_medio_por_arroba"))
         self.assertFalse(hasattr(app_mod, "_consumo_diario_por_insumo"))
 
+class TestEstoqueApi(BackendApiTestCase):
+    """Testes para GET /estoque e GET /estoque/previsao (Spec 0073)."""
+
+    def test_estoque_sem_token_retorna_401(self):
+        """Critério 1: GET /estoque e GET /estoque/previsao sem token retornam 401."""
+        res_inv = self.client.get("/estoque")
+        self.assertEqual(res_inv.status_code, 401)
+
+        res_prev = self.client.get("/estoque/previsao")
+        self.assertEqual(res_prev.status_code, 401)
+
+    def test_estoque_inventario_status_critico_baixo_ok(self):
+        """Critério 2: GET /estoque com insumos em situação crítica, baixa e ok bate com o web."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with _conn() as con:
+            con.execute("PRAGMA foreign_keys = OFF")
+            con.execute("DELETE FROM feeding_checks")
+            con.execute("DELETE FROM feeding_plans")
+            con.execute("DELETE FROM insumos")
+            con.execute("PRAGMA foreign_keys = ON")
+
+            # 1. Crítico: pct < 50% (40 / 100 = 40%)
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (1, "Milho Moído", "racao", "kg", 40.0, 100.0, 2.5),
+            )
+            # 2. Baixo: 50% <= pct < 100% (70 / 100 = 70%)
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (2, "Farelo de Soja", "racao", "kg", 70.0, 100.0, 3.0),
+            )
+            # 3. OK: pct >= 100% (150 / 100 = 150%)
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (3, "Sal Mineral", "mineral", "kg", 150.0, 100.0, 1.2),
+            )
+        db.clear_cache()
+
+        res = self.client.get("/estoque", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        itens = res.json()
+        self.assertEqual(len(itens), 3)
+
+        itens_por_id = {i["id"]: i for i in itens}
+
+        # Verifica Insumo 1 (Crítico)
+        i1 = itens_por_id[1]
+        self.assertEqual(i1["nome"], "Milho Moído")
+        self.assertEqual(i1["categoria"], "racao")
+        self.assertEqual(i1["estoque_atual"], 40.0)
+        self.assertEqual(i1["estoque_minimo"], 100.0)
+        self.assertEqual(i1["unidade"], "kg")
+        self.assertEqual(i1["custo_unitario"], 2.5)
+        self.assertEqual(i1["valor_total"], 100.0)  # 40.0 * 2.5
+        self.assertEqual(i1["status"], "critico")
+
+        # Verifica Insumo 2 (Baixo)
+        i2 = itens_por_id[2]
+        self.assertEqual(i2["nome"], "Farelo de Soja")
+        self.assertEqual(i2["categoria"], "racao")
+        self.assertEqual(i2["estoque_atual"], 70.0)
+        self.assertEqual(i2["estoque_minimo"], 100.0)
+        self.assertEqual(i2["unidade"], "kg")
+        self.assertEqual(i2["custo_unitario"], 3.0)
+        self.assertEqual(i2["valor_total"], 210.0)  # 70.0 * 3.0
+        self.assertEqual(i2["status"], "baixo")
+
+        # Verifica Insumo 3 (OK)
+        i3 = itens_por_id[3]
+        self.assertEqual(i3["nome"], "Sal Mineral")
+        self.assertEqual(i3["categoria"], "mineral")
+        self.assertEqual(i3["estoque_atual"], 150.0)
+        self.assertEqual(i3["estoque_minimo"], 100.0)
+        self.assertEqual(i3["unidade"], "kg")
+        self.assertEqual(i3["custo_unitario"], 1.2)
+        self.assertEqual(i3["valor_total"], 180.0)  # 150.0 * 1.2
+        self.assertEqual(i3["status"], "ok")
+
+    def test_estoque_inventario_min_stock_zero_nao_quebra(self):
+        """Critério 3: GET /estoque com min_stock=0 não quebra e retorna status ok."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with _conn() as con:
+            con.execute("PRAGMA foreign_keys = OFF")
+            con.execute("DELETE FROM feeding_checks")
+            con.execute("DELETE FROM feeding_plans")
+            con.execute("DELETE FROM insumos")
+            con.execute("PRAGMA foreign_keys = ON")
+
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (10, "Vacina Aftosa", "vacina", "dose", 25.0, 0.0, 5.0),
+            )
+        db.clear_cache()
+
+        res = self.client.get("/estoque", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        dados = res.json()
+        self.assertEqual(len(dados), 1)
+        item = dados[0]
+        self.assertEqual(item["id"], 10)
+        self.assertEqual(item["estoque_minimo"], 0.0)
+        self.assertEqual(item["status"], "ok")
+        self.assertEqual(item["valor_total"], 125.0)
+
+    def test_estoque_previsao_sem_plano_de_trato_retorna_sem_dados(self):
+        """Critério 4: GET /estoque/previsao sem plano de trato ativo retorna urgencia sem_dados e datas null."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with _conn() as con:
+            con.execute("PRAGMA foreign_keys = OFF")
+            con.execute("DELETE FROM feeding_checks")
+            con.execute("DELETE FROM feeding_plans")
+            con.execute("DELETE FROM insumos")
+            con.execute("PRAGMA foreign_keys = ON")
+
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (20, "Núcleo Mineral", "mineral", "kg", 80.0, 50.0, 4.0),
+            )
+        db.clear_cache()
+
+        res = self.client.get("/estoque/previsao", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        dados = res.json()
+        self.assertEqual(len(dados), 1)
+        prev = dados[0]
+        self.assertEqual(prev["insumo_id"], 20)
+        self.assertEqual(prev["nome"], "Núcleo Mineral")
+        self.assertEqual(prev["urgencia"], "sem_dados")
+        self.assertIsNone(prev["dias_restantes"])
+        self.assertIsNone(prev["data_ruptura"])
+        self.assertIsNone(prev["comprar_ate"])
+
+    def test_estoque_previsao_com_plano_bate_com_prever_direto(self):
+        """Critério 5: GET /estoque/previsao com plano ativo bate com chamada direta a prever."""
+        from services.previsao_estoque import prever as prever_direto
+        from services.previsao_estoque_adaptador import montar_insumos as montar_direto
+
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with _conn() as con:
+            con.execute("PRAGMA foreign_keys = OFF")
+            con.execute("DELETE FROM feeding_checks")
+            con.execute("DELETE FROM feeding_plans")
+            con.execute("DELETE FROM lotes")
+            con.execute("DELETE FROM insumos")
+            con.execute("PRAGMA foreign_keys = ON")
+
+            con.execute(
+                "INSERT INTO lotes (id, name, property_id, capacity_ua) VALUES (?, ?, ?, ?)",
+                ("L01", "Pasto 1", "PROP1", 10.0),
+            )
+            con.execute(
+                "INSERT INTO insumos (id, name, category, unit, current_stock, min_stock, cost_per_unit) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (1, "Ração Confinamento", "racao", "kg", 100.0, 20.0, 2.0),
+            )
+            con.execute(
+                "INSERT INTO feeding_plans (id, lote_id, product_name, insumo_id, quantity, unit, frequency, active) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (1, "L01", "Ração Confinamento", 1, 10.0, "kg", "diario", 1),
+            )
+        db.clear_cache()
+
+        # Prova real independente
+        insumos = db.get_all_insumos()
+        consumo = db._consumo_diario_por_insumo()
+        montados = montar_direto(insumos, consumo)
+        esperado_prever = prever_direto(montados, date.today().isoformat())
+        self.assertEqual(len(esperado_prever), 1)
+
+        res = self.client.get("/estoque/previsao", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        dados = res.json()
+        self.assertEqual(len(dados), 1)
+
+        api_item = dados[0]
+        dir_item = esperado_prever[0]
+        self.assertEqual(api_item["insumo_id"], dir_item["id"])
+        self.assertEqual(api_item["nome"], dir_item["nome"])
+        self.assertEqual(api_item["dias_restantes"], dir_item["dias_restantes"])
+        self.assertEqual(api_item["data_ruptura"], dir_item["data_ruptura"])
+        self.assertEqual(api_item["comprar_ate"], dir_item["comprar_ate"])
+        self.assertEqual(api_item["urgencia"], dir_item["urgencia"])
+
+    def test_database_previsao_e_inventario_isolados(self):
+        """Critério 6: database.previsao_estoque() e inventario_estoque() funcionam isolados."""
+        prev = db.previsao_estoque()
+        self.assertIsInstance(prev, list)
+        if prev:
+            p = prev[0]
+            self.assertIn("id", p)
+            self.assertIn("nome", p)
+            self.assertIn("dias_restantes", p)
+            self.assertIn("data_ruptura", p)
+            self.assertIn("comprar_ate", p)
+            self.assertIn("urgencia", p)
+
+        inv = db.inventario_estoque()
+        self.assertIsInstance(inv, list)
+        if inv:
+            i = inv[0]
+            self.assertIn("id", i)
+            self.assertIn("nome", i)
+            self.assertIn("categoria", i)
+            self.assertIn("estoque_atual", i)
+            self.assertIn("estoque_minimo", i)
+            self.assertIn("unidade", i)
+            self.assertIn("custo_unitario", i)
+            self.assertIn("valor_total", i)
+            self.assertIn("status", i)
+
+    def test_app_py_previsao_estoque_relocada(self):
+        """Critério 7: app.py não define mais _previsao_estoque e database define previsao_estoque."""
+        import app as app_mod
+        self.assertFalse(hasattr(app_mod, "_previsao_estoque"))
+        self.assertTrue(hasattr(db, "previsao_estoque"))
+        self.assertTrue(hasattr(db, "inventario_estoque"))
+
 
 class TestSecurityAndIsolation(unittest.TestCase):
 
