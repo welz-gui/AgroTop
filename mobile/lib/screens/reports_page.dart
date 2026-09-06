@@ -543,22 +543,27 @@ class _ReportsPageState extends State<ReportsPage> {
                           color: colors['texto'],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors['fundo_alt'],
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: colors['borda']!),
-                        ),
-                        child: Text(
-                          metodoLabel,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colors['texto_secundario'],
-                            fontWeight: FontWeight.w500,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors['fundo_alt'],
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: colors['borda']!),
+                          ),
+                          child: Text(
+                            metodoLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors['texto_secundario'],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ),
@@ -575,13 +580,17 @@ class _ReportsPageState extends State<ReportsPage> {
                         ),
                       ),
                       const Text(' · '),
-                      Text(
-                        item.operador != null
-                            ? 'Operador: ${item.operador}'
-                            : 'Operador não informado',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colors['texto_secundario'],
+                      Expanded(
+                        child: Text(
+                          item.operador != null
+                              ? 'Operador: ${item.operador}'
+                              : 'Operador não informado',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colors['texto_secundario'],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ],
