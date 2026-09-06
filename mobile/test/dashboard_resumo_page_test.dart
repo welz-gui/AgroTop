@@ -126,28 +126,31 @@ void main() {
     expect(find.text('412,5 kg'), findsOneWidget);
     expect(find.text('0,650 kg/dia'), findsOneWidget);
     expect(find.text('28,4 @'), findsOneWidget);
-    await tester.drag(
-      find.byKey(const ValueKey('dashboard-resumo-list')),
-      const Offset(0, -360),
+    final scrollable = find.byKey(const ValueKey('dashboard-resumo-list'));
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('dashboard-alert-sumidos')),
+      scrollable,
+      const Offset(0, -120),
     );
     await tester.pumpAndSettle();
-
     expect(
       find.byKey(const ValueKey('dashboard-alert-sumidos')),
       findsOneWidget,
     );
-    await tester.drag(
-      find.byKey(const ValueKey('dashboard-resumo-list')),
-      const Offset(0, -140),
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('dashboard-alert-carencia')),
+      scrollable,
+      const Offset(0, -120),
     );
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('dashboard-alert-carencia')),
       findsOneWidget,
     );
-    await tester.drag(
-      find.byKey(const ValueKey('dashboard-resumo-list')),
-      const Offset(0, -140),
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('dashboard-alert-prontos')),
+      scrollable,
+      const Offset(0, -120),
     );
     await tester.pumpAndSettle();
     expect(
