@@ -197,6 +197,28 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         self.assertEqual(len(resultado_previsao), 1)
         self.assertEqual(resultado_previsao[0]["urgencia"], "critica")
 
+    def test_quantidade_negativa_ou_zero_e_ignorada(self):
+        """Quantidades negativas ou zero devem ser ignoradas e não abater do saldo total."""
+        insumos = {1: {"unit": "kg"}}
+        planos = [
+            {
+                "insumo_id": 1,
+                "quantity": -5.0,
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            },
+            {
+                "insumo_id": 1,
+                "quantity": 0.0,
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            },
+        ]
+        res = consumo_diario_planejado(insumos, planos, dummy_converter)
+        self.assertEqual(res, {1: 0.0})
+
     def test_montar_insumos_fallback_estoque_minimo_invalido(self):
         """Testa se valores não parseáveis para min_stock ou estoque_minimo sofrem fallback para 0.0.
 
