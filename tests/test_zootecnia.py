@@ -3,6 +3,7 @@ from datetime import date
 from unittest.mock import patch
 
 from services.zootecnia import (
+    get_age_category,
     get_age_display,
     get_age_months,
     calculate_gmd_total,
@@ -13,6 +14,35 @@ from services.zootecnia import (
 
 
 class TestZootecniaGetAgeDisplay(unittest.TestCase):
+
+    @patch("services.zootecnia.get_age_months")
+    def test_plural_years_only(self, mock_get_age_months):
+        mock_get_age_months.return_value = 24
+        animal = {"birth_date": "2021-01-01"}
+        result = get_age_display(animal)
+        self.assertEqual(result, "2 anos")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_singular_year_only(self, mock_get_age_months):
+        mock_get_age_months.return_value = 12
+        animal = {"birth_date": "2022-01-01"}
+        result = get_age_display(animal)
+        self.assertEqual(result, "1 ano")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_plural_months_only(self, mock_get_age_months):
+        mock_get_age_months.return_value = 2
+        animal = {"birth_date": "2023-01-01"}
+        result = get_age_display(animal)
+        self.assertEqual(result, "2 meses")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_singular_month_only(self, mock_get_age_months):
+        mock_get_age_months.return_value = 1
+        animal = {"birth_date": "2023-01-01"}
+        result = get_age_display(animal)
+        self.assertEqual(result, "1 mes")
+
     @patch("services.zootecnia.get_age_months")
     def test_no_birth_date_returns_dash(self, mock_get_age_months):
         mock_get_age_months.return_value = None
@@ -342,3 +372,29 @@ class TestZootecniaKgToArrobas(unittest.TestCase):
 
         # 334 kg * 0.52 / 15.0 = 11.578666... -> 11.58
         self.assertEqual(kg_to_arrobas(334), 11.58)
+
+class TestZootecniaGetAgeCategory(unittest.TestCase):
+    @patch("services.zootecnia.get_age_months")
+    def test_get_age_category_none(self, mock_get_age_months):
+        mock_get_age_months.return_value = None
+        self.assertEqual(get_age_category(None), "Sem idade")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_get_age_category_up_to_12(self, mock_get_age_months):
+        mock_get_age_months.return_value = 12
+        self.assertEqual(get_age_category("2023-01-01"), "Até 12 meses")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_get_age_category_13_to_24(self, mock_get_age_months):
+        mock_get_age_months.return_value = 24
+        self.assertEqual(get_age_category("2022-01-01"), "13 a 24 meses")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_get_age_category_25_to_36(self, mock_get_age_months):
+        mock_get_age_months.return_value = 36
+        self.assertEqual(get_age_category("2021-01-01"), "25 a 36 meses")
+
+    @patch("services.zootecnia.get_age_months")
+    def test_get_age_category_over_36(self, mock_get_age_months):
+        mock_get_age_months.return_value = 48
+        self.assertEqual(get_age_category("2020-01-01"), "+ de 36 meses")
