@@ -10,6 +10,7 @@ import 'animal_photo_section.dart';
 import 'alerts_page.dart';
 import 'create_lote_page.dart';
 import 'csv_import_page.dart';
+import 'dashboard_resumo_page.dart';
 import 'devices_page.dart';
 import 'feeding_page.dart';
 import 'medication_page.dart';
@@ -310,6 +311,15 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> _openDashboardResumo() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => DashboardResumoPage(
+        api: widget.api,
+        onUnauthorized: widget.onUnauthorized,
+      ),
+    ),
+  );
+
   Future<void> _openPerimeterGps() => Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) => PerimeterGpsPage(
@@ -346,6 +356,12 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
+              IconButton(
+                key: const ValueKey('open-dashboard-resumo'),
+                onPressed: _openDashboardResumo,
+                tooltip: 'Resumo',
+                icon: const Icon(Icons.dashboard_outlined),
+              ),
               IconButton(
                 key: const ValueKey('open-perimeter-gps'),
                 onPressed: _openPerimeterGps,

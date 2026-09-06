@@ -11,6 +11,7 @@ import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:agrotop_mobile/screens/alerts_page.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:agrotop_mobile/screens/create_lote_page.dart';
+import 'package:agrotop_mobile/screens/dashboard_resumo_page.dart';
 import 'package:agrotop_mobile/screens/devices_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
@@ -1156,6 +1157,69 @@ void main() {
                 'preview' => '25-perimetro-preview',
                 _ => '26-perimetro-invalido',
               }}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    }
+  });
+
+  testWidgets('tela de resumo cobre vazio e dados nos três temas', (tester) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final mode in ThemeMode.values) {
+      for (final empty in [true, false]) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.method == 'GET' &&
+                request.url.path == '/dashboard/resumo') {
+              return _json({
+                'total_animais': empty ? 0 : 12,
+                'peso_medio_kg': empty ? 0 : 412.5,
+                'gmd_medio_kg_dia': empty ? 0 : 0.65,
+                'arrobas_produzidas': empty ? 0 : 28.4,
+                'lotacao_ua_ha': empty ? 0 : 1.25,
+                'machos': empty ? 0 : 7,
+                'femeas': empty ? 0 : 5,
+                'alertas': {
+                  'sumidos': empty ? 0 : 1,
+                  'carencia': empty ? 0 : 2,
+                  'prontos_para_abate': empty ? 0 : 3,
+                },
+              });
+            }
+            return _json({'detail': 'Não encontrado'}, status: 404);
+          }),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${empty ? '27-dashboard-vazio' : '28-dashboard-com-dados'}.png',
             ),
           );
         }

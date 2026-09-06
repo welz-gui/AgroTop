@@ -462,6 +462,61 @@ class OperationalAlerts {
   );
 }
 
+class DashboardAlertCounts {
+  const DashboardAlertCounts({
+    required this.sumidos,
+    required this.carencia,
+    required this.prontosParaAbate,
+  });
+
+  final int sumidos;
+  final int carencia;
+  final int prontosParaAbate;
+
+  factory DashboardAlertCounts.fromJson(Map<String, dynamic> json) =>
+      DashboardAlertCounts(
+        sumidos: (json['sumidos'] as num).toInt(),
+        carencia: (json['carencia'] as num).toInt(),
+        prontosParaAbate: (json['prontos_para_abate'] as num).toInt(),
+      );
+}
+
+class DashboardResumo {
+  const DashboardResumo({
+    required this.totalAnimais,
+    required this.pesoMedioKg,
+    required this.gmdMedioKgDia,
+    required this.arrobasProduzidas,
+    required this.lotacaoUaHa,
+    required this.machos,
+    required this.femeas,
+    required this.alertas,
+  });
+
+  final int totalAnimais;
+  final double pesoMedioKg;
+  final double gmdMedioKgDia;
+  final double arrobasProduzidas;
+  final double lotacaoUaHa;
+  final int machos;
+  final int femeas;
+  final DashboardAlertCounts alertas;
+
+  factory DashboardResumo.fromJson(Map<String, dynamic> json) =>
+      DashboardResumo(
+        totalAnimais: (json['total_animais'] as num).toInt(),
+        pesoMedioKg: (json['peso_medio_kg'] as num).toDouble(),
+        gmdMedioKgDia: (json['gmd_medio_kg_dia'] as num).toDouble(),
+        arrobasProduzidas: (json['arrobas_produzidas'] as num).toDouble(),
+        lotacaoUaHa: (json['lotacao_ua_ha'] as num).toDouble(),
+        machos: (json['machos'] as num).toInt(),
+        femeas: (json['femeas'] as num).toInt(),
+        alertas: DashboardAlertCounts.fromJson(
+          json['alertas'] as Map<String, dynamic>,
+        ),
+      );
+}
+
 class MissingAnimalAlert {
   const MissingAnimalAlert({
     required this.animalId,

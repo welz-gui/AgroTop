@@ -85,6 +85,17 @@ class MockApiServer {
   ];
 
   int recomendacoesRequests = 0;
+  int dashboardResumoRequests = 0;
+  Map<String, dynamic> dashboardResumo = {
+    'total_animais': 12,
+    'peso_medio_kg': 412.5,
+    'gmd_medio_kg_dia': 0.65,
+    'arrobas_produzidas': 28.4,
+    'lotacao_ua_ha': 1.25,
+    'machos': 7,
+    'femeas': 5,
+    'alertas': {'sumidos': 1, 'carencia': 2, 'prontos_para_abate': 3},
+  };
   List<Map<String, dynamic>> recomendacoes = [
     {
       'regra': 'estoque_insuficiente',
@@ -98,7 +109,8 @@ class MockApiServer {
       'regra': 'gmd_abaixo_da_meta',
       'severidade': 'media',
       'titulo': 'GMD abaixo da meta no lote L01',
-      'motivo': 'Animais do lote L01 ganharam 0.35 kg/dia vs meta de 0.60 kg/dia.',
+      'motivo':
+          'Animais do lote L01 ganharam 0.35 kg/dia vs meta de 0.60 kg/dia.',
       'dados': {'gmd_medio': 0.35, 'meta': 0.60},
       'acao': 'Avaliar suplementação e pasto.',
     },
@@ -219,6 +231,12 @@ class MockApiServer {
       if (request.method == 'GET' && path == '/recomendacoes') {
         recomendacoesRequests++;
         await _json(request, 200, recomendacoes);
+        return;
+      }
+
+      if (request.method == 'GET' && path == '/dashboard/resumo') {
+        dashboardResumoRequests++;
+        await _json(request, 200, dashboardResumo);
         return;
       }
 
@@ -514,14 +532,18 @@ class MockApiServer {
         });
         return;
       }
-      final perimetroMatch = RegExp(r'^/lotes/([^/]+)/perimetro$').firstMatch(path);
+      final perimetroMatch = RegExp(
+        r'^/lotes/([^/]+)/perimetro$',
+      ).firstMatch(path);
       if (request.method == 'POST' && perimetroMatch != null) {
         postPerimetroRequests++;
         final loteId = Uri.decodeComponent(perimetroMatch.group(1)!);
         final body = await _body(request);
         lastPerimetroBody = body;
         final pontos = body['pontos'] as List<dynamic>? ?? [];
-        if (loteId == 'P-404' || (!existingLoteIds.contains(loteId) && !['P01', 'P02', 'P03'].contains(loteId))) {
+        if (loteId == 'P-404' ||
+            (!existingLoteIds.contains(loteId) &&
+                !['P01', 'P02', 'P03'].contains(loteId))) {
           await _json(request, 404, {'detail': 'Piquete não encontrado.'});
           return;
         }

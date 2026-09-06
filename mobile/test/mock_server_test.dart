@@ -199,6 +199,10 @@ void main() {
       expect(server.recomendacoesRequests, 1);
       expect(recs, hasLength(3));
       expect(recs.first.severidade, 'alta');
+      final resumo = await api.getDashboardResumo();
+      expect(server.dashboardResumoRequests, 1);
+      expect(resumo.totalAnimais, 12);
+      expect(resumo.alertas.prontosParaAbate, 3);
       await api.logout();
     }, PassthroughHttpOverrides());
   });
