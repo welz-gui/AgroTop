@@ -98,6 +98,18 @@ def get_all_weighings() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_average_weighings_by_date() -> list[dict]:
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT w.weigh_date AS "Data", AVG(w.weight) AS "Peso Médio (kg)"
+               FROM weighings w JOIN animals a ON a.uuid=w.animal_uuid
+               WHERE a.status='ativo'
+               GROUP BY w.weigh_date
+               ORDER BY w.weigh_date"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def calculate_gmd(animal_id: str) -> Optional[float]:
     """GMD recente: entre as duas últimas pesagens (como o animal está agora)."""
     ws = get_weighings(animal_id)
