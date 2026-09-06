@@ -2346,6 +2346,238 @@ class TestDashboardResumoEndpoint(BackendApiTestCase):
         )
 
 
+class TestRelatoriosEndpoints(BackendApiTestCase):
+    def _headers(self):
+        return {"Authorization": f"Bearer {self._get_access_token()}"}
+
+    def test_relatorio_inventario_sem_token_retorna_401(self):
+        """Critério 1: GET /relatorios/inventario sem token -> 401."""
+        response = self.client.get("/relatorios/inventario")
+        self.assertEqual(response.status_code, 401)
+
+    def test_relatorio_inventario_campos_conferem_com_fontes_reais(self):
+        """Critério 2: GET /relatorios/inventario com pelo menos 3 animais
+        (nascimento conhecido/estimado, com/sem carência, com/sem fornecedor) -> 200,
+        cada campo bate com chamadas independentes às mesmas funções."""
+        with _conn() as con:
+            row_forn = con.execute("SELECT id, name FROM fornecedores LIMIT 1").fetchone()
+            forn_id = row_forn["id"] if row_forn else None
+            forn_name = row_forn["name"] if row_forn else None
+
+            # Animal 1: nascimento conhecido, com fornecedor, com carência
+            con.execute(
+                """UPDATE animals SET
+                   birth_date='2023-01-10', birth_estimated=0, age_source='propriedade',
+                   fornecedor_id=?, status='ativo'
+                   WHERE id='BR0001'""",
+                (forn_id,),
+            )
+            # Animal 2: nascimento estimado, sem fornecedor, sem carência
+            con.execute(
+                """UPDATE animals SET
+                   birth_date='2022-05-15', birth_estimated=1, age_source='estimado',
+                   fornecedor_id=NULL, status='ativo'
+                   WHERE id='BR0002'""",
+            )
+            # Animal 3: nascimento nulo, com fornecedor, sem carência
+            con.execute(
+                """UPDATE animals SET
+                   birth_date=NULL, birth_estimated=0, age_source='operador',
+                   fornecedor_id=?, status='ativo'
+                   WHERE id='BR0003'""",
+                (forn_id,),
+            )
+            # Remover carências prévias de BR0002 e BR0003 para isolar o teste
+            u2 = con.execute("SELECT uuid FROM animals WHERE id='BR0002'").fetchone()["uuid"]
+            u3 = con.execute("SELECT uuid FROM animals WHERE id='BR0003'").fetchone()["uuid"]
+            con.execute("DELETE FROM medications WHERE animal_uuid IN (?, ?)", (u2, u3))
+
+        # Adicionar medicamento com carência no BR0001
+        add_medication(
+            animal_id="BR0001",
+            medication_name="Vacina Teste Carencia",
+            dose=10,
+            unit="ml",
+            application_route="Subcutânea",
+            withdrawal_days=45,
+            med_date=date.today().isoformat(),
+            applied_by="Veterinario",
+        )
+
+        db.clear_cache()
+
+        response = self.client.get("/relatorios/inventario", headers=self._headers())
+        self.assertEqual(response.status_code, 200)
+        itens = response.json()
+        self.assertGreaterEqual(len(itens), 3)
+
+        itens_by_id = {item["id"]: item for item in itens}
+
+        all_animals = db.get_all_animals(status=None)
+        a_ids = [str(a["id"]) for a in all_animals]
+        expected_gmds = db.calculate_gmd_bulk(a_ids)
+        expected_wds = db.get_withdrawal_end_batch(a_ids)
+
+        # Prova real campo por campo para todos os animais
+        for a in all_animals:
+            aid = str(a["id"])
+            self.assertIn(aid, itens_by_id)
+            item = itens_by_id[aid]
+
+            self.assertEqual(item["id"], aid)
+            self.assertEqual(item["raca"], a.get("breed") or None)
+            self.assertEqual(item["sexo"], a.get("sex") or None)
+            self.assertEqual(item["categoria_idade"], db.get_age_category(a.get("birth_date")))
+            self.assertEqual(item["idade_display"], db.get_age_display(a))
+            self.assertEqual(item["data_nascimento"], a.get("birth_date") or None)
+            self.assertEqual(item["nascimento_estimado"], bool(a.get("birth_estimated")))
+
+            expected_origem = a.get("age_source") or "propriedade"
+            if expected_origem not in db.AGE_SOURCES:
+                expected_origem = "propriedade"
+            self.assertEqual(item["origem_idade"], expected_origem)
+
+            self.assertEqual(item["data_entrada"], str(a["entry_date"]))
+            self.assertEqual(item["peso_entrada_kg"], float(a["entry_weight"]))
+            self.assertEqual(item["peso_atual_kg"], float(a["current_weight"]))
+            self.assertEqual(
+                item["ganho_kg"],
+                round(float(a["current_weight"]) - float(a["entry_weight"]), 1),
+            )
+            self.assertEqual(
+                item["arrobas_atuais"],
+                float(db.kg_to_arrobas(a["current_weight"])),
+            )
+            self.assertEqual(item["gmd_kg_dia"], expected_gmds.get(aid))
+            self.assertEqual(item["status"], str(a["status"]))
+            self.assertEqual(
+                item["lote_id"],
+                str(a["lote_id"]) if a.get("lote_id") else None,
+            )
+            self.assertEqual(item["fornecedor"], a.get("fornecedor_name") or None)
+            self.assertEqual(item["nf"], a.get("nf_number") or None)
+            self.assertEqual(item["gta"], a.get("gta_number") or None)
+
+            wd = expected_wds.get(aid)
+            if hasattr(wd, "isoformat"):
+                expected_wd_str = wd.isoformat()
+            elif wd:
+                expected_wd_str = str(wd)
+            else:
+                expected_wd_str = None
+            self.assertEqual(item["carencia_ate"], expected_wd_str)
+
+        # Verificações específicas para os 3 animais modelo do Critério 2:
+        # 1. BR0001: nascimento conhecido, com carência, com fornecedor
+        br1 = itens_by_id["BR0001"]
+        self.assertEqual(br1["nascimento_estimado"], False)
+        self.assertEqual(br1["data_nascimento"], "2023-01-10")
+        self.assertIsNotNone(br1["carencia_ate"])
+        if forn_name:
+            self.assertEqual(br1["fornecedor"], forn_name)
+
+        # 2. BR0002: nascimento estimado, sem carência, sem fornecedor
+        br2 = itens_by_id["BR0002"]
+        self.assertEqual(br2["nascimento_estimado"], True)
+        self.assertEqual(br2["data_nascimento"], "2022-05-15")
+        self.assertIsNone(br2["carencia_ate"])
+        self.assertIsNone(br2["fornecedor"])
+
+        # 3. BR0003: nascimento nulo, sem carência, com fornecedor
+        br3 = itens_by_id["BR0003"]
+        self.assertIsNone(br3["data_nascimento"])
+        self.assertEqual(br3["categoria_idade"], "Sem idade")
+        self.assertIsNone(br3["carencia_ate"])
+        if forn_name:
+            self.assertEqual(br3["fornecedor"], forn_name)
+
+    def test_relatorio_inventario_inclui_todos_os_status(self):
+        """Critério 3: GET /relatorios/inventario inclui animais de todos os status,
+        não só ativo (confirme com um animal vendido ou morto aparecendo na resposta)."""
+        response = self.client.get("/relatorios/inventario", headers=self._headers())
+        self.assertEqual(response.status_code, 200)
+        itens = response.json()
+        statuses = {item["id"]: item["status"] for item in itens}
+
+        # O seed já inclui BR0013 como vendido e BR0014 como morto
+        self.assertIn("BR0013", statuses)
+        self.assertEqual(statuses["BR0013"], "vendido")
+        self.assertIn("BR0014", statuses)
+        self.assertEqual(statuses["BR0014"], "morto")
+
+    def test_relatorio_pesagens_sem_token_retorna_401(self):
+        """Critério 4: GET /relatorios/pesagens sem token -> 401."""
+        response = self.client.get("/relatorios/pesagens")
+        self.assertEqual(response.status_code, 401)
+
+    def test_relatorio_pesagens_metodos_e_ordenacao(self):
+        """Critério 5: GET /relatorios/pesagens com métodos diferentes -> 200."""
+        today = date.today()
+        d1 = (today - timedelta(days=20)).isoformat()
+        d2 = (today - timedelta(days=10)).isoformat()
+        d3 = (today - timedelta(days=2)).isoformat()
+
+        # Adiciona pesagens com métodos diferentes
+        db.add_weighing(
+            animal_id="BR0001",
+            weigh_date=d1,
+            weight=410.0,
+            method="pesado",
+            operator="Op A",
+            notes="Nota A",
+        )
+        db.add_weighing(
+            animal_id="BR0001",
+            weigh_date=d2,
+            weight=420.0,
+            method="estimado",
+            operator="Op B",
+            notes="Nota B",
+        )
+        db.add_weighing(
+            animal_id="BR0002",
+            weigh_date=d3,
+            weight=390.0,
+            method="fita",
+            operator="Op C",
+            notes="Nota C",
+        )
+        db.clear_cache()
+
+        response = self.client.get("/relatorios/pesagens", headers=self._headers())
+        self.assertEqual(response.status_code, 200)
+        pesagens = response.json()
+        self.assertGreaterEqual(len(pesagens), 3)
+
+        # Confere ordenação por data
+        datas = [p["data"] for p in pesagens]
+        self.assertEqual(datas, sorted(datas))
+
+        # Confere 1:1 com db.get_all_weighings()
+        expected = db.get_all_weighings()
+        self.assertEqual(len(pesagens), len(expected))
+        for p, exp in zip(pesagens, expected):
+            self.assertEqual(p["animal_id"], str(exp["animal_id"]))
+            self.assertEqual(p["data"], str(exp["weigh_date"]))
+            self.assertEqual(p["peso_kg"], float(exp["weight"]))
+            self.assertEqual(p["metodo"], str(exp.get("method") or "pesado"))
+            self.assertEqual(
+                p["lote_id"],
+                str(exp["lote_id"]) if exp.get("lote_id") else None,
+            )
+            self.assertEqual(p["operador"], exp.get("operator") or None)
+            self.assertEqual(p["observacoes"], exp.get("notes") or None)
+
+        # Confere que os métodos são técnicos e não traduzidos
+        metodos = {p["metodo"] for p in pesagens}
+        self.assertIn("pesado", metodos)
+        self.assertIn("estimado", metodos)
+        self.assertIn("fita", metodos)
+        for m in metodos:
+            self.assertNotIn("Balança", m)
+            self.assertNotIn("Estimado (visual)", m)
+
+
 class TestSecurityAndIsolation(unittest.TestCase):
 
     def test_secret_inseguro_rejeitado(self):

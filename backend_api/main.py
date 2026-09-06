@@ -60,12 +60,15 @@ from backend_api.schemas import (
     RecomendacaoItem,
     RefreshInput,
     RefreshOutput,
+    RelatorioInventarioItemOutput,
+    RelatorioPesagemItemOutput,
     SalvarPerimetroInput,
     TokenOutput,
     TratoPendenteOutput,
     UserSummary,
 )
 from database import (
+    AGE_SOURCES,
     LoteData,
     add_feeding_check,
     add_lote,
@@ -87,20 +90,32 @@ from database import (
 )
 from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk
 from repositories.dispositivos import mudar_status, por_codigo
-from repositories.pesagens import add_weighing, calculate_gmd, get_weighings_batch
+from repositories.pesagens import (
+    add_weighing,
+    calculate_gmd,
+    calculate_gmd_bulk,
+    get_all_weighings,
+    get_weighings_batch,
+)
 from repositories.sanidade import (
     add_medication,
     dose_for_animal,
     get_medications,
     get_protocols,
     get_withdrawal_end,
+    get_withdrawal_end_batch,
 )
 from services.estados_dispositivo import estados, transicao_permitida
 from services.importacao import parse_pesagens
 from services.geometria import perimetro_metros, validar
 from services.qualidade import avaliar_pesagem
 from services.recomendacoes import avaliar as avaliar_recomendacoes
-from services.zootecnia import calculate_gmd_total
+from services.zootecnia import (
+    calculate_gmd_total,
+    get_age_category,
+    get_age_display,
+    kg_to_arrobas,
+)
 
 MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
 ALLOWED_PHOTO_MIMES = {"image/jpeg", "image/png", "image/jpg"}
@@ -953,4 +968,92 @@ def get_estoque_previsao(
     return previsao_estoque()
 
 
+@app.get(
+    "/relatorios/inventario",
+    response_model=list[RelatorioInventarioItemOutput],
+    summary="Relatório de inventário completo do rebanho",
+    tags=["Relatórios"],
+)
+def get_relatorio_inventario(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Retorna inventário com dados zootécnicos e regulatórios."""
+    animals = get_all_animals(status=None)
+    if not animals:
+        return []
+    a_ids = [str(a["id"]) for a in animals]
+    gmd_batch = calculate_gmd_bulk(a_ids)
+    wd_batch = get_withdrawal_end_batch(a_ids)
 
+    itens = []
+    for a in animals:
+        aid = str(a["id"])
+        gmd = gmd_batch.get(aid)
+        wd = wd_batch.get(aid)
+        if hasattr(wd, "isoformat"):
+            carencia_str = wd.isoformat()
+        elif wd:
+            carencia_str = str(wd)
+        else:
+            carencia_str = None
+
+        current_wt = float(a.get("current_weight") or 0.0)
+        entry_wt = float(a.get("entry_weight") or 0.0)
+        ganho = round(current_wt - entry_wt, 1)
+        arrobas = float(kg_to_arrobas(current_wt))
+
+        categoria = get_age_category(a.get("birth_date"))
+        idade_disp = get_age_display(a)
+
+        origem = a.get("age_source") or "propriedade"
+        if origem not in AGE_SOURCES:
+            origem = "propriedade"
+
+        itens.append({
+            "id": aid,
+            "raca": a.get("breed") or None,
+            "sexo": a.get("sex") or None,
+            "categoria_idade": categoria,
+            "idade_display": idade_disp,
+            "data_nascimento": a.get("birth_date") or None,
+            "nascimento_estimado": bool(a.get("birth_estimated")),
+            "origem_idade": origem,
+            "data_entrada": str(a.get("entry_date") or ""),
+            "peso_entrada_kg": entry_wt,
+            "peso_atual_kg": current_wt,
+            "ganho_kg": ganho,
+            "arrobas_atuais": arrobas,
+            "gmd_kg_dia": gmd,
+            "status": str(a.get("status") or ""),
+            "lote_id": str(a["lote_id"]) if a.get("lote_id") else None,
+            "fornecedor": a.get("fornecedor_name") or None,
+            "nf": a.get("nf_number") or None,
+            "gta": a.get("gta_number") or None,
+            "carencia_ate": carencia_str,
+        })
+    return itens
+
+
+@app.get(
+    "/relatorios/pesagens",
+    response_model=list[RelatorioPesagemItemOutput],
+    summary="Relatório de histórico de pesagens",
+    tags=["Relatórios"],
+)
+def get_relatorio_pesagens(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Retorna o histórico de pesagens ordenado por data."""
+    raw = get_all_weighings()
+    itens = []
+    for w in raw:
+        itens.append({
+            "animal_id": str(w["animal_id"]),
+            "data": str(w["weigh_date"]),
+            "peso_kg": float(w["weight"]),
+            "metodo": str(w.get("method") or "pesado"),
+            "lote_id": str(w["lote_id"]) if w.get("lote_id") else None,
+            "operador": w.get("operator") or None,
+            "observacoes": w.get("notes") or None,
+        })
+    return itens
