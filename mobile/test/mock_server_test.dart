@@ -208,6 +208,10 @@ void main() {
       expect(server.previsaoRequests, 1);
       expect(previsao, hasLength(4));
       expect(previsao.any((item) => item.urgencia == 'sem_dados'), isTrue);
+      final resumo = await api.getDashboardResumo();
+      expect(server.dashboardResumoRequests, 1);
+      expect(resumo.totalAnimais, 12);
+      expect(resumo.alertas.prontosParaAbate, 3);
       await api.logout();
     }, PassthroughHttpOverrides());
   });
