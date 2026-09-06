@@ -2291,7 +2291,7 @@ def _fin_precos():
         for band in AGE_BANDS:
             c1, c2, c3 = st.columns([2,1,1])
             with c1:
-                st.markdown(f"<div style='padding-top:.55rem'>{band}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top:.55rem'>{html.escape(str(band))}</div>", unsafe_allow_html=True)
             with c2:
                 novos[(band,"M")] = st.number_input(f"♂ Macho", min_value=0.0, step=0.10,
                     value=float(precos.get((band,"M"),0.0)), key=f"pk_{band}_M", format="%.2f")
