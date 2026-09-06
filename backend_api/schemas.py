@@ -369,5 +369,38 @@ class PrevisaoEstoqueOutput(BaseModel):
     urgencia: Literal["critica", "atencao", "ok", "sem_dados"]
 
 
+class RelatorioInventarioItemOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    raca: Optional[str] = None
+    sexo: Optional[str] = None
+    categoria_idade: str
+    idade_display: str
+    data_nascimento: Optional[str] = None
+    nascimento_estimado: bool
+    origem_idade: str
+    data_entrada: str
+    peso_entrada_kg: float
+    peso_atual_kg: float
+    ganho_kg: float
+    arrobas_atuais: float
+    gmd_kg_dia: Optional[float] = None
+    status: str
+    lote_id: Optional[str] = None
+    fornecedor: Optional[str] = None
+    nf: Optional[str] = None
+    gta: Optional[str] = None
+    carencia_ate: Optional[str] = None
 
 
+class RelatorioPesagemItemOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    animal_id: str
+    data: str
+    peso_kg: float
+    metodo: str
+    lote_id: Optional[str] = None
+    operador: Optional[str] = None
+    observacoes: Optional[str] = None
