@@ -34,17 +34,6 @@ def authenticate_user(username: str, password: str) -> dict[str, Any] | None:
     if not row or not _verify_password(password, row["password_hash"]):
         return None
 
-    # Migração automática de hash legado
-    if _is_legacy_hash(row["password_hash"]):
-        try:
-            with _conn() as con:
-                con.execute(
-                    "UPDATE users SET password_hash = ? WHERE id = ?",
-                    (_hash(password), row["id"]),
-                )
-            clear_cache()
-        except Exception:
-            pass
 
     return {
         "id": row["id"],

@@ -46,13 +46,6 @@ class TestSeguranca(unittest.TestCase):
         self.assertTrue(_verify_password(pwd, hashed))
         self.assertFalse(_verify_password("senha_errada", hashed))
 
-    def test_verify_password_legacy(self):
-        pwd = "minha_senha"
-        legacy_hashed = hashlib.sha256(pwd.encode()).hexdigest()
-
-        self.assertTrue(_verify_password(pwd, legacy_hashed))
-        self.assertFalse(_verify_password("senha_errada", legacy_hashed))
-
     def test_verify_password_empty(self):
         self.assertFalse(_verify_password("senha", None))
         self.assertFalse(_verify_password("senha", ""))

@@ -60,6 +60,25 @@ def novo_uuid() -> str:
 
 
 @_cache
+def get_total_gain_kg(status: Optional[str] = "ativo",
+                      lote_id: Optional[str] = None,
+                      breed: Optional[str] = None) -> float:
+    sql = "SELECT SUM(current_weight - entry_weight) FROM animals WHERE 1=1"
+    args = []
+    if status:
+        sql += " AND status=?"
+        args.append(status)
+    if lote_id:
+        sql += " AND lote_id=?"
+        args.append(lote_id)
+    if breed:
+        sql += " AND breed=?"
+        args.append(breed)
+    with _conn() as con:
+        result = con.execute(sql, args).fetchone()
+        return float(result[0]) if result and result[0] is not None else 0.0
+
+@_cache
 def get_all_animals(status: Optional[str] = "ativo",
                     lote_id: Optional[str] = None,
                     breed: Optional[str] = None) -> list[dict]:
@@ -74,6 +93,21 @@ def get_all_animals(status: Optional[str] = "ativo",
     sql += " ORDER BY a.id"
     with _conn() as con:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
+
+
+def count_animals(status: Optional[str] = "ativo",
+                  lote_id: Optional[str] = None,
+                  breed: Optional[str] = None) -> int:
+    sql  = "SELECT COUNT(*) FROM animals a WHERE 1=1"
+    args: list = []
+    if status:
+        sql += " AND a.status=?"; args.append(status)
+    if lote_id:
+        sql += " AND a.lote_id=?"; args.append(lote_id)
+    if breed:
+        sql += " AND a.breed=?"; args.append(breed)
+    with _conn() as con:
+        return con.execute(sql, args).fetchone()[0]
 
 
 def get_animal(animal_id: str) -> Optional[dict]:

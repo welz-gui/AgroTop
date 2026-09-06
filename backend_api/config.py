@@ -1,7 +1,6 @@
 """Configurações da API Backend AgroTop."""
 
 import os
-from pathlib import Path
 
 TOKEN_ALGORITHM = "HS256"
 TOKEN_ISSUER = "agrotop-backend-api"

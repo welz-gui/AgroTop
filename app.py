@@ -631,8 +631,7 @@ def _sidebar():
             if _use_arroba():
                 prod_str = f"🏷️ <b style='color:{c['atencao']}'>{stats.arrobas_prod:.1f} @</b> ganhas"
             else:
-                total_gain_kg = sum(a["current_weight"]-a["entry_weight"]
-                                    for a in db.get_all_animals())
+                total_gain_kg = db.get_total_gain_kg(status="ativo")
                 prod_str = f"📦 <b style='color:{c['atencao']}'>{total_gain_kg:.0f} kg</b> ganhos"
 
             st.markdown(f"""
@@ -699,6 +698,10 @@ def _dash_kpis(stats, animals):
         prod_label = "🏷️ @ Ganhas"
         prod_value = f"{stats.arrobas_prod:.1f} @"
     else:
+        # Avoid python loop if animals matches the default "ativo" filter without other filters
+        # Or safely do the python sum if we can't guarantee it.
+        # animals comes from db.get_all_animals() in page_dashboard (status="ativo")
+        # To be perfectly robust for any future filtered list:
         total_gain_kg = sum(a["current_weight"]-a["entry_weight"] for a in animals)
         prod_label = "📦 Ganho Total"
         prod_value = f"{total_gain_kg:.0f} kg"
@@ -917,7 +920,7 @@ def _dash_completude():
                 m += 12; a -= 1
             meses.append((a, m))
 
-        animais_ativos = len(db.get_all_animals(status="ativo"))
+        animais_ativos = db.count_animals(status="ativo")
         pesagens = normalizar_pesagens(db.get_all_weighings())
 
         linhas = []
