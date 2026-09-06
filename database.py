@@ -1586,6 +1586,27 @@ def get_all_lotes() -> list[dict]:
     return out
 
 
+def get_lotes_resumo() -> list[dict]:
+    """Retorna os lotes de forma simplificada para o motor de recomendações."""
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT l.id,
+                      l.name as nome,
+                      l.capacity_ua as capacidade_ua,
+                      SUM(a.current_weight) / 450.0 as total_ua
+               FROM lotes l
+               LEFT JOIN animals a ON a.lote_id=l.id AND a.status='ativo'
+               GROUP BY l.id ORDER BY l.id""",
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["ua_atual"] = round(float(d["total_ua"]), 2) if d.get("total_ua") is not None else None
+        del d["total_ua"]
+        out.append(d)
+    return out
+
+
 def get_lote(lote_id: str) -> Optional[dict]:
     with _conn() as con:
         row = con.execute("SELECT * FROM lotes WHERE id=?", (lote_id,)).fetchone()
@@ -2645,10 +2666,7 @@ def contexto_recomendacoes() -> dict:
             "carencia_ate": fim.isoformat() if fim and fim >= hoje else None,
         })
 
-    lotes = [{"id": l["id"],
-              "capacidade_ua": l.get("capacity_ua"),
-              "ua_atual": l.get("total_ua")}
-             for l in get_all_lotes()]
+    lotes = get_lotes_resumo()
 
     insumos = [{"id": i["id"], "nome": i["name"],
                 "saldo": i.get("current_stock"),
