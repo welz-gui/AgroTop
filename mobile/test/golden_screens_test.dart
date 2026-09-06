@@ -16,6 +16,7 @@ import 'package:agrotop_mobile/screens/devices_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
 import 'package:agrotop_mobile/screens/perimeter_gps_page.dart';
+import 'package:agrotop_mobile/screens/reports_page.dart';
 import 'package:agrotop_mobile/screens/stock_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1354,6 +1355,135 @@ void main() {
             find.byType(MaterialApp),
             matchesGoldenFile(
               'goldens/${mode.name}-${empty ? '29-dashboard-vazio' : '30-dashboard-com-dados'}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    }
+  });
+
+  testWidgets('tela de relatórios cobre inventário e pesagens nos três temas', (tester) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mockInventario = [
+      {
+        'id': 'BR0001',
+        'raca': 'Nelore',
+        'sexo': 'M',
+        'categoria_idade': '13 a 24 meses',
+        'idade_display': '18 meses',
+        'data_nascimento': '2025-03-01',
+        'nascimento_estimado': false,
+        'origem_idade': 'propriedade',
+        'data_entrada': '2025-09-01',
+        'peso_entrada_kg': 280.0,
+        'peso_atual_kg': 420.5,
+        'ganho_kg': 140.5,
+        'arrobas_atuais': 14.02,
+        'gmd_kg_dia': 0.75,
+        'status': 'ativo',
+        'lote_id': 'P01',
+        'fornecedor': 'Fazenda Primavera',
+        'nf': '12345',
+        'gta': '98765',
+        'carencia_ate': null,
+      },
+      {
+        'id': 'BR0002',
+        'raca': 'Angus',
+        'sexo': 'F',
+        'categoria_idade': '25 a 36 meses',
+        'idade_display': '26 meses (est.)',
+        'data_nascimento': '2024-07-15',
+        'nascimento_estimado': true,
+        'origem_idade': 'estimado',
+        'data_entrada': '2025-01-10',
+        'peso_entrada_kg': 310.0,
+        'peso_atual_kg': 465.0,
+        'ganho_kg': 155.0,
+        'arrobas_atuais': 15.5,
+        'gmd_kg_dia': null,
+        'status': 'carencia',
+        'lote_id': 'P02',
+        'fornecedor': 'Cabanha Estrela',
+        'nf': '54321',
+        'gta': '11223',
+        'carencia_ate': '2026-09-20',
+      },
+    ];
+
+    final mockPesagens = [
+      {
+        'animal_id': 'BR0001',
+        'data': '2026-09-01',
+        'peso_kg': 420.5,
+        'metodo': 'pesado',
+        'lote_id': 'P01',
+        'operador': 'João Silva',
+        'observacoes': 'Pesagem de rotina no brete',
+      },
+      {
+        'animal_id': 'BR0002',
+        'data': '2026-08-28',
+        'peso_kg': 465.0,
+        'metodo': 'estimado',
+        'lote_id': 'P02',
+        'operador': 'Carlos Souza',
+        'observacoes': null,
+      },
+    ];
+
+    for (final mode in ThemeMode.values) {
+      for (final tab in ['inventario', 'pesagens']) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.method == 'GET' &&
+                request.url.path == '/relatorios/inventario') {
+              return _json(mockInventario);
+            }
+            if (request.method == 'GET' &&
+                request.url.path == '/relatorios/pesagens') {
+              return _json(mockPesagens);
+            }
+            return _json({});
+          }),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: ReportsPage(api: api, onUnauthorized: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        if (tab == 'pesagens') {
+          await tester.tap(find.byKey(const ValueKey('tab-pesagens')));
+          await tester.pumpAndSettle();
+        }
+
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${tab == 'inventario' ? '31-relatorios-inventario' : '32-relatorios-pesagens'}.png',
             ),
           );
         }

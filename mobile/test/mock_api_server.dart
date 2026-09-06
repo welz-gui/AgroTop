@@ -197,6 +197,107 @@ class MockApiServer {
     },
   ];
 
+  int relatorioInventarioRequests = 0;
+  List<Map<String, dynamic>> relatorioInventario = [
+    {
+      'id': 'BR0001',
+      'raca': 'Nelore',
+      'sexo': 'M',
+      'categoria_idade': '13 a 24 meses',
+      'idade_display': '18 meses',
+      'data_nascimento': '2025-03-01',
+      'nascimento_estimado': false,
+      'origem_idade': 'propriedade',
+      'data_entrada': '2025-09-01',
+      'peso_entrada_kg': 280.0,
+      'peso_atual_kg': 420.5,
+      'ganho_kg': 140.5,
+      'arrobas_atuais': 14.02,
+      'gmd_kg_dia': 0.75,
+      'status': 'ativo',
+      'lote_id': 'P01',
+      'fornecedor': 'Fazenda Primavera',
+      'nf': '12345',
+      'gta': '98765',
+      'carencia_ate': null,
+    },
+    {
+      'id': 'BR0002',
+      'raca': 'Angus',
+      'sexo': 'F',
+      'categoria_idade': '25 a 36 meses',
+      'idade_display': '26 meses (est.)',
+      'data_nascimento': '2024-07-15',
+      'nascimento_estimado': true,
+      'origem_idade': 'estimado',
+      'data_entrada': '2025-01-10',
+      'peso_entrada_kg': 310.0,
+      'peso_atual_kg': 465.0,
+      'ganho_kg': 155.0,
+      'arrobas_atuais': 15.5,
+      'gmd_kg_dia': null,
+      'status': 'carencia',
+      'lote_id': 'P02',
+      'fornecedor': 'Cabanha Estrela',
+      'nf': '54321',
+      'gta': '11223',
+      'carencia_ate': '2026-09-20',
+    },
+    {
+      'id': 'BR0003',
+      'raca': 'Brahman',
+      'sexo': 'M',
+      'categoria_idade': 'Até 12 meses',
+      'idade_display': '10 meses',
+      'data_nascimento': '2025-11-01',
+      'nascimento_estimado': false,
+      'origem_idade': 'propriedade',
+      'data_entrada': '2026-02-01',
+      'peso_entrada_kg': 210.0,
+      'peso_atual_kg': 320.0,
+      'ganho_kg': 110.0,
+      'arrobas_atuais': 10.67,
+      'gmd_kg_dia': 0.62,
+      'status': 'ativo',
+      'lote_id': 'P01',
+      'fornecedor': null,
+      'nf': null,
+      'gta': null,
+      'carencia_ate': null,
+    },
+  ];
+
+  int relatorioPesagensRequests = 0;
+  List<Map<String, dynamic>> relatorioPesagens = [
+    {
+      'animal_id': 'BR0001',
+      'data': '2026-09-01',
+      'peso_kg': 420.5,
+      'metodo': 'pesado',
+      'lote_id': 'P01',
+      'operador': 'João Silva',
+      'observacoes': 'Pesagem de rotina no brete',
+    },
+    {
+      'animal_id': 'BR0002',
+      'data': '2026-08-28',
+      'peso_kg': 465.0,
+      'metodo': 'estimado',
+      'lote_id': 'P02',
+      'operador': 'Carlos Souza',
+      'observacoes': null,
+    },
+    {
+      'animal_id': 'BR0003',
+      'data': '2026-08-25',
+      'peso_kg': 320.0,
+      'metodo': 'medicao',
+      'lote_id': 'P01',
+      'operador': 'João Silva',
+      'observacoes': 'Medição por fita',
+    },
+  ];
+
   String get baseUrl => 'http://${_server.address.address}:${_server.port}';
 
   static Future<MockApiServer> start() async =>
@@ -322,6 +423,18 @@ class MockApiServer {
       if (request.method == 'GET' && path == '/dashboard/resumo') {
         dashboardResumoRequests++;
         await _json(request, 200, dashboardResumo);
+        return;
+      }
+
+      if (request.method == 'GET' && path == '/relatorios/inventario') {
+        relatorioInventarioRequests++;
+        await _json(request, 200, relatorioInventario);
+        return;
+      }
+
+      if (request.method == 'GET' && path == '/relatorios/pesagens') {
+        relatorioPesagensRequests++;
+        await _json(request, 200, relatorioPesagens);
         return;
       }
 

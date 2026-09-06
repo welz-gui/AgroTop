@@ -18,6 +18,7 @@ import 'movement_page.dart';
 import 'offline_cache_banner.dart';
 import 'perimeter_gps_page.dart';
 import 'qr_scanner_page.dart';
+import 'reports_page.dart';
 import 'stock_page.dart';
 import 'sync_report_dialog.dart';
 import 'weighing_page.dart';
@@ -347,6 +348,13 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> _openReports() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) =>
+          ReportsPage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -355,8 +363,8 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
         IconButtonTheme(
           data: IconButtonThemeData(
             style: IconButton.styleFrom(
-              minimumSize: const Size(32, 32),
-              padding: const EdgeInsets.all(4),
+              minimumSize: const Size(28, 28),
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
@@ -393,6 +401,12 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
                 onPressed: _openStock,
                 tooltip: 'Estoque',
                 icon: const Icon(Icons.inventory_2_outlined),
+              ),
+              IconButton(
+                key: const ValueKey('open-reports'),
+                onPressed: _openReports,
+                tooltip: 'Relatórios',
+                icon: const Icon(Icons.description_outlined),
               ),
               _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
               _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
