@@ -286,6 +286,23 @@ class AlertasOutput(BaseModel):
     baixo_desempenho: list[AlertaBaixoDesempenhoOutput]
 
 
+class DashboardAlertasOutput(BaseModel):
+    sumidos: int
+    carencia: int
+    prontos_para_abate: int
+
+
+class DashboardResumoOutput(BaseModel):
+    total_animais: int
+    peso_medio_kg: float
+    gmd_medio_kg_dia: float
+    arrobas_produzidas: float
+    lotacao_ua_ha: float
+    machos: int
+    femeas: int
+    alertas: DashboardAlertasOutput
+
+
 class TransicaoPermitida(BaseModel):
     para: str
     exige_motivo: bool

@@ -112,6 +112,79 @@ class MockApiServer {
     },
   ];
 
+  int estoqueRequests = 0;
+  List<Map<String, dynamic>> estoque = [
+    {
+      'id': 1,
+      'nome': 'Sal Mineral 80',
+      'categoria': 'mineral',
+      'estoque_atual': 150.0,
+      'estoque_minimo': 100.0,
+      'unidade': 'kg',
+      'custo_unitario': 3.50,
+      'valor_total': 525.00,
+      'status': 'ok',
+    },
+    {
+      'id': 2,
+      'nome': 'Ração Confinamento',
+      'categoria': 'racao',
+      'estoque_atual': 45.0,
+      'estoque_minimo': 50.0,
+      'unidade': 'kg',
+      'custo_unitario': 2.80,
+      'valor_total': 126.00,
+      'status': 'baixo',
+    },
+    {
+      'id': 3,
+      'nome': 'Ivermectina 1%',
+      'categoria': 'medicamento',
+      'estoque_atual': 2.0,
+      'estoque_minimo': 10.0,
+      'unidade': 'frasco',
+      'custo_unitario': 45.00,
+      'valor_total': 90.00,
+      'status': 'critico',
+    },
+  ];
+
+  int previsaoRequests = 0;
+  List<Map<String, dynamic>> previsao = [
+    {
+      'insumo_id': 2,
+      'nome': 'Ração Confinamento',
+      'dias_restantes': 3.0,
+      'data_ruptura': '2026-09-08',
+      'comprar_ate': '2026-09-06',
+      'urgencia': 'critica',
+    },
+    {
+      'insumo_id': 1,
+      'nome': 'Sal Mineral 80',
+      'dias_restantes': 12.0,
+      'data_ruptura': '2026-09-17',
+      'comprar_ate': '2026-09-14',
+      'urgencia': 'atencao',
+    },
+    {
+      'insumo_id': 4,
+      'nome': 'Milho Moído',
+      'dias_restantes': 45.0,
+      'data_ruptura': '2026-10-20',
+      'comprar_ate': '2026-10-10',
+      'urgencia': 'ok',
+    },
+    {
+      'insumo_id': 3,
+      'nome': 'Ivermectina 1%',
+      'dias_restantes': null,
+      'data_ruptura': null,
+      'comprar_ate': null,
+      'urgencia': 'sem_dados',
+    },
+  ];
+
   String get baseUrl => 'http://${_server.address.address}:${_server.port}';
 
   static Future<MockApiServer> start() async =>
@@ -219,6 +292,18 @@ class MockApiServer {
       if (request.method == 'GET' && path == '/recomendacoes') {
         recomendacoesRequests++;
         await _json(request, 200, recomendacoes);
+        return;
+      }
+
+      if (request.method == 'GET' && path == '/estoque') {
+        estoqueRequests++;
+        await _json(request, 200, estoque);
+        return;
+      }
+
+      if (request.method == 'GET' && path == '/estoque/previsao') {
+        previsaoRequests++;
+        await _json(request, 200, previsao);
         return;
       }
 
