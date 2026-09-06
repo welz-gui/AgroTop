@@ -47,10 +47,11 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 [#331](https://github.com/welz-gui/AgroTop/pull/331)). **0073/0074/0075 fechadas em
 2026-09-06** ([PR #333](https://github.com/welz-gui/AgroTop/pull/333),
 [#335](https://github.com/welz-gui/AgroTop/pull/335),
-[#334](https://github.com/welz-gui/AgroTop/pull/334)). **0076/0077 fechadas em 2026-09-06**
-([PR #359](https://github.com/welz-gui/AgroTop/pull/359),
-[#365](https://github.com/welz-gui/AgroTop/pull/365)) — só falta a 0078 (mobile
-relatórios) pro Tier 2 fechar por completo.
+[#334](https://github.com/welz-gui/AgroTop/pull/334)). **0076/0077/0078 fechadas em
+2026-09-06** ([PR #359](https://github.com/welz-gui/AgroTop/pull/359),
+[#365](https://github.com/welz-gui/AgroTop/pull/365),
+[#367](https://github.com/welz-gui/AgroTop/pull/367)) — **Tier 2 da ADR 0007 completo,
+as 8 specs fechadas.**
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -340,7 +341,7 @@ relatórios) pro Tier 2 fechar por completo.
 | — | [0075](0075-api-dashboard-resumo.md) — API: resumo do dashboard (KPIs) 🏗️ | — | ✅ [#334](https://github.com/welz-gui/AgroTop/pull/334) | | 2026-09-06 |
 | — | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | ✅ [#359](https://github.com/welz-gui/AgroTop/pull/359) | | 2026-09-06 |
 | — | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | ✅ [#365](https://github.com/welz-gui/AgroTop/pull/365) | | 2026-09-06 |
-| 8 | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | 🟢 disponível (0077 já mesclada) | | 2026-09-03 |
+| — | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | ✅ [#367](https://github.com/welz-gui/AgroTop/pull/367) | | 2026-09-06 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -623,6 +624,17 @@ relatórios) pro Tier 2 fechar por completo.
 > fallback de `AGE_SOURCES`. Confirma explicitamente que `metodo` não é traduzido (checa
 > que rótulos em português tipo "Balança" não aparecem). **Com isso, o Tier 2 da ADR 0007
 > está com 7 das 8 specs fechadas — só falta a 0078 (mobile relatórios), livre agora.**
+>
+> **0078 fechada em 2026-09-06 — [PR #367](https://github.com/welz-gui/AgroTop/pull/367) —
+> última spec do Tier 2, agora completo (8 de 8).** Mesmo padrão de defeito real que a 0076
+> teve: CI mobile pegou dois overflows horizontais genuínos em `reports_page.dart` (não
+> flakiness) — um Row peso+badge-de-método estourava com o rótulo longo de "medição"
+> (`'Estimado por medição (fita/fórmula)'`), outro Row lote+operador estourava com nome de
+> operador comprido (ex. "Carlos Souza"). Ambos corrigidos com `Flexible`/`Expanded` +
+> `overflow: ellipsis`, mantendo peso e "Lote:" em tamanho fixo (informação primária).
+> Verificado via CI real (`build-apk` + `test` verdes no commit final), não só leitura de
+> código — mesma disciplina da 0076. **Tier 2 da ADR 0007 (paridade admin no mobile, só
+> leitura) está com as 8 specs fechadas.**
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
