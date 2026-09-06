@@ -44,7 +44,11 @@ regras no mobile) são as primeiras — ver nota abaixo.** **Além disso, 0073-0
 Tier 2 da ADR 0007 (paridade admin no mobile, só leitura: estoque, resumo do dashboard,
 relatórios) — desbloqueado agora que o Tier 1 fechou por completo.** **0071/0072 fechadas
 em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
-[#331](https://github.com/welz-gui/AgroTop/pull/331)) — 0073 (Tier 2, estoque) livre agora.
+[#331](https://github.com/welz-gui/AgroTop/pull/331)). **0073/0074/0075 fechadas em
+2026-09-06** ([PR #333](https://github.com/welz-gui/AgroTop/pull/333),
+[#335](https://github.com/welz-gui/AgroTop/pull/335),
+[#334](https://github.com/welz-gui/AgroTop/pull/334)) — 0076 (Tier 2, dashboard) livre
+agora.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -329,10 +333,10 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 | — | [0070](0070-mobile-demarcacao-de-perimetro-por-gps.md) — Mobile: demarcação de perímetro por GPS 🏗️ ⚠️médio | — | ✅ [#325](https://github.com/welz-gui/AgroTop/pull/325) | | 2026-09-03 |
 | — | [0071](0071-api-recomendacoes-motor-de-regras.md) — API: expor as recomendações do motor de regras 🏗️ ⚠️médio | — | ✅ [#330](https://github.com/welz-gui/AgroTop/pull/330) | | 2026-09-04 |
 | — | [0072](0072-mobile-recomendacoes-do-motor-de-regras.md) — Mobile: recomendações do motor de regras 🏗️ | — | ✅ [#331](https://github.com/welz-gui/AgroTop/pull/331) | | 2026-09-04 |
-| 3 | [0073](0073-api-estoque-inventario-e-previsao.md) — API: inventário de estoque e previsão de ruptura 🏗️ ⚠️médio | — | 🟢 disponível (0071 já mesclada) | | 2026-09-03 |
-| 4 | [0074](0074-mobile-tela-de-estoque.md) — Mobile: tela de estoque (inventário e previsão) 🏗️ | — | 🟡 depende da 0073 mesclar (ou teste contra mock) | | 2026-09-03 |
-| 5 | [0075](0075-api-dashboard-resumo.md) — API: resumo do dashboard (KPIs) 🏗️ | — | 🟢 disponível | | 2026-09-03 |
-| 6 | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | 🟡 depende da 0075 mesclar (ou teste contra mock) | | 2026-09-03 |
+| — | [0073](0073-api-estoque-inventario-e-previsao.md) — API: inventário de estoque e previsão de ruptura 🏗️ ⚠️médio | — | ✅ [#333](https://github.com/welz-gui/AgroTop/pull/333) | | 2026-09-06 |
+| — | [0074](0074-mobile-tela-de-estoque.md) — Mobile: tela de estoque (inventário e previsão) 🏗️ | — | ✅ [#335](https://github.com/welz-gui/AgroTop/pull/335) | | 2026-09-06 |
+| — | [0075](0075-api-dashboard-resumo.md) — API: resumo do dashboard (KPIs) 🏗️ | — | ✅ [#334](https://github.com/welz-gui/AgroTop/pull/334) | | 2026-09-06 |
+| 6 | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | 🟢 disponível (0075 já mesclada) | | 2026-09-03 |
 | 7 | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | 🟢 disponível | | 2026-09-03 |
 | 8 | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | 🟡 depende da 0077 mesclar (ou teste contra mock) | | 2026-09-03 |
 
@@ -583,6 +587,18 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 > (`04-pesagem`, `05-destino`, `10-sanidade-medicamento`) achou a causa: um campo de data
 > (`date.today()` de fixture) 2 dias mais recente que a última rodada de goldens —
 > inofensivo, nada a ver com o mistério sem explicação da PR #321.
+>
+> **0073/0074/0075 fechadas em 2026-09-06 — [PR #333](https://github.com/welz-gui/AgroTop/pull/333),
+> [#335](https://github.com/welz-gui/AgroTop/pull/335), [#334](https://github.com/welz-gui/AgroTop/pull/334).**
+> A 0073 checou o código real de `services/previsao_estoque.py::prever` em vez de confiar
+> cegamente na spec — a função devolve a chave `"id"`, não `"insumo_id"` como o contrato
+> pedia — e fez a ponte certa (`item["insumo_id"] = item["id"]`, com `extra="ignore"` no
+> schema escondendo o `"id"` sobrando da resposta). A 0073 e a 0075 entraram em conflito
+> real uma com a outra (ambas tocaram perto em `backend_api/main.py`) — resolvido num
+> worktree isolado (só ordem de imports, sem ambiguidade semântica), suíte inteira rodada
+> antes de reenviar. A 0074 (mobile) não reimplementa nenhum limiar de status/urgência,
+> goldens reais (47-50 KB) nos 3 cenários × 3 temas. **0076 (mobile dashboard) está livre
+> agora.**
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),

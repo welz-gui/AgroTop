@@ -279,6 +279,41 @@ class ApiClient {
         .toList(growable: false);
   }
 
+  Future<List<InsumoInventario>> getEstoqueInventario() async {
+    final response = await _authorized(
+      (headers) => _http.get(Uri.parse('$baseUrl/estoque'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar o inventário de estoque.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((item) => InsumoInventario.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<PrevisaoEstoqueItem>> getEstoquePrevisao() async {
+    final response = await _authorized(
+      (headers) =>
+          _http.get(Uri.parse('$baseUrl/estoque/previsao'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar a previsão de estoque.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map(
+          (item) => PrevisaoEstoqueItem.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(growable: false);
+  }
+
   Future<DeviceLookup?> findDevice(String codigoVisual) async {
     final response = await _authorized(
       (headers) => _http.get(

@@ -15,6 +15,7 @@ import 'package:agrotop_mobile/screens/devices_page.dart';
 import 'package:agrotop_mobile/screens/feeding_page.dart';
 import 'package:agrotop_mobile/screens/medication_page.dart';
 import 'package:agrotop_mobile/screens/perimeter_gps_page.dart';
+import 'package:agrotop_mobile/screens/stock_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1156,6 +1157,139 @@ void main() {
                 'preview' => '25-perimetro-preview',
                 _ => '26-perimetro-invalido',
               }}.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    }
+  });
+
+  testWidgets(
+      'tela de estoque cobre inventário e previsão de ruptura nos três temas',
+      (tester) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mockInventory = [
+      {
+        'id': 1,
+        'nome': 'Sal Mineral 80',
+        'categoria': 'mineral',
+        'estoque_atual': 150.0,
+        'estoque_minimo': 100.0,
+        'unidade': 'kg',
+        'custo_unitario': 3.50,
+        'valor_total': 525.00,
+        'status': 'ok',
+      },
+      {
+        'id': 2,
+        'nome': 'Ração Confinamento',
+        'categoria': 'racao',
+        'estoque_atual': 45.0,
+        'estoque_minimo': 50.0,
+        'unidade': 'kg',
+        'custo_unitario': 2.80,
+        'valor_total': 126.00,
+        'status': 'baixo',
+      },
+      {
+        'id': 3,
+        'nome': 'Ivermectina 1%',
+        'categoria': 'medicamento',
+        'estoque_atual': 2.0,
+        'estoque_minimo': 10.0,
+        'unidade': 'frasco',
+        'custo_unitario': 45.00,
+        'valor_total': 90.00,
+        'status': 'critico',
+      },
+    ];
+
+    final mockForecast = [
+      {
+        'insumo_id': 2,
+        'nome': 'Ração Confinamento',
+        'dias_restantes': 3.0,
+        'data_ruptura': '2026-09-08',
+        'comprar_ate': '2026-09-06',
+        'urgencia': 'critica',
+      },
+      {
+        'insumo_id': 1,
+        'nome': 'Sal Mineral 80',
+        'dias_restantes': 12.0,
+        'data_ruptura': '2026-09-17',
+        'comprar_ate': '2026-09-14',
+        'urgencia': 'atencao',
+      },
+      {
+        'insumo_id': 4,
+        'nome': 'Milho Moído',
+        'dias_restantes': 45.0,
+        'data_ruptura': '2026-10-20',
+        'comprar_ate': '2026-10-10',
+        'urgencia': 'ok',
+      },
+      {
+        'insumo_id': 3,
+        'nome': 'Ivermectina 1%',
+        'dias_restantes': null,
+        'data_ruptura': null,
+        'comprar_ate': null,
+        'urgencia': 'sem_dados',
+      },
+    ];
+
+    for (final mode in ThemeMode.values) {
+      for (final tab in ['inventario', 'previsao']) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.method == 'GET' && request.url.path == '/estoque') {
+              return _json(mockInventory);
+            }
+            if (request.method == 'GET' &&
+                request.url.path == '/estoque/previsao') {
+              return _json(mockForecast);
+            }
+            return _json({});
+          }),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: StockPage(api: api, onUnauthorized: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        if (tab == 'previsao') {
+          await tester.tap(find.byKey(const ValueKey('tab-previsao')));
+          await tester.pumpAndSettle();
+        }
+
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-${tab == 'inventario' ? '27-estoque-inventario' : '28-estoque-previsao'}.png',
             ),
           );
         }
