@@ -37,7 +37,7 @@ def main():
 
     try:
         import psycopg2
-        import psycopg2.extras
+        from psycopg2.extras import execute_batch
     except ImportError:
         print("[ERRO] Instale o driver:  python -m pip install psycopg2-binary")
         sys.exit(1)
@@ -77,7 +77,7 @@ def main():
         placeholders = ",".join(["%s"] * len(cols))
         sql = f"INSERT INTO {t} ({collist}) VALUES ({placeholders})"
         data = [tuple(r[c] for c in cols) for r in rows]
-        psycopg2.extras.execute_batch(pgc, sql, data)
+        execute_batch(pgc, sql, data)
         pg.commit()
         print(f"[OK] {t}: {len(rows)} registro(s)")
         total += len(rows)

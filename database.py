@@ -12,7 +12,6 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
-import random
 from datetime import datetime, date, timedelta
 from typing import Optional
 from dataclasses import dataclass
@@ -62,7 +61,7 @@ from repositories import regras as regras  # noqa: F401
 from repositories import compras as compras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
-    get_all_animals, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
+    get_all_animals, count_animals, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
     _seed_animals, AnimalData,
 )
 from repositories.pesagens import (
@@ -1322,15 +1321,6 @@ def verify_login(username: str, password: str) -> Optional[dict]:
         ).fetchone()
     if not row or not _verify_password(password, row["password_hash"]):
         return None
-    # Migração automática: atualiza hash legado (SHA-256) para PBKDF2
-    if _is_legacy_hash(row["password_hash"]):
-        try:
-            with _conn() as con:
-                con.execute("UPDATE users SET password_hash=? WHERE id=?",
-                            (_hash(password), row["id"]))
-            clear_cache()
-        except Exception:
-            pass
     user = dict(row)
     user.pop("password_hash", None)   # nunca expõe o hash
     return user

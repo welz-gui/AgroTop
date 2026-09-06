@@ -110,7 +110,7 @@ class TestCompletudeDeDadosNaTela(unittest.TestCase):
         from services.completude import avaliar_mes
 
         hoje = date.today()
-        animais_ativos = len(db.get_all_animals(status="ativo"))
+        animais_ativos = db.count_animals(status="ativo")
         pesagens = normalizar_pesagens(db.get_all_weighings())
 
         inicio = date(hoje.year, hoje.month, 1)
