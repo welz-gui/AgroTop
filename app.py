@@ -740,21 +740,22 @@ def _dash_chart_evolucao_peso():
     st.subheader("📈 Evolução de Peso do Rebanho")
     raw = db.get_all_weighings()
     if raw:
-        df_all = pd.DataFrame(raw)
-        df_all["weigh_date"] = pd.to_datetime(df_all["weigh_date"])
-        df_avg = (df_all.groupby("weigh_date")["weight"]
-                  .mean().reset_index()
-                  .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
-        df_all = df_all.sort_values(["animal_id", "weigh_date"])
+        raw.sort(key=lambda x: (x["animal_id"], x["weigh_date"]))
+
         fig = px.line(
-            df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
+            raw, x="weigh_date", y="weight", color="animal_id", markers=True,
             color_discrete_sequence=[c["borda"]]
         )
         fig.update_traces(
             showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
             hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
         )
-        fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
+
+        raw_avg = db.get_average_weighings_by_date()
+        x_data = [d["Data"] for d in raw_avg]
+        y_data = [d["Peso Médio (kg)"] for d in raw_avg]
+
+        fig.add_trace(go.Scatter(x=x_data,y=y_data,
             mode="lines+markers",name="Média do Rebanho",
             line=dict(width=3,color=c["primaria"]),
             marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
