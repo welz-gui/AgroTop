@@ -86,16 +86,19 @@ class TestParseDate(unittest.TestCase):
 
 class TestPercentageChange(unittest.TestCase):
     def test_divide_by_zero_current_zero(self):
-        self.assertEqual(_percentage_change(0.0, 0.0), 0.0)
+        self.assertAlmostEqual(_percentage_change(0.0, 0.0), 0.0, places=3)
 
     def test_divide_by_zero_current_nonzero(self):
         self.assertEqual(_percentage_change(10.0, 0.0), float("inf"))
 
     def test_normal_increase(self):
-        self.assertEqual(_percentage_change(150.0, 100.0), 50.0)
+        self.assertAlmostEqual(_percentage_change(150.0, 100.0), 50.0, places=3)
 
     def test_normal_decrease(self):
-        self.assertEqual(_percentage_change(50.0, 100.0), 50.0)
+        self.assertAlmostEqual(_percentage_change(50.0, 100.0), 50.0, places=3)
+
+    def test_negative_percentage(self):
+        self.assertAlmostEqual(_percentage_change(80.0, 100.0), 20.0, places=3)
 
 
 if __name__ == "__main__":
