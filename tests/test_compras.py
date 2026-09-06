@@ -22,6 +22,10 @@ class TestTotalCompra(unittest.TestCase):
         itens = [{"quantidade": 3.0, "custo_unitario": 3.333}]
         self.assertEqual(total_compra(itens), 10.0)
 
+    def test_lista_nula(self):
+        with self.assertRaises(TypeError):
+            total_compra(None)
+
 
 class TestGerarParcelas(unittest.TestCase):
     def test_parcela_unica_igual_ao_total(self):

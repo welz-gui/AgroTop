@@ -74,14 +74,6 @@ def _login(username: str, password: str) -> dict[str, Any] | None:
     if not row or not _verify_password(password, row["password_hash"]):
         return None
 
-    if _is_legacy_hash(row["password_hash"]):
-        with _conn() as con:
-            con.execute(
-                "UPDATE users SET password_hash=? WHERE id=?",
-                (_hash(password), row["id"]),
-            )
-        clear_cache()
-
     return {
         "id": row["id"],
         "username": row["username"],

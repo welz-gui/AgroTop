@@ -1,10 +1,17 @@
 import unittest
+from datetime import date
 
-from services.caixa import em_aberto, fluxo_de_caixa, resultado_por_competencia
+from services.caixa import (
+    _date_or_none,
+    _lançamento_valido,
+    em_aberto,
+    fluxo_de_caixa,
+    resultado_por_competencia,
+)
 
 
 class TestCaixa(unittest.TestCase):
-    def test_resultado_por_competencia_soma_receita_e_despesa_e_calcula_resultado(self):
+    def test_resultado_por_competencia_soma_receita_e_despesa(self):
         lancamentos = [
             {
                 "tipo": "receita",
@@ -125,6 +132,49 @@ class TestCaixa(unittest.TestCase):
         self.assertEqual(resultado["receitas"], 0.0)
         self.assertEqual(resultado["despesas"], 0.0)
         self.assertEqual(resultado["resultado"], 0.0)
+
+    def test_lancamento_valido_com_chaves_ausentes_ou_vazias(self):
+        # Missing keys entirely
+        self.assertTrue(_lançamento_valido({}))
+
+        # Keys present but values are None
+        self.assertTrue(_lançamento_valido({
+            "competencia": None,
+            "vencimento": None,
+            "pagamento": None,
+        }))
+
+        # Keys present but values are empty strings
+        self.assertTrue(_lançamento_valido({
+            "competencia": "",
+            "vencimento": "",
+            "pagamento": "",
+        }))
+
+        # Keys present with valid values
+        self.assertTrue(_lançamento_valido({
+            "competencia": "2026-03-01",
+            "vencimento": "2026-03-05",
+            "pagamento": "2026-03-10",
+        }))
+
+        # Key present with invalid value should return False
+        self.assertFalse(_lançamento_valido({
+            "competencia": "invalid-date",
+        }))
+
+    def test_date_or_none_returns_date_for_valid_string(self):
+        resultado = _date_or_none("2026-03-15")
+        self.assertEqual(resultado, date(2026, 3, 15))
+
+    def test_date_or_none_returns_none_for_empty_string(self):
+        self.assertIsNone(_date_or_none(""))
+        self.assertIsNone(_date_or_none(None))
+
+    def test_date_or_none_returns_none_for_invalid_string(self):
+        self.assertIsNone(_date_or_none("invalid-date"))
+        self.assertIsNone(_date_or_none("2026-15-03"))
+        self.assertIsNone(_date_or_none("2026/03/15"))
 
 
 if __name__ == "__main__":

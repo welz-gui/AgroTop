@@ -12,7 +12,6 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
-import random
 from datetime import datetime, date, timedelta
 from typing import Optional
 from dataclasses import dataclass
@@ -1322,15 +1321,6 @@ def verify_login(username: str, password: str) -> Optional[dict]:
         ).fetchone()
     if not row or not _verify_password(password, row["password_hash"]):
         return None
-    # Migração automática: atualiza hash legado (SHA-256) para PBKDF2
-    if _is_legacy_hash(row["password_hash"]):
-        try:
-            with _conn() as con:
-                con.execute("UPDATE users SET password_hash=? WHERE id=?",
-                            (_hash(password), row["id"]))
-            clear_cache()
-        except Exception:
-            pass
     user = dict(row)
     user.pop("password_hash", None)   # nunca expõe o hash
     return user

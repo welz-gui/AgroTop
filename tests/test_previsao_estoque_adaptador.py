@@ -53,6 +53,21 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         res = consumo_diario_planejado(insumos, planos, dummy_converter)
         self.assertEqual(res, {1: 0.0})
 
+    def test_quantidade_invalida_string_nao_causa_erro(self):
+        """Critério extra: quantidade como string não convertível deve ser ignorada sem exceção."""
+        insumos = {1: {"unit": "kg"}}
+        planos = [
+            {
+                "insumo_id": 1,
+                "quantity": "invalid_string",
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            }
+        ]
+        res = consumo_diario_planejado(insumos, planos, dummy_converter)
+        self.assertEqual(res, {1: 0.0})
+
     def test_criterio_3_frequencia_desconhecida_e_ignorada(self):
         """Critério 3: Frequência fora de {"diario", "semanal", "mensal"} (ex: quinzenal) é ignorada.
 
@@ -139,6 +154,31 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         res = montar_insumos(insumos_raw, consumo_por_id)
         self.assertEqual(res[0]["consumo_diario"], 0.0)
 
+    def test_montar_insumos_raw_stock_invalid_string_fallback(self):
+        """Testa o fallback para 0.0 quando current_stock ou saldo possui um valor inválido para float."""
+        insumos_raw = [
+            {
+                "id": 1,
+                "name": "Ração Inválida",
+                "unit": "kg",
+                "current_stock": "invalid_stock",
+                "min_stock": 50.0,
+            },
+            {
+                "id": 2,
+                "name": "Outra Ração Inválida",
+                "unit": "kg",
+                "saldo": "invalid_saldo",
+                "min_stock": 50.0,
+            }
+        ]
+        consumo_por_id = {1: 10.0, 2: 10.0}
+        insumos_montados = montar_insumos(insumos_raw, consumo_por_id)
+
+        self.assertEqual(len(insumos_montados), 2)
+        self.assertEqual(insumos_montados[0]["saldo"], 0.0)
+        self.assertEqual(insumos_montados[1]["saldo"], 0.0)
+
     def test_criterio_6_encadeamento_com_previsao_estoque_prever(self):
         """Critério 6: montar_insumos + previsao_estoque.prever produz urgencia 'critica' para saldo < min_stock."""
         insumos_raw = [
@@ -156,6 +196,65 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         resultado_previsao = prever(insumos_montados, "2026-08-06")
         self.assertEqual(len(resultado_previsao), 1)
         self.assertEqual(resultado_previsao[0]["urgencia"], "critica")
+
+    def test_quantidade_negativa_ou_zero_e_ignorada(self):
+        """Quantidades negativas ou zero devem ser ignoradas e não abater do saldo total."""
+        insumos = {1: {"unit": "kg"}}
+        planos = [
+            {
+                "insumo_id": 1,
+                "quantity": -5.0,
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            },
+            {
+                "insumo_id": 1,
+                "quantity": 0.0,
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            },
+        ]
+        res = consumo_diario_planejado(insumos, planos, dummy_converter)
+        self.assertEqual(res, {1: 0.0})
+
+    def test_montar_insumos_fallback_estoque_minimo_invalido(self):
+        """Testa se valores não parseáveis para min_stock ou estoque_minimo sofrem fallback para 0.0.
+
+        Verifica a tratativa de ValueError (string não conversível) e TypeError (tipo incompatível, ex: lista).
+        """
+        insumos_raw = [
+            {
+                "id": 1,
+                "name": "Milho",
+                "unit": "kg",
+                "current_stock": 100.0,
+                "min_stock": "invalido",
+            },
+            {
+                "id": 2,
+                "name": "Soja",
+                "unit": "kg",
+                "current_stock": 200.0,
+                "min_stock": None,
+                "estoque_minimo": ["lista_invalida"],
+            },
+            {
+                "id": 3,
+                "name": "Sorgo",
+                "unit": "kg",
+                "current_stock": 300.0,
+                "min_stock": None,
+            },
+        ]
+        consumo_por_id = {1: 10.0, 2: 10.0, 3: 10.0}
+        res = montar_insumos(insumos_raw, consumo_por_id)
+
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[0]["estoque_minimo"], 0.0)
+        self.assertEqual(res[1]["estoque_minimo"], 0.0)
+        self.assertEqual(res[2]["estoque_minimo"], 0.0)
 
 
 if __name__ == "__main__":
