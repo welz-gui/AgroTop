@@ -65,6 +65,25 @@ def get_all_animal_ids(status: str = "ativo") -> set[str]:
         return {r["id"] for r in con.execute(sql, (status,)).fetchall()}
 
 @_cache
+def get_total_gain_kg(status: Optional[str] = "ativo",
+                      lote_id: Optional[str] = None,
+                      breed: Optional[str] = None) -> float:
+    sql = "SELECT SUM(current_weight - entry_weight) FROM animals WHERE 1=1"
+    args = []
+    if status:
+        sql += " AND status=?"
+        args.append(status)
+    if lote_id:
+        sql += " AND lote_id=?"
+        args.append(lote_id)
+    if breed:
+        sql += " AND breed=?"
+        args.append(breed)
+    with _conn() as con:
+        result = con.execute(sql, args).fetchone()
+        return float(result[0]) if result and result[0] is not None else 0.0
+
+@_cache
 def get_all_animals(status: Optional[str] = "ativo",
                     lote_id: Optional[str] = None,
                     breed: Optional[str] = None) -> list[dict]:

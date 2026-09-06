@@ -4,6 +4,7 @@ from datetime import date
 from services.caixa import (
     _date_or_none,
     _lançamento_valido,
+    _to_float,
     em_aberto,
     fluxo_de_caixa,
     resultado_por_competencia,
@@ -132,6 +133,13 @@ class TestCaixa(unittest.TestCase):
         self.assertEqual(resultado["receitas"], 0.0)
         self.assertEqual(resultado["despesas"], 0.0)
         self.assertEqual(resultado["resultado"], 0.0)
+
+    def test_to_float_lida_com_tipos_invalidos_retornando_zero(self):
+        self.assertEqual(_to_float("123.45"), 123.45)
+        self.assertEqual(_to_float(10), 10.0)
+        self.assertEqual(_to_float("abc"), 0.0)
+        self.assertEqual(_to_float({}), 0.0)
+        self.assertEqual(_to_float(None), 0.0)
 
     def test_lancamento_valido_com_chaves_ausentes_ou_vazias(self):
         # Missing keys entirely
