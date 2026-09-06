@@ -1,6 +1,6 @@
 import unittest
 
-from services.caixa import em_aberto, fluxo_de_caixa, resultado_por_competencia
+from services.caixa import _parse_date, em_aberto, fluxo_de_caixa, resultado_por_competencia
 
 
 class TestCaixa(unittest.TestCase):
@@ -125,6 +125,11 @@ class TestCaixa(unittest.TestCase):
         self.assertEqual(resultado["receitas"], 0.0)
         self.assertEqual(resultado["despesas"], 0.0)
         self.assertEqual(resultado["resultado"], 0.0)
+
+    def test_parse_date_invalid_raises_value_error(self):
+        with self.assertRaises(ValueError) as context:
+            _parse_date("invalid-date")
+        self.assertEqual(str(context.exception), "data inválida: invalid-date")
 
 
 if __name__ == "__main__":
