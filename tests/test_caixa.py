@@ -4,6 +4,7 @@ from datetime import date
 from services.caixa import (
     _date_or_none,
     _lançamento_valido,
+    _parse_date,
     _to_float,
     em_aberto,
     fluxo_de_caixa,
@@ -133,6 +134,11 @@ class TestCaixa(unittest.TestCase):
         self.assertEqual(resultado["receitas"], 0.0)
         self.assertEqual(resultado["despesas"], 0.0)
         self.assertEqual(resultado["resultado"], 0.0)
+
+    def test_parse_date_invalid_raises_value_error(self):
+        with self.assertRaises(ValueError) as context:
+            _parse_date("invalid-date")
+        self.assertEqual(str(context.exception), "data inválida: invalid-date")
 
     def test_to_float_lida_com_tipos_invalidos_retornando_zero(self):
         self.assertEqual(_to_float("123.45"), 123.45)
