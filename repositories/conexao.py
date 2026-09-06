@@ -256,23 +256,35 @@ def _conn():
 # O import de streamlit é preguiçoso e com fallback (ROADMAP.md R9): sem o
 # framework, o cache vira no-op e a camada de dados continua utilizável pela API,
 # pelo app mobile e por jobs agendados.
+_cached_functions = []
+
 try:
     import streamlit as _st
 
     def _cache(fn):
-        return _st.cache_data(ttl=120, show_spinner=False)(fn)
+        cached = _st.cache_data(ttl=120, show_spinner=False)(fn)
+        _cached_functions.append(cached)
+        return cached
 
     def clear_cache() -> None:
         try:
             _st.cache_data.clear()
         except Exception:
             pass
+        for fn in _cached_functions:
+            if hasattr(fn, "clear"):
+                try: fn.clear()
+                except Exception: pass
 except Exception:
     def _cache(fn):
+        _cached_functions.append(fn)
         return fn
 
     def clear_cache() -> None:
-        pass
+        for fn in _cached_functions:
+            if hasattr(fn, "cache_clear"):
+                try: fn.cache_clear()
+                except Exception: pass
 
 
 def _writes(fn):

@@ -5170,6 +5170,7 @@ def _nutricao_custo_por_piquete(lotes, insumos):
                "schema hoje (fora do escopo desta integração, decisão registrada no "
                "ROADMAP); custo em R$ não é afetado.")
 
+    # Convertendo do parâmetro `insumos` ao invés de buscar globalmente
     insumos_por_id = {i["id"]: i for i in insumos}
     lotes_com_plano_ativo = sorted({
         p["lote_id"] for p in db.get_feeding_plans(active_only=True)

@@ -1677,6 +1677,11 @@ def get_all_insumos() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+@_cache
+def get_all_insumos_dict() -> dict[int, dict]:
+    return {i["id"]: i for i in get_all_insumos()}
+
+
 @_writes
 def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
                      operator: str = "") -> None:
@@ -2612,7 +2617,7 @@ def delete_photo(photo_id: int) -> None:
 
 def _consumo_diario_por_insumo() -> dict:
     """Consumo diário previsto de cada insumo, somando os planos de trato ativos."""
-    insumos_por_id = {i["id"]: i for i in get_all_insumos()}
+    insumos_por_id = get_all_insumos_dict()
     planos_ativos = get_feeding_plans(active_only=True)
     return consumo_diario_planejado(insumos_por_id, planos_ativos, convert_quantity)
 
