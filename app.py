@@ -1045,7 +1045,7 @@ def _teclado_numerico():
     """Teclado numérico isolado em fragmento: digitar não re-roda a página toda."""
     st.caption("Teclado grande para uso ao sol / com luvas.")
     disp = st.session_state.keypad_value or "——"
-    st.markdown(f'<div class="keypad-display">BR {disp}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="keypad-display">BR {html.escape(str(disp))}</div>', unsafe_allow_html=True)
     rows_kbd = [["7","8","9"],["4","5","6"],["1","2","3"],["C","0","✓"]]
     for row in rows_kbd:
         kc = st.columns(3)
@@ -2287,7 +2287,7 @@ def _fin_precos():
         for band in AGE_BANDS:
             c1, c2, c3 = st.columns([2,1,1])
             with c1:
-                st.markdown(f"<div style='padding-top:.55rem'>{band}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top:.55rem'>{html.escape(str(band))}</div>", unsafe_allow_html=True)
             with c2:
                 novos[(band,"M")] = st.number_input(f"♂ Macho", min_value=0.0, step=0.10,
                     value=float(precos.get((band,"M"),0.0)), key=f"pk_{band}_M", format="%.2f")
