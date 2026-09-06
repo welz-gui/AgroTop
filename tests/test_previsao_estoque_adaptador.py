@@ -53,6 +53,21 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         res = consumo_diario_planejado(insumos, planos, dummy_converter)
         self.assertEqual(res, {1: 0.0})
 
+    def test_quantidade_invalida_string_nao_causa_erro(self):
+        """Critério extra: quantidade como string não convertível deve ser ignorada sem exceção."""
+        insumos = {1: {"unit": "kg"}}
+        planos = [
+            {
+                "insumo_id": 1,
+                "quantity": "invalid_string",
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            }
+        ]
+        res = consumo_diario_planejado(insumos, planos, dummy_converter)
+        self.assertEqual(res, {1: 0.0})
+
     def test_criterio_3_frequencia_desconhecida_e_ignorada(self):
         """Critério 3: Frequência fora de {"diario", "semanal", "mensal"} (ex: quinzenal) é ignorada.
 
