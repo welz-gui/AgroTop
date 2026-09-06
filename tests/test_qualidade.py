@@ -83,6 +83,10 @@ class TestParseDate(unittest.TestCase):
         self.assertIsNone(_parse_date([]))
         self.assertIsNone(_parse_date({}))
 
+    def test_parse_date_invalid_calendar_value(self):
+        self.assertIsNone(_parse_date("2023-13-01"))
+        self.assertIsNone(_parse_date("2023-02-30"))
+
 
 class TestPercentageChange(unittest.TestCase):
     def test_divide_by_zero_current_zero(self):
