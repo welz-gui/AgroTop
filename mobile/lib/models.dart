@@ -835,3 +835,138 @@ class PrevisaoEstoqueItem {
   };
 }
 
+class RelatorioInventarioItem {
+  const RelatorioInventarioItem({
+    required this.id,
+    this.raca,
+    this.sexo,
+    required this.categoriaIdade,
+    required this.idadeDisplay,
+    this.dataNascimento,
+    required this.nascimentoEstimado,
+    required this.origemIdade,
+    required this.dataEntrada,
+    required this.pesoEntradaKg,
+    required this.pesoAtualKg,
+    required this.ganhoKg,
+    required this.arrobasAtuais,
+    this.gmdKgDia,
+    required this.status,
+    this.loteId,
+    this.fornecedor,
+    this.nf,
+    this.gta,
+    this.carenciaAte,
+  });
+
+  final String id;
+  final String? raca;
+  final String? sexo;
+  final String categoriaIdade;
+  final String idadeDisplay;
+  final String? dataNascimento;
+  final bool nascimentoEstimado;
+  final String origemIdade;
+  final String dataEntrada;
+  final double pesoEntradaKg;
+  final double pesoAtualKg;
+  final double ganhoKg;
+  final double arrobasAtuais;
+  final double? gmdKgDia;
+  final String status;
+  final String? loteId;
+  final String? fornecedor;
+  final String? nf;
+  final String? gta;
+  final String? carenciaAte;
+
+  factory RelatorioInventarioItem.fromJson(Map<String, dynamic> json) =>
+      RelatorioInventarioItem(
+        id: json['id'] as String,
+        raca: json['raca'] as String?,
+        sexo: json['sexo'] as String?,
+        categoriaIdade: (json['categoria_idade'] as String?) ?? '',
+        idadeDisplay: (json['idade_display'] as String?) ?? '',
+        dataNascimento: json['data_nascimento'] as String?,
+        nascimentoEstimado: json['nascimento_estimado'] as bool? ?? false,
+        origemIdade: (json['origem_idade'] as String?) ?? 'propriedade',
+        dataEntrada: (json['data_entrada'] as String?) ?? '',
+        pesoEntradaKg: (json['peso_entrada_kg'] as num?)?.toDouble() ?? 0.0,
+        pesoAtualKg: (json['peso_atual_kg'] as num?)?.toDouble() ?? 0.0,
+        ganhoKg: (json['ganho_kg'] as num?)?.toDouble() ?? 0.0,
+        arrobasAtuais: (json['arrobas_atuais'] as num?)?.toDouble() ?? 0.0,
+        gmdKgDia: (json['gmd_kg_dia'] as num?)?.toDouble(),
+        status: (json['status'] as String?) ?? '',
+        loteId: json['lote_id']?.toString(),
+        fornecedor: json['fornecedor'] as String?,
+        nf: json['nf'] as String?,
+        gta: json['gta'] as String?,
+        carenciaAte: json['carencia_ate'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'raca': raca,
+    'sexo': sexo,
+    'categoria_idade': categoriaIdade,
+    'idade_display': idadeDisplay,
+    'data_nascimento': dataNascimento,
+    'nascimento_estimado': nascimentoEstimado,
+    'origem_idade': origemIdade,
+    'data_entrada': dataEntrada,
+    'peso_entrada_kg': pesoEntradaKg,
+    'peso_atual_kg': pesoAtualKg,
+    'ganho_kg': ganhoKg,
+    'arrobas_atuais': arrobasAtuais,
+    'gmd_kg_dia': gmdKgDia,
+    'status': status,
+    'lote_id': loteId,
+    'fornecedor': fornecedor,
+    'nf': nf,
+    'gta': gta,
+    'carencia_ate': carenciaAte,
+  };
+}
+
+class RelatorioPesagemItem {
+  const RelatorioPesagemItem({
+    required this.animalId,
+    required this.data,
+    required this.pesoKg,
+    required this.metodo,
+    this.loteId,
+    this.operador,
+    this.observacoes,
+  });
+
+  final String animalId;
+  final String data;
+  final double pesoKg;
+  final String metodo;
+  final String? loteId;
+  final String? operador;
+  final String? observacoes;
+
+  factory RelatorioPesagemItem.fromJson(Map<String, dynamic> json) =>
+      RelatorioPesagemItem(
+        animalId: json['animal_id'] as String,
+        data: json['data'] as String,
+        pesoKg: (json['peso_kg'] as num).toDouble(),
+        metodo: (json['metodo'] as String?) ?? 'pesado',
+        loteId: json['lote_id']?.toString(),
+        operador: json['operador'] as String?,
+        observacoes: json['observacoes'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'animal_id': animalId,
+    'data': data,
+    'peso_kg': pesoKg,
+    'metodo': metodo,
+    'lote_id': loteId,
+    'operador': operador,
+    'observacoes': observacoes,
+  };
+}
+
+

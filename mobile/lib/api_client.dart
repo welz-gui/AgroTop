@@ -329,6 +329,49 @@ class ApiClient {
         .toList(growable: false);
   }
 
+  Future<List<RelatorioInventarioItem>> getRelatorioInventario() async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse('$baseUrl/relatorios/inventario'),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar o relatório de inventário.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map(
+          (item) =>
+              RelatorioInventarioItem.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<RelatorioPesagemItem>> getRelatorioPesagens() async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse('$baseUrl/relatorios/pesagens'),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar o relatório de pesagens.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map(
+          (item) => RelatorioPesagemItem.fromJson(item as Map<String, dynamic>),
+        )
+        .toList(growable: false);
+  }
+
   Future<DeviceLookup?> findDevice(String codigoVisual) async {
     final response = await _authorized(
       (headers) => _http.get(

@@ -212,6 +212,14 @@ void main() {
       expect(server.dashboardResumoRequests, 1);
       expect(resumo.totalAnimais, 12);
       expect(resumo.alertas.prontosParaAbate, 3);
+      final relInventario = await api.getRelatorioInventario();
+      expect(server.relatorioInventarioRequests, 1);
+      expect(relInventario, hasLength(3));
+      expect(relInventario.first.id, 'BR0001');
+      final relPesagens = await api.getRelatorioPesagens();
+      expect(server.relatorioPesagensRequests, 1);
+      expect(relPesagens, hasLength(3));
+      expect(relPesagens.first.metodo, 'pesado');
       await api.logout();
     }, PassthroughHttpOverrides());
   });
