@@ -5,6 +5,7 @@ from services.caixa import (
     _date_or_none,
     _lançamento_valido,
     _parse_date,
+    _to_float,
     em_aberto,
     fluxo_de_caixa,
     resultado_por_competencia,
@@ -138,6 +139,13 @@ class TestCaixa(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             _parse_date("invalid-date")
         self.assertEqual(str(context.exception), "data inválida: invalid-date")
+
+    def test_to_float_lida_com_tipos_invalidos_retornando_zero(self):
+        self.assertEqual(_to_float("123.45"), 123.45)
+        self.assertEqual(_to_float(10), 10.0)
+        self.assertEqual(_to_float("abc"), 0.0)
+        self.assertEqual(_to_float({}), 0.0)
+        self.assertEqual(_to_float(None), 0.0)
 
     def test_lancamento_valido_com_chaves_ausentes_ou_vazias(self):
         # Missing keys entirely
