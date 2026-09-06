@@ -89,7 +89,7 @@ class TestDietaPorPiqueteNaTela(unittest.TestCase):
 
         insumos_por_id = {i["id"]: i for i in db.get_all_insumos()}
         planos = db.get_feeding_plans(lote_id=lote["id"], active_only=True)
-        cabecas = len(db.get_all_animals(status="ativo", lote_id=lote["id"]))
+        cabecas = db.count_animals(status="ativo", lote_id=lote["id"])
         self.assertGreaterEqual(cabecas, 1)
 
         ingredientes = ingredientes_por_cabeca(

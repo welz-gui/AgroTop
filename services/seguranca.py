@@ -39,5 +39,4 @@ def _verify_password(pwd: str, stored: str) -> bool:
         except (ValueError, TypeError):
             return False
     # Legado: SHA-256 sem salt
-    legacy = hashlib.sha256(pwd.encode()).hexdigest()
-    return hmac.compare_digest(legacy, stored)
+    return False

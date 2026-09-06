@@ -3,6 +3,7 @@ from datetime import date
 
 from services.caixa import (
     _date_or_none,
+    _lançamento_valido,
     _parse_date,
     em_aberto,
     fluxo_de_caixa,
@@ -137,6 +138,36 @@ class TestCaixa(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             _parse_date("invalid-date")
         self.assertEqual(str(context.exception), "data inválida: invalid-date")
+
+    def test_lancamento_valido_com_chaves_ausentes_ou_vazias(self):
+        # Missing keys entirely
+        self.assertTrue(_lançamento_valido({}))
+
+        # Keys present but values are None
+        self.assertTrue(_lançamento_valido({
+            "competencia": None,
+            "vencimento": None,
+            "pagamento": None,
+        }))
+
+        # Keys present but values are empty strings
+        self.assertTrue(_lançamento_valido({
+            "competencia": "",
+            "vencimento": "",
+            "pagamento": "",
+        }))
+
+        # Keys present with valid values
+        self.assertTrue(_lançamento_valido({
+            "competencia": "2026-03-01",
+            "vencimento": "2026-03-05",
+            "pagamento": "2026-03-10",
+        }))
+
+        # Key present with invalid value should return False
+        self.assertFalse(_lançamento_valido({
+            "competencia": "invalid-date",
+        }))
 
     def test_date_or_none_returns_date_for_valid_string(self):
         resultado = _date_or_none("2026-03-15")

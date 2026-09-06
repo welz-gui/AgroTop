@@ -917,7 +917,7 @@ def _dash_completude():
                 m += 12; a -= 1
             meses.append((a, m))
 
-        animais_ativos = len(db.get_all_animals(status="ativo"))
+        animais_ativos = db.count_animals(status="ativo")
         pesagens = normalizar_pesagens(db.get_all_weighings())
 
         linhas = []
