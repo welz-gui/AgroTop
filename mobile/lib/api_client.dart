@@ -262,6 +262,21 @@ class ApiClient {
     return OperationalAlerts.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<DashboardResumo> getDashboardResumo() async {
+    final response = await _authorized(
+      (headers) =>
+          _http.get(Uri.parse('$baseUrl/dashboard/resumo'), headers: headers),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar o resumo do rebanho.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return DashboardResumo.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<List<RecomendacaoItem>> getRecomendacoes() async {
     final response = await _authorized(
       (headers) =>
