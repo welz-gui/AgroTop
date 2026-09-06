@@ -157,6 +157,43 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         self.assertEqual(len(resultado_previsao), 1)
         self.assertEqual(resultado_previsao[0]["urgencia"], "critica")
 
+    def test_montar_insumos_fallback_estoque_minimo_invalido(self):
+        """Testa se valores não parseáveis para min_stock ou estoque_minimo sofrem fallback para 0.0.
+
+        Verifica a tratativa de ValueError (string não conversível) e TypeError (tipo incompatível, ex: lista).
+        """
+        insumos_raw = [
+            {
+                "id": 1,
+                "name": "Milho",
+                "unit": "kg",
+                "current_stock": 100.0,
+                "min_stock": "invalido",
+            },
+            {
+                "id": 2,
+                "name": "Soja",
+                "unit": "kg",
+                "current_stock": 200.0,
+                "min_stock": None,
+                "estoque_minimo": ["lista_invalida"],
+            },
+            {
+                "id": 3,
+                "name": "Sorgo",
+                "unit": "kg",
+                "current_stock": 300.0,
+                "min_stock": None,
+            },
+        ]
+        consumo_por_id = {1: 10.0, 2: 10.0, 3: 10.0}
+        res = montar_insumos(insumos_raw, consumo_por_id)
+
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[0]["estoque_minimo"], 0.0)
+        self.assertEqual(res[1]["estoque_minimo"], 0.0)
+        self.assertEqual(res[2]["estoque_minimo"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
