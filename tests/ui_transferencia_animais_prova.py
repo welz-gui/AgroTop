@@ -77,7 +77,7 @@ class TestTransferenciaDeAnimaisNaTela(unittest.TestCase):
         # Garante uma origem com pelo menos 2 animais ativos, senão o teste
         # não exercitaria a transferência em lote de verdade.
         with_animals = [l for l in lotes
-                        if len(db.get_all_animals(status="ativo", lote_id=l["id"])) >= 2]
+                        if db.count_animals(status="ativo", lote_id=l["id"]) >= 2]
         self.assertTrue(with_animals, "seed sem piquete com >= 2 animais ativos")
         origem = with_animals[0]
         destino = next(l for l in lotes if l["id"] != origem["id"])
