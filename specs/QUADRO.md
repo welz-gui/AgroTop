@@ -47,9 +47,10 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 [#331](https://github.com/welz-gui/AgroTop/pull/331)). **0073/0074/0075 fechadas em
 2026-09-06** ([PR #333](https://github.com/welz-gui/AgroTop/pull/333),
 [#335](https://github.com/welz-gui/AgroTop/pull/335),
-[#334](https://github.com/welz-gui/AgroTop/pull/334)). **0076 fechada em 2026-09-06**
-([PR #359](https://github.com/welz-gui/AgroTop/pull/359)) — só falta 0077/0078
-(relatórios) pro Tier 2 fechar por completo.
+[#334](https://github.com/welz-gui/AgroTop/pull/334)). **0076/0077 fechadas em 2026-09-06**
+([PR #359](https://github.com/welz-gui/AgroTop/pull/359),
+[#365](https://github.com/welz-gui/AgroTop/pull/365)) — só falta a 0078 (mobile
+relatórios) pro Tier 2 fechar por completo.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -338,8 +339,8 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 | — | [0074](0074-mobile-tela-de-estoque.md) — Mobile: tela de estoque (inventário e previsão) 🏗️ | — | ✅ [#335](https://github.com/welz-gui/AgroTop/pull/335) | | 2026-09-06 |
 | — | [0075](0075-api-dashboard-resumo.md) — API: resumo do dashboard (KPIs) 🏗️ | — | ✅ [#334](https://github.com/welz-gui/AgroTop/pull/334) | | 2026-09-06 |
 | — | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | ✅ [#359](https://github.com/welz-gui/AgroTop/pull/359) | | 2026-09-06 |
-| 7 | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | 🟢 disponível | | 2026-09-03 |
-| 8 | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | 🟡 depende da 0077 mesclar (ou teste contra mock) | | 2026-09-03 |
+| — | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | ✅ [#365](https://github.com/welz-gui/AgroTop/pull/365) | | 2026-09-06 |
+| 8 | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | 🟢 disponível (0077 já mesclada) | | 2026-09-03 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
@@ -612,8 +613,16 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 > para telas diferentes e escreveram no mesmo bloco de `testWidgets`/mock — separados em
 > dois testes independentes, dashboard renumerado para 29/30 pra não colidir. Nenhuma
 > dessas três correções veio do autor original da PR — todas verificadas via CI real
-> (mobile CI disparada manualmente 3 vezes), não só leitura de código. **Com isso, o Tier 2
-> da ADR 0007 está com 6 das 8 specs fechadas — só falta 0077/0078 (relatórios).**
+> (mobile CI disparada manualmente 3 vezes), não só leitura de código.
+>
+> **0077 fechada em 2026-09-06 — [PR #365](https://github.com/welz-gui/AgroTop/pull/365).**
+> `GET /relatorios/inventario` + `GET /relatorios/pesagens`, zero lógica nova. Teste de
+> prova real compara campo a campo (19 campos) **para cada animal retornado**, não só os
+> 3 modelos do critério — contra chamadas independentes de `get_age_category`,
+> `get_age_display`, `calculate_gmd_bulk`, `get_withdrawal_end_batch`, `kg_to_arrobas` e o
+> fallback de `AGE_SOURCES`. Confirma explicitamente que `metodo` não é traduzido (checa
+> que rótulos em português tipo "Balança" não aparecem). **Com isso, o Tier 2 da ADR 0007
+> está com 7 das 8 specs fechadas — só falta a 0078 (mobile relatórios), livre agora.**
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
