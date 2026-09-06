@@ -12,7 +12,6 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
-import random
 from datetime import datetime, date, timedelta
 from typing import Optional
 from dataclasses import dataclass
@@ -62,13 +61,13 @@ from repositories import regras as regras  # noqa: F401
 from repositories import compras as compras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
-    get_all_animals, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
+    get_all_animals, count_animals, get_total_gain_kg, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
     _seed_animals, AnimalData,
 )
 from repositories.pesagens import (
     calculate_gmd_bulk,  # noqa: F401
     _weighings_by_animal, get_weighings, get_weighings_batch, add_weighing, get_all_weighings,
-    calculate_gmd, get_last_estimate,
+    get_average_weighings_by_date, calculate_gmd, get_last_estimate
 )
 from repositories.sanidade import (
     get_withdrawal_end_batch,  # noqa: F401
@@ -1322,15 +1321,6 @@ def verify_login(username: str, password: str) -> Optional[dict]:
         ).fetchone()
     if not row or not _verify_password(password, row["password_hash"]):
         return None
-    # Migração automática: atualiza hash legado (SHA-256) para PBKDF2
-    if _is_legacy_hash(row["password_hash"]):
-        try:
-            with _conn() as con:
-                con.execute("UPDATE users SET password_hash=? WHERE id=?",
-                            (_hash(password), row["id"]))
-            clear_cache()
-        except Exception:
-            pass
     user = dict(row)
     user.pop("password_hash", None)   # nunca expõe o hash
     return user
@@ -1592,6 +1582,27 @@ def get_all_lotes() -> list[dict]:
         d = dict(r)
         if d.get("total_ua") is not None:
             d["total_ua"] = round(float(d["total_ua"]), 2)
+        out.append(d)
+    return out
+
+
+def get_lotes_resumo() -> list[dict]:
+    """Retorna os lotes de forma simplificada para o motor de recomendações."""
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT l.id,
+                      l.name as nome,
+                      l.capacity_ua as capacidade_ua,
+                      SUM(a.current_weight) / 450.0 as total_ua
+               FROM lotes l
+               LEFT JOIN animals a ON a.lote_id=l.id AND a.status='ativo'
+               GROUP BY l.id ORDER BY l.id""",
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["ua_atual"] = round(float(d["total_ua"]), 2) if d.get("total_ua") is not None else None
+        del d["total_ua"]
         out.append(d)
     return out
 
@@ -2655,10 +2666,7 @@ def contexto_recomendacoes() -> dict:
             "carencia_ate": fim.isoformat() if fim and fim >= hoje else None,
         })
 
-    lotes = [{"id": l["id"],
-              "capacidade_ua": l.get("capacity_ua"),
-              "ua_atual": l.get("total_ua")}
-             for l in get_all_lotes()]
+    lotes = get_lotes_resumo()
 
     insumos = [{"id": i["id"], "nome": i["name"],
                 "saldo": i.get("current_stock"),

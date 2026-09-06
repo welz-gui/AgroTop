@@ -631,8 +631,7 @@ def _sidebar():
             if _use_arroba():
                 prod_str = f"🏷️ <b style='color:{c['atencao']}'>{stats.arrobas_prod:.1f} @</b> ganhas"
             else:
-                total_gain_kg = sum(a["current_weight"]-a["entry_weight"]
-                                    for a in db.get_all_animals())
+                total_gain_kg = db.get_total_gain_kg(status="ativo")
                 prod_str = f"📦 <b style='color:{c['atencao']}'>{total_gain_kg:.0f} kg</b> ganhos"
 
             st.markdown(f"""
@@ -699,6 +698,10 @@ def _dash_kpis(stats, animals):
         prod_label = "🏷️ @ Ganhas"
         prod_value = f"{stats.arrobas_prod:.1f} @"
     else:
+        # Avoid python loop if animals matches the default "ativo" filter without other filters
+        # Or safely do the python sum if we can't guarantee it.
+        # animals comes from db.get_all_animals() in page_dashboard (status="ativo")
+        # To be perfectly robust for any future filtered list:
         total_gain_kg = sum(a["current_weight"]-a["entry_weight"] for a in animals)
         prod_label = "📦 Ganho Total"
         prod_value = f"{total_gain_kg:.0f} kg"
@@ -740,21 +743,22 @@ def _dash_chart_evolucao_peso():
     st.subheader("📈 Evolução de Peso do Rebanho")
     raw = db.get_all_weighings()
     if raw:
-        df_all = pd.DataFrame(raw)
-        df_all["weigh_date"] = pd.to_datetime(df_all["weigh_date"])
-        df_avg = (df_all.groupby("weigh_date")["weight"]
-                  .mean().reset_index()
-                  .rename(columns={"weigh_date":"Data","weight":"Peso Médio (kg)"}))
-        df_all = df_all.sort_values(["animal_id", "weigh_date"])
+        raw.sort(key=lambda x: (x["animal_id"], x["weigh_date"]))
+
         fig = px.line(
-            df_all, x="weigh_date", y="weight", color="animal_id", markers=True,
+            raw, x="weigh_date", y="weight", color="animal_id", markers=True,
             color_discrete_sequence=[c["borda"]]
         )
         fig.update_traces(
             showlegend=False, opacity=0.35, line=dict(width=1), marker=dict(size=3),
             hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
         )
-        fig.add_trace(go.Scatter(x=df_avg["Data"],y=df_avg["Peso Médio (kg)"],
+
+        raw_avg = db.get_average_weighings_by_date()
+        x_data = [d["Data"] for d in raw_avg]
+        y_data = [d["Peso Médio (kg)"] for d in raw_avg]
+
+        fig.add_trace(go.Scatter(x=x_data,y=y_data,
             mode="lines+markers",name="Média do Rebanho",
             line=dict(width=3,color=c["primaria"]),
             marker=dict(size=9,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
@@ -917,7 +921,7 @@ def _dash_completude():
                 m += 12; a -= 1
             meses.append((a, m))
 
-        animais_ativos = len(db.get_all_animals(status="ativo"))
+        animais_ativos = db.count_animals(status="ativo")
         pesagens = normalizar_pesagens(db.get_all_weighings())
 
         linhas = []
@@ -1045,7 +1049,7 @@ def _teclado_numerico():
     """Teclado numérico isolado em fragmento: digitar não re-roda a página toda."""
     st.caption("Teclado grande para uso ao sol / com luvas.")
     disp = st.session_state.keypad_value or "——"
-    st.markdown(f'<div class="keypad-display">BR {html.escape(str(disp))}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="keypad-display">BR {html.escape(str(disp), quote=True)}</div>', unsafe_allow_html=True)
     rows_kbd = [["7","8","9"],["4","5","6"],["1","2","3"],["C","0","✓"]]
     for row in rows_kbd:
         kc = st.columns(3)
