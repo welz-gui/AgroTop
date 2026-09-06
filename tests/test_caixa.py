@@ -1,6 +1,6 @@
 import unittest
 
-from services.caixa import em_aberto, fluxo_de_caixa, resultado_por_competencia
+from services.caixa import _to_float, em_aberto, fluxo_de_caixa, resultado_por_competencia
 
 
 class TestCaixa(unittest.TestCase):
@@ -125,6 +125,13 @@ class TestCaixa(unittest.TestCase):
         self.assertEqual(resultado["receitas"], 0.0)
         self.assertEqual(resultado["despesas"], 0.0)
         self.assertEqual(resultado["resultado"], 0.0)
+
+    def test_to_float_lida_com_tipos_invalidos_retornando_zero(self):
+        self.assertEqual(_to_float("123.45"), 123.45)
+        self.assertEqual(_to_float(10), 10.0)
+        self.assertEqual(_to_float("abc"), 0.0)
+        self.assertEqual(_to_float({}), 0.0)
+        self.assertEqual(_to_float(None), 0.0)
 
 
 if __name__ == "__main__":
