@@ -4,12 +4,16 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-09-03 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
+Última atualização: 2026-09-06 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
 (API + mobile, exceto Bluetooth — hardware, não delegável), 2 (geometria/GPS) e 3
 (Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** ·
-fila de specs em `specs/QUADRO.md` zerada de 0001 a 0070 · **Trilha 4 (Inteligência) é a
-única fronteira aberta**, primeiras specs (0071/0072 — recomendações do motor de regras no
-mobile) escritas em 2026-09-03 — ver seção 5
+fila de specs em `specs/QUADRO.md` zerada de 0001 a 0078 · Tier 2 da
+[ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md) (paridade admin no
+mobile, só leitura) concluído · **Trilha 4 (Inteligência) é a única fronteira aberta** —
+escopo imediato (PWA, importação/detecção de pesagem suspeita, lucro por raça, chuva×GMD)
+e o motor de regras já em produção; falta só o NDVI por piquete
+([spec 0079](specs/0079-web-ndvi-por-piquete.md), escrita em 2026-09-06, fundamentada na
+PoC já concluída) — ver seção 5
 
 ---
 
@@ -708,16 +712,26 @@ ver acima); DRE e fluxo de caixa não se contradizem — sem achado em contrári
 
 ### Trilha 4 — Inteligência: relatórios, regras e (depois) modelos
 
-**Escopo imediato (baixo custo, baixa colisão)**
+**Escopo imediato (baixo custo, baixa colisão) — status em 2026-09-06: todo concluído**
 - **PWA:** `manifest.json` + ícone → AgroTop com ícone na tela inicial do celular, em tela
   cheia. ~1 dia. Não dá offline nem câmera nativa, mas dá ganho de campo imediato.
+  ✅ Concluído (spec 0002/[PR #31](https://github.com/welz-gui/AgroTop/pull/31)):
+  `static/manifest.json` + ícones + injeção no `<head>` de `app.py`. Falta só a
+  verificação manual de que a sessão sobrevive à instalação — exige deploy HTTPS, ver
+  "Pendência do PWA" em `specs/QUADRO.md`, não é trabalho de código.
 - **Importação CSV de pesagens** e **detecção de valor suspeito** (peso muito acima/abaixo do
   anterior, GMD implausível, duplicidade na mesma data). Funções puras, fáceis de testar.
+  ✅ Concluído: `avaliar_pesagem` em produção no web (`app.py`) e na API
+  ([spec 0057](specs/0057-api-importacao-de-pesagens-csv.md)).
 - **Relatórios**: tratar como atividade **contínua**, não como fase. Cada módulo entrega seus
   2–3 relatórios junto. Concentrar 20 relatórios no fim significa meses sem conseguir ver se
   os módulos funcionam.
 - **Lucro por raça/cruzamento** — extensão direta de `get_fornecedor_ranking`.
+  ✅ Concluído: `app.py::_fin_rentabilidade_por_raca` (spec 0042), em produção em
+  `page_financeiro`.
 - **Correlação chuva × GMD** — o dado já existe (`pluviometria` + pesagens).
+  ✅ Concluído: `services/projecao.py::correlacao_chuva_gmd`, em produção
+  (`app.py::_render_tab_correlacao_chuva_gmd`).
 
 **Motor de regras** (o passo que importa)
 Regras explícitas com motivo e dados à vista: NDVI em queda + pouca chuva + alta lotação →
@@ -757,8 +771,20 @@ ficando treinável.
 
 **NDVI (satélite)** entra aqui, e **depois** da Trilha 2 (precisa dos polígonos):
 cena mais recente, cobertura de nuvem, NDVI médio por piquete, histórico, comparação.
-Fontes: Copernicus Data Space / Sentinel-2. **NDVI não equivale a kg de matéria seca** —
-nenhum alerta deve afirmar disponibilidade de forragem sem calibração de campo.
+**NDVI não equivale a kg de matéria seca** — nenhum alerta deve afirmar disponibilidade de
+forragem sem calibração de campo.
+
+**Status em 2026-09-06:** a Trilha 2 (polígonos por piquete) fechou em 2026-09-03 — o
+bloqueio acima está removido. A PoC ([spec 0004](specs/0004-poc-ndvi-viabilidade.md),
+`poc/ndvi/`) já respondeu a pergunta de viabilidade com dados reais: fonte de dados é o
+**Earth Search v1 da Element 84** (Sentinel-2 L2A nos Dados Abertos da AWS — não
+Copernicus Data Space nem Sentinel Hub como cogitado inicialmente; não exige cadastro nem
+chave de API), limiar de 20% de nuvem, maior vão de 105 dias na estação chuvosa, e
+veredito explícito **"seguir com ressalvas"** (sinal sazonal real, mas sem prometer
+monitoramento contínuo durante a chuva). [Spec 0079](specs/0079-web-ndvi-por-piquete.md),
+escrita em 2026-09-06, implementa isso como leitura de tendência por piquete no web
+(`page_lotes`), não como funcionalidade mobile nem como alerta automático — ambos ficam
+para depois, se fizerem sentido, como specs à parte.
 
 ---
 

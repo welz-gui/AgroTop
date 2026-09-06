@@ -53,6 +53,19 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 [#367](https://github.com/welz-gui/AgroTop/pull/367)) — **Tier 2 da ADR 0007 completo,
 as 8 specs fechadas.**
 
+**0079 escrita em 2026-09-06** — auditoria do "escopo imediato" da Trilha 4 (ROADMAP.md)
+confirmou que lucro por raça (`_fin_rentabilidade_por_raca`), correlação chuva×GMD
+(`services.projecao.correlacao_chuva_gmd`), detecção de valor suspeito na pesagem
+(`avaliar_pesagem`, web e API) e indicador de completude (`_dash_completude`) **já estão
+em produção** — nenhuma spec nova precisa deles. O PWA (`manifest.json`) **também já
+está em produção** (spec 0002/[PR #31](https://github.com/welz-gui/AgroTop/pull/31),
+`static/manifest.json` + injeção no `<head>` de `app.py`) — só falta a verificação manual
+de sessão pós-instalação registrada acima em "⚠️ Pendência do PWA", que exige deploy HTTPS
+e não é trabalho de spec. **A única peça genuinamente ausente é o NDVI por piquete** —
+a PoC (spec 0004) já decidiu fonte de dados, limiar de nuvem e deu o veredito "seguir com
+ressalvas"; a 0079 implementa isso como leitura de tendência em `page_lotes`, não como
+monitoramento contínuo (a PoC condicionou o "seguir" a essa ressalva).
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -342,6 +355,7 @@ as 8 specs fechadas.**
 | — | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | ✅ [#359](https://github.com/welz-gui/AgroTop/pull/359) | | 2026-09-06 |
 | — | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | ✅ [#365](https://github.com/welz-gui/AgroTop/pull/365) | | 2026-09-06 |
 | — | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | ✅ [#367](https://github.com/welz-gui/AgroTop/pull/367) | | 2026-09-06 |
+| — | [0079](0079-web-ndvi-por-piquete.md) — Web: NDVI por piquete (satélite) 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-06 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
