@@ -47,8 +47,9 @@ em 2026-09-04** ([PR #330](https://github.com/welz-gui/AgroTop/pull/330),
 [#331](https://github.com/welz-gui/AgroTop/pull/331)). **0073/0074/0075 fechadas em
 2026-09-06** ([PR #333](https://github.com/welz-gui/AgroTop/pull/333),
 [#335](https://github.com/welz-gui/AgroTop/pull/335),
-[#334](https://github.com/welz-gui/AgroTop/pull/334)) — 0076 (Tier 2, dashboard) livre
-agora.
+[#334](https://github.com/welz-gui/AgroTop/pull/334)). **0076 fechada em 2026-09-06**
+([PR #359](https://github.com/welz-gui/AgroTop/pull/359)) — só falta 0077/0078
+(relatórios) pro Tier 2 fechar por completo.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -336,7 +337,7 @@ agora.
 | — | [0073](0073-api-estoque-inventario-e-previsao.md) — API: inventário de estoque e previsão de ruptura 🏗️ ⚠️médio | — | ✅ [#333](https://github.com/welz-gui/AgroTop/pull/333) | | 2026-09-06 |
 | — | [0074](0074-mobile-tela-de-estoque.md) — Mobile: tela de estoque (inventário e previsão) 🏗️ | — | ✅ [#335](https://github.com/welz-gui/AgroTop/pull/335) | | 2026-09-06 |
 | — | [0075](0075-api-dashboard-resumo.md) — API: resumo do dashboard (KPIs) 🏗️ | — | ✅ [#334](https://github.com/welz-gui/AgroTop/pull/334) | | 2026-09-06 |
-| 6 | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | 🟢 disponível (0075 já mesclada) | | 2026-09-03 |
+| — | [0076](0076-mobile-dashboard-resumo.md) — Mobile: resumo do dashboard 🏗️ | — | ✅ [#359](https://github.com/welz-gui/AgroTop/pull/359) | | 2026-09-06 |
 | 7 | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | 🟢 disponível | | 2026-09-03 |
 | 8 | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | 🟡 depende da 0077 mesclar (ou teste contra mock) | | 2026-09-03 |
 
@@ -599,6 +600,20 @@ agora.
 > antes de reenviar. A 0074 (mobile) não reimplementa nenhum limiar de status/urgência,
 > goldens reais (47-50 KB) nos 3 cenários × 3 temas. **0076 (mobile dashboard) está livre
 > agora.**
+>
+> **0076 fechada em 2026-09-06 — [PR #359](https://github.com/welz-gui/AgroTop/pull/359).**
+> A CI mobile nunca tinha disparado sozinha nessa PR (nenhum run encontrado) — disparada
+> manualmente via `workflow_dispatch`, e revelou dois defeitos reais: (1) overflow de 4.2px
+> no card de KPI (`GridView.count(childAspectRatio: 1.7)` baixo demais pro conteúdo —
+> ajustado para 1.4) e (2) um teste com `tester.drag(offset fixo)` que parou de achar os
+> cards de alerta depois do ajuste de altura — trocado por `dragUntilVisible` (rola até
+> achar de verdade, não depende de um offset calibrado à mão). Depois disso, um **conflito
+> real** com a 0074 (já mesclada): as duas specs reaproveitaram os números de golden 27/28
+> para telas diferentes e escreveram no mesmo bloco de `testWidgets`/mock — separados em
+> dois testes independentes, dashboard renumerado para 29/30 pra não colidir. Nenhuma
+> dessas três correções veio do autor original da PR — todas verificadas via CI real
+> (mobile CI disparada manualmente 3 vezes), não só leitura de código. **Com isso, o Tier 2
+> da ADR 0007 está com 6 das 8 specs fechadas — só falta 0077/0078 (relatórios).**
 
 > **0056/0057/0058/0059 concluídas em 2026-08-27 — [#240](https://github.com/welz-gui/AgroTop/pull/240),
 > [#241](https://github.com/welz-gui/AgroTop/pull/241), [#249](https://github.com/welz-gui/AgroTop/pull/249),
