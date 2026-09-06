@@ -1045,7 +1045,7 @@ def _teclado_numerico():
     """Teclado numérico isolado em fragmento: digitar não re-roda a página toda."""
     st.caption("Teclado grande para uso ao sol / com luvas.")
     disp = st.session_state.keypad_value or "——"
-    st.markdown(f'<div class="keypad-display">BR {disp}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="keypad-display">BR {html.escape(str(disp), quote=True)}</div>', unsafe_allow_html=True)
     rows_kbd = [["7","8","9"],["4","5","6"],["1","2","3"],["C","0","✓"]]
     for row in rows_kbd:
         kc = st.columns(3)
