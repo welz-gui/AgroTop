@@ -176,7 +176,7 @@ class TestImportacaoLigada(BaseIntegracao):
 
     def test_brinco_inexistente_e_rejeitado_com_o_rebanho_real(self):
         a = self._qualquer_ativo()
-        ativos = {x["id"] for x in db.get_all_animals(status="ativo")}
+        ativos = db.get_all_animal_ids(status="ativo")
         texto = f"{a};420;2026-01-15\nBOI_FANTASMA;430;2026-01-15"
         r = db.parse_pesagens(texto, ids_conhecidos=ativos)
         self.assertEqual(len(r["aceitas"]), 1)
@@ -187,7 +187,7 @@ class TestImportacaoLigada(BaseIntegracao):
     def test_linha_aceita_pode_ser_gravada_por_add_weighing(self):
         """O contrato entre o parser e a escrita: nomes e tipos têm de bater."""
         a = self._qualquer_ativo()
-        ativos = {x["id"] for x in db.get_all_animals(status="ativo")}
+        ativos = db.get_all_animal_ids(status="ativo")
         r = db.parse_pesagens(f"{a};433,5;15/01/2026", ids_conhecidos=ativos)
         self.assertEqual(len(r["aceitas"]), 1, r)
 

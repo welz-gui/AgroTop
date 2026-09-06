@@ -83,7 +83,7 @@ from database import (
     previsao_estoque,
     set_lote_poligono,
 )
-from repositories.animais import get_all_animals, get_animal, move_animals_bulk
+from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import add_weighing, calculate_gmd, get_weighings_batch
 from repositories.sanidade import (
@@ -390,7 +390,7 @@ def importar_pesagens_csv(
                 detail="Não foi possível decodificar o arquivo.",
             )
 
-    ativos = {a["id"] for a in get_all_animals(status="ativo")}
+    ativos = get_all_animal_ids(status="ativo")
     resultado = parse_pesagens(texto, ids_conhecidos=ativos)
     aceitas_raw = resultado["aceitas"]
     rejeitadas = resultado["rejeitadas"]

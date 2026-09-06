@@ -59,6 +59,11 @@ def novo_uuid() -> str:
     return str(_uuid.uuid4())
 
 
+def get_all_animal_ids(status: str = "ativo") -> set[str]:
+    sql = "SELECT id FROM animals WHERE status=?"
+    with _conn() as con:
+        return {r["id"] for r in con.execute(sql, (status,)).fetchall()}
+
 @_cache
 def get_all_animals(status: Optional[str] = "ativo",
                     lote_id: Optional[str] = None,
