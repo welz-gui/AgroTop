@@ -139,6 +139,31 @@ class TestPrevisaoEstoqueAdaptador(unittest.TestCase):
         res = montar_insumos(insumos_raw, consumo_por_id)
         self.assertEqual(res[0]["consumo_diario"], 0.0)
 
+    def test_montar_insumos_raw_stock_invalid_string_fallback(self):
+        """Testa o fallback para 0.0 quando current_stock ou saldo possui um valor inválido para float."""
+        insumos_raw = [
+            {
+                "id": 1,
+                "name": "Ração Inválida",
+                "unit": "kg",
+                "current_stock": "invalid_stock",
+                "min_stock": 50.0,
+            },
+            {
+                "id": 2,
+                "name": "Outra Ração Inválida",
+                "unit": "kg",
+                "saldo": "invalid_saldo",
+                "min_stock": 50.0,
+            }
+        ]
+        consumo_por_id = {1: 10.0, 2: 10.0}
+        insumos_montados = montar_insumos(insumos_raw, consumo_por_id)
+
+        self.assertEqual(len(insumos_montados), 2)
+        self.assertEqual(insumos_montados[0]["saldo"], 0.0)
+        self.assertEqual(insumos_montados[1]["saldo"], 0.0)
+
     def test_criterio_6_encadeamento_com_previsao_estoque_prever(self):
         """Critério 6: montar_insumos + previsao_estoque.prever produz urgencia 'critica' para saldo < min_stock."""
         insumos_raw = [
