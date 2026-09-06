@@ -1,5 +1,5 @@
 import unittest
-from services.previsao_estoque import prever
+from services.previsao_estoque import prever, _safe_int
 
 
 class TestPrevisaoEstoque(unittest.TestCase):
@@ -220,6 +220,12 @@ class TestPrevisaoEstoque(unittest.TestCase):
         self.assertEqual(_safe_int("abc"), 0)
         self.assertEqual(_safe_int("abc", default=2), 2)
         self.assertEqual(_safe_int([]), 0)
+
+    def test_safe_int_error_paths(self):
+        self.assertEqual(_safe_int("abc"), 0)
+        self.assertEqual(_safe_int([]), 0)
+        self.assertEqual(_safe_int({}, 5), 5)
+        self.assertEqual(_safe_int("12.34"), 0)
 
 
 if __name__ == "__main__":
