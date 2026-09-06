@@ -1406,7 +1406,7 @@ def _campo_importar():
         # Indicadores de balança costumam exportar em cp1252/latin-1.
         texto = bruto.decode("latin-1")
 
-    ativos = {a["id"] for a in db.get_all_animals(status="ativo")}
+    ativos = db.get_all_animal_ids(status="ativo")
     resultado = db.parse_pesagens(texto, ids_conhecidos=ativos)
     aceitas, rejeitadas = resultado["aceitas"], resultado["rejeitadas"]
 

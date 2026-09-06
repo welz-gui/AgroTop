@@ -31,7 +31,7 @@ from backend_api.config import (
 from backend_api.idempotency import get_cached_response, store_response
 from backend_api.main import app, limiter
 from backend_api.schemas import ConfirmarTratoInput
-from repositories.animais import get_all_animals, get_animal
+from repositories.animais import get_all_animals, get_all_animal_ids, get_animal
 from repositories.conexao import _conn, configurar_sqlite
 from repositories.pesagens import get_weighings
 from repositories.sanidade import add_medication, get_withdrawal_end
@@ -1278,7 +1278,7 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
         """Critério 4: aceitas, rejeitadas e total_linhas conferem com services.importacao.parse_pesagens."""
         from services.importacao import parse_pesagens
 
-        ativos = {a["id"] for a in get_all_animals(status="ativo")}
+        ativos = get_all_animal_ids(status="ativo")
         csv_text = "animal,peso,data\nBR0001,450.0,2026-08-20\nINVALIDO,abc,2026-08-20\nINEXISTENTE_9999,500.0,2026-08-20\n"
         csv_bytes = csv_text.encode("utf-8")
 
