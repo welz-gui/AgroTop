@@ -90,6 +90,15 @@ spec, decisão de arquitetura em aberto — provedor, dados saindo pra API exter
 `get_weighings`, `get_photos`) — nenhum repositório novo, nenhum dado financeiro interno
 (custo/lucro/margem) no PDF gerado, aviso de não-certificação obrigatório na capa.
 
+**0081 escrita em 2026-09-07** — decisão de migrar a hospedagem do app web para fora do
+Streamlit Community Cloud (conversa com o usuário sobre Fly.io/Cloud Run/Azure/Hetzner/
+Render/Railway — comparativo completo na conversa, `gru`/São Paulo do Fly.io e
+`southamerica-east1` do Cloud Run são as opções com região perto do banco). O
+`docs/revisao-relatorio-arquitetura-2026-08.md` já apontava "containerizar" como
+pré-requisito de "sair do Community Cloud" (§7, itens 5 e 6) — nenhum `Dockerfile`
+existe no repo ainda. 0081 entrega só o container do web (`app.py`); a API
+(`backend_api/`) e a escolha do host ficam de fora, são decisões separadas.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -381,6 +390,7 @@ spec, decisão de arquitetura em aberto — provedor, dados saindo pra API exter
 | — | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | ✅ [#367](https://github.com/welz-gui/AgroTop/pull/367) | | 2026-09-06 |
 | — | [0079](0079-web-ndvi-por-piquete.md) — Web: NDVI por piquete (satélite) 🏗️ ⚠️médio | — | ✅ [#370](https://github.com/welz-gui/AgroTop/pull/370) | | 2026-09-07 |
 | — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-07 |
+| — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | 🟢 livre | | 2026-09-07 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
