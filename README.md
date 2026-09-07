@@ -124,6 +124,21 @@ streamlit run app.py
 No Windows há também o `Iniciar_AgroTop.bat`. O sistema cria um SQLite local
 (`agrotop.db`) e popula dados de demonstração se as tabelas estiverem vazias.
 
+### Executando via Docker
+
+```bash
+# Construir a imagem do app web
+docker build -t agrotop-web .
+
+# Executar localmente com SQLite efêmero de teste
+docker run --rm -p 8501:8501 -e DATABASE_URL=sqlite:///./agrotop.db agrotop-web
+
+# Ou apontando para banco PostgreSQL externo
+docker run --rm -p 8501:8501 -e DATABASE_URL="postgresql://usuario:senha@host:5432/banco" agrotop-web
+```
+
+A aplicação fica acessível em `http://localhost:8501` e o endpoint de verificação de saúde responde em `http://localhost:8501/_stcore/health`.
+
 ### Rodando os testes
 
 ```bash

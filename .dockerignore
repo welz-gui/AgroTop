@@ -1,0 +1,50 @@
+# Version control & CI
+.git
+.github
+.gitignore
+
+# AI / IDE configs
+.claude
+.gemini
+.idea
+.vscode
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Subprojects with separate lifecycles
+mobile
+backend_api
+poc
+
+# Tests, tools, docs and database migrations
+tests
+tools
+specs
+docs
+supabase
+
+# Python cache & artifacts
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache
+.coverage
+htmlcov
+
+# Local databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Secrets (CRITICAL: never bake credentials into image)
+.streamlit/secrets.toml
+
+# Docker-related
+Dockerfile
+.dockerignore
