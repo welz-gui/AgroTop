@@ -4,16 +4,20 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-09-06 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
-(API + mobile, exceto Bluetooth — hardware, não delegável), 2 (geometria/GPS) e 3
-(Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100% ligada à interface (7 de 7)** ·
-fila de specs em `specs/QUADRO.md` zerada de 0001 a 0078 · Tier 2 da
-[ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md) (paridade admin no
-mobile, só leitura) concluído · **Trilha 4 (Inteligência) é a única fronteira aberta** —
-escopo imediato (PWA, importação/detecção de pesagem suspeita, lucro por raça, chuva×GMD)
-e o motor de regras já em produção; falta só o NDVI por piquete
-([spec 0079](specs/0079-web-ndvi-por-piquete.md), escrita em 2026-09-06, fundamentada na
-PoC já concluída) — ver seção 5
+Última atualização: 2026-09-07 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
+(API + mobile, exceto Bluetooth — hardware, não delegável, aguardando o equipamento em
+mãos), 2 (geometria/GPS) e 3 (Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100%
+ligada à interface (7 de 7)** · fila de specs em `specs/QUADRO.md` zerada de 0001 a 0079 ·
+Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md) (paridade admin
+no mobile, só leitura) concluído · **Trilha 4 (Inteligência):** escopo imediato, motor de
+regras e NDVI por piquete ([spec 0079](specs/0079-web-ndvi-por-piquete.md)) já em
+produção · **três objetivos novos** vindos de um relatório estratégico externo conferido
+contra o código em 2026-09-07: pacote de evidências por lote de venda
+([spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md), escrita agora),
+cruzamento com CAR (sem spec, fonte de dados não levantada) e IA como interface de
+consulta (sem spec, decisão de arquitetura em aberto) — ver seção 5. **Modelos
+estatísticos aguardam dado real de uso** (a etapa de testes com o software em operação é
+o que vai gerar os ciclos completos que os modelos precisam, não mais um prazo estimado)
 
 ---
 
@@ -784,7 +788,32 @@ veredito explícito **"seguir com ressalvas"** (sinal sazonal real, mas sem prom
 monitoramento contínuo durante a chuva). [Spec 0079](specs/0079-web-ndvi-por-piquete.md),
 escrita em 2026-09-06, implementa isso como leitura de tendência por piquete no web
 (`page_lotes`), não como funcionalidade mobile nem como alerta automático — ambos ficam
-para depois, se fizerem sentido, como specs à parte.
+para depois, se fizerem sentido, como specs à parte. **Concluída em 2026-09-07
+([PR #370](https://github.com/welz-gui/AgroTop/pull/370)).**
+
+**Objetivos futuros (a partir de relatório estratégico externo, revisado em 2026-09-07)**
+
+Um relatório de tendências do setor (rastreabilidade PNIB/EUDR, hardware conectado, IA
+como interface, gestão de risco climático) foi conferido item a item contra o código —
+a maior parte do que ele recomenda **já existe** (núcleo de eventos com auditoria desde a
+Fase B, geolocalização de piquete, escore de conformidade com aviso explícito de que não é
+certificação legal, adaptadores desacoplados por dispositivo). Três pontos são
+genuinamente novos e viram objetivo desta trilha, sem data comprometida:
+
+- **Cruzamento com CAR e imagens de satélite** — o relatório chama isso de "cruzamento
+  **futuro**" (§4.3), não de item imediato. O NDVI (spec 0079) resolve a parte de imagem de
+  satélite; falta a integração com o Cadastro Ambiental Rural (CAR) para cruzar o polígono
+  do piquete com a situação ambiental da propriedade. Sem spec ainda — API/fonte de dados
+  do CAR não levantada.
+- **Geração de relatório/pacote de evidências** — reunir, por lote de venda (`sales.lot_ref`),
+  os registros já existentes (identificação, origem, pesagens, sanidade/carência, foto) num
+  documento pronto para o comprador, sem prometer certificação. [Spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md),
+  escrita em 2026-09-07.
+- **IA como interface de consulta** (busca em linguagem natural sobre o rebanho, resumos,
+  explicação de indicadores — não decisão autônoma nem modelo preditivo) — genuinamente
+  ausente do projeto hoje, zero integração de LLM no código. Decisão de arquitetura em
+  aberto (provedor, dados da fazenda saindo para API externa, custo por consulta) antes de
+  virar spec — não especificado ainda.
 
 ---
 
