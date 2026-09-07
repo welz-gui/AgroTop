@@ -514,6 +514,171 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
         # Falha inesperada não deve derrubar a página de relatórios
         return b""
 
+
+def _evidencias_data(value) -> str:
+    """Formata datas de registros para o padrão usado no pacote externo."""
+    if value is None or value == "":
+        return "—"
+    if isinstance(value, (date, datetime)):
+        return value.strftime("%d/%m/%Y")
+    try:
+        return date.fromisoformat(str(value)[:10]).strftime("%d/%m/%Y")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _vendas_para_evidencias(vendas: list[dict]) -> list[dict]:
+    """Alinha as linhas originais aos grupos definidos pelo serviço de vendas.
+
+    O serviço é a única fonte da regra de agrupamento. O alinhamento abaixo
+    apenas recupera as linhas que deram origem a cada grupo para compor o PDF;
+    em particular, cada venda sem ``lot_ref`` continua sendo uma seleção
+    independente.
+    """
+    grupos = por_lote_de_venda(vendas)
+    avulsas = [venda for venda in vendas if not venda.get("lot_ref")]
+    avulsa_idx = 0
+    resultado = []
+    for grupo in grupos:
+        lot_ref = grupo.get("lot_ref")
+        if lot_ref:
+            linhas = [venda for venda in vendas if venda.get("lot_ref") == lot_ref]
+        elif avulsa_idx < len(avulsas):
+            linhas = [avulsas[avulsa_idx]]
+            avulsa_idx += 1
+        else:
+            linhas = []
+        if linhas:
+            resultado.append({"grupo": grupo, "vendas": linhas})
+
+    def _data_mais_recente(item):
+        return max((str(venda.get("sale_date") or "") for venda in item["vendas"]), default="")
+
+    return sorted(resultado, key=_data_mais_recente, reverse=True)
+
+
+def _evidencias_nome_arquivo(vendas_do_lote: list[dict]) -> str:
+    referencia = vendas_do_lote[0].get("lot_ref") if vendas_do_lote else None
+    if not referencia and vendas_do_lote:
+        referencia = vendas_do_lote[0].get("animal_id") or vendas_do_lote[0].get("id")
+    referencia = str(referencia or "lote")
+    slug = "".join(char if char.isalnum() or char in "-_" else "_" for char in referencia)
+    return f"agrotop_evidencias_{slug or 'lote'}.pdf"
+
+
+def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
+    """Monta o PDF de evidências para um lote de venda (spec 0080).
+
+    ``vendas_do_lote`` é a fatia de ``get_sales()`` que partilha o mesmo
+    ``lot_ref`` (ou uma venda avulsa sozinha). O documento expõe somente
+    identificação, origem, pesagem e sanidade — nunca dados financeiros.
+    """
+    try:
+        from fpdf import FPDF
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=14)
+
+        def texto(label, value):
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(42, 6, _pdf_safe(label))
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(0, 6, _pdf_safe(value), ln=True)
+
+        def tabela(titulo, cabecalhos, linhas):
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 7, _pdf_safe(titulo), ln=True)
+            if not linhas:
+                pdf.set_font("Helvetica", "I", 9)
+                pdf.cell(0, 6, "Sem registros.", ln=True)
+                return
+            largura = 182 / len(cabecalhos)
+            pdf.set_fill_color(30, 60, 30)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Helvetica", "B", 7)
+            for cabecalho in cabecalhos:
+                pdf.cell(largura, 6, _pdf_safe(cabecalho)[:24], border=1, fill=True, align="C")
+            pdf.ln()
+            pdf.set_text_color(20, 20, 20)
+            pdf.set_font("Helvetica", "", 7)
+            for linha in linhas:
+                for valor in linha:
+                    pdf.cell(largura, 5, _pdf_safe(valor)[:30], border=1)
+                pdf.ln()
+
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.cell(0, 12, _pdf_safe("AgroTop — Pacote de Evidências"), ln=True, align="C")
+        pdf.ln(4)
+        compradores = sorted({str(venda.get("buyer") or "—") for venda in vendas_do_lote})
+        datas_venda = sorted({str(venda.get("sale_date") or "") for venda in vendas_do_lote if venda.get("sale_date")})
+        texto("Comprador", ", ".join(compradores) or "—")
+        texto("Data(s) da venda", ", ".join(_evidencias_data(data) for data in datas_venda) or "—")
+        texto("Quantidade de animais", str(len(vendas_do_lote)))
+        pdf.ln(7)
+        pdf.set_fill_color(255, 236, 196)
+        pdf.set_text_color(100, 55, 0)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.multi_cell(0, 8, _pdf_safe(
+            "Aviso: este pacote não é avaliação de conformidade legal nem certificação oficial."
+        ), border=1, fill=True)
+        pdf.set_text_color(20, 20, 20)
+
+        for venda in vendas_do_lote:
+            animal_id = venda.get("animal_id") or venda.get("animal_id_str") or "—"
+            animal = get_animal(animal_id) or {}
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 15)
+            pdf.cell(0, 9, _pdf_safe(f"Animal {animal_id}"), ln=True)
+            pdf.ln(2)
+            texto("Raça", animal.get("breed") or venda.get("breed") or "—")
+            sexo = animal.get("sex") or venda.get("sex") or "—"
+            texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
+            texto("Categoria", db.get_age_category(animal.get("birth_date")))
+            texto("Idade", db.get_age_display(animal) if animal else "—")
+            texto("Fornecedor", animal.get("fornecedor_name") or "—")
+            texto("NF", animal.get("nf_number") or "—")
+            texto("GTA", animal.get("gta_number") or "—")
+
+            fotos = db.get_photos(animal_id) or []
+            if fotos:
+                foto = max(fotos, key=lambda item: (str(item.get("taken_date") or ""), item.get("id") or 0))
+                imagem = db.get_photo_image(foto.get("id"))
+                if imagem:
+                    try:
+                        pdf.set_font("Helvetica", "B", 11)
+                        pdf.cell(0, 7, "Foto mais recente", ln=True)
+                        pdf.image(io.BytesIO(imagem[0]), w=55)
+                        pdf.ln(2)
+                    except Exception:
+                        pass
+
+            pesagens = db.get_weighings(animal_id) or []
+            tabela("Pesagens", ["Data", "Peso (kg)", "Método", "Operador"], [
+                (_evidencias_data(item.get("weigh_date")), item.get("weight") or "—",
+                 db.WEIGH_METHODS.get(item.get("method") or "pesado", item.get("method") or "—"),
+                 item.get("operator") or "—") for item in pesagens
+            ])
+
+            medicamentos = db.get_medications(animal_id) or []
+            tabela("Sanidade / Medicamentos", ["Data", "Medicamento", "Dose", "Carência (dias)", "Aplicado por"], [
+                (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
+                 f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
+                 item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
+                for item in medicamentos
+            ])
+            fim_carencia = db.get_withdrawal_end(animal_id)
+            status_carencia = (
+                f"Em carência até {_evidencias_data(fim_carencia)}" if fim_carencia else "Livre"
+            )
+            texto("Status de carência", status_carencia)
+
+        return bytes(pdf.output())
+    except ImportError:
+        return b""
+    except Exception:
+        return b""
+
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN
 # ══════════════════════════════════════════════════════════════════════════════
@@ -4099,7 +4264,7 @@ def page_relatorios():
     st.markdown('<div class="page-title">📄 Relatórios e Exportação</div>', unsafe_allow_html=True)
     animals=db.get_all_animals(status=None)
 
-    rt1,rt2,rt3=st.tabs(["🐄 Inventário","⚖️ Pesagens","💰 Financeiro"])
+    rt1,rt2,rt3,rt4=st.tabs(["🐄 Inventário","⚖️ Pesagens","💰 Financeiro","📦 Pacote de Evidências"])
 
     def _download_row(title, df, key):
         dc1,dc2,dc3=st.columns(3)
@@ -4197,6 +4362,40 @@ def page_relatorios():
         if not df_fin.empty:
             st.dataframe(df_fin,use_container_width=True,hide_index=True)
             _download_row("Financeiro",df_fin,"financeiro")
+
+    with rt4:
+        st.subheader("📦 Pacote de Evidências")
+        st.caption("Agrupa um lote de venda para compartilhar registros de origem, pesagem e sanidade.")
+        vendas_evidencias = db.get_sales()
+        grupos_evidencias = _vendas_para_evidencias(vendas_evidencias)
+        if not grupos_evidencias:
+            st.info("Nenhuma venda disponível para gerar um pacote.")
+        else:
+            rotulos = []
+            for item in grupos_evidencias:
+                linhas = item["vendas"]
+                referencia = item["grupo"].get("lot_ref")
+                if referencia:
+                    rotulos.append(str(referencia))
+                else:
+                    venda = linhas[0]
+                    rotulos.append(
+                        f"Venda avulsa — {venda.get('animal_id') or 'animal'} ({venda.get('sale_date') or '—'})"
+                    )
+            indice = st.selectbox("Lote de venda", range(len(rotulos)),
+                format_func=lambda i: rotulos[i], key="evidencias_lote_idx")
+            selecao = grupos_evidencias[indice]["vendas"]
+            st.caption(f"{len(selecao)} animal(is) no lote selecionado.")
+            chave_pdf = f"evidencias_pdf_{indice}"
+            if st.button("Gerar PDF", type="primary", key="gerar_pacote_evidencias"):
+                st.session_state[chave_pdf] = _gerar_pacote_evidencias(selecao)
+            pdf_gerado = st.session_state.get(chave_pdf)
+            if pdf_gerado:
+                st.download_button(
+                    "⬇️ Baixar pacote de evidências", pdf_gerado,
+                    _evidencias_nome_arquivo(selecao), "application/pdf",
+                    use_container_width=True, key="download_pacote_evidencias",
+                )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CADASTRAR
