@@ -29,6 +29,7 @@ from services.geometria import (
     perimetro_metros as geometria_perimetro_m,
     validar as geometria_validar,
 )
+from services.ndvi import ndvi_do_piquete, NdviIndisponivelError
 from services.importacao_geometria import ler_geojson, ler_kml
 from services.clima_adaptador import localizacoes_para_previsao
 from services.lotacao import sobrepostos as lotacao_sobrepostos
@@ -2070,6 +2071,166 @@ def page_lotes():
         _lotes_transferir_animais(lotes)
 
 
+# ─── NDVI por Piquete (Spec 0079) ───────────────────────────────────────────
+AVISO_NDVI_MATERIA_SECA = (
+    "ℹ️ NDVI não equivale a matéria seca: nenhum dado de satélite substitui a "
+    "avaliação presencial do pasto. Transformar índice vegetativo em "
+    "estimativa de forragem requer calibração de campo com medições reais."
+)
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _consultar_ndvi_cacheado(
+    anel_tuplas: tuple[tuple[float, float], ...],
+    inicio: date,
+    fim: date,
+    nuvem_max_pct: int = 20,
+):
+    return ndvi_do_piquete(list(anel_tuplas), inicio, fim, nuvem_max_pct)
+
+
+def _render_secao_ndvi_lote(lote: dict) -> None:
+    """Seção de consulta e série temporal de NDVI por piquete (Spec 0079)."""
+    with st.expander(f"🛰️ NDVI (satélite) — {lote['name']}"):
+        st.info(AVISO_NDVI_MATERIA_SECA)
+        poligono_raw = lote.get("poligono")
+        if not poligono_raw:
+            st.caption(
+                "📍 Demarque o perímetro do piquete primeiro na seção acima "
+                "para habilitar a consulta de imagens de satélite."
+            )
+            return
+
+        anel = []
+        try:
+            anel = _ler_poligono(_poligono_para_texto(poligono_raw))
+        except (ValueError, TypeError):
+            pass
+
+        if not anel or geometria_validar(anel):
+            st.warning(
+                "⚠️ Perímetro cadastrado inválido. Corrija o perímetro na "
+                "seção acima antes de consultar o NDVI."
+            )
+            return
+
+        hoje = date.today()
+        c_i, c_f, c_nuv, c_btn = st.columns([2, 2, 2, 2])
+        with c_i:
+            d_inicio = st.date_input(
+                "Início",
+                value=hoje - timedelta(days=365),
+                key=f"ndvi_ini_{lote['id']}",
+            )
+        with c_f:
+            d_fim = st.date_input(
+                "Fim",
+                value=hoje,
+                key=f"ndvi_fim_{lote['id']}",
+            )
+        with c_nuv:
+            nuvem_max = st.number_input(
+                "Nuvem máx. (%)",
+                min_value=5,
+                max_value=80,
+                value=20,
+                step=5,
+                key=f"ndvi_nuv_{lote['id']}",
+            )
+        with c_btn:
+            st.write("")
+            st.write("")
+            buscar = st.button(
+                "🛰️ Consultar NDVI", key=f"ndvi_btn_{lote['id']}"
+            )
+
+        estado_chave = f"ndvi_dados_{lote['id']}"
+        if buscar:
+            if d_inicio > d_fim:
+                st.error(
+                    "🚫 Data de início não pode ser posterior à data de fim."
+                )
+            else:
+                with st.spinner("Buscando cenas de satélite e calculando..."):
+                    try:
+                        res = _consultar_ndvi_cacheado(
+                            tuple(anel), d_inicio, d_fim, int(nuvem_max)
+                        )
+                        st.session_state[estado_chave] = res
+                    except NdviIndisponivelError as e:
+                        st.error(
+                            "🚫 Serviço de imagens de satélite indisponível no "
+                            "momento. Tente novamente mais tarde."
+                        )
+                        st.caption(str(e))
+                        st.session_state.pop(estado_chave, None)
+                    except Exception as e:
+                        st.error(f"🚫 Erro ao processar imagens: {e}")
+                        st.session_state.pop(estado_chave, None)
+
+        resultado = st.session_state.get(estado_chave)
+        if resultado is not None:
+            if resultado.serie:
+                m1, m2, m3 = st.columns(3)
+                m1.metric(
+                    "Última imagem utilizável",
+                    resultado.serie[-1].data.strftime("%d/%m/%Y"),
+                )
+                m2.metric(
+                    "NDVI mais recente",
+                    f"{resultado.serie[-1].ndvi_medio:.3f}",
+                )
+                m3.metric(
+                    "Maior vão sem imagem",
+                    f"{resultado.maior_vao_dias} dias",
+                )
+
+                if resultado.maior_vao_dias > 60:
+                    st.warning(
+                        f"⚠️ Maior vão: {resultado.maior_vao_dias} dias. "
+                        "Intervalos longos sem imagens utilizáveis são "
+                        "comuns na estação chuvosa (outubro a abril) devido à "
+                        "cobertura de nuvens, não constituindo falha."
+                    )
+
+                df_plot = pd.DataFrame([
+                    {
+                        "Data": p.data,
+                        "NDVI Médio": p.ndvi_medio,
+                        "Nuvem (%)": p.nuvem_pct_cena,
+                        "Cena": p.id_da_cena,
+                    }
+                    for p in resultado.serie
+                ])
+                fig_ndvi = px.line(
+                    df_plot,
+                    x="Data",
+                    y="NDVI Médio",
+                    markers=True,
+                    title=f"Série Temporal de NDVI Médio — {lote['name']}",
+                )
+                fig_ndvi.update_layout(
+                    **PLOTLY,
+                    height=300,
+                    xaxis=dict(gridcolor=c["superficie"]),
+                    yaxis=dict(gridcolor=c["superficie"], range=[0, 1]),
+                )
+                st.plotly_chart(fig_ndvi, use_container_width=True)
+            else:
+                st.info(
+                    f"Nenhuma cena utilizável com nuvem ≤ {nuvem_max}% "
+                    f"encontrada no período ({resultado.total_cenas_buscadas} "
+                    f"cenas avaliadas). Maior vão: {resultado.maior_vao_dias} "
+                    "dias."
+                )
+                if resultado.maior_vao_dias > 60:
+                    st.warning(
+                        f"⚠️ Maior vão: {resultado.maior_vao_dias} dias. "
+                        "Na estação chuvosa é esperada a ausência temporária "
+                        "de cenas aproveitáveis."
+                    )
+
+
 def _render_tab_visao_geral(lotes):
     for l in lotes:
         ua  = l["total_ua"] or 0
@@ -2182,6 +2343,9 @@ def _render_tab_visao_geral(lotes):
                 else:
                     st.success("✅ Perímetro removido.")
                 st.rerun()
+
+        # NDVI do piquete por satélite (Spec 0079)
+        _render_secao_ndvi_lote(l)
 
     # Gráfico UA por Lote
     if lotes:
