@@ -75,9 +75,20 @@ regex que não há segredo hardcoded em `services/ndvi.py`/`app.py`). Seção "�
 lote+período), com o aviso permanente de que NDVI não equivale a matéria seca e sem
 prometer monitoramento contínuo na chuva. 20 testes novos em `tests/test_ndvi.py` +
 prova de UI em `tests/ui_ndvi_prova.py` (aviso visível, piquete sem perímetro não quebra,
-consulta com mock renderiza gráfico) — suíte inteira (931 testes) verde. **Com isto, a
-fila de specs está vazia** — não há trabalho da Trilha 4 pendente de especificação até
-que uma necessidade nova apareça.
+consulta com mock renderiza gráfico) — suíte inteira (931 testes) verde.
+
+**0080 escrita em 2026-09-07** — relatório estratégico externo (tendências do setor:
+rastreabilidade PNIB/EUDR, hardware conectado, IA como interface) conferido item a item
+contra o código, mesmo tratamento de "não confie, verifique" já aplicado a todo relatório
+externo desta base (ver `docs/revisao-relatorio-arquitetura-2026-08.md` para o precedente).
+A maior parte já existia (núcleo de eventos com auditoria, geolocalização, escore de
+conformidade com aviso de "não é certificação"). Três pontos genuinamente novos viraram
+objetivo da Trilha 4 no ROADMAP.md: cruzamento com CAR (sem spec, fonte de dados não
+levantada), pacote de evidências por lote de venda (**0080**, esta) e IA de consulta (sem
+spec, decisão de arquitetura em aberto — provedor, dados saindo pra API externa, custo).
+0080 usa só leitura já existente (`get_sales`, `por_lote_de_venda`, `get_medications`,
+`get_weighings`, `get_photos`) — nenhum repositório novo, nenhum dado financeiro interno
+(custo/lucro/margem) no PDF gerado, aviso de não-certificação obrigatório na capa.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -369,6 +380,7 @@ que uma necessidade nova apareça.
 | — | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | ✅ [#365](https://github.com/welz-gui/AgroTop/pull/365) | | 2026-09-06 |
 | — | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | ✅ [#367](https://github.com/welz-gui/AgroTop/pull/367) | | 2026-09-06 |
 | — | [0079](0079-web-ndvi-por-piquete.md) — Web: NDVI por piquete (satélite) 🏗️ ⚠️médio | — | ✅ [#370](https://github.com/welz-gui/AgroTop/pull/370) | | 2026-09-07 |
+| — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-07 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
