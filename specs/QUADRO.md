@@ -99,6 +99,22 @@ pré-requisito de "sair do Community Cloud" (§7, itens 5 e 6) — nenhum `Docke
 existe no repo ainda. 0081 entrega só o container do web (`app.py`); a API
 (`backend_api/`) e a escolha do host ficam de fora, são decisões separadas.
 
+**0080 e 0081 concluídas em 2026-09-07 — [PR #374](https://github.com/welz-gui/AgroTop/pull/374)
+e [PR #375](https://github.com/welz-gui/AgroTop/pull/375).** 0080: aba "📦 Pacote de
+Evidências" em `page_relatorios`, reusando `por_lote_de_venda`/`get_animal`/`io` já
+importados — nenhum import novo. Vendas avulsas (`lot_ref=None`) testadas para não se
+misturar entre si; teste usa uma subclasse de `dict` que **levanta exceção** se o gerador
+ler `cost_at_sale`/`profit`/`custo`/`margem`/`total_value` — prova de que o dado
+financeiro nunca é lido, não só que não aparece no texto. Aviso de não-certificação em
+caixa destacada na capa, não em rodapé. 0081: multi-stage (`builder`+`runner`,
+`python:3.12-slim`), dependências de sistema **confirmadas rodando dentro do
+container**, não assumidas — `tesseract-ocr` (OCR de brinco), `libexpat1` (exigência
+transitiva do `rasterio`, não prevista na spec, achada só ao testar) e `curl`
+(healthcheck); `opencv-python-headless`/`pyproj`/`shapely` não precisaram de pacote
+extra, as wheels manylinux bastaram. `/_stcore/health` confirmado com `curl` real (200
+OK), imagem final 1,56 GB registrado como baseline. `backend_api/` corretamente fora do
+`.dockerignore`-COPY. **Fila vazia de novo.**
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -389,8 +405,8 @@ existe no repo ainda. 0081 entrega só o container do web (`app.py`); a API
 | — | [0077](0077-api-relatorios-inventario-e-pesagens.md) — API: relatórios de inventário e pesagens 🏗️ | — | ✅ [#365](https://github.com/welz-gui/AgroTop/pull/365) | | 2026-09-06 |
 | — | [0078](0078-mobile-tela-de-relatorios.md) — Mobile: tela de relatórios (inventário e pesagens) 🏗️ | — | ✅ [#367](https://github.com/welz-gui/AgroTop/pull/367) | | 2026-09-06 |
 | — | [0079](0079-web-ndvi-por-piquete.md) — Web: NDVI por piquete (satélite) 🏗️ ⚠️médio | — | ✅ [#370](https://github.com/welz-gui/AgroTop/pull/370) | | 2026-09-07 |
-| — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-07 |
-| — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | 🟢 livre | | 2026-09-07 |
+| — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | ✅ [#374](https://github.com/welz-gui/AgroTop/pull/374) | | 2026-09-07 |
+| — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | ✅ [#375](https://github.com/welz-gui/AgroTop/pull/375) | | 2026-09-07 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
