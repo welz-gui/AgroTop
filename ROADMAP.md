@@ -804,9 +804,13 @@ genuinamente novos e viram objetivo desta trilha, sem data comprometida:
 
 - **Cruzamento com CAR e imagens de satélite** — o relatório chama isso de "cruzamento
   **futuro**" (§4.3), não de item imediato. O NDVI (spec 0079) resolve a parte de imagem de
-  satélite; falta a integração com o Cadastro Ambiental Rural (CAR) para cruzar o polígono
-  do piquete com a situação ambiental da propriedade. Sem spec ainda — API/fonte de dados
-  do CAR não levantada.
+  satélite. **Fonte de dados do CAR pesquisada em 2026-09-08: não há API viável para
+  automação** — a API oficial é restrita a órgão público federal, o download em massa
+  exige CAPTCHA por arquivo (não será automatizado — ver `services/importacao_car.py` na
+  spec), e "Meu Imóvel Rural" (app oficial lançado em julho de 2026) só entrega PDF, sem
+  geometria. [Spec 0082](specs/0082-web-cruzamento-com-car.md), escrita em 2026-09-08,
+  facilita o que dá pra facilitar sem contornar CAPTCHA: link direto pro imóvel no SICAR +
+  importador de Shapefile (o formato real que o SICAR entrega, não GeoJSON/KML).
 - **Geração de relatório/pacote de evidências** — reunir, por lote de venda (`sales.lot_ref`),
   os registros já existentes (identificação, origem, pesagens, sanidade/carência, foto) num
   documento pronto para o comprador, sem prometer certificação. ✅ Concluído em 2026-09-07
