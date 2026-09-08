@@ -113,7 +113,20 @@ transitiva do `rasterio`, não prevista na spec, achada só ao testar) e `curl`
 (healthcheck); `opencv-python-headless`/`pyproj`/`shapely` não precisaram de pacote
 extra, as wheels manylinux bastaram. `/_stcore/health` confirmado com `curl` real (200
 OK), imagem final 1,56 GB registrado como baseline. `backend_api/` corretamente fora do
-`.dockerignore`-COPY. **Fila vazia de novo.**
+`.dockerignore`-COPY.
+
+**0082 escrita em 2026-09-08** — pesquisa da fonte de dados do CAR concluída (era o item
+que faltava do relatório estratégico de 2026-09-07). Achado central: **não existe API
+viável para automação** — a API oficial ("Consulta SICAR CPF/CNPJ") é restrita a órgão
+público federal, o download em massa exige e-mail+CAPTCHA por arquivo (não será
+automatizado, é linha que o projeto não atravessa), e o app "Meu Imóvel Rural" (lançado
+jul/2026) só dá PDF, sem geometria. 0082 facilita o que dá pra facilitar sem contornar o
+CAPTCHA: link direto pro imóvel no SICAR, e um importador novo de Shapefile (`pyshp`,
+sem GDAL) que aceita o formato real que o SICAR entrega — hoje `services/importacao_geometria.py`
+só lê GeoJSON/KML de um polígono, o CAR vem em `.zip` multi-camada (perímetro do imóvel,
+APP, Reserva Legal, etc.). Só a camada de perímetro é persistida
+(`properties.poligono_car`/`car_numero`/`car_area_ha`, colunas novas); as demais são só
+visuais, sem salvar — decisão de escopo explícita na spec, não acidente.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -407,6 +420,7 @@ OK), imagem final 1,56 GB registrado como baseline. `backend_api/` corretamente 
 | — | [0079](0079-web-ndvi-por-piquete.md) — Web: NDVI por piquete (satélite) 🏗️ ⚠️médio | — | ✅ [#370](https://github.com/welz-gui/AgroTop/pull/370) | | 2026-09-07 |
 | — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | ✅ [#374](https://github.com/welz-gui/AgroTop/pull/374) | | 2026-09-07 |
 | — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | ✅ [#375](https://github.com/welz-gui/AgroTop/pull/375) | | 2026-09-07 |
+| — | [0082](0082-web-cruzamento-com-car.md) — Web: cruzamento com CAR (situação ambiental) 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-08 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
