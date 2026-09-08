@@ -139,8 +139,18 @@ achado de processo (não funcional): a PR editou `supabase/migrations/0000_basel
 à mão junto da migration 0030 nova — redundante mas inofensivo, porque a migration usa
 `ADD COLUMN IF NOT EXISTS` (idempotente); o hábito correto é deixar o baseline para a
 próxima regeneração real via `tools/dump_schema_nuvem.py --baseline` contra produção, não
-editar à mão — vale mencionar a próximo agente que tocar `supabase/migrations/`. **Com
-isto, a fila de specs está vazia de novo.**
+editar à mão — vale mencionar a próximo agente que tocar `supabase/migrations/`.
+
+**0083 escrita em 2026-09-08** — último objetivo do relatório estratégico externo a
+ganhar spec: IA como interface de consulta. Decisão de arquitetura tomada em conversa com
+o usuário: **OpenRouter**, nível `:free` para começar (pesquisado antes de decidir: o
+OpenRouter em si não treina modelo — é roteador —, mas modelos `:free` podem ter termos
+de retenção diferentes dos pagos; tem filtro de Zero Data Retention pra quando o uso
+envolver dado sensível de verdade). v1 deliberadamente pequena — só pergunta livre com
+contexto agregado (`get_rebanho_stats`/`get_alert_animals`/`recomendacoes.avaliar`), sem
+tabela crua saindo pra API externa, sem escrita, sem memória de conversa. `requests` já é
+dependência (spec 0079) — zero dependência nova. **Com isto, a fila de specs está vazia
+de novo.**
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -435,6 +445,7 @@ isto, a fila de specs está vazia de novo.**
 | — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | ✅ [#374](https://github.com/welz-gui/AgroTop/pull/374) | | 2026-09-07 |
 | — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | ✅ [#375](https://github.com/welz-gui/AgroTop/pull/375) | | 2026-09-07 |
 | — | [0082](0082-web-cruzamento-com-car.md) — Web: cruzamento com CAR (situação ambiental) 🏗️ ⚠️médio | — | ✅ [#381](https://github.com/welz-gui/AgroTop/pull/381) | | 2026-09-08 |
+| — | [0083](0083-web-assistente-de-consulta-ia.md) — Web: assistente de consulta por IA (OpenRouter) 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-08 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
