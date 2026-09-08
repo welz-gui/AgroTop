@@ -808,9 +808,12 @@ genuinamente novos e viram objetivo desta trilha, sem data comprometida:
   automação** — a API oficial é restrita a órgão público federal, o download em massa
   exige CAPTCHA por arquivo (não será automatizado — ver `services/importacao_car.py` na
   spec), e "Meu Imóvel Rural" (app oficial lançado em julho de 2026) só entrega PDF, sem
-  geometria. [Spec 0082](specs/0082-web-cruzamento-com-car.md), escrita em 2026-09-08,
-  facilita o que dá pra facilitar sem contornar CAPTCHA: link direto pro imóvel no SICAR +
-  importador de Shapefile (o formato real que o SICAR entrega, não GeoJSON/KML).
+  geometria. ✅ Concluído em 2026-09-08 ([spec 0082](specs/0082-web-cruzamento-com-car.md)/
+  [PR #381](https://github.com/welz-gui/AgroTop/pull/381)) — facilita o que dá pra
+  facilitar sem contornar CAPTCHA: link direto pro imóvel no SICAR + importador de
+  Shapefile (`services/importacao_car.py`, o formato real que o SICAR entrega, não
+  GeoJSON/KML) em `page_propriedades`. Só o perímetro do imóvel é persistido; APP/Reserva
+  Legal/etc. ficam só visuais na comparação.
 - **Geração de relatório/pacote de evidências** — reunir, por lote de venda (`sales.lot_ref`),
   os registros já existentes (identificação, origem, pesagens, sanidade/carência, foto) num
   documento pronto para o comprador, sem prometer certificação. ✅ Concluído em 2026-09-07
