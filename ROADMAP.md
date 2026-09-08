@@ -4,20 +4,22 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-09-07 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
+Última atualização: 2026-09-08 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
 (API + mobile, exceto Bluetooth — hardware, não delegável, aguardando o equipamento em
 mãos), 2 (geometria/GPS) e 3 (Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100%
-ligada à interface (7 de 7)** · fila de specs em `specs/QUADRO.md` zerada de 0001 a 0079 ·
-Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md) (paridade admin
-no mobile, só leitura) concluído · **Trilha 4 (Inteligência):** escopo imediato, motor de
-regras e NDVI por piquete ([spec 0079](specs/0079-web-ndvi-por-piquete.md)) já em
-produção · **três objetivos novos** vindos de um relatório estratégico externo conferido
-contra o código em 2026-09-07: pacote de evidências por lote de venda
-([spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md), escrita agora),
-cruzamento com CAR (sem spec, fonte de dados não levantada) e IA como interface de
-consulta (sem spec, decisão de arquitetura em aberto) — ver seção 5. **Modelos
-estatísticos aguardam dado real de uso** (a etapa de testes com o software em operação é
-o que vai gerar os ciclos completos que os modelos precisam, não mais um prazo estimado)
+ligada à interface (7 de 7)** · fila de specs em `specs/QUADRO.md` **vazia** (0001 a
+0081 fechadas) · Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)
+(paridade admin no mobile, só leitura) concluído · **Trilha 4 (Inteligência):** escopo
+imediato, motor de regras, NDVI por piquete ([spec 0079](specs/0079-web-ndvi-por-piquete.md))
+e pacote de evidências por lote de venda ([spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md))
+já em produção · **dois objetivos do relatório estratégico externo (2026-09-07) seguem
+sem spec:** cruzamento com CAR (fonte de dados não levantada) e IA como interface de
+consulta (decisão de arquitetura em aberto) — ver seção 5 · **Dockerfile do app web
+pronto** ([spec 0081](specs/0081-dockerfile-do-app-web.md)/[PR #375](https://github.com/welz-gui/AgroTop/pull/375)) —
+falta a decisão do mantenedor sobre qual host usar (Fly.io recomendado; comparativo
+completo fora deste arquivo) · **Modelos estatísticos aguardam dado real de uso** (a
+etapa de testes com o software em operação é o que vai gerar os ciclos completos que os
+modelos precisam, não mais um prazo estimado)
 
 ---
 
@@ -807,8 +809,9 @@ genuinamente novos e viram objetivo desta trilha, sem data comprometida:
   do CAR não levantada.
 - **Geração de relatório/pacote de evidências** — reunir, por lote de venda (`sales.lot_ref`),
   os registros já existentes (identificação, origem, pesagens, sanidade/carência, foto) num
-  documento pronto para o comprador, sem prometer certificação. [Spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md),
-  escrita em 2026-09-07.
+  documento pronto para o comprador, sem prometer certificação. ✅ Concluído em 2026-09-07
+  ([spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md)/[PR #374](https://github.com/welz-gui/AgroTop/pull/374)) —
+  aba "📦 Pacote de Evidências" em `page_relatorios`.
 - **IA como interface de consulta** (busca em linguagem natural sobre o rebanho, resumos,
   explicação de indicadores — não decisão autônoma nem modelo preditivo) — genuinamente
   ausente do projeto hoje, zero integração de LLM no código. Decisão de arquitetura em
