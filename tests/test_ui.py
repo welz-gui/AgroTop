@@ -50,6 +50,7 @@ PROVAS = [
     "tests.ui_transferencia_animais_prova", # move_animals_bulk() ligado (Trilha 3)
     "tests.ui_custo_por_lote_de_venda_prova", # por_lote_de_venda() ligado (Trilha 3 — fecha a trilha)
     "tests.ui_ndvi_prova", # ndvi_do_piquete ligado (Spec 0079)
+    "tests.ui_car_prova", # cruzamento visual propriedade × CAR (Spec 0082)
 ]
 
 

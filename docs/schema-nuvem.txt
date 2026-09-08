@@ -376,6 +376,9 @@ properties.endereco
 properties.latitude
 properties.longitude
 properties.poligono
+properties.car_numero
+properties.poligono_car
+properties.car_area_ha
 properties.atividade
 properties.situacao
 properties.inicio
