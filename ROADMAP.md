@@ -808,19 +808,27 @@ genuinamente novos e viram objetivo desta trilha, sem data comprometida:
   automação** — a API oficial é restrita a órgão público federal, o download em massa
   exige CAPTCHA por arquivo (não será automatizado — ver `services/importacao_car.py` na
   spec), e "Meu Imóvel Rural" (app oficial lançado em julho de 2026) só entrega PDF, sem
-  geometria. [Spec 0082](specs/0082-web-cruzamento-com-car.md), escrita em 2026-09-08,
-  facilita o que dá pra facilitar sem contornar CAPTCHA: link direto pro imóvel no SICAR +
-  importador de Shapefile (o formato real que o SICAR entrega, não GeoJSON/KML).
+  geometria. ✅ Concluído em 2026-09-08 ([spec 0082](specs/0082-web-cruzamento-com-car.md)/
+  [PR #381](https://github.com/welz-gui/AgroTop/pull/381)) — facilita o que dá pra
+  facilitar sem contornar CAPTCHA: link direto pro imóvel no SICAR + importador de
+  Shapefile (`services/importacao_car.py`, o formato real que o SICAR entrega, não
+  GeoJSON/KML) em `page_propriedades`. Só o perímetro do imóvel é persistido; APP/Reserva
+  Legal/etc. ficam só visuais na comparação.
 - **Geração de relatório/pacote de evidências** — reunir, por lote de venda (`sales.lot_ref`),
   os registros já existentes (identificação, origem, pesagens, sanidade/carência, foto) num
   documento pronto para o comprador, sem prometer certificação. ✅ Concluído em 2026-09-07
   ([spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md)/[PR #374](https://github.com/welz-gui/AgroTop/pull/374)) —
   aba "📦 Pacote de Evidências" em `page_relatorios`.
 - **IA como interface de consulta** (busca em linguagem natural sobre o rebanho, resumos,
-  explicação de indicadores — não decisão autônoma nem modelo preditivo) — genuinamente
-  ausente do projeto hoje, zero integração de LLM no código. Decisão de arquitetura em
-  aberto (provedor, dados da fazenda saindo para API externa, custo por consulta) antes de
-  virar spec — não especificado ainda.
+  explicação de indicadores — não decisão autônoma nem modelo preditivo). **Decisão de
+  arquitetura tomada em 2026-09-08: OpenRouter**, nível `:free` para começar — pesquisado
+  antes de decidir (OpenRouter não treina modelo, é roteador; mas variantes `:free` podem
+  ter termos de retenção diferentes dos pagos; tem filtro de Zero Data Retention para
+  quando o uso envolver dado sensível de verdade — ver a spec para o caminho de migração).
+  [Spec 0083](specs/0083-web-assistente-de-consulta-ia.md), escrita em 2026-09-08: v1
+  pequena, só pergunta livre com contexto agregado (nunca tabela crua), sem escrita, sem
+  memória de conversa. Resumo automático de ficha/lote e relatório narrativo ficam para
+  specs futuras, se esta v1 provar valor.
 
 ---
 
