@@ -31,6 +31,13 @@ from services.geometria import (
 )
 from services.ndvi import ndvi_do_piquete, NdviIndisponivelError
 from services.importacao_geometria import ler_geojson, ler_kml
+from services.importacao_car import (
+    CamadaCar,
+    area_camada_ha,
+    camada_para_geojson,
+    ler_shapefile_car,
+    percentual_sobreposicao,
+)
 from services.clima_adaptador import localizacoes_para_previsao
 from services.lotacao import sobrepostos as lotacao_sobrepostos
 from services.sincronizacao import (
@@ -6497,6 +6504,96 @@ def _propriedades_editar(props):
             st.rerun()
         else:
             st.error("🚫 Nada foi alterado.")
+
+    with st.expander("🌳 Situação Ambiental (CAR)", expanded=False):
+        st.warning("Aviso: este registro não é avaliação de conformidade legal nem certificação oficial.")
+        car_numero = st.text_input(
+            "Número do CAR", value=p.get("car_numero") or "",
+            key=f"prop_car_numero_{p['id']}").strip()
+        st.link_button(
+            "Consultar no SICAR",
+            "https://consultapublica.car.gov.br/publico/imoveis/index",
+        )
+        arquivo_car = st.file_uploader(
+            "Arquivo Shapefile do CAR (.zip)", type=["zip"],
+            key=f"prop_car_arquivo_{p['id']}")
+
+        if arquivo_car is None:
+            if st.button("Salvar dados do CAR", key=f"prop_car_numero_salvar_{p['id']}"):
+                if db.propriedades.atualizar(p["id"], car_numero=car_numero or None):
+                    db.clear_cache()
+                    st.success("✅ Número do CAR atualizado.")
+                    st.rerun()
+            return
+
+        try:
+            camadas = ler_shapefile_car(arquivo_car.getvalue())
+        except ValueError as exc:
+            st.error(f"🚫 {exc}")
+            return
+
+        perimetros = camadas["Área do Imóvel"]
+        poligonos_car = [anel for camada in perimetros for anel in camada.poligonos]
+        area_car = sum(area_camada_ha(camada) for camada in perimetros)
+        area_agrotop = 0.0
+        anel_agrotop = []
+        try:
+            geo = json.loads(p.get("poligono") or "")
+            if geo.get("type") == "Polygon":
+                anel_agrotop = [tuple(v) for v in geo["coordinates"][0]]
+                area_agrotop = geometria_area_ha(anel_agrotop)
+        except (AttributeError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+        sobreposicao = percentual_sobreposicao(anel_agrotop, poligonos_car) if anel_agrotop else 0.0
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Área declarada no CAR", f"{_num_br(area_car, 2)} ha")
+        m2.metric("Área cadastrada no AgroTop", f"{_num_br(area_agrotop, 2)} ha")
+        m3.metric("Sobreposição", f"{_num_br(sobreposicao, 2)}%")
+
+        pontos = [ponto for anel in poligonos_car for ponto in anel]
+        pontos += anel_agrotop
+        centro_lat = sum(ponto[1] for ponto in pontos) / len(pontos)
+        centro_lon = sum(ponto[0] for ponto in pontos) / len(pontos)
+        mapa_car = folium.Map(location=[centro_lat, centro_lon], zoom_start=13)
+        if anel_agrotop:
+            folium.Polygon(
+                [(lat, lon) for lon, lat in anel_agrotop],
+                color=c["primaria"], fill=True, fill_opacity=0.15,
+                tooltip="Perímetro cadastrado no AgroTop",
+            ).add_to(mapa_car)
+        for anel in poligonos_car:
+            folium.Polygon(
+                [(lat, lon) for lon, lat in anel],
+                color=c["info"], fill=True, fill_opacity=0.15,
+                tooltip="Perímetro declarado no CAR",
+            ).add_to(mapa_car)
+        cores_camadas = [c["atencao"], c["perigo"], c["sucesso"]]
+        for indice, (tipo, itens) in enumerate(camadas.items()):
+            if tipo == "Área do Imóvel":
+                continue
+            for item in itens:
+                for anel in item.poligonos:
+                    folium.Polygon(
+                        [(lat, lon) for lon, lat in anel],
+                        color=cores_camadas[indice % len(cores_camadas)],
+                        fill=True, fill_opacity=0.12, tooltip=tipo,
+                    ).add_to(mapa_car)
+        st_folium(mapa_car, height=400, key=f"prop_car_mapa_{p['id']}")
+
+        camada_perimetro = CamadaCar(
+            "Área do Imóvel", poligonos_car,
+            sum(camada.area_ha_atributo or 0.0 for camada in perimetros) or None,
+        )
+        if st.button("Salvar perímetro do CAR", type="primary",
+                     key=f"prop_car_salvar_{p['id']}"):
+            if db.propriedades.atualizar(
+                p["id"], car_numero=car_numero or None,
+                poligono_car=camada_para_geojson(camada_perimetro),
+                car_area_ha=area_car,
+            ):
+                db.clear_cache()
+                st.success("✅ Perímetro do CAR salvo.")
+                st.rerun()
 
 
 def _propriedade_nova():

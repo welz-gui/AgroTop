@@ -132,7 +132,8 @@ def atualizar(property_id: str, **campos) -> bool:
 
     permitidos = {"nome", "codigo_oficial", "municipio", "uf", "endereco",
                   "latitude", "longitude", "poligono", "atividade",
-                  "situacao", "inicio", "encerramento"}
+                  "situacao", "inicio", "encerramento", "car_numero",
+                  "poligono_car", "car_area_ha"}
     campos = {k: v for k, v in campos.items() if k in permitidos}
     if not campos:
         return False

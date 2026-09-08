@@ -185,6 +185,9 @@ _SCHEMA_SQL = """
                 latitude       REAL,
                 longitude      REAL,
                 poligono       TEXT,   -- GeoJSON; alimentado pela spec 0015
+                car_numero     TEXT,
+                poligono_car   TEXT,
+                car_area_ha    REAL,
                 atividade      TEXT,
                 situacao       TEXT NOT NULL DEFAULT 'ativa',
                 inicio         TEXT,
@@ -1067,6 +1070,13 @@ def _migrate(con) -> None:
     if "poligono" not in lcols:
         # Migration 0015 — perímetro do piquete, destrava services.lotacao.sobrepostos().
         con.execute("ALTER TABLE lotes ADD COLUMN poligono TEXT")
+    pcols = {r["name"] for r in con.execute("PRAGMA table_info(properties)").fetchall()}
+    if "car_numero" not in pcols:
+        con.execute("ALTER TABLE properties ADD COLUMN car_numero TEXT")
+    if "poligono_car" not in pcols:
+        con.execute("ALTER TABLE properties ADD COLUMN poligono_car TEXT")
+    if "car_area_ha" not in pcols:
+        con.execute("ALTER TABLE properties ADD COLUMN car_area_ha REAL")
     scols = {r["name"] for r in con.execute("PRAGMA table_info(sales)").fetchall()}
     if "a_prazo" not in scols:
         # Migration 0020 — mesma razão: distingue venda cujo caixa é rastreado
