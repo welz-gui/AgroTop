@@ -944,7 +944,7 @@ def _dash_chart_evolucao_peso():
 
 
 def _dash_chart_por_raca(animals):
-    st.subheader("🥧 Por Raça")
+    st.subheader("🐄 Por Raça")
     df_br = pd.Series([a["breed"] for a in animals]).value_counts().reset_index()
     df_br.columns=["Raça","Qtd"]
     fig_p=px.pie(df_br,names="Raça",values="Qtd",hole=0.45,
