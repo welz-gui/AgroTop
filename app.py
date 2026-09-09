@@ -5,6 +5,7 @@ PWA responsivo: Streamlit + SQLite + Plotly
 
 import io
 import html
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -21,6 +22,7 @@ from services.qualidade import avaliar_pesagem
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
 from services.recomendacoes import avaliar as avaliar_recomendacoes
+from services import assistente_ia
 import json
 from services.regras_regulatorias import simular as simular_regra_pura
 from services.geometria import (
@@ -763,6 +765,7 @@ def _sidebar():
                 ("🚚","Movimentação","movimentacao",""),
                 ("🏞️","Propriedades","propriedades",""),
                 ("📜","Regras","regras",""),
+                ("🤖","Assistente IA","assistente",""),
                 ("📡","Sincronização","sincronizacao",""),
                 ("🌾","Nutrição","nutricao",""),
                 ("💉","Sanitário","sanitario",""),
@@ -6383,6 +6386,41 @@ def _entrada_de_perimetro(key_prefix: str, valor_inicial: str) -> str:
     return st.session_state[texto_key]
 
 
+def page_assistente():
+    """Pergunta isolada sobre agregados, exclusivamente para administradores."""
+    if st.session_state.user["role"] != "admin":
+        st.error("🔒 Acesso restrito ao Administrador.")
+        return
+    st.markdown('<div class="page-title">🤖 Assistente IA</div>',
+                unsafe_allow_html=True)
+    st.warning(assistente_ia.AVISO_PRIVACIDADE)
+    st.caption("Consulta somente leitura, sem histórico de conversa. A IA pode errar; "
+               "não substitui aconselhamento veterinário ou financeiro profissional.")
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key.strip():
+        st.info("Recurso não configurado. Solicite a configuração ao administrador.")
+        return
+    modelo = os.environ.get("OPENROUTER_MODEL", assistente_ia.MODELO_PADRAO)
+    pergunta = st.text_area("Sua pergunta sobre a fazenda", key="assistente_pergunta")
+    if st.button("Perguntar", key="assistente_enviar"):
+        if not pergunta.strip():
+            st.info("Digite uma pergunta antes de enviar.")
+            return
+        try:
+            with st.spinner("Consultando o assistente…"):
+                contexto = assistente_ia.montar_contexto()
+                resposta = assistente_ia.perguntar(
+                    pergunta, contexto, api_key=api_key, modelo=modelo,
+                )
+        except assistente_ia.AssistenteIndisponivelError as exc:
+            st.error(str(exc))
+            return
+        st.info("🤖 Resposta gerada por IA — confira os dados antes de decidir.")
+        # Texto literal: uma resposta externa não deve criar HTML, imagens remotas
+        # ou links invisíveis que enviem dados para outro destino no navegador.
+        st.text(resposta)
+
+
 def page_propriedades():
     """Hierarquia Organização → Produtor → Propriedade (PNIB §3).
 
@@ -7220,6 +7258,7 @@ def main():
         "movimentacao": page_movimentacao,
         "propriedades": page_propriedades,
         "regras":    page_regras,
+        "assistente": page_assistente,
         "sincronizacao": page_sincronizacao,
         "nutricao":  page_nutricao,
         "sanitario": page_sanitario,
