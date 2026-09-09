@@ -1,0 +1,13 @@
+# Build remoto do backend_api via Dockerfile.api — usado porque
+# `gcloud run deploy --source` só reconhece um arquivo chamado
+# literalmente "Dockerfile" na raiz do contexto, e este repositório
+# já tem um (o do app web, spec 0081). Roda inteiramente no Cloud
+# Build, sem depender de Docker local.
+#
+# Uso: gcloud builds submit --config=cloudbuild.api.yaml \
+#        --substitutions=_IMAGE=<repositório>/backend-api .
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["build", "-f", "Dockerfile.api", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"

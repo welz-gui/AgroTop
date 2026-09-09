@@ -15,9 +15,14 @@ venv
 env
 ENV
 
-# Subprojects with separate lifecycles
+# Subprojects with separate lifecycles.
+# backend_api is NOT excluded — Dockerfile.api (spec: hospedagem da API
+# mobile) builds from this same context and needs backend_api/*.py in the
+# COPY . . step. It's a small cost for the web image (Dockerfile) to carry
+# those files unused, cheaper than a per-Dockerfile .dockerignore whose
+# BuildKit-only override convention isn't guaranteed to be honored by
+# `gcloud run deploy --source .`.
 mobile
-backend_api
 poc
 
 # Tests, tools, docs and database migrations
