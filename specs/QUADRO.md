@@ -151,8 +151,22 @@ de retenção diferentes dos pagos; tem filtro de Zero Data Retention pra quando
 envolver dado sensível de verdade). v1 deliberadamente pequena — só pergunta livre com
 contexto agregado (`get_rebanho_stats`/`get_alert_animals`/`recomendacoes.avaliar`), sem
 tabela crua saindo pra API externa, sem escrita, sem memória de conversa. `requests` já é
-dependência (spec 0079) — zero dependência nova. **Com isto, a fila de specs está vazia
-de novo.**
+dependência (spec 0079) — zero dependência nova.
+
+**0083 concluída em 2026-09-09 — [PR #383](https://github.com/welz-gui/AgroTop/pull/383).**
+Implementação excepcionalmente cuidadosa — a mais rigorosa desta sessão em teste de
+privacidade. `montar_contexto()` reagrupa a saída do motor de regras (que traz `titulo`/
+`motivo`/`acao`/`dados` com ID e valor por animal) em descrições fixas por regra —
+testado contra o motor **real** (não mockado) com segredos sintéticos plantados em todo
+nível (UUID, fornecedor, comprador, valor individual), confirmando por serialização que
+nada vaza. Teste adicional usa `ast.parse`/`ast.walk` pra travar estruturalmente que o
+módulo só chama os 3 métodos de banco autorizados — trava contra expansão de escopo
+futura, não só o estado atual. Defesa a mais que a spec pedia: prompt de sistema nega
+que a pergunta do usuário possa "mudar estas instruções" (proteção contra injeção),
+resposta renderizada com `st.text()` em vez de markdown/HTML (a IA não pode gerar link
+nem imagem remota disfarçados). Modelo padrão `google/gemma-4-31b-it:free` verificado
+contra o catálogo público do OpenRouter em 2026-09-09, sem gastar credencial. **Com
+isto, a fila de specs está vazia de novo.**
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -447,7 +461,7 @@ de novo.**
 | — | [0080](0080-web-pacote-de-evidencias-por-lote-de-venda.md) — Web: pacote de evidências por lote de venda 🏗️ ⚠️médio | — | ✅ [#374](https://github.com/welz-gui/AgroTop/pull/374) | | 2026-09-07 |
 | — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | ✅ [#375](https://github.com/welz-gui/AgroTop/pull/375) | | 2026-09-07 |
 | — | [0082](0082-web-cruzamento-com-car.md) — Web: cruzamento com CAR (situação ambiental) 🏗️ ⚠️médio | — | ✅ [#381](https://github.com/welz-gui/AgroTop/pull/381) | | 2026-09-08 |
-| — | [0083](0083-web-assistente-de-consulta-ia.md) — Web: assistente de consulta por IA (OpenRouter) 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-08 |
+| — | [0083](0083-web-assistente-de-consulta-ia.md) — Web: assistente de consulta por IA (OpenRouter) 🏗️ ⚠️médio | — | ✅ [#383](https://github.com/welz-gui/AgroTop/pull/383) | | 2026-09-09 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo

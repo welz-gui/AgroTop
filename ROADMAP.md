@@ -4,22 +4,20 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-09-08 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
+Última atualização: 2026-09-09 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
 (API + mobile, exceto Bluetooth — hardware, não delegável, aguardando o equipamento em
 mãos), 2 (geometria/GPS) e 3 (Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100%
 ligada à interface (7 de 7)** · fila de specs em `specs/QUADRO.md` **vazia** (0001 a
-0081 fechadas) · Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)
-(paridade admin no mobile, só leitura) concluído · **Trilha 4 (Inteligência):** escopo
-imediato, motor de regras, NDVI por piquete ([spec 0079](specs/0079-web-ndvi-por-piquete.md))
-e pacote de evidências por lote de venda ([spec 0080](specs/0080-web-pacote-de-evidencias-por-lote-de-venda.md))
-já em produção · **dois objetivos do relatório estratégico externo (2026-09-07) seguem
-sem spec:** cruzamento com CAR (fonte de dados não levantada) e IA como interface de
-consulta (decisão de arquitetura em aberto) — ver seção 5 · **Dockerfile do app web
-pronto** ([spec 0081](specs/0081-dockerfile-do-app-web.md)/[PR #375](https://github.com/welz-gui/AgroTop/pull/375)) —
-falta a decisão do mantenedor sobre qual host usar (Fly.io recomendado; comparativo
-completo fora deste arquivo) · **Modelos estatísticos aguardam dado real de uso** (a
-etapa de testes com o software em operação é o que vai gerar os ciclos completos que os
-modelos precisam, não mais um prazo estimado)
+0083 fechadas) · Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)
+(paridade admin no mobile, só leitura) concluído · **Trilha 4 (Inteligência) — todos os
+objetivos concluídos:** escopo imediato, motor de regras, NDVI por piquete, pacote de
+evidências por lote de venda, cruzamento com CAR e assistente de consulta por IA — ver
+seção 5. **Modelos estatísticos aguardam dado real de uso** (a etapa de testes com o
+software em operação é o que vai gerar os ciclos completos que os modelos precisam, não
+mais um prazo estimado) · **Hospedagem migrada para o Cloud Run** em 2026-09-09 (região
+`us-central1`, free tier, ~8-9s de cold start em vez da hibernação do Streamlit Community
+Cloud) — `https://agrotop-876345671972.us-central1.run.app`; PWA testado e confirmado
+funcionando (sessão persiste após instalar/fechar/reabrir num celular real)
 
 ---
 
@@ -825,10 +823,11 @@ genuinamente novos e viram objetivo desta trilha, sem data comprometida:
   antes de decidir (OpenRouter não treina modelo, é roteador; mas variantes `:free` podem
   ter termos de retenção diferentes dos pagos; tem filtro de Zero Data Retention para
   quando o uso envolver dado sensível de verdade — ver a spec para o caminho de migração).
-  [Spec 0083](specs/0083-web-assistente-de-consulta-ia.md), escrita em 2026-09-08: v1
-  pequena, só pergunta livre com contexto agregado (nunca tabela crua), sem escrita, sem
-  memória de conversa. Resumo automático de ficha/lote e relatório narrativo ficam para
-  specs futuras, se esta v1 provar valor.
+  ✅ Concluído em 2026-09-09 ([spec 0083](specs/0083-web-assistente-de-consulta-ia.md)/
+  [PR #383](https://github.com/welz-gui/AgroTop/pull/383)) — v1 pequena, só pergunta livre
+  com contexto agregado (nunca tabela crua), sem escrita, sem memória de conversa,
+  admin-only em `page_assistente`. Resumo automático de ficha/lote e relatório narrativo
+  ficam para specs futuras, se esta v1 provar valor.
 
 ---
 
