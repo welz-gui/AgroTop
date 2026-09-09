@@ -52,6 +52,7 @@ PROVAS = [
     "tests.ui_ndvi_prova", # ndvi_do_piquete ligado (Spec 0079)
     "tests.ui_car_prova", # cruzamento visual propriedade × CAR (Spec 0082)
     "tests.ui_assistente_prova", # consulta IA: privacidade e acesso (Spec 0083)
+    "tests.ui_campo_chuva_prova", # registro rápido de chuva no Modo Campo
 ]
 
 

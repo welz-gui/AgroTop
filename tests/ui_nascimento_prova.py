@@ -101,7 +101,39 @@ class TestTelaNascimento(unittest.TestCase):
         self.assertEqual(len(alvos), 1, "botão de registrar nascimento não encontrado")
         return alvos[0]
 
+    @classmethod
+    def _touro_ativo(cls):
+        """Um macho ativo para servir de pai — cria um se o seed não tiver."""
+        for a in db.get_all_animals(status="ativo"):
+            if a.get("sex") == "M":
+                return a
+        db.add_animal(db.AnimalData("TOURO_TESTE", "Nelore", "M", _dias_atras(1800),
+                                    _dias_atras(400), 500.0, 700.0, 4000.0, None, None))
+        db.clear_cache()
+        return [a for a in db.get_all_animals(status="ativo")
+               if a["id"] == "TOURO_TESTE"][0]
+
     # ── testes ───────────────────────────────────────────────────────────────
+
+    def test_pai_e_opcional_lista_so_machos_e_nao_bloqueia_sem_escolher(self):
+        touro = self._touro_ativo()
+        at = self._selecionar_mae(self._tela(), self._mae_apta())
+
+        caixa_pai = self._por_chave(at.selectbox, "nasc_pai")
+        self.assertEqual(caixa_pai.value, "— Não informado —",
+                         "pai não deveria vir pré-selecionado")
+        femeas = [a["id"] for a in db.get_all_animals(status="ativo")
+                 if a.get("sex") == "F"]
+        for f in femeas:
+            self.assertFalse(any(o.startswith(f) for o in caixa_pai.options),
+                             f"fêmea {f} apareceu como opção de pai")
+        self.assertTrue(any(o.startswith(touro["id"]) for o in caixa_pai.options),
+                        "touro ativo não apareceu como opção de pai")
+
+        # Sem escolher pai, o cadastro segue liberado normalmente (é opcional).
+        self._por_chave(at.text_input, "nasc_id_0").set_value("SEMPAI_UI")
+        at.run()
+        self.assertFalse(self._botao(at).disabled)
 
     def test_a_aba_existe_e_lista_so_femeas(self):
         at = self._tela()
