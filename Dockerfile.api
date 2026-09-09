@@ -1,0 +1,56 @@
+# Dockerfile do backend_api (FastAPI) — o app mobile fala com este processo,
+# não com o app web (Dockerfile na raiz, spec 0081). São dois serviços
+# separados porque backend_api/main.py importa direto de database.py/
+# repositories/ (raiz do repo), então o contexto de build tem que ser a raiz
+# do repositório, mesmo o Dockerfile sendo específico da API — não dá pra
+# fazer o build de dentro de backend_api/ sozinho.
+#
+# Instala requirements.txt (raiz) + backend_api/requirements.txt — mesma
+# combinação que .github/workflows/ci.yml já prova necessária e suficiente
+# (os testes de backend_api/ rodam contra as duas instaladas juntas).
+# backend_api/main.py não importa services/ndvi.py, services/importacao_car.py
+# nem faz OCR (_ocr_number é só em app.py) — por isso, ao contrário do
+# Dockerfile do web, não instala tesseract-ocr aqui.
+
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt ./requirements.txt
+COPY backend_api/requirements.txt ./backend_api-requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt -r backend_api-requirements.txt
+
+FROM python:3.12-slim AS runner
+
+# libexpat1: dependência de sistema exigida pelo rasterio (libexpat.so.1),
+# que está em requirements.txt da raiz desde a spec 0079 — mesmo achado do
+# Dockerfile do web (PR #375). curl: usado pelo HEALTHCHECK.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libexpat1 \
+        curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+COPY . .
+
+EXPOSE 8000
+
+# Mesmo raciocínio do Dockerfile do web (PR #380): forma shell, não exec,
+# porque só a shell expande ${PORT:-8000} — o Cloud Run injeta $PORT quando
+# a imagem é publicada por referência, sem inspecionar o Dockerfile.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f "http://localhost:${PORT:-8000}/docs" || exit 1
+
+CMD uvicorn backend_api.main:app --host 0.0.0.0 --port ${PORT:-8000}

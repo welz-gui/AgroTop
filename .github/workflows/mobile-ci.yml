@@ -9,6 +9,15 @@ name: Mobile CI (Flutter)
 # aqui e com `pull_request:` adicionado corrige isso.
 on:
   workflow_dispatch:
+    inputs:
+      api_url:
+        description: >-
+          URL real do backend_api (ex.: https://backend-api-XXXX.REGIAO.run.app).
+          Deixe em branco para o build de smoke-test de sempre, que não fala
+          com nada real — só disparo manual usa este campo, push/pull_request
+          continuam com o placeholder.
+        required: false
+        default: ""
   push:
     branches: [ main ]
     paths:
@@ -59,7 +68,12 @@ jobs:
           git diff --exit-code -- lib/app_colors.dart
 
       - name: APK de depuração
-        run: flutter build apk --debug --dart-define=AGROTOP_API_URL=https://api.example.invalid
+        env:
+          API_URL_INPUT: ${{ github.event.inputs.api_url }}
+        run: |
+          API_URL="${API_URL_INPUT:-https://api.example.invalid}"
+          echo "Buildando com AGROTOP_API_URL=$API_URL"
+          flutter build apk --debug --dart-define=AGROTOP_API_URL="$API_URL"
 
       - name: Publicar APK
         uses: actions/upload-artifact@v7
