@@ -66,6 +66,20 @@ class TestPartoSimples(BaseB3):
         self.assertEqual(cria["peso_nascimento"], 32.0)
         self.assertEqual(cria["birth_date"], _dias_atras(10))
 
+    def test_pai_e_opcional_e_persiste_quando_informado(self):
+        """§4.3: pai "quando conhecido" — sem pai não é erro, com pai persiste."""
+        nascimentos.registrar(self.mae, _dias_atras(10),
+                              [{"id": "SEMPAI", "sexo": "M", "raca": "Nelore"}])
+        sem_pai = self._linhas("SELECT * FROM animals WHERE id='SEMPAI'")[0]
+        self.assertIsNone(sem_pai["pai_uuid"])
+
+        pai_uuid = self._criar_femea_adulta("TOURO1")  # helper só cria o animal
+        nascimentos.registrar(
+            self.mae, _dias_atras(10),
+            [{"id": "COMPAI", "sexo": "F", "raca": "Nelore", "pai_uuid": pai_uuid}])
+        com_pai = self._linhas("SELECT * FROM animals WHERE id='COMPAI'")[0]
+        self.assertEqual(com_pai["pai_uuid"], pai_uuid)
+
     def test_propriedade_de_nascimento_e_preenchida(self):
         """§4.3: onde nasceu é diferente de onde está — e não muda depois."""
         nascimentos.registrar(self.mae, _dias_atras(10),

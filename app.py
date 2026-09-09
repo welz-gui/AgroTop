@@ -1220,6 +1220,36 @@ def _campo_trato():
                     st.rerun()
 
 
+def _campo_chuva():
+    """Registro rápido da leitura de chuva do dia — mesmo espírito do trato do dia:
+    poucos campos, uma confirmação, disponível pro operador no Modo Campo (a tela
+    completa de pluviometria em page_clima é admin-only)."""
+    hoje = date.today()
+    lotes = [l for l in db.get_all_lotes() if l["status"] == "ativo"]
+
+    leituras_hoje = db.get_rain(hoje.isoformat(), hoje.isoformat())
+    if leituras_hoje:
+        total_hoje = sum(r["rain_mm"] for r in leituras_hoje)
+        st.info(f"💧 Já registrado hoje: **{total_hoje:.1f} mm** "
+                f"({len(leituras_hoje)} leitura(s)). Pode registrar outra se for de "
+                f"outro piquete ou outro horário.")
+
+    st.caption("Leitura do pluviômetro de hoje. Se houver um por piquete, escolha o "
+               "piquete; se for um só, deixe em **Geral / Sede**.")
+    with st.form("f_campo_chuva", clear_on_submit=True):
+        rmm = st.number_input("Chuva medida (mm)", min_value=0.0, step=1.0, format="%.1f",
+                              key="campo_chuva_mm")
+        lote_sel = st.selectbox("Piquete", [None] + lotes,
+            format_func=lambda x: "Geral / Sede" if x is None else f"{x['id']} — {x['name']}",
+            key="campo_chuva_lote")
+        if st.form_submit_button("💧 Registrar chuva de hoje", type="primary",
+                                 use_container_width=True):
+            db.add_rain(hoje.isoformat(), rmm, lote_sel["id"] if lote_sel else None,
+                        st.session_state.user["name"])
+            st.success(f"✅ {rmm:.1f} mm registrados para hoje.")
+            st.rerun()
+
+
 @st.fragment
 def _teclado_numerico():
     """Teclado numérico isolado em fragmento: digitar não re-roda a página toda."""
@@ -1646,10 +1676,12 @@ def page_campo():
     pend = db.get_pending_feedings()
     n_pend = sum(1 for p in pend if not p["done_this_period"])
     trato_label = f"🌾 Trato do Dia{' 🔴'+str(n_pend) if n_pend else ''}"
-    tab_trato, tab_animal, tab_import = st.tabs(
-        [trato_label, "🐄 Manejo do Animal", "📥 Importar CSV"])
+    tab_trato, tab_chuva, tab_animal, tab_import = st.tabs(
+        [trato_label, "🌧️ Chuva do Dia", "🐄 Manejo do Animal", "📥 Importar CSV"])
     with tab_trato:
         _campo_trato()
+    with tab_chuva:
+        _campo_chuva()
     with tab_animal:
         _campo_animal()
     with tab_import:
@@ -4507,6 +4539,19 @@ def _cadastro_nascimento():
     with c3:
         hora = st.text_input("Hora", placeholder="14:30", key="nasc_hora").strip()
 
+    # Pai é opcional (§4.3: "quando conhecido") — sem validação biológica como a
+    # mãe (services/genealogia.py não avalia pai_uuid); é só o vínculo, quando
+    # o produtor souber. Um só seletor pro parto inteiro: gêmeos do mesmo parto
+    # quase sempre têm o mesmo pai, e o dado já é opcional — não vale complicar
+    # pedindo pai por cria individualmente.
+    machos = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "M"]
+    pai = None
+    if machos:
+        rotulos_pai = {f"{a['id']} — {a['breed']}": a for a in machos}
+        opcoes_pai = ["— Não informado —"] + list(rotulos_pai)
+        sel_pai = st.selectbox("🐂 Pai (opcional)", opcoes_pai, key="nasc_pai")
+        pai = rotulos_pai.get(sel_pai)
+
     c4, c5, c6 = st.columns(3)
     with c4:
         tipo_parto = st.selectbox("Tipo de parto", ["normal", "assistido", "cesarea"],
@@ -4574,7 +4619,7 @@ def _cadastro_nascimento():
             peso = st.number_input("Peso (kg)", min_value=0.0, max_value=100.0,
                                    step=0.5, value=0.0, key=f"nasc_peso_{i}")
         crias.append({"id": brinco, "sexo": sexo, "raca": raca,
-                      "peso": peso or None})
+                      "peso": peso or None, "pai_uuid": pai["uuid"] if pai else None})
 
     obs = st.text_area("Observações", key="nasc_obs").strip()
 
