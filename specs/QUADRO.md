@@ -59,9 +59,11 @@ confirmou que lucro por raça (`_fin_rentabilidade_por_raca`), correlação chuv
 (`avaliar_pesagem`, web e API) e indicador de completude (`_dash_completude`) **já estão
 em produção** — nenhuma spec nova precisa deles. O PWA (`manifest.json`) **também já
 está em produção** (spec 0002/[PR #31](https://github.com/welz-gui/AgroTop/pull/31),
-`static/manifest.json` + injeção no `<head>` de `app.py`) — só falta a verificação manual
-de sessão pós-instalação registrada acima em "⚠️ Pendência do PWA", que exige deploy HTTPS
-e não é trabalho de spec. **A única peça genuinamente ausente é o NDVI por piquete** —
+`static/manifest.json` + injeção no `<head>` de `app.py`) — a verificação manual de
+sessão pós-instalação, que exigia deploy HTTPS sem o portão de auth do Streamlit Cloud,
+**foi confirmada em 2026-09-09** (ver "✅ Pendência do PWA fechada" mais abaixo), depois
+da migração para o Cloud Run. **A única peça genuinamente ausente [na época desta nota]
+era o NDVI por piquete** —
 a PoC (spec 0004) já decidiu fonte de dados, limiar de nuvem e deu o veredito "seguir com
 ressalvas"; a 0079 implementa isso como leitura de tendência em `page_lotes`, não como
 monitoramento contínuo (a PoC condicionou o "seguir" a essa ressalva).
@@ -1009,14 +1011,23 @@ ao CI — ligar é decisão do mantenedor.
 `repositories/usuarios.py`** — o SQL de `users` ainda mora em `database.py`, que a spec
 proibia tocar. Se a API virar produção, extrair esse repositório primeiro (R1/R9).
 
-### ⚠️ Pendência do PWA (spec 0002, PR #31)
+### ✅ Pendência do PWA fechada em 2026-09-09 (spec 0002, PR #31)
 
-O agente validou a persistência do cookie `agrotop_sid` **no contexto web** (fechar e reabrir
-a aba mantém a sessão), mas **não conseguiu testar o fluxo do ícone instalado** — exige
-HTTPS. Ele declarou isso explicitamente, em vez de afirmar o que não verificou.
+O agente original validou a persistência do cookie `agrotop_sid` **no contexto web**
+(fechar e reabrir a aba mantém a sessão), mas **não conseguiu testar o fluxo do ícone
+instalado** — exigia HTTPS sem o portão de autenticação do Streamlit Community Cloud na
+frente, que só existiu depois da migração para o Cloud Run (`https://agrotop-876345671972.us-central1.run.app`,
+spec 0081/PR #375).
 
-**Falta confirmar no deploy:** instalar pela tela inicial, fechar, reabrir pelo ícone e
-verificar que a sessão persiste. Um PWA instalado tem contexto de armazenamento próprio.
+**Confirmado pelo usuário em celular real, 2026-09-09:** instalou pela tela inicial,
+fechou o app, reabriu pelo ícone — **a sessão persiste**. Antes disso, verificação remota
+(emulação de viewport mobile) já tinha confirmado os pré-requisitos técnicos: HTTPS ✅,
+manifest válido servido em `/app/static/manifest.json` ✅, ícone Apple Touch presente ✅,
+zero erro de console. Achado registrado à parte: a instalação não tem service worker
+(decisão proposital da spec 0002, evita cache servindo versão velha) — em algumas versões
+de Chrome/Android isso significa que o banner automático de instalação pode não aparecer
+sozinho, mas a instalação manual pelo menu do navegador funciona normalmente, como o
+teste confirmou.
 
 ### Fora da fila
 
