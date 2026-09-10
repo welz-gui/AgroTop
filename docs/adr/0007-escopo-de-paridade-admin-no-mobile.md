@@ -102,3 +102,24 @@ mobile correspondente, mesmo padrão de todo o Mobile v1.
   dessas páginas é necessária no campo (ex.: GTA sendo preenchido na fazenda mesmo), volta a
   ser avaliada. Não é uma proibição arquitetural como o ADR 0002, é uma leitura do valor
   hoje.
+
+---
+
+## 5. Emenda — 2026-09-10: "sem gráfico" do §2.3 era sobre o completo, não sobre qualquer gráfico
+
+Pedido do usuário: aproximar design e usabilidade do mobile do padrão web. O dashboard
+mobile (spec 0075/0076) saiu **sem nenhum gráfico** — só números em card — citando esta
+ADR: "o dashboard completo tem gráficos que pedem tela grande".
+
+**Essa frase falava do dashboard *completo* do web** (evolução de peso, pizza por raça,
+GMD por animal, conformidade, completude — várias visualizações Plotly interativas, com
+zoom e hover, competindo por espaço na mesma tela). Não é uma proibição de qualquer
+gráfico no mobile — o §2.3 já dizia "resumo, não o completo", e um resumo pode ter **uma**
+visualização simples, estática, sem interação, sem quebrar essa distinção.
+
+**Emenda:** o dashboard resumo do mobile pode ganhar **um** gráfico leve por vez — sem
+zoom, sem hover, sem múltiplas séries competindo — desde que continue cabendo numa tela
+de celular sem rolagem excessiva. Primeira aplicação: distribuição de animais por raça
+(rosca), specs 0085 (API) e 0086 (mobile). Isto não reabre o dashboard completo inteiro
+para o mobile — GMD por animal, evolução de peso e conformidade continuam fora, porque
+essas sim são análises de mesa (várias séries, comparação ao longo do tempo).

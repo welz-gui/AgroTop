@@ -1,0 +1,62 @@
+name: Deploy — App Web (Cloud Run)
+
+# Sem isto, nada reimplanta o app web depois de mesclado em main — descoberto em
+# 2026-09-10 quando o usuário reportou mudanças mescladas (ícone do dashboard, pai
+# opcional no nascimento, chuva do dia) que nunca chegaram ao ar: a migração pro
+# Cloud Run (spec 0081/PR #375) trocou o Streamlit Community Cloud, que reimplantava
+# a cada push sozinho, e ninguém montou o substituto até agora.
+#
+# Autenticação via Workload Identity Federation — sem chave de conta de serviço
+# baixável armazenada como secret (mesma disciplina de nunca guardar credencial
+# estática que o projeto já segue para DATABASE_URL/AGROTOP_API_SECRET).
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "app.py"
+      - "database.py"
+      - "repositories/**"
+      - "services/**"
+      - "ui/**"
+      - "static/**"
+      - ".streamlit/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "requirements.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # obrigatório para o WIF trocar o token do GitHub por credencial do GCP
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/876345671972/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: agrotop-deployer@agrotop-cloudrun-teste.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy no Cloud Run
+        # Todas as flags de configuração explícitas de propósito, mesmo as que
+        # já eram o valor atual do serviço — não depende de "gcloud preserva o
+        # que não foi passado" ficar verdade para sempre. Este comando É a
+        # fonte da verdade da configuração do serviço, não um diff sobre ela.
+        run: |
+          gcloud run deploy agrotop \
+            --source . \
+            --project=agrotop-cloudrun-teste \
+            --region=us-central1 \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=4 \
+            --memory=1Gi \
+            --set-secrets=DATABASE_URL=agrotop-database-url:latest,OPENROUTER_API_KEY=agrotop-openrouter-api-key:latest \
+            --quiet

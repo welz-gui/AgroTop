@@ -168,6 +168,22 @@ nem imagem remota disfarçados). Modelo padrão `google/gemma-4-31b-it:free` ver
 contra o catálogo público do OpenRouter em 2026-09-09, sem gastar credencial. **Com
 isto, a fila de specs está vazia de novo.**
 
+**0084-0087 escritas em 2026-09-10** — pedido do usuário: aproximar usabilidade e design
+do mobile do padrão web. Investigação antes de escrever encontrou três achados
+concretos, não impressão vaga: (1) `AnimalsPage` tem 11 ícones sem rótulo enfileirados na
+`AppBar`, contra a sidebar rotulada do web — **0084** troca por um `Drawer`; (2) o
+dashboard mobile não tem nenhum gráfico, enquanto o web tem pizza por raça e barra de
+GMD — achado um conflito real com a [ADR 0007 §2.3](../docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)
+("o dashboard completo tem gráficos que pedem tela grande"); levado ao usuário via
+pergunta explícita, decisão: gráfico único e leve não contraria a ADR, registrada como
+emenda §5 datada — **0085** (API: distribuição por raça) e **0086** (mobile: rosca);
+(3) `_AlertCard` não usa cor de status nenhuma, enquanto `app.py::page_alertas` usa
+`.card-red`/`.card-yellow` — **0087** aplica a cor, mas só onde o web também usa (não em
+"Prontos para Abate"/"Baixo Desempenho", que no web também são sem cor — conferido linha
+a linha antes de escrever, não presumido pela cor do emoji do título). Ordem de
+implementação: 0084 primeiro (maior ganho, menor risco), depois 0085→0086 (API antes do
+consumidor), 0087 por último.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -462,6 +478,10 @@ isto, a fila de specs está vazia de novo.**
 | — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | ✅ [#375](https://github.com/welz-gui/AgroTop/pull/375) | | 2026-09-07 |
 | — | [0082](0082-web-cruzamento-com-car.md) — Web: cruzamento com CAR (situação ambiental) 🏗️ ⚠️médio | — | ✅ [#381](https://github.com/welz-gui/AgroTop/pull/381) | | 2026-09-08 |
 | — | [0083](0083-web-assistente-de-consulta-ia.md) — Web: assistente de consulta por IA (OpenRouter) 🏗️ ⚠️médio | — | ✅ [#383](https://github.com/welz-gui/AgroTop/pull/383) | | 2026-09-09 |
+| — | [0084](0084-mobile-menu-de-navegacao-lateral.md) — Mobile: menu de navegação lateral (Drawer) 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-10 |
+| — | [0085](0085-api-distribuicao-por-raca-no-dashboard-resumo.md) — API: distribuição por raça no dashboard resumo 🏗️ | — | 🟢 livre | | 2026-09-10 |
+| — | [0086](0086-mobile-grafico-de-raca-no-dashboard.md) — Mobile: gráfico de raça no dashboard resumo 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-10 |
+| — | [0087](0087-mobile-cards-de-status-coloridos.md) — Mobile: cards de status coloridos 🏗️ | — | 🟢 livre | | 2026-09-10 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo

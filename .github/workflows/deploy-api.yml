@@ -1,0 +1,60 @@
+name: Deploy — Backend API (Cloud Run)
+
+# Mesmo raciocínio do deploy-web.yml — mas usa cloudbuild.api.yaml em vez de
+# `--source .` direto, porque `gcloud run deploy --source` só reconhece um
+# arquivo chamado exatamente "Dockerfile" na raiz, e este repositório já tem
+# um (o do app web). Ver Dockerfile.api e cloudbuild.api.yaml (spec: hospedagem
+# do backend_api, 2026-09-09).
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "backend_api/**"
+      - "database.py"
+      - "repositories/**"
+      - "services/**"
+      - "Dockerfile.api"
+      - "cloudbuild.api.yaml"
+      - "requirements.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/876345671972/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: agrotop-deployer@agrotop-cloudrun-teste.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build via Cloud Build
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild.api.yaml \
+            --substitutions=_IMAGE=us-central1-docker.pkg.dev/agrotop-cloudrun-teste/cloud-run-source-deploy/backend-api \
+            --project=agrotop-cloudrun-teste \
+            .
+
+      - name: Deploy no Cloud Run
+        run: |
+          gcloud run deploy backend-api \
+            --image=us-central1-docker.pkg.dev/agrotop-cloudrun-teste/cloud-run-source-deploy/backend-api \
+            --project=agrotop-cloudrun-teste \
+            --region=us-central1 \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=4 \
+            --port=8000 \
+            --memory=512Mi \
+            --set-secrets=DATABASE_URL=agrotop-database-url:latest,AGROTOP_API_SECRET=agrotop-api-secret:latest \
+            --quiet
