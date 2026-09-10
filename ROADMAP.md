@@ -4,11 +4,10 @@
 > escrever qualquer linha de código. Elas contêm decisões já tomadas e regras que,
 > se violadas, quebram produção ou desfazem trabalho feito.
 
-Última atualização: 2026-09-09 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
+Última atualização: 2026-09-10 · Estado: **Fases A, B e B-UI CONCLUÍDAS · Trilhas 1
 (API + mobile, exceto Bluetooth — hardware, não delegável, aguardando o equipamento em
 mãos), 2 (geometria/GPS) e 3 (Estoque → Financeiro → Nutrição) CONCLUÍDAS · Fase B 100%
-ligada à interface (7 de 7)** · fila de specs em `specs/QUADRO.md` **vazia** (0001 a
-0083 fechadas) · Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)
+ligada à interface (7 de 7)** · Tier 2 da [ADR 0007](docs/adr/0007-escopo-de-paridade-admin-no-mobile.md)
 (paridade admin no mobile, só leitura) concluído · **Trilha 4 (Inteligência) — todos os
 objetivos concluídos:** escopo imediato, motor de regras, NDVI por piquete, pacote de
 evidências por lote de venda, cruzamento com CAR e assistente de consulta por IA — ver
@@ -17,7 +16,16 @@ software em operação é o que vai gerar os ciclos completos que os modelos pre
 mais um prazo estimado) · **Hospedagem migrada para o Cloud Run** em 2026-09-09 (região
 `us-central1`, free tier, ~8-9s de cold start em vez da hibernação do Streamlit Community
 Cloud) — `https://agrotop-876345671972.us-central1.run.app`; PWA testado e confirmado
-funcionando (sessão persiste após instalar/fechar/reabrir num celular real)
+funcionando (sessão persiste após instalar/fechar/reabrir num celular real) · `backend_api`
+também hospedado no Cloud Run (serviço `backend-api`), APK mobile real buildado e
+confirmado conectando · **Achado em 2026-09-10: a migração pro Cloud Run não trouxe
+deploy automático** (o Streamlit Community Cloud reimplantava a cada push sozinho, o
+Cloud Run não) — corrigido com `.github/workflows/deploy-web.yml`/`deploy-api.yml`
+(Workload Identity Federation, sem chave estática) · **Fila de specs**: 0001-0083
+fechadas, **0084-0087 abertas** — pedido do usuário para aproximar usabilidade/design do
+mobile do padrão web (menu lateral, gráfico de raça no dashboard, cards de status
+coloridos); 0085/0086 motivaram uma emenda à ADR 0007 (§5) sobre o que conta como
+"gráfico leve" versus "dashboard completo"
 
 ---
 
