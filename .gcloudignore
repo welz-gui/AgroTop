@@ -1,0 +1,61 @@
+# Controla o que `gcloud builds submit`/`gcloud run deploy --source` sobem como
+# "source" para o Cloud Build — achado real em 2026-09-10: sem este arquivo, o
+# `gcloud builds submit .` do deploy-api.yml subiu `mobile/` (2,36 GB) e `.venv/`
+# (605 MB) inteiros (nenhum dos dois é ignorado automaticamente — `gcloud` não
+# cai de volta no `.gitignore` sozinho numa chamada não interativa), virando um
+# tarball de 778 MB parado no bucket de staging, gerando cobrança de
+# armazenamento (Cloud Storage) todo mês por um artefato que ninguém usa.
+#
+# Mesma lista do `.dockerignore` — os dois arquivos devem excluir o mesmo
+# conteúdo; mantenha sincronizados se um mudar.
+
+# Version control & CI
+.git
+.github
+.gitignore
+
+# AI / IDE configs
+.claude
+.gemini
+.idea
+.vscode
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Subprojects with separate lifecycles
+mobile
+poc
+
+# Tests, tools, docs and database migrations
+tests
+tools
+specs
+docs
+supabase
+
+# Python cache & artifacts
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache
+.coverage
+htmlcov
+.hypothesis
+
+# Local databases & logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Secrets (CRITICAL: never upload credentials as build source)
+.streamlit/secrets.toml
+
+# Docker-related (não precisa subir como "source", só é referenciado localmente
+# pelo Cloud Build via -f)
+.dockerignore
