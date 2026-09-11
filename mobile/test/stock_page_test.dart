@@ -26,86 +26,93 @@ class TestTokenStore implements TokenStore {
 }
 
 http.Response _json(dynamic body, {int status = 200}) => http.Response(
-      jsonEncode(body),
-      status,
-      headers: {'content-type': 'application/json; charset=utf-8'},
-    );
+  jsonEncode(body),
+  status,
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
 
 List<Map<String, dynamic>> _mockInventory() => [
-      {
-        'id': 1,
-        'nome': 'Sal Mineral 80',
-        'categoria': 'mineral',
-        'estoque_atual': 150.0,
-        'estoque_minimo': 100.0,
-        'unidade': 'kg',
-        'custo_unitario': 3.50,
-        'valor_total': 525.00,
-        'status': 'ok',
-      },
-      {
-        'id': 2,
-        'nome': 'Ração Confinamento',
-        'categoria': 'racao',
-        'estoque_atual': 45.0,
-        'estoque_minimo': 50.0,
-        'unidade': 'kg',
-        'custo_unitario': 2.80,
-        'valor_total': 126.00,
-        'status': 'baixo',
-      },
-      {
-        'id': 3,
-        'nome': 'Ivermectina 1%',
-        'categoria': 'medicamento',
-        'estoque_atual': 2.0,
-        'estoque_minimo': 10.0,
-        'unidade': 'frasco',
-        'custo_unitario': 45.00,
-        'valor_total': 90.00,
-        'status': 'critico',
-      },
-    ];
+  {
+    'id': 1,
+    'nome': 'Sal Mineral 80',
+    'categoria': 'mineral',
+    'estoque_atual': 150.0,
+    'estoque_minimo': 100.0,
+    'unidade': 'kg',
+    'custo_unitario': 3.50,
+    'valor_total': 525.00,
+    'status': 'ok',
+  },
+  {
+    'id': 2,
+    'nome': 'Ração Confinamento',
+    'categoria': 'racao',
+    'estoque_atual': 45.0,
+    'estoque_minimo': 50.0,
+    'unidade': 'kg',
+    'custo_unitario': 2.80,
+    'valor_total': 126.00,
+    'status': 'baixo',
+  },
+  {
+    'id': 3,
+    'nome': 'Ivermectina 1%',
+    'categoria': 'medicamento',
+    'estoque_atual': 2.0,
+    'estoque_minimo': 10.0,
+    'unidade': 'frasco',
+    'custo_unitario': 45.00,
+    'valor_total': 90.00,
+    'status': 'critico',
+  },
+];
 
 List<Map<String, dynamic>> _mockForecast() => [
-      {
-        'insumo_id': 2,
-        'nome': 'Ração Confinamento',
-        'dias_restantes': 3.0,
-        'data_ruptura': '2026-09-08',
-        'comprar_ate': '2026-09-06',
-        'urgencia': 'critica',
-      },
-      {
-        'insumo_id': 1,
-        'nome': 'Sal Mineral 80',
-        'dias_restantes': 12.0,
-        'data_ruptura': '2026-09-17',
-        'comprar_ate': '2026-09-14',
-        'urgencia': 'atencao',
-      },
-      {
-        'insumo_id': 4,
-        'nome': 'Milho Moído',
-        'dias_restantes': 45.0,
-        'data_ruptura': '2026-10-20',
-        'comprar_ate': '2026-10-10',
-        'urgencia': 'ok',
-      },
-      {
-        'insumo_id': 3,
-        'nome': 'Ivermectina 1%',
-        'dias_restantes': null,
-        'data_ruptura': null,
-        'comprar_ate': null,
-        'urgencia': 'sem_dados',
-      },
-    ];
+  {
+    'insumo_id': 2,
+    'nome': 'Ração Confinamento',
+    'dias_restantes': 3.0,
+    'data_ruptura': '2026-09-08',
+    'comprar_ate': '2026-09-06',
+    'urgencia': 'critica',
+  },
+  {
+    'insumo_id': 1,
+    'nome': 'Sal Mineral 80',
+    'dias_restantes': 12.0,
+    'data_ruptura': '2026-09-17',
+    'comprar_ate': '2026-09-14',
+    'urgencia': 'atencao',
+  },
+  {
+    'insumo_id': 4,
+    'nome': 'Milho Moído',
+    'dias_restantes': 45.0,
+    'data_ruptura': '2026-10-20',
+    'comprar_ate': '2026-10-10',
+    'urgencia': 'ok',
+  },
+  {
+    'insumo_id': 3,
+    'nome': 'Ivermectina 1%',
+    'dias_restantes': null,
+    'data_ruptura': null,
+    'comprar_ate': null,
+    'urgencia': 'sem_dados',
+  },
+];
 
 void main() {
   testWidgets(
     'Critério 2: abrir tela de estoque a partir de AnimalsPage -> mostra abas e dados',
     (tester) async {
+      // Tamanho de tela real (o padrão 800x600 do harness de teste não cabe
+      // os itens mais abaixo no Drawer, quebrando o tap em "Estoque").
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final client = MockClient((request) async {
         if (request.url.path == '/animais') {
           return _json([
@@ -118,7 +125,7 @@ void main() {
               'lote_id': 'P01',
               'birth_date': '2024-03-10',
               'animal_uuid': 'uuid-1',
-            }
+            },
           ]);
         }
         if (request.url.path == '/trato/pendentes') return _json([]);
@@ -132,7 +139,9 @@ void main() {
           });
         }
         if (request.url.path == '/estoque') return _json(_mockInventory());
-        if (request.url.path == '/estoque/previsao') return _json(_mockForecast());
+        if (request.url.path == '/estoque/previsao') {
+          return _json(_mockForecast());
+        }
         return _json({'detail': 'Not found'}, status: 404);
       });
 
@@ -156,10 +165,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Botão de estoque no AppBar
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
       final stockButton = find.byKey(const ValueKey('open-stock'));
       expect(stockButton, findsOneWidget);
 
       // Clica para abrir StockPage
+      await tester.ensureVisible(stockButton);
       await tester.tap(stockButton);
       await tester.pumpAndSettle();
 
@@ -209,7 +221,7 @@ void main() {
               'data_ruptura': null,
               'comprar_ate': null,
               'urgencia': 'sem_dados',
-            }
+            },
           ]);
         }
         return _json({});
@@ -311,7 +323,7 @@ void main() {
                 'custo_unitario': 10.0,
                 'valor_total': 100.0,
                 'status': 'ok',
-              }
+              },
             ]);
           } else {
             return _json([
@@ -325,7 +337,7 @@ void main() {
                 'custo_unitario': 10.0,
                 'valor_total': 20.0,
                 'status': 'baixo',
-              }
+              },
             ]);
           }
         }
@@ -340,7 +352,7 @@ void main() {
                 'data_ruptura': '2026-09-20',
                 'comprar_ate': '2026-09-15',
                 'urgencia': 'ok',
-              }
+              },
             ]);
           } else {
             return _json([
@@ -351,7 +363,7 @@ void main() {
                 'data_ruptura': '2026-09-07',
                 'comprar_ate': '2026-09-05',
                 'urgencia': 'critica',
-              }
+              },
             ]);
           }
         }
@@ -403,33 +415,32 @@ void main() {
     },
   );
 
-  testWidgets(
-    '401 não autorizado chama callback onUnauthorized',
-    (tester) async {
-      bool unauthorizedCalled = false;
-      final client = MockClient((request) async {
-        return _json({'detail': 'Token expired'}, status: 401);
-      });
+  testWidgets('401 não autorizado chama callback onUnauthorized', (
+    tester,
+  ) async {
+    bool unauthorizedCalled = false;
+    final client = MockClient((request) async {
+      return _json({'detail': 'Token expired'}, status: 401);
+    });
 
-      final api = ApiClient(
-        tokenStore: TestTokenStore(),
-        httpClient: client,
-        baseUrl: 'http://mock.local',
-      );
+    final api = ApiClient(
+      tokenStore: TestTokenStore(),
+      httpClient: client,
+      baseUrl: 'http://mock.local',
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppThemes.light,
-          home: StockPage(
-            api: api,
-            onUnauthorized: () => unauthorizedCalled = true,
-          ),
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppThemes.light,
+        home: StockPage(
+          api: api,
+          onUnauthorized: () => unauthorizedCalled = true,
         ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
-      expect(unauthorizedCalled, isTrue);
-    },
-  );
+    expect(unauthorizedCalled, isTrue);
+  });
 }

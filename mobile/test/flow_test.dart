@@ -335,10 +335,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('BR0001'), findsOneWidget);
       expect(refreshRequests, 3);
+
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('alerts-badge')), findsOneWidget);
       expect(find.text('5'), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('open-alerts')));
+      final alertsButton = find.byKey(const ValueKey('open-alerts'));
+      await tester.ensureVisible(alertsButton);
+      await tester.tap(alertsButton);
       await tester.pumpAndSettle();
       expect(find.text('🔴 Animais Sumidos (1)'), findsOneWidget);
       expect(find.text('🟡 Em Período de Carência (1)'), findsOneWidget);
@@ -587,6 +591,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('BR0001'), findsOneWidget);
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('open-alerts')), findsOneWidget);
     expect(find.byKey(const ValueKey('alerts-badge')), findsNothing);
   });

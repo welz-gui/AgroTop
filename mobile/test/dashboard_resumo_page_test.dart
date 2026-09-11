@@ -37,6 +37,18 @@ ApiClient _api(MockClient client) => ApiClient(
   httpClient: client,
 );
 
+Future<void> _openDrawer(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Open navigation menu'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapDrawerItem(WidgetTester tester, String key) async {
+  final item = find.byKey(ValueKey<String>(key));
+  await tester.ensureVisible(item);
+  await tester.tap(item);
+  await tester.pumpAndSettle();
+}
+
 Map<String, dynamic> _resumo({
   int total = 12,
   double peso = 412.5,
@@ -100,8 +112,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('open-dashboard-resumo')));
-    await tester.pumpAndSettle();
+    await _openDrawer(tester);
+    await _tapDrawerItem(tester, 'open-dashboard-resumo');
 
     expect(find.byType(DashboardResumoPage), findsOneWidget);
     expect(
