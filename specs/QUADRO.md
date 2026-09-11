@@ -1155,8 +1155,9 @@ o nome da branch some da vista de quem decide se a tarefa está livre.
 | **Um agente por vez** ⭐ padrão | ele pega a próxima livre, reivindicando o branch **antes** de começar | **Variante A** |
 | **Vários em paralelo** | **você atribui** a spec no prompt | Variante B (obrigatória) |
 
-A fila abaixo é lida pelo agente: ele pega a **primeira com número de ordem** (as concluídas
-estão marcadas ✅ e sem número).
+A fila abaixo é lida pelo agente: ele pega a **primeira linha com Estado `🟢 livre`**, de cima
+para baixo (as concluídas estão marcadas ✅). A coluna `Ordem` está sempre vazia (`—`) — não é
+um número a ser procurado; a posição da linha na tabela **é** a prioridade.
 
 A colisão de 2026-07-31 aconteceu com **dois agentes iniciados em paralelo**. Sequencialmente
 o autoatendimento funciona, porque não há dois lendo a fila ao mesmo tempo.

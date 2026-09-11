@@ -286,8 +286,9 @@ simultâneos, não contra dois agentes trabalhando em paralelo antes de empurrar
 > Crie um **worktree** para esta tarefa e trabalhe dentro dele. Você vai atuar no projeto
 > AgroTop (gestão de gado de corte, Streamlit + PostgreSQL).
 >
-> 1. Abra `specs/QUADRO.md` e pegue a **primeira tarefa livre** da fila (as concluídas estão
->    marcadas ✅ e não têm número de ordem).
+> 1. Abra `specs/QUADRO.md` e pegue a **primeira linha com Estado `🟢 livre`**, de cima para
+>    baixo (as concluídas estão marcadas ✅). A coluna `Ordem` está sempre vazia (`—`) — não
+>    é um número a ser procurado; a posição da linha na tabela **é** a prioridade.
 > 2. **Antes de qualquer outra coisa**, reivindique-a criando o branch no remoto —
 >    **`<branch-da-spec>` é o valor exato do campo `Branch:` no cabeçalho da spec, não o
 >    nome de worktree/sessão que sua ferramenta gera por padrão** (se sua ferramenta usa
@@ -438,8 +439,10 @@ quando você quer o texto inteiro num bloco só, sem precisar juntar pedaços de
 > ```
 > git fetch origin
 > ```
-> Abra `specs/QUADRO.md` e pegue a **primeira tarefa com número de ordem**. As concluídas
-> estão marcadas ✅ e não têm número.
+> Abra `specs/QUADRO.md` e pegue a **primeira tarefa com Estado `🟢 livre`**, de cima para
+> baixo na tabela — a posição da linha é a prioridade. **A coluna `Ordem` está sempre vazia
+> (`—`), para toda spec, concluída ou não — não é um número a ser procurado.** Se não achar
+> nenhuma linha `🟢 livre`, a fila está vazia; não invente tarefa fora dela.
 >
 > **PASSO 3 — confirme no GitHub que a tarefa está mesmo livre**
 >
