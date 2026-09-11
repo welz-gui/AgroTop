@@ -802,13 +802,11 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     }
   }
 
-  Future<AnimalMedications> _loadMedications() async {
-    try {
-      return await widget.api.getAnimalMedications(widget.id);
-    } catch (_) {
-      return const AnimalMedications(carenciaAte: null, aplicacoes: []);
-    }
-  }
+  // Não capture erros aqui para virar "sem carência": um 200 com
+  // carencia_ate nulo é a única fonte legítima de "liberado". Se a consulta
+  // falhar (rede, servidor), o FutureBuilder abaixo mostra erro com opção de
+  // tentar de novo — nunca a ficha afirmando liberação sem ter confirmado.
+  Future<AnimalMedications> _loadMedications() => widget.api.getAnimalMedications(widget.id);
 
   void _reload() => setState(() {
     _detail = _loadDetail();

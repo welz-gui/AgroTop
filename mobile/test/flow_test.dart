@@ -902,4 +902,63 @@ void main() {
     expect(find.text('Gestão do rebanho'), findsOneWidget);
     expect(store.tokens, isNull);
   });
+
+  testWidgets(
+    'falha ao consultar sanidade nunca aparece como "liberado para abate"',
+    (tester) async {
+      final api = ApiClient(
+        tokenStore: MemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/animais/BR0001') {
+            return _json({
+              'id': 'BR0001',
+              'breed': 'Nelore',
+              'sex': 'M',
+              'birth_date': '2024-03-10',
+              'entry_weight': 278.2,
+              'current_weight': 382.4,
+              'target_weight': 500.0,
+              'status': 'ativo',
+              'lote_id': 'P01',
+              'lot_name': 'Piquete Central',
+              'animal_uuid': '123e4567-e89b-12d3-a456-426614174000',
+            });
+          }
+          if (request.url.path == '/animais/BR0001/medicamentos') {
+            return _json({'detail': 'Erro interno'}, status: 500);
+          }
+          return _json({'detail': 'Não encontrado'}, status: 404);
+        }),
+        baseUrl: 'http://mock.local',
+      );
+      await api.tokenStore.write(
+        const StoredTokens(
+          accessToken: 'access-live',
+          refreshToken: 'refresh-valid',
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AnimalDetailPage(
+            api: api,
+            id: 'BR0001',
+            onUnauthorized: () {},
+            onMovementCompleted: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Nunca afirme liberação quando a consulta de carência falhou.
+      expect(find.text('Sem restrição de carência'), findsNothing);
+      expect(
+        find.text('Animal liberado para comercialização/abate.'),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('carencia-status-card')), findsNothing);
+      // Erro visível com opção de tentar de novo.
+      expect(find.text('Tentar novamente'), findsOneWidget);
+    },
+  );
 }
