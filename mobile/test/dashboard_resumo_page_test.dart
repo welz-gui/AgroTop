@@ -44,7 +44,8 @@ Future<void> _openDrawer(WidgetTester tester) async {
 
 Future<void> _tapDrawerItem(WidgetTester tester, String key) async {
   final item = find.byKey(ValueKey<String>(key));
-  tester.widget<ListTile>(item).onTap!();
+  await tester.ensureVisible(item);
+  await tester.tap(item);
   await tester.pumpAndSettle();
 }
 

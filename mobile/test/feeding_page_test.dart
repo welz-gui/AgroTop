@@ -72,6 +72,12 @@ List<Map<String, dynamic>> _feedings() => [
 ];
 
 Future<void> _pumpAnimals(WidgetTester tester, ApiClient api) async {
+  // Tamanho de tela real (o padrão 800x600 do harness de teste não cabe os
+  // itens mais abaixo no Drawer, quebrando o tap em "Trato do dia").
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
       theme: ThemeData(colorSchemeSeed: Colors.green),
@@ -93,7 +99,8 @@ Future<void> _openDrawer(WidgetTester tester) async {
 
 Future<void> _tapDrawerItem(WidgetTester tester, String key) async {
   final item = find.byKey(ValueKey<String>(key));
-  tester.widget<ListTile>(item).onTap!();
+  await tester.ensureVisible(item);
+  await tester.tap(item);
   await tester.pumpAndSettle();
 }
 

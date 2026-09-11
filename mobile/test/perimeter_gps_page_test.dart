@@ -389,7 +389,8 @@ void main() {
       await tester.pumpAndSettle();
       final openButton = find.byKey(const ValueKey('open-perimeter-gps'));
       expect(openButton, findsOneWidget);
-      tester.widget<ListTile>(openButton).onTap!();
+      await tester.ensureVisible(openButton);
+      await tester.tap(openButton);
       await tester.pumpAndSettle();
 
       expect(find.byType(PerimeterGpsPage), findsOneWidget);

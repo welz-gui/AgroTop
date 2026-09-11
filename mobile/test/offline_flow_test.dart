@@ -218,7 +218,8 @@ void main() {
       // Normalizar rede e clicar em sincronizar agora
       networkFailWeighing = false;
       final syncButton = find.byKey(const ValueKey('sync-queue-button'));
-      tester.widget<ListTile>(syncButton).onTap!();
+      await tester.ensureVisible(syncButton);
+      await tester.tap(syncButton);
       await tester.pumpAndSettle();
 
       // Diálogo com relatório de sincronização exibindo as 3 seções
@@ -329,7 +330,8 @@ void main() {
       await tester.tap(find.byTooltip('Open navigation menu'));
       await tester.pumpAndSettle();
       final syncButton = find.byKey(const ValueKey('sync-queue-button'));
-      tester.widget<ListTile>(syncButton).onTap!();
+      await tester.ensureVisible(syncButton);
+      await tester.tap(syncButton);
       await tester.pumpAndSettle();
 
       // Verificar que foi removido da fila e exibido na seção de rejeitados

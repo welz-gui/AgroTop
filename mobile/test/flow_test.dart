@@ -341,7 +341,8 @@ void main() {
       expect(find.byKey(const ValueKey('alerts-badge')), findsOneWidget);
       expect(find.text('5'), findsOneWidget);
       final alertsButton = find.byKey(const ValueKey('open-alerts'));
-      tester.widget<ListTile>(alertsButton).onTap!();
+      await tester.ensureVisible(alertsButton);
+      await tester.tap(alertsButton);
       await tester.pumpAndSettle();
       expect(find.text('🔴 Animais Sumidos (1)'), findsOneWidget);
       expect(find.text('🟡 Em Período de Carência (1)'), findsOneWidget);

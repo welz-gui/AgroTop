@@ -134,6 +134,13 @@ void main() {
   testWidgets(
     'Critério 2: abrir tela de relatórios a partir de AnimalsPage -> inventário -> pesagens traduzidas',
     (tester) async {
+      // Tamanho de tela real (o padrão 800x600 do harness de teste não cabe
+      // os itens mais abaixo no Drawer, quebrando o tap em "Relatórios").
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final client = MockClient((request) async {
         if (request.url.path == '/animais') {
           return _json([
@@ -192,7 +199,8 @@ void main() {
       await tester.pumpAndSettle();
       final reportsButton = find.byKey(const ValueKey('open-reports'));
       expect(reportsButton, findsOneWidget);
-      tester.widget<ListTile>(reportsButton).onTap!();
+      await tester.ensureVisible(reportsButton);
+      await tester.tap(reportsButton);
       await tester.pumpAndSettle();
 
       expect(find.text('Relatórios'), findsOneWidget);
