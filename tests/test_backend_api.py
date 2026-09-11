@@ -2263,6 +2263,11 @@ class TestDashboardResumoEndpoint(BackendApiTestCase):
                 "get_alert_animals",
                 return_value={"sumidos": [], "carencia": [], "prontos": []},
             ),
+            patch.object(
+                main_mod,
+                "get_all_animals",
+                return_value=[],
+            ),
         ):
             response = self.client.get("/dashboard/resumo", headers=self._headers())
 
@@ -2282,6 +2287,7 @@ class TestDashboardResumoEndpoint(BackendApiTestCase):
                     "carencia": 0,
                     "prontos_para_abate": 0,
                 },
+                "distribuicao_por_raca": [],
             },
         )
 
@@ -2324,6 +2330,7 @@ class TestDashboardResumoEndpoint(BackendApiTestCase):
     def test_dashboard_resumo_confere_com_fontes_reais(self):
         stats = db.get_rebanho_stats()
         alertas = db.get_alert_animals()
+        animais = db.get_all_animals()
 
         response = self.client.get("/dashboard/resumo", headers=self._headers())
 
@@ -2344,6 +2351,115 @@ class TestDashboardResumoEndpoint(BackendApiTestCase):
                 "prontos_para_abate": len(alertas["prontos"]),
             },
         )
+        self.assertIn("distribuicao_por_raca", data)
+        # Critério 3: a soma de todas as quantidades é igual a total_animais
+        total_distribuicao = sum(item["quantidade"] for item in data["distribuicao_por_raca"])
+        self.assertEqual(total_distribuicao, data["total_animais"])
+        self.assertEqual(total_distribuicao, len(animais))
+
+    def test_distribuicao_por_raca_contagem_e_soma_igual_total_animais(self):
+        animais_mock = [
+            {"id": 1, "breed": "Nelore"},
+            {"id": 2, "breed": "Nelore"},
+            {"id": 3, "breed": "Nelore"},
+            {"id": 4, "breed": "Angus"},
+            {"id": 5, "breed": "Angus"},
+            {"id": 6, "breed": "Brahman"},
+        ]
+        stats_mock = db.AnimalStats(total=len(animais_mock))
+        with (
+            patch.object(main_mod, "get_rebanho_stats", return_value=stats_mock),
+            patch.object(main_mod, "get_all_animals", return_value=animais_mock),
+        ):
+            response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        distribuicao = data["distribuicao_por_raca"]
+
+        # Critério 2: contagem bate com contagem manual
+        esperado = [
+            {"raca": "Nelore", "quantidade": 3},
+            {"raca": "Angus", "quantidade": 2},
+            {"raca": "Brahman", "quantidade": 1},
+        ]
+        self.assertEqual(distribuicao, esperado)
+
+        # Critério 3: soma das quantidades é exatamente igual a total_animais
+        self.assertEqual(
+            sum(item["quantidade"] for item in distribuicao),
+            data["total_animais"],
+        )
+        self.assertEqual(data["total_animais"], 6)
+
+    def test_distribuicao_por_raca_animais_sem_raca_agrupados_em_nao_informada(self):
+        animais_mock = [
+            {"id": 1, "breed": "Nelore"},
+            {"id": 2, "breed": None},
+            {"id": 3, "breed": ""},
+            {"id": 4, "breed": "   "},
+            {"id": 5, "breed": "Nelore"},
+        ]
+        stats_mock = db.AnimalStats(total=len(animais_mock))
+        with (
+            patch.object(main_mod, "get_rebanho_stats", return_value=stats_mock),
+            patch.object(main_mod, "get_all_animals", return_value=animais_mock),
+        ):
+            response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        distribuicao = data["distribuicao_por_raca"]
+
+        # Critério 4: breed vazio/nulo vira "Não informada", nenhum animal descartado
+        esperado = [
+            {"raca": "Não informada", "quantidade": 3},
+            {"raca": "Nelore", "quantidade": 2},
+        ]
+        self.assertEqual(distribuicao, esperado)
+        self.assertEqual(
+            sum(item["quantidade"] for item in distribuicao),
+            data["total_animais"],
+        )
+        self.assertEqual(data["total_animais"], 5)
+
+    def test_distribuicao_por_raca_rebanho_vazio_retorna_lista_vazia(self):
+        stats_mock = db.AnimalStats(total=0)
+        with (
+            patch.object(main_mod, "get_rebanho_stats", return_value=stats_mock),
+            patch.object(main_mod, "get_all_animals", return_value=[]),
+        ):
+            response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        # Critério 5: rebanho vazio devolve 200 e lista vazia
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["distribuicao_por_raca"], [])
+        self.assertEqual(data["total_animais"], 0)
+
+    def test_distribuicao_por_raca_ordenacao_decrescente_por_quantidade(self):
+        animais_mock = (
+            [{"id": i, "breed": "Brangus"} for i in range(1, 3)]          # 2
+            + [{"id": i, "breed": "Nelore"} for i in range(3, 13)]         # 10
+            + [{"id": i, "breed": "Guzerá"} for i in range(13, 18)]        # 5
+            + [{"id": i, "breed": "Senepol"} for i in range(18, 26)]       # 8
+        )
+        stats_mock = db.AnimalStats(total=len(animais_mock))
+        with (
+            patch.object(main_mod, "get_rebanho_stats", return_value=stats_mock),
+            patch.object(main_mod, "get_all_animals", return_value=animais_mock),
+        ):
+            response = self.client.get("/dashboard/resumo", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200)
+        distribuicao = response.json()["distribuicao_por_raca"]
+
+        # Critério 6: ordenação decrescente por quantidade testada com pelo menos 3 raças
+        racas_ordenadas = [item["raca"] for item in distribuicao]
+        quantidades_ordenadas = [item["quantidade"] for item in distribuicao]
+
+        self.assertEqual(racas_ordenadas, ["Nelore", "Senepol", "Guzerá", "Brangus"])
+        self.assertEqual(quantidades_ordenadas, [10, 8, 5, 2])
 
 
 class TestRelatoriosEndpoints(BackendApiTestCase):

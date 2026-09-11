@@ -6,8 +6,9 @@ reaproveitando a camada de serviços e repositórios existente.
 
 from __future__ import annotations
 
-import json
+from collections import Counter
 from datetime import date
+import json
 from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
@@ -144,6 +145,19 @@ def dashboard_resumo(
 ) -> dict[str, Any]:
     stats = get_rebanho_stats()
     alertas = get_alert_animals()
+    animals = get_all_animals()
+
+    raca_counter: Counter[str] = Counter()
+    for animal in animals:
+        raca_bruta = animal.get("breed")
+        raca = raca_bruta.strip() if isinstance(raca_bruta, str) and raca_bruta.strip() else "Não informada"
+        raca_counter[raca] += 1
+
+    distribuicao_por_raca = [
+        {"raca": raca, "quantidade": count}
+        for raca, count in raca_counter.most_common()
+    ]
+
     return {
         "total_animais": stats.total,
         "peso_medio_kg": stats.avg_weight,
@@ -157,6 +171,7 @@ def dashboard_resumo(
             "carencia": len(alertas["carencia"]),
             "prontos_para_abate": len(alertas["prontos"]),
         },
+        "distribuicao_por_raca": distribuicao_por_raca,
     }
 
 
