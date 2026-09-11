@@ -86,6 +86,17 @@ Future<void> _pumpAnimals(WidgetTester tester, ApiClient api) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _openDrawer(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Open navigation menu'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapDrawerItem(WidgetTester tester, String key) async {
+  final item = find.byKey(ValueKey<String>(key));
+  tester.widget<ListTile>(item).onTap!();
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('abre trato agrupado, confirma item e mantém os demais', (
     tester,
@@ -119,11 +130,11 @@ void main() {
     );
 
     await _pumpAnimals(tester, api);
+    await _openDrawer(tester);
     expect(find.byKey(const ValueKey('pending-feeding-badge')), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('open-feeding')));
-    await tester.pumpAndSettle();
+    await _tapDrawerItem(tester, 'open-feeding');
     expect(find.text('2 item(ns) pendente(s)'), findsOneWidget);
     expect(find.byKey(const ValueKey('feeding-lote-P01')), findsOneWidget);
     expect(find.byKey(const ValueKey('feeding-lote-P02')), findsOneWidget);
@@ -187,8 +198,8 @@ void main() {
       );
 
       await _pumpAnimals(tester, api);
-      await tester.tap(find.byKey(const ValueKey('open-feeding')));
-      await tester.pumpAndSettle();
+      await _openDrawer(tester);
+      await _tapDrawerItem(tester, 'open-feeding');
 
       // Clica no botão rápido de confirmação
       await tester.tap(find.byKey(const ValueKey('confirm-feeding-101')));
@@ -206,7 +217,10 @@ void main() {
         'notas': null,
       });
 
-      expect(find.textContaining('Trato confirmado: Sal mineral'), findsOneWidget);
+      expect(
+        find.textContaining('Trato confirmado: Sal mineral'),
+        findsOneWidget,
+      );
       expect(find.textContaining('Confirmado agora'), findsOneWidget);
     },
   );
@@ -235,8 +249,8 @@ void main() {
       );
 
       await _pumpAnimals(tester, api);
-      await tester.tap(find.byKey(const ValueKey('open-feeding')));
-      await tester.pumpAndSettle();
+      await _openDrawer(tester);
+      await _tapDrawerItem(tester, 'open-feeding');
 
       // Clica no botão rápido do item 103 (sem insumo_id)
       await tester.tap(find.byKey(const ValueKey('confirm-feeding-103')));
@@ -270,8 +284,8 @@ void main() {
       );
 
       await _pumpAnimals(tester, api);
-      await tester.tap(find.byKey(const ValueKey('open-feeding')));
-      await tester.pumpAndSettle();
+      await _openDrawer(tester);
+      await _tapDrawerItem(tester, 'open-feeding');
 
       // Item 102 já está confirmado no período
       expect(find.byKey(const ValueKey('confirm-feeding-102')), findsNothing);
@@ -306,8 +320,8 @@ void main() {
     );
 
     await _pumpAnimals(tester, api);
-    await tester.tap(find.byKey(const ValueKey('open-feeding')));
-    await tester.pumpAndSettle();
+    await _openDrawer(tester);
+    await _tapDrawerItem(tester, 'open-feeding');
     await tester.tap(find.byKey(const ValueKey('feeding-item-101')));
     await tester.pumpAndSettle();
     await tester.enterText(

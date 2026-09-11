@@ -807,6 +807,8 @@ void main() {
           );
           await tester.pumpAndSettle();
 
+          await tester.tap(find.byTooltip('Open navigation menu'));
+          await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('sync-queue-button')),
             findsOneWidget,
@@ -823,6 +825,8 @@ void main() {
               findsNothing,
             );
           }
+          Navigator.of(tester.element(find.byType(Drawer))).pop();
+          await tester.pumpAndSettle();
 
           if (captureGoldens) {
             await expectLater(
@@ -862,7 +866,10 @@ void main() {
           loteId: 'P01',
         ),
       ]);
-      await prefs.setString('cache_animais_list_time', '2026-08-29T10:00:00.000');
+      await prefs.setString(
+        'cache_animais_list_time',
+        '2026-08-29T10:00:00.000',
+      );
 
       final store = GoldenTokenStore()
         ..tokens = const StoredTokens(
@@ -999,309 +1006,326 @@ void main() {
     }
   });
 
-  testWidgets('tela de criar lote cobre formulário vazio e erro de duplicidade nos três temas', (
-    tester,
-  ) async {
-    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
-    if (captureGoldens) await loadAppFonts();
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    for (final mode in ThemeMode.values) {
-      for (final view in ['vazio', 'duplicado']) {
-        final store = GoldenTokenStore()
-          ..tokens = const StoredTokens(
-            accessToken: 'access-live',
-            refreshToken: 'refresh-valid',
-          );
-        final api = ApiClient(
-          tokenStore: store,
-          baseUrl: 'http://mock.local',
-          httpClient: MockClient((request) async {
-            if (request.method == 'POST' && request.url.path == '/lotes') {
-              return _json({'detail': 'Lote P01 já existe.'}, status: 409);
-            }
-            return _json({});
-          }),
-        );
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: AppThemes.light,
-            darkTheme: AppThemes.dark,
-            themeMode: mode,
-            home: CreateLotePage(api: api, onUnauthorized: () {}),
-          ),
-        );
-        await tester.pumpAndSettle();
-        if (view == 'duplicado') {
-          await tester.enterText(
-            find.byKey(const ValueKey('lote-id-field')),
-            'P01',
-          );
-          await tester.enterText(
-            find.byKey(const ValueKey('lote-name-field')),
-            'Piquete Central',
-          );
-          await tester.enterText(
-            find.byKey(const ValueKey('lote-area-field')),
-            '25.0',
-          );
-          await tester.enterText(
-            find.byKey(const ValueKey('lote-capacity-field')),
-            '30.0',
-          );
-          await tester.enterText(
-            find.byKey(const ValueKey('lote-notes-field')),
-            'Pasto principal',
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('save-lote-button')));
-          await tester.pumpAndSettle();
-        }
-        if (captureGoldens) {
-          await expectLater(
-            find.byType(MaterialApp),
-            matchesGoldenFile(
-              'goldens/${mode.name}-${view == 'vazio' ? '22-criar-lote-vazio' : '23-criar-lote-duplicado'}.png',
-            ),
-          );
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
-      }
-    }
-  });
-
   testWidgets(
-      'tela de demarcação de perímetro por GPS cobre vazio, preview e erro nos três temas',
-      (tester) async {
-    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
-    if (captureGoldens) await loadAppFonts();
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    'tela de criar lote cobre formulário vazio e erro de duplicidade nos três temas',
+    (tester) async {
+      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+      if (captureGoldens) await loadAppFonts();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    for (final mode in ThemeMode.values) {
-      for (final view in ['vazio', 'preview', 'erro']) {
-        int pointIndex = 0;
-        final fixedPoints = [
-          const PositionPoint(latitude: -20.1000, longitude: -48.1000),
-          const PositionPoint(latitude: -20.2000, longitude: -48.1000),
-          const PositionPoint(latitude: -20.2000, longitude: -48.2000),
-          const PositionPoint(latitude: -20.1000, longitude: -48.2000),
-        ];
-
-        final store = GoldenTokenStore()
-          ..tokens = const StoredTokens(
-            accessToken: 'access-live',
-            refreshToken: 'refresh-valid',
+      for (final mode in ThemeMode.values) {
+        for (final view in ['vazio', 'duplicado']) {
+          final store = GoldenTokenStore()
+            ..tokens = const StoredTokens(
+              accessToken: 'access-live',
+              refreshToken: 'refresh-valid',
+            );
+          final api = ApiClient(
+            tokenStore: store,
+            baseUrl: 'http://mock.local',
+            httpClient: MockClient((request) async {
+              if (request.method == 'POST' && request.url.path == '/lotes') {
+                return _json({'detail': 'Lote P01 já existe.'}, status: 409);
+              }
+              return _json({});
+            }),
           );
-        final api = ApiClient(
-          tokenStore: store,
-          baseUrl: 'http://mock.local',
-          httpClient: MockClient((request) async {
-            if (request.method == 'GET' && request.url.path == '/lotes') {
-              return _json([
-                {'id': 'P01', 'nome': 'Piquete Central', 'animais_ativos': 10},
-                {'id': 'P02', 'nome': 'Piquete da Represa', 'animais_ativos': 5},
-              ]);
-            }
-            if (request.method == 'POST' && request.url.path.endsWith('/perimetro')) {
-              return _json({
-                'detail': ['Polígono auto-interceptante.'],
-              }, status: 422);
-            }
-            return _json({});
-          }),
-        );
-
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: AppThemes.light,
-            darkTheme: AppThemes.dark,
-            themeMode: mode,
-            home: PerimeterGpsPage(
-              api: api,
-              onUnauthorized: () {},
-              permissionChecker: () async => LocationPermission.always,
-              positionProvider: () async => fixedPoints[pointIndex++ % fixedPoints.length],
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppThemes.light,
+              darkTheme: AppThemes.dark,
+              themeMode: mode,
+              home: CreateLotePage(api: api, onUnauthorized: () {}),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        if (view != 'vazio') {
-          final markButton = find.byKey(const ValueKey('mark-point-button'));
-          for (int i = 0; i < 4; i++) {
-            await tester.tap(markButton);
+          );
+          await tester.pumpAndSettle();
+          if (view == 'duplicado') {
+            await tester.enterText(
+              find.byKey(const ValueKey('lote-id-field')),
+              'P01',
+            );
+            await tester.enterText(
+              find.byKey(const ValueKey('lote-name-field')),
+              'Piquete Central',
+            );
+            await tester.enterText(
+              find.byKey(const ValueKey('lote-area-field')),
+              '25.0',
+            );
+            await tester.enterText(
+              find.byKey(const ValueKey('lote-capacity-field')),
+              '30.0',
+            );
+            await tester.enterText(
+              find.byKey(const ValueKey('lote-notes-field')),
+              'Pasto principal',
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('save-lote-button')));
             await tester.pumpAndSettle();
           }
-        }
-
-        if (view == 'erro') {
-          final saveButton = find.byKey(const ValueKey('save-perimeter-button'));
-          await tester.ensureVisible(saveButton);
-          await tester.tap(saveButton);
+          if (captureGoldens) {
+            await expectLater(
+              find.byType(MaterialApp),
+              matchesGoldenFile(
+                'goldens/${mode.name}-${view == 'vazio' ? '22-criar-lote-vazio' : '23-criar-lote-duplicado'}.png',
+              ),
+            );
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
           await tester.pumpAndSettle();
         }
-
-        if (captureGoldens) {
-          await expectLater(
-            find.byType(MaterialApp),
-            matchesGoldenFile(
-              'goldens/${mode.name}-${switch (view) {
-                'vazio' => '24-perimetro-vazio',
-                'preview' => '25-perimetro-preview',
-                _ => '26-perimetro-invalido',
-              }}.png',
-            ),
-          );
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
       }
-    }
-  });
+    },
+  );
 
   testWidgets(
-      'tela de estoque cobre inventário e previsão de ruptura nos três temas',
-      (tester) async {
-    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
-    if (captureGoldens) await loadAppFonts();
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    'tela de demarcação de perímetro por GPS cobre vazio, preview e erro nos três temas',
+    (tester) async {
+      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+      if (captureGoldens) await loadAppFonts();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final mockInventory = [
-      {
-        'id': 1,
-        'nome': 'Sal Mineral 80',
-        'categoria': 'mineral',
-        'estoque_atual': 150.0,
-        'estoque_minimo': 100.0,
-        'unidade': 'kg',
-        'custo_unitario': 3.50,
-        'valor_total': 525.00,
-        'status': 'ok',
-      },
-      {
-        'id': 2,
-        'nome': 'Ração Confinamento',
-        'categoria': 'racao',
-        'estoque_atual': 45.0,
-        'estoque_minimo': 50.0,
-        'unidade': 'kg',
-        'custo_unitario': 2.80,
-        'valor_total': 126.00,
-        'status': 'baixo',
-      },
-      {
-        'id': 3,
-        'nome': 'Ivermectina 1%',
-        'categoria': 'medicamento',
-        'estoque_atual': 2.0,
-        'estoque_minimo': 10.0,
-        'unidade': 'frasco',
-        'custo_unitario': 45.00,
-        'valor_total': 90.00,
-        'status': 'critico',
-      },
-    ];
+      for (final mode in ThemeMode.values) {
+        for (final view in ['vazio', 'preview', 'erro']) {
+          int pointIndex = 0;
+          final fixedPoints = [
+            const PositionPoint(latitude: -20.1000, longitude: -48.1000),
+            const PositionPoint(latitude: -20.2000, longitude: -48.1000),
+            const PositionPoint(latitude: -20.2000, longitude: -48.2000),
+            const PositionPoint(latitude: -20.1000, longitude: -48.2000),
+          ];
 
-    final mockForecast = [
-      {
-        'insumo_id': 2,
-        'nome': 'Ração Confinamento',
-        'dias_restantes': 3.0,
-        'data_ruptura': '2026-09-08',
-        'comprar_ate': '2026-09-06',
-        'urgencia': 'critica',
-      },
-      {
-        'insumo_id': 1,
-        'nome': 'Sal Mineral 80',
-        'dias_restantes': 12.0,
-        'data_ruptura': '2026-09-17',
-        'comprar_ate': '2026-09-14',
-        'urgencia': 'atencao',
-      },
-      {
-        'insumo_id': 4,
-        'nome': 'Milho Moído',
-        'dias_restantes': 45.0,
-        'data_ruptura': '2026-10-20',
-        'comprar_ate': '2026-10-10',
-        'urgencia': 'ok',
-      },
-      {
-        'insumo_id': 3,
-        'nome': 'Ivermectina 1%',
-        'dias_restantes': null,
-        'data_ruptura': null,
-        'comprar_ate': null,
-        'urgencia': 'sem_dados',
-      },
-    ];
-
-    for (final mode in ThemeMode.values) {
-      for (final tab in ['inventario', 'previsao']) {
-        final store = GoldenTokenStore()
-          ..tokens = const StoredTokens(
-            accessToken: 'access-live',
-            refreshToken: 'refresh-valid',
+          final store = GoldenTokenStore()
+            ..tokens = const StoredTokens(
+              accessToken: 'access-live',
+              refreshToken: 'refresh-valid',
+            );
+          final api = ApiClient(
+            tokenStore: store,
+            baseUrl: 'http://mock.local',
+            httpClient: MockClient((request) async {
+              if (request.method == 'GET' && request.url.path == '/lotes') {
+                return _json([
+                  {
+                    'id': 'P01',
+                    'nome': 'Piquete Central',
+                    'animais_ativos': 10,
+                  },
+                  {
+                    'id': 'P02',
+                    'nome': 'Piquete da Represa',
+                    'animais_ativos': 5,
+                  },
+                ]);
+              }
+              if (request.method == 'POST' &&
+                  request.url.path.endsWith('/perimetro')) {
+                return _json({
+                  'detail': ['Polígono auto-interceptante.'],
+                }, status: 422);
+              }
+              return _json({});
+            }),
           );
-        final api = ApiClient(
-          tokenStore: store,
-          baseUrl: 'http://mock.local',
-          httpClient: MockClient((request) async {
-            if (request.method == 'GET' && request.url.path == '/estoque') {
-              return _json(mockInventory);
-            }
-            if (request.method == 'GET' &&
-                request.url.path == '/estoque/previsao') {
-              return _json(mockForecast);
-            }
-            return _json({});
-          }),
-        );
 
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: AppThemes.light,
-            darkTheme: AppThemes.dark,
-            themeMode: mode,
-            home: StockPage(api: api, onUnauthorized: () {}),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        if (tab == 'previsao') {
-          await tester.tap(find.byKey(const ValueKey('tab-previsao')));
-          await tester.pumpAndSettle();
-        }
-
-        if (captureGoldens) {
-          await expectLater(
-            find.byType(MaterialApp),
-            matchesGoldenFile(
-              'goldens/${mode.name}-${tab == 'inventario' ? '27-estoque-inventario' : '28-estoque-previsao'}.png',
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppThemes.light,
+              darkTheme: AppThemes.dark,
+              themeMode: mode,
+              home: PerimeterGpsPage(
+                api: api,
+                onUnauthorized: () {},
+                permissionChecker: () async => LocationPermission.always,
+                positionProvider: () async =>
+                    fixedPoints[pointIndex++ % fixedPoints.length],
+              ),
             ),
           );
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
-      }
-    }
-  });
+          await tester.pumpAndSettle();
 
-  testWidgets('tela de resumo cobre vazio e dados nos três temas', (tester) async {
+          if (view != 'vazio') {
+            final markButton = find.byKey(const ValueKey('mark-point-button'));
+            for (int i = 0; i < 4; i++) {
+              await tester.tap(markButton);
+              await tester.pumpAndSettle();
+            }
+          }
+
+          if (view == 'erro') {
+            final saveButton = find.byKey(
+              const ValueKey('save-perimeter-button'),
+            );
+            await tester.ensureVisible(saveButton);
+            await tester.tap(saveButton);
+            await tester.pumpAndSettle();
+          }
+
+          if (captureGoldens) {
+            await expectLater(
+              find.byType(MaterialApp),
+              matchesGoldenFile(
+                'goldens/${mode.name}-${switch (view) {
+                  'vazio' => '24-perimetro-vazio',
+                  'preview' => '25-perimetro-preview',
+                  _ => '26-perimetro-invalido',
+                }}.png',
+              ),
+            );
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'tela de estoque cobre inventário e previsão de ruptura nos três temas',
+    (tester) async {
+      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+      if (captureGoldens) await loadAppFonts();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockInventory = [
+        {
+          'id': 1,
+          'nome': 'Sal Mineral 80',
+          'categoria': 'mineral',
+          'estoque_atual': 150.0,
+          'estoque_minimo': 100.0,
+          'unidade': 'kg',
+          'custo_unitario': 3.50,
+          'valor_total': 525.00,
+          'status': 'ok',
+        },
+        {
+          'id': 2,
+          'nome': 'Ração Confinamento',
+          'categoria': 'racao',
+          'estoque_atual': 45.0,
+          'estoque_minimo': 50.0,
+          'unidade': 'kg',
+          'custo_unitario': 2.80,
+          'valor_total': 126.00,
+          'status': 'baixo',
+        },
+        {
+          'id': 3,
+          'nome': 'Ivermectina 1%',
+          'categoria': 'medicamento',
+          'estoque_atual': 2.0,
+          'estoque_minimo': 10.0,
+          'unidade': 'frasco',
+          'custo_unitario': 45.00,
+          'valor_total': 90.00,
+          'status': 'critico',
+        },
+      ];
+
+      final mockForecast = [
+        {
+          'insumo_id': 2,
+          'nome': 'Ração Confinamento',
+          'dias_restantes': 3.0,
+          'data_ruptura': '2026-09-08',
+          'comprar_ate': '2026-09-06',
+          'urgencia': 'critica',
+        },
+        {
+          'insumo_id': 1,
+          'nome': 'Sal Mineral 80',
+          'dias_restantes': 12.0,
+          'data_ruptura': '2026-09-17',
+          'comprar_ate': '2026-09-14',
+          'urgencia': 'atencao',
+        },
+        {
+          'insumo_id': 4,
+          'nome': 'Milho Moído',
+          'dias_restantes': 45.0,
+          'data_ruptura': '2026-10-20',
+          'comprar_ate': '2026-10-10',
+          'urgencia': 'ok',
+        },
+        {
+          'insumo_id': 3,
+          'nome': 'Ivermectina 1%',
+          'dias_restantes': null,
+          'data_ruptura': null,
+          'comprar_ate': null,
+          'urgencia': 'sem_dados',
+        },
+      ];
+
+      for (final mode in ThemeMode.values) {
+        for (final tab in ['inventario', 'previsao']) {
+          final store = GoldenTokenStore()
+            ..tokens = const StoredTokens(
+              accessToken: 'access-live',
+              refreshToken: 'refresh-valid',
+            );
+          final api = ApiClient(
+            tokenStore: store,
+            baseUrl: 'http://mock.local',
+            httpClient: MockClient((request) async {
+              if (request.method == 'GET' && request.url.path == '/estoque') {
+                return _json(mockInventory);
+              }
+              if (request.method == 'GET' &&
+                  request.url.path == '/estoque/previsao') {
+                return _json(mockForecast);
+              }
+              return _json({});
+            }),
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppThemes.light,
+              darkTheme: AppThemes.dark,
+              themeMode: mode,
+              home: StockPage(api: api, onUnauthorized: () {}),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          if (tab == 'previsao') {
+            await tester.tap(find.byKey(const ValueKey('tab-previsao')));
+            await tester.pumpAndSettle();
+          }
+
+          if (captureGoldens) {
+            await expectLater(
+              find.byType(MaterialApp),
+              matchesGoldenFile(
+                'goldens/${mode.name}-${tab == 'inventario' ? '27-estoque-inventario' : '28-estoque-previsao'}.png',
+              ),
+            );
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      }
+    },
+  );
+
+  testWidgets('tela de resumo cobre vazio e dados nos três temas', (
+    tester,
+  ) async {
     final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
     if (captureGoldens) await loadAppFonts();
     tester.view.physicalSize = const Size(390, 844);
@@ -1364,7 +1388,9 @@ void main() {
     }
   });
 
-  testWidgets('tela de relatórios cobre inventário e pesagens nos três temas', (tester) async {
+  testWidgets('tela de relatórios cobre inventário e pesagens nos três temas', (
+    tester,
+  ) async {
     final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
     if (captureGoldens) await loadAppFonts();
     tester.view.physicalSize = const Size(390, 844);
@@ -1493,5 +1519,3 @@ void main() {
     }
   });
 }
-
-

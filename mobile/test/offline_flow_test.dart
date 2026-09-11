@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/models.dart';
@@ -179,32 +179,46 @@ void main() {
       await tester.pumpAndSettle();
 
       // Rolar até o botão de pesagem e abrir tela de pesagem
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('open-weighing')), 200);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('open-weighing')),
+        200,
+      );
       await tester.tap(find.byKey(const ValueKey('open-weighing')));
       await tester.pumpAndSettle();
 
       // Simular queda de rede na pesagem
       networkFailWeighing = true;
 
-      await tester.enterText(find.byKey(const ValueKey('weighing-weight')), '420.5');
+      await tester.enterText(
+        find.byKey(const ValueKey('weighing-weight')),
+        '420.5',
+      );
       await tester.tap(find.byKey(const ValueKey('save-weighing')));
       await tester.pumpAndSettle();
 
       // Confirmação de salvo offline e retorno para a ficha sem erro bloqueante
-      expect(find.text('Salvo. Será enviado quando houver conexão.'), findsOneWidget);
+      expect(
+        find.text('Salvo. Será enviado quando houver conexão.'),
+        findsOneWidget,
+      );
       expect(await queue.countPending(), equals(1));
 
       // Voltar para a tela de lista de animais
-      Navigator.of(tester.element(find.byKey(const ValueKey('carencia-status-card')))).pop();
+      Navigator.of(
+        tester.element(find.byKey(const ValueKey('carencia-status-card'))),
+      ).pop();
       await tester.pumpAndSettle();
 
       // Badge no botão de sincronização indica 1 pendência
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('pending-queue-badge')), findsOneWidget);
       expect(find.text('1'), findsOneWidget);
 
       // Normalizar rede e clicar em sincronizar agora
       networkFailWeighing = false;
-      await tester.tap(find.byKey(const ValueKey('sync-queue-button')));
+      final syncButton = find.byKey(const ValueKey('sync-queue-button'));
+      tester.widget<ListTile>(syncButton).onTap!();
       await tester.pumpAndSettle();
 
       // Diálogo com relatório de sincronização exibindo as 3 seções
@@ -254,14 +268,20 @@ void main() {
       await tester.tap(find.widgetWithText(ListTile, 'BR0001'));
       await tester.pumpAndSettle();
 
-      await tester.scrollUntilVisible(find.byKey(const ValueKey('open-weighing')), 200);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('open-weighing')),
+        200,
+      );
       await tester.tap(find.byKey(const ValueKey('open-weighing')));
       await tester.pumpAndSettle();
 
       // Simular erro 422 da API
       failWeighing422 = true;
 
-      await tester.enterText(find.byKey(const ValueKey('weighing-weight')), '420.5');
+      await tester.enterText(
+        find.byKey(const ValueKey('weighing-weight')),
+        '420.5',
+      );
       await tester.tap(find.byKey(const ValueKey('save-weighing')));
       await tester.pumpAndSettle();
 
@@ -306,7 +326,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Clicar no botão de sincronizar
-      await tester.tap(find.byKey(const ValueKey('sync-queue-button')));
+      await tester.tap(find.byTooltip('Open navigation menu'));
+      await tester.pumpAndSettle();
+      final syncButton = find.byKey(const ValueKey('sync-queue-button'));
+      tester.widget<ListTile>(syncButton).onTap!();
       await tester.pumpAndSettle();
 
       // Verificar que foi removido da fila e exibido na seção de rejeitados
@@ -361,7 +384,10 @@ void main() {
       expect(find.text('BR0001'), findsOneWidget);
 
       // Banner de dados em cache desatualizados é exibido
-      expect(find.byKey(const ValueKey('offline-cache-banner')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('offline-cache-banner')),
+        findsOneWidget,
+      );
       expect(find.textContaining('pode estar desatualizado'), findsOneWidget);
       expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
     },

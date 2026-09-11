@@ -308,8 +308,10 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
 
   Future<void> _openCreateLote() => Navigator.of(context).push<void>(
     MaterialPageRoute(
-      builder: (_) =>
-          CreateLotePage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+      builder: (_) => CreateLotePage(
+        api: widget.api,
+        onUnauthorized: widget.onUnauthorized,
+      ),
     ),
   );
 
@@ -355,81 +357,162 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  void _closeDrawerAnd(Future<void> Function() action) {
+    Navigator.of(context).pop();
+    action();
+  }
+
+  Widget? _drawerBadge(
+    int? count, {
+    required Key key,
+    required String semanticsSuffix,
+    required bool useErrorColor,
+  }) {
+    if (count == null || count <= 0) return null;
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      label: '$count $semanticsSuffix',
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Container(
+          key: key,
+          constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: useErrorColor ? colors.error : colors.primary,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '$count',
+            style: TextStyle(
+              color: useErrorColor ? colors.onError : colors.onPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawer() => Drawer(
+    child: SafeArea(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          const DrawerHeader(
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                '🐄 AgroTop',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          ListTile(
+            key: const ValueKey('open-dashboard-resumo'),
+            leading: const Icon(Icons.dashboard_outlined),
+            title: const Text('Resumo'),
+            onTap: () => _closeDrawerAnd(_openDashboardResumo),
+          ),
+          ListTile(
+            key: const ValueKey('open-perimeter-gps'),
+            leading: const Icon(Icons.location_on_outlined),
+            title: const Text('Demarcar perímetro'),
+            onTap: () => _closeDrawerAnd(_openPerimeterGps),
+          ),
+          ListTile(
+            key: const ValueKey('open-create-lote'),
+            leading: const Icon(Icons.add_location_alt_outlined),
+            title: const Text('Novo lote'),
+            onTap: () => _closeDrawerAnd(_openCreateLote),
+          ),
+          ListTile(
+            key: const ValueKey('open-devices'),
+            leading: const Icon(Icons.sell_outlined),
+            title: const Text('Brincos e dispositivos'),
+            onTap: () => _closeDrawerAnd(_openDevices),
+          ),
+          ListTile(
+            key: const ValueKey('open-stock'),
+            leading: const Icon(Icons.inventory_2_outlined),
+            title: const Text('Estoque'),
+            onTap: () => _closeDrawerAnd(_openStock),
+          ),
+          ListTile(
+            key: const ValueKey('open-reports'),
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Relatórios'),
+            onTap: () => _closeDrawerAnd(_openReports),
+          ),
+          ListTile(
+            key: const ValueKey('open-alerts'),
+            leading: const Icon(Icons.notifications_outlined),
+            title: const Text('Alertas operacionais'),
+            trailing: _drawerBadge(
+              _alertCount,
+              key: const ValueKey('alerts-badge'),
+              semanticsSuffix: 'alertas operacionais',
+              useErrorColor: true,
+            ),
+            onTap: () => _closeDrawerAnd(_openAlerts),
+          ),
+          ListTile(
+            key: const ValueKey('open-feeding'),
+            leading: const Icon(Icons.grass_outlined),
+            title: const Text('Trato do dia'),
+            trailing: _drawerBadge(
+              _pendingFeedings,
+              key: const ValueKey('pending-feeding-badge'),
+              semanticsSuffix: 'pendências de trato',
+              useErrorColor: true,
+            ),
+            onTap: () => _closeDrawerAnd(_openFeeding),
+          ),
+          ListTile(
+            key: const ValueKey('open-csv-import'),
+            leading: const Icon(Icons.upload_file_outlined),
+            title: const Text('Importar pesagens'),
+            onTap: () => _closeDrawerAnd(_openCsvImport),
+          ),
+          ListTile(
+            key: const ValueKey('sync-queue-button'),
+            title: const Text('Fila offline'),
+            leading: Icon(
+              _pendingQueueCount > 0
+                  ? Icons.cloud_upload_outlined
+                  : Icons.cloud_outlined,
+            ),
+            trailing: _drawerBadge(
+              _pendingQueueCount,
+              key: const ValueKey('pending-queue-badge'),
+              semanticsSuffix: 'pendências na fila offline',
+              useErrorColor: false,
+            ),
+            onTap: () => _closeDrawerAnd(() => _syncQueue(manual: true)),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sair'),
+            onTap: () => _closeDrawerAnd(_logout),
+          ),
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Animais ativos'),
       actions: [
-        IconButtonTheme(
-          data: IconButtonThemeData(
-            style: IconButton.styleFrom(
-              minimumSize: const Size(28, 28),
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
-              IconButton(
-                key: const ValueKey('open-dashboard-resumo'),
-                onPressed: _openDashboardResumo,
-                tooltip: 'Resumo',
-                icon: const Icon(Icons.dashboard_outlined),
-              ),
-              IconButton(
-                key: const ValueKey('open-perimeter-gps'),
-                onPressed: _openPerimeterGps,
-                tooltip: 'Demarcar perímetro',
-                icon: const Icon(Icons.location_on_outlined),
-              ),
-              IconButton(
-                key: const ValueKey('open-create-lote'),
-                onPressed: _openCreateLote,
-                tooltip: 'Novo lote',
-                icon: const Icon(Icons.add_location_alt_outlined),
-              ),
-              IconButton(
-                key: const ValueKey('open-devices'),
-                onPressed: _openDevices,
-                tooltip: 'Brincos e dispositivos',
-                icon: const Icon(Icons.sell_outlined),
-              ),
-              IconButton(
-                key: const ValueKey('open-stock'),
-                onPressed: _openStock,
-                tooltip: 'Estoque',
-                icon: const Icon(Icons.inventory_2_outlined),
-              ),
-              IconButton(
-                key: const ValueKey('open-reports'),
-                onPressed: _openReports,
-                tooltip: 'Relatórios',
-                icon: const Icon(Icons.description_outlined),
-              ),
-              _AlertsButton(alertCount: _alertCount, onPressed: _openAlerts),
-              _FeedingButton(pendingCount: _pendingFeedings, onPressed: _openFeeding),
-              IconButton(
-                key: const ValueKey('open-csv-import'),
-                onPressed: _openCsvImport,
-                tooltip: 'Importar pesagens',
-                icon: const Icon(Icons.upload_file_outlined),
-              ),
-              _SyncQueueButton(
-                pendingCount: _pendingQueueCount,
-                onPressed: () => _syncQueue(manual: true),
-              ),
-              IconButton(
-                onPressed: _logout,
-                tooltip: 'Sair',
-                icon: const Icon(Icons.logout),
-              ),
-            ],
-          ),
-        ),
+        ThemePicker(value: widget.themeMode, onChanged: widget.onThemeChanged),
       ],
     ),
+    drawer: _buildDrawer(),
     body: _buildBody(),
     bottomNavigationBar: _selecting
         ? SafeArea(
@@ -595,154 +678,6 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
   }
 }
 
-class _SyncQueueButton extends StatelessWidget {
-  const _SyncQueueButton({required this.pendingCount, required this.onPressed});
-
-  final int pendingCount;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      IconButton(
-        key: const ValueKey('sync-queue-button'),
-        onPressed: onPressed,
-        tooltip: pendingCount > 0
-            ? 'Fila offline ($pendingCount pendente${pendingCount == 1 ? "" : "s"})'
-            : 'Fila offline',
-        icon: Icon(
-          pendingCount > 0 ? Icons.cloud_upload_outlined : Icons.cloud_outlined,
-        ),
-      ),
-      if (pendingCount > 0)
-        Positioned(
-          right: 5,
-          top: 4,
-          child: IgnorePointer(
-            child: Semantics(
-              label: '$pendingCount pendências na fila offline',
-              child: Container(
-                key: const ValueKey('pending-queue-badge'),
-                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$pendingCount',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-    ],
-  );
-}
-
-class _FeedingButton extends StatelessWidget {
-  const _FeedingButton({required this.pendingCount, required this.onPressed});
-
-  final int? pendingCount;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      IconButton(
-        key: const ValueKey('open-feeding'),
-        onPressed: onPressed,
-        tooltip: 'Trato do dia',
-        icon: const Icon(Icons.grass_outlined),
-      ),
-      if (pendingCount != null && pendingCount! > 0)
-        Positioned(
-          right: 5,
-          top: 4,
-          child: IgnorePointer(
-            child: Semantics(
-              label: '$pendingCount pendências de trato',
-              child: Container(
-                key: const ValueKey('pending-feeding-badge'),
-                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$pendingCount',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onError,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-    ],
-  );
-}
-
-class _AlertsButton extends StatelessWidget {
-  const _AlertsButton({required this.alertCount, required this.onPressed});
-
-  final int? alertCount;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      IconButton(
-        key: const ValueKey('open-alerts'),
-        onPressed: onPressed,
-        tooltip: 'Alertas operacionais',
-        icon: const Icon(Icons.notifications_outlined),
-      ),
-      if (alertCount != null && alertCount! > 0)
-        Positioned(
-          right: 5,
-          top: 4,
-          child: IgnorePointer(
-            child: Semantics(
-              label: '$alertCount alertas operacionais',
-              child: Container(
-                key: const ValueKey('alerts-badge'),
-                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$alertCount',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onError,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-    ],
-  );
-}
-
 class AnimalDetailPage extends StatefulWidget {
   const AnimalDetailPage({
     super.key,
@@ -806,7 +741,8 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
   // carencia_ate nulo é a única fonte legítima de "liberado". Se a consulta
   // falhar (rede, servidor), o FutureBuilder abaixo mostra erro com opção de
   // tentar de novo — nunca a ficha afirmando liberação sem ter confirmado.
-  Future<AnimalMedications> _loadMedications() => widget.api.getAnimalMedications(widget.id);
+  Future<AnimalMedications> _loadMedications() =>
+      widget.api.getAnimalMedications(widget.id);
 
   void _reload() => setState(() {
     _detail = _loadDetail();
