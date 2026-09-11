@@ -184,6 +184,38 @@ a linha antes de escrever, não presumido pela cor do emoji do título). Ordem d
 implementação: 0084 primeiro (maior ganho, menor risco), depois 0085→0086 (API antes do
 consumidor), 0087 por último.
 
+**Auditoria de design externa em `DESIGN-IS-2026-09-10/` (2026-09-10/11)** — outra sessão
+avaliou o web e o mobile pela heurística de Dieter Rams (nota 10/24, ver
+`DESIGN-IS-2026-09-10/02-scorecard.md`/`03-verdict.md`), achando um problema de segurança
+real que nenhuma das specs 0084-0087 cobria: `AnimalDetailPage` engolia qualquer falha na
+consulta de carência e mostrava "liberado para comercialização/abate" sem ter confirmado
+isso com o servidor. **Corrigido imediatamente, fora da fila de specs (bug de segurança,
+não redesign)** — [PR #391](https://github.com/welz-gui/AgroTop/pull/391), 2026-09-11.
+Investigando por que outra sessão de agente não conseguiu reivindicar 0084-0087 (achou a
+coluna `Ordem` vazia e desistiu), achado um segundo problema real: o protocolo em
+`README.md`/`QUADRO.md` dizia "pegue a tarefa **com número de ordem**" — mas essa coluna
+nunca teve número, para nenhuma spec, desde 2026-07-31. **Corrigido em
+[PR #392](https://github.com/welz-gui/AgroTop/pull/392)**, mesmo dia — o sinal certo sempre
+foi o Estado `🟢 livre` e a posição da linha.
+
+**0088-0091 escritas em 2026-09-11** — cobrem os três achados restantes da auditoria que
+ainda não tinham spec (o quarto, carência, já foi corrigido direto, ver acima). Mesmo
+tratamento cuidadoso: código real lido e citado, não a descrição do relatório aceita sem
+checar. (1) busca de animal no mobile filtra só a página já carregada, nunca o servidor
+inteiro (`animals_page.dart:457-460`) — **0088** (API: parâmetro `q` de busca por
+substring, reusando o `WHERE` parametrizado que `get_all_animals` já tem para
+`status`/`lote_id`/`breed`) e **0089** (mobile: troca o filtro local pela busca no
+servidor, com debounce); (2) refresh falho do dashboard mobile fica silencioso depois da
+primeira carga bem-sucedida (`dashboard_resumo_page.dart:31-69`, mesma família do bug da
+carência — falha real fica invisível) — **0090** (mostra `SnackBar`, mantém os dados
+antigos na tela, sem apagar nem bloquear); (3) badges do web com contraste abaixo do WCAG
+AA — calculado e confirmado (não só citado do relatório): badge-green mede **4,09:1**,
+badge-red **3,62:1**, ambos abaixo do alvo 4,5:1 que `ui/tema.py` já declara — **0091**
+(troca os dois tokens de fundo por `sucesso_fundo`/`perigo_fundo`, que já existem e medem
+5,23:1/5,84:1, e move todo o bloco de CSS de `app.py` para `var(--token)`, mesmo método da
+spec 0007). Ordem sugerida: 0088→0089 (API antes do consumidor, mesmo padrão de sempre),
+0090 e 0091 são independentes entre si e das duas primeiras.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -482,6 +514,10 @@ consumidor), 0087 por último.
 | — | [0085](0085-api-distribuicao-por-raca-no-dashboard-resumo.md) — API: distribuição por raça no dashboard resumo 🏗️ | — | 🟢 livre | | 2026-09-10 |
 | — | [0086](0086-mobile-grafico-de-raca-no-dashboard.md) — Mobile: gráfico de raça no dashboard resumo 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-10 |
 | — | [0087](0087-mobile-cards-de-status-coloridos.md) — Mobile: cards de status coloridos 🏗️ | — | 🟢 livre | | 2026-09-10 |
+| — | [0088](0088-api-busca-de-animais-por-substring.md) — API: busca de animais por substring de ID/brinco 🏗️ | — | 🟢 livre | | 2026-09-11 |
+| — | [0089](0089-mobile-usar-busca-do-servidor.md) — Mobile: usar a busca do servidor em vez de filtrar só a página carregada 🏗️ | — | 🟢 livre | | 2026-09-11 |
+| — | [0090](0090-mobile-refresh-falho-do-dashboard-visivel.md) — Mobile: refresh falho do dashboard nunca fica silencioso 🏗️ | — | 🟢 livre | | 2026-09-11 |
+| — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | 🟢 livre | | 2026-09-11 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
