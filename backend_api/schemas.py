@@ -292,6 +292,11 @@ class DashboardAlertasOutput(BaseModel):
     prontos_para_abate: int
 
 
+class RacaContagemOutput(BaseModel):
+    raca: str
+    quantidade: int
+
+
 class DashboardResumoOutput(BaseModel):
     total_animais: int
     peso_medio_kg: float
@@ -301,6 +306,7 @@ class DashboardResumoOutput(BaseModel):
     machos: int
     femeas: int
     alertas: DashboardAlertasOutput
+    distribuicao_por_raca: list[RacaContagemOutput]
 
 
 class TransicaoPermitida(BaseModel):
