@@ -234,4 +234,125 @@ void main() {
     expect(requests, 2);
     expect(find.text('15'), findsOneWidget);
   });
+
+  testWidgets(
+    'Spec 0090: pull-to-refresh com erro 500 mantém dados antigos e exibe SnackBar',
+    (tester) async {
+      var requests = 0;
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          requests++;
+          if (requests == 1) {
+            return _json(_resumo(total: 12));
+          }
+          return _json(
+            {'detail': 'Falha interna ao atualizar resumo'},
+            status: 500,
+          );
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('12'), findsOneWidget);
+
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(requests, 2);
+      // Dados antigos continuam visíveis
+      expect(find.text('12'), findsOneWidget);
+      // SnackBar exibido com mensagem de erro da API
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Falha interna ao atualizar resumo'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Spec 0090: pull-to-refresh com erro de rede mantém dados antigos e exibe SnackBar genérico',
+    (tester) async {
+      var requests = 0;
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          requests++;
+          if (requests == 1) {
+            return _json(_resumo(total: 12));
+          }
+          throw http.ClientException('Falha de conexão com o servidor');
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('12'), findsOneWidget);
+
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(requests, 2);
+      // Dados antigos continuam visíveis
+      expect(find.text('12'), findsOneWidget);
+      // SnackBar exibido com mensagem genérica de rede
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(
+        find.text('API indisponível. Tente carregar o resumo novamente.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Spec 0090: falha na carga inicial continua mostrando _LoadError em tela cheia',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          return _json({'detail': 'Falha na carga inicial'}, status: 500);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tela de erro com botão retry
+      expect(find.text('Falha na carga inicial'), findsOneWidget);
+      expect(find.text('Tentar novamente'), findsOneWidget);
+      // Nenhum card do dashboard é renderizado
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-total-animais')),
+        findsNothing,
+      );
+      // Nenhum SnackBar exibido na carga inicial
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 }
