@@ -216,6 +216,19 @@ badge-red **3,62:1**, ambos abaixo do alvo 4,5:1 que `ui/tema.py` já declara �
 spec 0007). Ordem sugerida: 0088→0089 (API antes do consumidor, mesmo padrão de sempre),
 0090 e 0091 são independentes entre si e das duas primeiras.
 
+**0085 e 0084 concluídas em 2026-09-11/12** — [PR #394](https://github.com/welz-gui/AgroTop/pull/394)
+(0085, API) e [PR #395](https://github.com/welz-gui/AgroTop/pull/395) (0084, mobile).
+0085: `Counter` sobre `get_all_animals()`, breed vazio/nulo agrupado em "Não informada",
+soma das quantidades testada igual a `total_animais` (mock e contra o banco real). 0084:
+`Drawer` substitui os 11 ícones sem rótulo da `AppBar`, todas as `ValueKey`s preservadas,
+`ThemePicker` continua na `AppBar`, sem identidade do usuário no header — revisão achou
+8 ocorrências de `tester.widget<ListTile>(x).onTap!()` nos testes retrofitados (invoca o
+callback direto, sem hit-test real); trocado por `tester.tap()` de verdade, o que expôs um
+bug de teste genuíno em 3 arquivos que nunca definiam `tester.view.physicalSize` (rodavam
+na superfície padrão 800x600 do harness, pequena demais para o Drawer com 10 itens) —
+corrigido com o mesmo `Size(390, 844)` já usado no resto da suíte. **0086 (gráfico de
+rosca por raça) liberada** — pré-requisito 0085 mesclado.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -510,8 +523,8 @@ spec 0007). Ordem sugerida: 0088→0089 (API antes do consumidor, mesmo padrão 
 | — | [0081](0081-dockerfile-do-app-web.md) — Dockerfile do app web (Streamlit) 🏗️ | — | ✅ [#375](https://github.com/welz-gui/AgroTop/pull/375) | | 2026-09-07 |
 | — | [0082](0082-web-cruzamento-com-car.md) — Web: cruzamento com CAR (situação ambiental) 🏗️ ⚠️médio | — | ✅ [#381](https://github.com/welz-gui/AgroTop/pull/381) | | 2026-09-08 |
 | — | [0083](0083-web-assistente-de-consulta-ia.md) — Web: assistente de consulta por IA (OpenRouter) 🏗️ ⚠️médio | — | ✅ [#383](https://github.com/welz-gui/AgroTop/pull/383) | | 2026-09-09 |
-| — | [0084](0084-mobile-menu-de-navegacao-lateral.md) — Mobile: menu de navegação lateral (Drawer) 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-10 |
-| — | [0085](0085-api-distribuicao-por-raca-no-dashboard-resumo.md) — API: distribuição por raça no dashboard resumo 🏗️ | — | 🟢 livre | | 2026-09-10 |
+| — | [0084](0084-mobile-menu-de-navegacao-lateral.md) — Mobile: menu de navegação lateral (Drawer) 🏗️ ⚠️médio | — | ✅ [#395](https://github.com/welz-gui/AgroTop/pull/395) | | 2026-09-10 |
+| — | [0085](0085-api-distribuicao-por-raca-no-dashboard-resumo.md) — API: distribuição por raça no dashboard resumo 🏗️ | — | ✅ [#394](https://github.com/welz-gui/AgroTop/pull/394) | | 2026-09-10 |
 | — | [0086](0086-mobile-grafico-de-raca-no-dashboard.md) — Mobile: gráfico de raça no dashboard resumo 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-10 |
 | — | [0087](0087-mobile-cards-de-status-coloridos.md) — Mobile: cards de status coloridos 🏗️ | — | 🟢 livre | | 2026-09-10 |
 | — | [0088](0088-api-busca-de-animais-por-substring.md) — API: busca de animais por substring de ID/brinco 🏗️ | — | 🟢 livre | | 2026-09-11 |
