@@ -184,11 +184,12 @@ void main() {
           'animal_uuid': '123e4567-e89b-12d3-a456-426614174000',
         };
         if (request.method == 'GET' && request.url.path == '/animais') {
-          expect(request.url.queryParameters, {
-            'skip': '0',
-            'limit': '50',
-            'status': 'ativo',
-          });
+          expect(request.url.queryParameters['skip'], '0');
+          expect(request.url.queryParameters['limit'], '50');
+          expect(request.url.queryParameters['status'], 'ativo');
+          if (request.url.queryParameters.containsKey('q')) {
+            expect(request.url.queryParameters['q'], 'BR0001');
+          }
           return _json([animal]);
         }
         if (request.method == 'GET' && request.url.path == '/trato/pendentes') {

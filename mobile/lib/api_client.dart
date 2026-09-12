@@ -86,10 +86,17 @@ class ApiClient {
     int skip = 0,
     int limit = 50,
     String status = 'ativo',
+    String? q,
   }) async {
-    final uri = Uri.parse('$baseUrl/animais').replace(
-      queryParameters: {'skip': '$skip', 'limit': '$limit', 'status': status},
-    );
+    final queryParameters = {
+      'skip': '$skip',
+      'limit': '$limit',
+      'status': status,
+      if (q != null && q.isNotEmpty) 'q': q,
+    };
+    final uri = Uri.parse(
+      '$baseUrl/animais',
+    ).replace(queryParameters: queryParameters);
     final response = await _authorized(
       (headers) => _http.get(uri, headers: headers),
     );
