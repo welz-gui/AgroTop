@@ -42,13 +42,20 @@ class _DashboardResumoPageState extends State<DashboardResumoPage> {
         widget.onUnauthorized();
         return;
       }
-      setState(() => _error = error.message);
+      _handleError(error.message);
     } catch (_) {
-      if (mounted) {
-        setState(
-          () => _error = 'API indisponível. Tente carregar o resumo novamente.',
-        );
-      }
+      if (!mounted) return;
+      _handleError('API indisponível. Tente carregar o resumo novamente.');
+    }
+  }
+
+  void _handleError(String message) {
+    if (_resumo == null) {
+      setState(() => _error = message);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     }
   }
 
