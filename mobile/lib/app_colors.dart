@@ -4,6 +4,19 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
+  static const series = <Color>[
+    Color(0xFF4ADE80),
+    Color(0xFF22D3EE),
+    Color(0xFFFBBF24),
+    Color(0xFFA78BFA),
+    Color(0xFFF87171),
+    Color(0xFF34D399),
+    Color(0xFF60A5FA),
+    Color(0xFFFB923C),
+    Color(0xFFF472B6),
+    Color(0xFFFACC15)
+  ];
+
   static const dark = <String, Color>{
     'fundo': Color(0xFF0F172A),
     'fundo_alt': Color(0xFF0A1628),

@@ -31,6 +31,11 @@ def _palette(name: str, values: dict[str, str]) -> str:
     return f"  static const {name} = <String, Color>{{\n{fields}\n  }};"
 
 
+def _color_list(name: str, values: list[str]) -> str:
+    colors = ",\n".join(f"    {_dart_color(value)}" for value in values)
+    return f"  static const {name} = <Color>[\n{colors}\n  ];"
+
+
 def main() -> None:
     theme = _load_theme_module()
     output = f"""// GENERATED FILE — execute: python mobile/tool/generate_app_colors.py
@@ -39,6 +44,8 @@ def main() -> None:
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {{
+{_color_list('series', theme.SERIES)}
+
 {_palette('dark', theme.ESCURO)}
 
 {_palette('light', theme.CLARO)}

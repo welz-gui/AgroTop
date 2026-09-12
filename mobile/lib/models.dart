@@ -178,6 +178,8 @@ class PositionPoint {
 }
 
 
+
+
 class MovementResult {
   const MovementResult({
     required this.movidos,
@@ -481,6 +483,18 @@ class DashboardAlertCounts {
       );
 }
 
+class RacaContagem {
+  const RacaContagem({required this.raca, required this.quantidade});
+
+  final String raca;
+  final int quantidade;
+
+  factory RacaContagem.fromJson(Map<String, dynamic> json) => RacaContagem(
+    raca: json['raca'] as String,
+    quantidade: (json['quantidade'] as num).toInt(),
+  );
+}
+
 class DashboardResumo {
   const DashboardResumo({
     required this.totalAnimais,
@@ -491,6 +505,7 @@ class DashboardResumo {
     required this.machos,
     required this.femeas,
     required this.alertas,
+    required this.distribuicaoPorRaca,
   });
 
   final int totalAnimais;
@@ -501,6 +516,7 @@ class DashboardResumo {
   final int machos;
   final int femeas;
   final DashboardAlertCounts alertas;
+  final List<RacaContagem> distribuicaoPorRaca;
 
   factory DashboardResumo.fromJson(Map<String, dynamic> json) =>
       DashboardResumo(
@@ -514,6 +530,12 @@ class DashboardResumo {
         alertas: DashboardAlertCounts.fromJson(
           json['alertas'] as Map<String, dynamic>,
         ),
+        distribuicaoPorRaca:
+            (json['distribuicao_por_raca'] as List<dynamic>? ?? const [])
+                .map(
+                  (item) => RacaContagem.fromJson(item as Map<String, dynamic>),
+                )
+                .toList(growable: false),
       );
 }
 
@@ -968,5 +990,4 @@ class RelatorioPesagemItem {
     'observacoes': observacoes,
   };
 }
-
 

@@ -4,6 +4,7 @@ import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app_colors.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:agrotop_mobile/screens/dashboard_resumo_page.dart';
+import 'package:agrotop_mobile/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -60,6 +61,7 @@ Map<String, dynamic> _resumo({
   int sumidos = 1,
   int carencia = 2,
   int prontos = 3,
+  List<Map<String, dynamic>>? distribuicao,
 }) => {
   'total_animais': total,
   'peso_medio_kg': peso,
@@ -68,12 +70,25 @@ Map<String, dynamic> _resumo({
   'lotacao_ua_ha': lotacao,
   'machos': machos,
   'femeas': femeas,
+  'distribuicao_por_raca':
+      distribuicao ??
+      const [
+        {'raca': 'Nelore', 'quantidade': 7},
+        {'raca': 'Angus', 'quantidade': 3},
+        {'raca': 'Brangus', 'quantidade': 2},
+      ],
   'alertas': {
     'sumidos': sumidos,
     'carencia': carencia,
     'prontos_para_abate': prontos,
   },
 };
+
+const _tresRacas = [
+  {'raca': 'Nelore', 'quantidade': 7},
+  {'raca': 'Angus', 'quantidade': 3},
+  {'raca': 'Brangus', 'quantidade': 2},
+];
 
 Map<String, dynamic> _emptyAlerts() => {
   'sumidos': [],
@@ -198,6 +213,94 @@ void main() {
     expect(
       find.byKey(const ValueKey('dashboard-kpi-total-animais')),
       findsNothing,
+    );
+  });
+
+  test('RacaContagem.fromJson lê o payload da API', () {
+    final raca = RacaContagem.fromJson(const {
+      'raca': 'Nelore',
+      'quantidade': 7,
+    });
+
+    expect(raca.raca, 'Nelore');
+    expect(raca.quantidade, 7);
+  });
+
+  test('AppColors.series mantém a paleta categórica da fonte web', () {
+    expect(AppColors.series.map((color) => color.toARGB32()).toList(), const [
+      0xFF4ADE80,
+      0xFF22D3EE,
+      0xFFFBBF24,
+      0xFFA78BFA,
+      0xFFF87171,
+      0xFF34D399,
+      0xFF60A5FA,
+      0xFFFB923C,
+      0xFFF472B6,
+      0xFFFACC15,
+    ]);
+  });
+
+  testWidgets('gráfico por raça mostra legenda nos três temas', (tester) async {
+    expect(
+      DashboardResumo.fromJson(
+        _resumo(distribuicao: _tresRacas),
+      ).distribuicaoPorRaca,
+      hasLength(3),
+    );
+    final api = _api(
+      MockClient((request) async => _json(_resumo(distribuicao: _tresRacas))),
+    );
+
+    for (final mode in ThemeMode.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          darkTheme: AppThemes.dark,
+          themeMode: mode,
+          home: DashboardResumoPage(
+            key: ValueKey(mode),
+            api: api,
+            onUnauthorized: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('12'), findsOneWidget);
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('dashboard-breed-donut')),
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('dashboard-breed-donut')),
+        findsOneWidget,
+      );
+      expect(find.text('Nelore (7)'), findsOneWidget);
+      expect(find.text('Angus (3)'), findsOneWidget);
+      expect(find.text('Brangus (2)'), findsOneWidget);
+    }
+  });
+
+  testWidgets('distribuição vazia mantém o restante do resumo', (tester) async {
+    final api = _api(
+      MockClient((request) async => _json(_resumo(distribuicao: const []))),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppThemes.light,
+        home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('dashboard-breed-donut')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('dashboard-kpi-total-animais')),
+      findsOneWidget,
     );
   });
 
