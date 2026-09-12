@@ -229,6 +229,26 @@ na superfície padrão 800x600 do harness, pequena demais para o Drawer com 10 i
 corrigido com o mesmo `Size(390, 844)` já usado no resto da suíte. **0086 (gráfico de
 rosca por raça) liberada** — pré-requisito 0085 mesclado.
 
+**0086, 0087, 0088, 0089 e 0090 concluídas em 2026-09-12** — [PR #398](https://github.com/welz-gui/AgroTop/pull/398)
+(0086), [#397](https://github.com/welz-gui/AgroTop/pull/397) (0087),
+[#399](https://github.com/welz-gui/AgroTop/pull/399) (0088),
+[#401](https://github.com/welz-gui/AgroTop/pull/401) (0089) e
+[#400](https://github.com/welz-gui/AgroTop/pull/400) (0090) — todas as 4 sessões
+autônomas que pegaram a fila depois da correção do protocolo (#392). 0086: rosca
+desenhada com `CustomPainter` (sem dependência nova), `AppColors.series` gerado por
+`generate_app_colors.py` — rodado de verdade nesta revisão, zero divergência contra o
+commit. 0087: borda colorida certa por seção (perigo/atenção), Prontos/Baixo Desempenho
+confirmados sem cor por teste explícito, hex hardcoded do `_RecomendacaoCard` removido.
+0088: `LIKE`/`LOWER` parametrizado em `get_all_animals`, compõe com `status`/paginação.
+0089: filtro local trocado pela busca no servidor, debounce de 400ms com contador de
+geração contra corrida entre buscas. 0090: refresh falho após primeira carga mostra
+`SnackBar` sem apagar dados antigos.
+
+(O achado de revisão do `tester.widget<ListTile>(x).onTap!()` nos testes do Drawer foi
+na 0084/PR #395, já registrado acima — nenhum problema equivalente nestas cinco.)
+**Só falta a 0091** (contraste de badges no web) para a fila desta rodada de auditoria
+fechar por completo.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -525,11 +545,11 @@ rosca por raça) liberada** — pré-requisito 0085 mesclado.
 | — | [0083](0083-web-assistente-de-consulta-ia.md) — Web: assistente de consulta por IA (OpenRouter) 🏗️ ⚠️médio | — | ✅ [#383](https://github.com/welz-gui/AgroTop/pull/383) | | 2026-09-09 |
 | — | [0084](0084-mobile-menu-de-navegacao-lateral.md) — Mobile: menu de navegação lateral (Drawer) 🏗️ ⚠️médio | — | ✅ [#395](https://github.com/welz-gui/AgroTop/pull/395) | | 2026-09-10 |
 | — | [0085](0085-api-distribuicao-por-raca-no-dashboard-resumo.md) — API: distribuição por raça no dashboard resumo 🏗️ | — | ✅ [#394](https://github.com/welz-gui/AgroTop/pull/394) | | 2026-09-10 |
-| — | [0086](0086-mobile-grafico-de-raca-no-dashboard.md) — Mobile: gráfico de raça no dashboard resumo 🏗️ ⚠️médio | — | 🟢 livre | | 2026-09-10 |
-| — | [0087](0087-mobile-cards-de-status-coloridos.md) — Mobile: cards de status coloridos 🏗️ | — | 🟢 livre | | 2026-09-10 |
-| — | [0088](0088-api-busca-de-animais-por-substring.md) — API: busca de animais por substring de ID/brinco 🏗️ | — | 🟢 livre | | 2026-09-11 |
-| — | [0089](0089-mobile-usar-busca-do-servidor.md) — Mobile: usar a busca do servidor em vez de filtrar só a página carregada 🏗️ | — | 🟢 livre | | 2026-09-11 |
-| — | [0090](0090-mobile-refresh-falho-do-dashboard-visivel.md) — Mobile: refresh falho do dashboard nunca fica silencioso 🏗️ | — | 🟢 livre | | 2026-09-11 |
+| — | [0086](0086-mobile-grafico-de-raca-no-dashboard.md) — Mobile: gráfico de raça no dashboard resumo 🏗️ ⚠️médio | — | ✅ [#398](https://github.com/welz-gui/AgroTop/pull/398) | | 2026-09-10 |
+| — | [0087](0087-mobile-cards-de-status-coloridos.md) — Mobile: cards de status coloridos 🏗️ | — | ✅ [#397](https://github.com/welz-gui/AgroTop/pull/397) | | 2026-09-10 |
+| — | [0088](0088-api-busca-de-animais-por-substring.md) — API: busca de animais por substring de ID/brinco 🏗️ | — | ✅ [#399](https://github.com/welz-gui/AgroTop/pull/399) | | 2026-09-11 |
+| — | [0089](0089-mobile-usar-busca-do-servidor.md) — Mobile: usar a busca do servidor em vez de filtrar só a página carregada 🏗️ | — | ✅ [#401](https://github.com/welz-gui/AgroTop/pull/401) | | 2026-09-11 |
+| — | [0090](0090-mobile-refresh-falho-do-dashboard-visivel.md) — Mobile: refresh falho do dashboard nunca fica silencioso 🏗️ | — | ✅ [#400](https://github.com/welz-gui/AgroTop/pull/400) | | 2026-09-11 |
 | — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | 🟢 livre | | 2026-09-11 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
