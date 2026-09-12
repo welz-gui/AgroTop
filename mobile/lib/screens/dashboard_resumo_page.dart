@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
@@ -147,6 +150,10 @@ class _DashboardContent extends StatelessWidget {
               .map((metric) => _MetricCard(metric: metric))
               .toList(growable: false),
         ),
+        if (resumo.distribuicaoPorRaca.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _BreedDonutChart(entries: resumo.distribuicaoPorRaca),
+        ],
         const SizedBox(height: 24),
         Text('Alertas', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
@@ -176,6 +183,98 @@ class _DashboardContent extends StatelessWidget {
       ],
     );
   }
+}
+
+class _BreedDonutChart extends StatelessWidget {
+  const _BreedDonutChart({required this.entries})
+    : super(key: const ValueKey('dashboard-breed-donut'));
+
+  final List<RacaContagem> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.series;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Distribuição por raça',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: SizedBox(
+                width: 144,
+                height: 144,
+                child: CustomPaint(
+                  painter: _BreedDonutPainter(entries: entries),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...entries.asMap().entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: colors[entry.key % colors.length],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${entry.value.raca} (${entry.value.quantidade})',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BreedDonutPainter extends CustomPainter {
+  const _BreedDonutPainter({required this.entries});
+
+  final List<RacaContagem> entries;
+
+  @override
+  void paint(ui.Canvas canvas, ui.Size size) {
+    final total = entries.fold<int>(0, (sum, entry) => sum + entry.quantidade);
+    if (total <= 0) return;
+
+    final strokeWidth = 20.0;
+    final radius = size.shortestSide / 2 - strokeWidth / 2;
+    final center = ui.Offset(size.width / 2, size.height / 2);
+    final rect = ui.Rect.fromCircle(center: center, radius: radius);
+    final paint = ui.Paint()
+      ..style = ui.PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = ui.StrokeCap.butt;
+    var start = -math.pi / 2;
+    for (final entry in entries.asMap().entries) {
+      paint.color = AppColors.series[entry.key % AppColors.series.length];
+      final sweep = math.pi * 2 * entry.value.quantidade / total;
+      canvas.drawArc(rect, start, sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BreedDonutPainter oldDelegate) =>
+      oldDelegate.entries != entries;
 }
 
 class _Metric {

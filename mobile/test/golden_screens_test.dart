@@ -1354,6 +1354,13 @@ void main() {
                 'lotacao_ua_ha': empty ? 0 : 1.25,
                 'machos': empty ? 0 : 7,
                 'femeas': empty ? 0 : 5,
+                'distribuicao_por_raca': empty
+                    ? []
+                    : [
+                        {'raca': 'Nelore', 'quantidade': 7},
+                        {'raca': 'Angus', 'quantidade': 3},
+                        {'raca': 'Brangus', 'quantidade': 2},
+                      ],
                 'alertas': {
                   'sumidos': empty ? 0 : 1,
                   'carencia': empty ? 0 : 2,
