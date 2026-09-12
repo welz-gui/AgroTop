@@ -290,9 +290,10 @@ def list_animais(
     skip: int = Query(0, ge=0, description="Número de registros a pular"),
     limit: int = Query(50, ge=1, le=500, description="Número máximo de registros"),
     status_filter: Optional[str] = Query("ativo", alias="status", description="Filtro de status do animal"),
+    q: Optional[str] = Query(None, description="Substring do ID/brinco do animal"),
 ) -> list[dict[str, Any]]:
-    """Lista animais cadastrados com paginação."""
-    all_animals = get_all_animals(status=status_filter)
+    """Lista animais cadastrados com filtros e paginação."""
+    all_animals = get_all_animals(status=status_filter, id_contains=q)
     paginated = all_animals[skip : skip + limit]
 
     return [

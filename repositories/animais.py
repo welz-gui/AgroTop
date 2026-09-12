@@ -86,7 +86,8 @@ def get_total_gain_kg(status: Optional[str] = "ativo",
 @_cache
 def get_all_animals(status: Optional[str] = "ativo",
                     lote_id: Optional[str] = None,
-                    breed: Optional[str] = None) -> list[dict]:
+                    breed: Optional[str] = None,
+                    id_contains: Optional[str] = None) -> list[dict]:
     sql  = "SELECT a.*, f.name as fornecedor_name FROM animals a LEFT JOIN fornecedores f ON f.id=a.fornecedor_id WHERE 1=1"
     args: list = []
     if status:
@@ -95,6 +96,8 @@ def get_all_animals(status: Optional[str] = "ativo",
         sql += " AND a.lote_id=?"; args.append(lote_id)
     if breed:
         sql += " AND a.breed=?"; args.append(breed)
+    if id_contains:
+        sql += " AND LOWER(a.id) LIKE LOWER(?)"; args.append(f"%{id_contains}%")
     sql += " ORDER BY a.id"
     with _conn() as con:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
