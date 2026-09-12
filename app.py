@@ -81,7 +81,14 @@ from services.rateio_adaptador import com_dias_no_lote
 from services.rateio import ratear
 from services.gta_adaptador import montar_contexto as gta_montar_contexto
 from services.gta import validar as gta_validar
-from ui.tema import cores, plotly_layout, SERIES, ESCALA_RUIM_BOM, ESCALA_BOM_RUIM
+from ui.tema import (
+    cores,
+    css_variaveis,
+    plotly_layout,
+    SERIES,
+    ESCALA_RUIM_BOM,
+    ESCALA_BOM_RUIM,
+)
 
 # ─── Configuração da página ───────────────────────────────────────────────────
 st.set_page_config(
@@ -98,40 +105,41 @@ c = cores()
 c = cores()
 
 # ─── CSS ──────────────────────────────────────────────────────────────────────
+st.markdown(css_variaveis(), unsafe_allow_html=True)
 st.markdown("""
 <style>
 .main .block-container{padding-top:.8rem;padding-bottom:2rem}
-section[data-testid="stSidebar"]{background:#0a1628!important}
+section[data-testid="stSidebar"]{background:var(--fundo_alt)!important}
 
 /* Botões grandes — uso ao sol */
 .stButton>button{min-height:2.75rem;font-size:1rem;font-weight:600;border-radius:10px;transition:all .15s}
 .stButton>button:hover{transform:translateY(-1px)}
 
 /* Métricas */
-div[data-testid="stMetric"]{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:1rem 1.2rem}
+div[data-testid="stMetric"]{background:var(--superficie);border:1px solid var(--borda);border-radius:14px;padding:1rem 1.2rem}
 div[data-testid="stMetricValue"]{font-size:1.55rem!important}
 
 /* Título de página */
-.page-title{font-size:1.55rem;font-weight:800;color:#4ade80;border-left:4px solid #4ade80;padding-left:.75rem;margin-bottom:1.4rem}
+.page-title{font-size:1.55rem;font-weight:800;color:var(--primaria);border-left:4px solid var(--primaria);padding-left:.75rem;margin-bottom:1.4rem}
 
 /* Cards */
-.card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-green{background:linear-gradient(135deg,#14532d,#0f172a);border:1px solid #166534;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-yellow{background:linear-gradient(135deg,#422006,#0f172a);border:1px solid #854d0e;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-red{background:linear-gradient(135deg,#450a0a,#0f172a);border:1px solid #7f1d1d;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.card{background:var(--superficie);border:1px solid var(--borda);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.card-green{background:linear-gradient(135deg,var(--sucesso_fundo),var(--fundo));border:1px solid var(--sucesso_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.card-yellow{background:linear-gradient(135deg,var(--atencao_fundo),var(--fundo));border:1px solid var(--atencao_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.card-red{background:linear-gradient(135deg,var(--perigo_fundo),var(--fundo));border:1px solid var(--perigo_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
 
 /* Badges */
-.badge-green {background:#166534;color:#4ade80;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-yellow{background:#713f12;color:#fbbf24;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-red   {background:#7f1d1d;color:#f87171;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-blue  {background:#1e3a5f;color:#60a5fa;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-gray  {background:#1e293b;color:#94a3b8;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-green {background:var(--sucesso_fundo);color:var(--sucesso);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-yellow{background:var(--atencao_fundo_alt);color:var(--atencao);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-red   {background:var(--perigo_fundo);color:var(--perigo);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-blue  {background:var(--info_fundo);color:var(--info_texto);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-gray  {background:var(--superficie);color:var(--texto_secundario);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
 
 /* Linha de histórico */
-.hist-item{background:#0f172a;border-left:3px solid #4ade80;border-radius:8px;padding:.45rem .9rem;margin-bottom:.35rem}
+.hist-item{background:var(--fundo);border-left:3px solid var(--primaria);border-radius:8px;padding:.45rem .9rem;margin-bottom:.35rem}
 
 /* Teclado numérico */
-.keypad-display{font-size:3rem;font-weight:900;color:#4ade80;text-align:center;background:#0f172a;border:2px solid #334155;border-radius:14px;padding:1rem;margin-bottom:.5rem;letter-spacing:.1em}
+.keypad-display{font-size:3rem;font-weight:900;color:var(--primaria);text-align:center;background:var(--fundo);border:2px solid var(--borda);border-radius:14px;padding:1rem;margin-bottom:.5rem;letter-spacing:.1em}
 
 /* Ocultar elementos padrão (mantendo o botão de abrir o menu lateral) */
 #MainMenu,footer{visibility:hidden}
@@ -144,8 +152,8 @@ header[data-testid="stHeader"]{background:transparent}
     z-index:999999;
 }
 [data-testid="collapsedControl"] button{
-    background:#4ade80!important;
-    color:#0f172a!important;
+    background:var(--primaria)!important;
+    color:var(--fundo)!important;
     border-radius:8px;
 }
 
