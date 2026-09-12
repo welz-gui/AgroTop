@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -64,6 +66,8 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
   bool _hasMore = true;
   String? _error;
   String _query = '';
+  Timer? _searchDebounce;
+  int _loadGeneration = 0;
   bool _selecting = false;
   final _selectedIds = <String>{};
   int? _pendingFeedings;
@@ -85,6 +89,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -149,6 +154,8 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
   }
 
   Future<void> _load({required bool reset}) async {
+    final generation = ++_loadGeneration;
+    final query = _query.trim();
     setState(() {
       if (reset) {
         _loading = true;
@@ -161,8 +168,10 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
       final page = await widget.api.listAnimals(
         skip: reset ? 0 : _animals.length,
         limit: _pageSize,
+        status: 'ativo',
+        q: query.isEmpty ? null : query,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       if (reset && _shallowCache != null) {
         await _shallowCache.saveAnimals(page);
       }
@@ -174,7 +183,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
         _cachedTime = null;
       });
     } on ApiException catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       if (error.statusCode == 401) {
         widget.onUnauthorized();
         return;
@@ -194,7 +203,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
       }
       setState(() => _error = error.message);
     } catch (_) {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         if (reset && _shallowCache != null) {
           final cached = _shallowCache.getAnimals();
           if (cached != null && cached.data.isNotEmpty) {
@@ -214,13 +223,27 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           _loading = false;
           _loadingMore = false;
         });
       }
     }
+  }
+
+  void _onQueryChanged(String value) {
+    _searchDebounce?.cancel();
+    // Invalidate an in-flight request so an old result cannot replace a newer query.
+    _loadGeneration++;
+    setState(() => _query = value);
+    if (value.trim().isEmpty) {
+      _load(reset: true);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _load(reset: true);
+    });
   }
 
   Future<void> _logout() async {
@@ -537,10 +560,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
       return ErrorState(message: _error!, onRetry: () => _load(reset: true));
     }
 
-    final normalizedQuery = _query.trim().toLowerCase();
-    final filtered = _animals
-        .where((animal) => animal.id.toLowerCase().contains(normalizedQuery))
-        .toList(growable: false);
+    final displayedAnimals = _animals;
 
     return RefreshIndicator(
       onRefresh: () => _load(reset: true),
@@ -565,9 +585,14 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
                 onPressed: _openQrScanner,
               ),
             ),
-            onChanged: (value) => setState(() => _query = value),
+            onChanged: _onQueryChanged,
           ),
           const SizedBox(height: 12),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(child: CircularProgressIndicator()),
+            ),
           if (_selecting)
             Card(
               child: ListTile(
@@ -606,13 +631,13 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 12),
           ],
-          if (filtered.isEmpty)
+          if (displayedAnimals.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(child: Text('Nenhum animal encontrado.')),
             )
           else
-            for (final animal in filtered) ...[
+            for (final animal in displayedAnimals) ...[
               Card(
                 child: ListTile(
                   leading: CircleAvatar(

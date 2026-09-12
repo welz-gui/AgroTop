@@ -42,7 +42,7 @@ void main() {
     tokenStore = MemoryTokenStore();
     final client = MockClient((request) async {
       if (request.url.path == '/animais' && request.method == 'GET') {
-        return _json([
+        final animals = [
           {
             'id': 'BR0001',
             'breed': 'Nelore',
@@ -55,7 +55,18 @@ void main() {
             'current_weight': 410.0,
             'lote_id': 'P02',
           },
-        ]);
+        ];
+        final q = request.url.queryParameters['q']?.toLowerCase();
+        return _json(
+          q == null || q.isEmpty
+              ? animals
+              : animals
+                    .where(
+                      (animal) =>
+                          (animal['id']! as String).toLowerCase().contains(q),
+                    )
+                    .toList(growable: false),
+        );
       }
 
       if (request.url.path.startsWith('/animais/') &&
@@ -254,7 +265,7 @@ void main() {
     );
   });
 
-  testWidgets('AnimalsPage: botão de QR existe e leitura busca direto na API ignorando filtro local _query',
+  testWidgets('AnimalsPage: botão de QR existe e leitura busca direto na API',
       (tester) async {
     ValueChanged<String>? onScannedCallback;
 
@@ -279,13 +290,17 @@ void main() {
     expect(find.widgetWithText(ListTile, 'BR0001'), findsOneWidget);
     expect(find.widgetWithText(ListTile, 'BR0002'), findsOneWidget);
 
-    // Digita no filtro local algo que esconde BR0099 e BR0001
+    // Digita a busca; o filtro só é enviado ao servidor após o debounce.
     await tester.enterText(
       find.byKey(const ValueKey('animal-search')),
       'BR0002',
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 399));
 
+    expect(find.widgetWithText(ListTile, 'BR0001'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'BR0002'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pumpAndSettle();
     expect(find.widgetWithText(ListTile, 'BR0001'), findsNothing);
     expect(find.widgetWithText(ListTile, 'BR0002'), findsOneWidget);
 
