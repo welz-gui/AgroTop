@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../app_colors.dart';
 import '../models.dart';
 
 class AlertsPage extends StatefulWidget {
@@ -137,6 +138,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               title: '${alert.animalId} — ${alert.breed}',
                               subtitle:
                                   'Lote ${alert.loteId ?? '—'} · Último peso ${_weight(alert.pesoAtual)} · ${alert.diasSemPesagem} dias sem pesagem',
+                              statusColor: _tokenColor(context, 'perigo'),
                             ),
                           )
                           .toList(growable: false),
@@ -151,6 +153,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               title: '${alert.animalId} — ${alert.breed}',
                               subtitle:
                                   'Carência até ${alert.carenciaAte} · ${alert.diasRestantes} dias restantes',
+                              statusColor: _tokenColor(context, 'atencao'),
                             ),
                           )
                           .toList(growable: false),
@@ -179,6 +182,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               title: alert.nome,
                               subtitle:
                                   'Estoque ${_quantity(alert.estoqueAtual, alert.unidade)} · mínimo ${_quantity(alert.estoqueMinimo, alert.unidade)}',
+                              statusColor: _tokenColor(context, 'atencao'),
                             ),
                           )
                           .toList(growable: false),
@@ -219,6 +223,13 @@ String _weight(double value) => '${value.toStringAsFixed(1)} kg';
 String _quantity(double value, String unit) =>
     '${value.toStringAsFixed(1)} $unit';
 
+Color _tokenColor(BuildContext context, String token) {
+  final colors = Theme.of(context).brightness == Brightness.dark
+      ? AppColors.dark
+      : AppColors.light;
+  return colors[token]!;
+}
+
 class _AlertSection extends StatelessWidget {
   const _AlertSection({
     required this.title,
@@ -251,14 +262,25 @@ class _AlertSection extends StatelessWidget {
 }
 
 class _AlertCard extends StatelessWidget {
-  const _AlertCard({required this.title, required this.subtitle});
+  const _AlertCard({
+    required this.title,
+    required this.subtitle,
+    this.statusColor,
+  });
 
   final String title;
   final String subtitle;
+  final Color? statusColor;
 
   @override
   Widget build(BuildContext context) => Card(
     margin: const EdgeInsets.only(bottom: 8),
+    shape: statusColor == null
+        ? null // usa o CardTheme padrão (borda neutra), sem mudança de hoje
+        : RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: statusColor!, width: 1.5),
+          ),
     child: ListTile(title: Text(title), subtitle: Text(subtitle)),
   );
 }
@@ -317,15 +339,14 @@ class _RecomendacaoCard extends StatelessWidget {
   final RecomendacaoItem item;
 
   Color _severityColor(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (item.severidade.toLowerCase()) {
       case 'alta':
-        return Theme.of(context).colorScheme.error;
+        return _tokenColor(context, 'perigo');
       case 'baixa':
-        return Theme.of(context).colorScheme.primary;
+        return _tokenColor(context, 'sucesso');
       case 'media':
       default:
-        return isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+        return _tokenColor(context, 'atencao');
     }
   }
 
