@@ -18,7 +18,45 @@ from ui import tema  # noqa: E402
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
+def contraste_wcag(primeiro, segundo):
+    def luminancia(valor):
+        rgb = [int(valor[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        canais = [
+            ((canal + 0.055) / 1.055) ** 2.4
+            if canal > 0.03928
+            else canal / 12.92
+            for canal in rgb
+        ]
+        return 0.2126 * canais[0] + 0.7152 * canais[1] + 0.0722 * canais[2]
+
+    claro, escuro = sorted(
+        (luminancia(primeiro), luminancia(segundo)), reverse=True
+    )
+    return (claro + 0.05) / (escuro + 0.05)
+
+
 class TestParidadeDeTemas(unittest.TestCase):
+    def test_badges_de_status_mantem_contraste_wcag_aa(self):
+        contraste_verde = contraste_wcag(
+            tema.cores()["sucesso"], tema.cores()["sucesso_fundo"]
+        )
+        contraste_vermelho = contraste_wcag(
+            tema.cores()["perigo"], tema.cores()["perigo_fundo"]
+        )
+
+        self.assertGreaterEqual(contraste_verde, 4.5)
+        self.assertGreaterEqual(contraste_vermelho, 4.5)
+        self.assertAlmostEqual(contraste_verde, 5.23, places=2)
+        self.assertAlmostEqual(contraste_vermelho, 5.84, places=2)
+
+    def test_bloco_css_do_app_nao_tem_hex_literal(self):
+        caminho = os.path.join(RAIZ, "app.py")
+        with open(caminho, encoding="utf-8") as arquivo:
+            codigo = arquivo.read()
+        bloco = codigo.split("# ─── CSS", 1)[1].split("</style>", 1)[0]
+
+        self.assertEqual(re.findall(r"#[0-9a-fA-F]{6}", bloco), [])
+
     def test_mesmos_tokens_nos_dois_temas(self):
         so_escuro = sorted(set(tema.ESCURO) - set(tema.CLARO))
         so_claro = sorted(set(tema.CLARO) - set(tema.ESCURO))
