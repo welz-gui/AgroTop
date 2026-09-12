@@ -201,6 +201,69 @@ class TestProtectedDataEndpoints(BackendApiTestCase):
             self.assertIn("current_weight", item)
             self.assertIn("status", item)
 
+    def test_list_animais_filtra_por_substring_case_insensitive(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        animal_id = get_all_animals()[0]["id"]
+        q = animal_id[1:-1] if len(animal_id) > 2 else animal_id
+
+        upper = self.client.get("/animais", params={"q": q.upper()}, headers=headers)
+        lower = self.client.get("/animais", params={"q": q.lower()}, headers=headers)
+
+        self.assertEqual(upper.status_code, 200)
+        self.assertEqual(lower.status_code, 200)
+        self.assertEqual(upper.json(), lower.json())
+        self.assertTrue(any(item["id"] == animal_id for item in upper.json()))
+
+        missing = self.client.get(
+            "/animais", params={"q": "sem-animal-correspondente"}, headers=headers
+        )
+        self.assertEqual(missing.status_code, 200)
+        self.assertEqual(missing.json(), [])
+
+    def test_list_animais_q_compoe_status_e_paginacao(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        ativos = get_all_animals(status="ativo")
+        q = ativos[0]["id"][0]
+        esperados = get_all_animals(status="ativo", id_contains=q)
+
+        res = self.client.get(
+            "/animais",
+            params={"q": q, "status": "ativo", "skip": 1, "limit": 1},
+            headers=headers,
+        )
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), [
+            {
+                "id": a["id"],
+                "breed": a.get("breed"),
+                "sex": a.get("sex"),
+                "birth_date": a.get("birth_date"),
+                "entry_weight": a.get("entry_weight"),
+                "current_weight": a.get("current_weight"),
+                "target_weight": a.get("target_weight"),
+                "status": a.get("status"),
+                "lote_id": a.get("lote_id"),
+                "lot_name": a.get("lote_name"),
+                "animal_uuid": a.get("uuid") or a.get("animal_uuid"),
+            }
+            for a in esperados[1:2]
+        ])
+        self.assertTrue(all(item["status"] == "ativo" for item in res.json()))
+
+    def test_list_animais_q_vazio_preserva_resultado_padrao(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        sem_q = self.client.get("/animais", headers=headers)
+        vazio = self.client.get("/animais", params={"q": ""}, headers=headers)
+
+        self.assertEqual(sem_q.status_code, 200)
+        self.assertEqual(vazio.status_code, 200)
+        self.assertEqual(sem_q.json(), vazio.json())
+
     def test_get_animal_detalhes_com_gmd(self):
         """Critério 4: GET /animais/{id} retorna detalhes e cálculos de GMD."""
         token = self._get_access_token()
