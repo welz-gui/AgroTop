@@ -246,8 +246,19 @@ geração contra corrida entre buscas. 0090: refresh falho após primeira carga 
 
 (O achado de revisão do `tester.widget<ListTile>(x).onTap!()` nos testes do Drawer foi
 na 0084/PR #395, já registrado acima — nenhum problema equivalente nestas cinco.)
-**Só falta a 0091** (contraste de badges no web) para a fila desta rodada de auditoria
-fechar por completo.
+
+**0091 concluída em 2026-09-13 — [PR #403](https://github.com/welz-gui/AgroTop/pull/403).**
+Todo hex do bloco de CSS de `app.py` trocado por `var(--token)`, conferido linha a linha
+contra a tabela da spec — bate. Contraste recalculado nesta revisão de forma independente
+(não só confiado no PR): badge-green 5,23:1, badge-red 5,84:1, ambos acima do alvo 4,5:1 —
+mesmos números do teste novo em `test_tema.py`. `test_auditar_cores.py` atualizado para
+`total == 0`/`distintos == 0` porque o resto de `app.py` já tinha sido limpo pela spec
+0007 — confirmado por grep antes de aceitar a mudança do teste, não presumido.
+
+**Com isto, toda a rodada de paridade/design mobile-web está fechada: 0084-0087 (pedido
+original do usuário) e 0088-0091 (achados da auditoria de `DESIGN-IS-2026-09-10/`), mais a
+correção de carência do PR #391 (fora da fila, bug de segurança). A fila está vazia de
+novo.**
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -550,7 +561,7 @@ fechar por completo.
 | — | [0088](0088-api-busca-de-animais-por-substring.md) — API: busca de animais por substring de ID/brinco 🏗️ | — | ✅ [#399](https://github.com/welz-gui/AgroTop/pull/399) | | 2026-09-11 |
 | — | [0089](0089-mobile-usar-busca-do-servidor.md) — Mobile: usar a busca do servidor em vez de filtrar só a página carregada 🏗️ | — | ✅ [#401](https://github.com/welz-gui/AgroTop/pull/401) | | 2026-09-11 |
 | — | [0090](0090-mobile-refresh-falho-do-dashboard-visivel.md) — Mobile: refresh falho do dashboard nunca fica silencioso 🏗️ | — | ✅ [#400](https://github.com/welz-gui/AgroTop/pull/400) | | 2026-09-11 |
-| — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | 🟢 livre | | 2026-09-11 |
+| — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | ✅ [#403](https://github.com/welz-gui/AgroTop/pull/403) | | 2026-09-11 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
