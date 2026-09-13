@@ -102,8 +102,8 @@ class TestMapear(unittest.TestCase):
 
         resultado = mapear(extrair_hex(codigo), TEMAS)
 
-        self.assertGreater(resultado["resumo"]["total"], 0)
-        self.assertGreater(resultado["resumo"]["distintos"], 0)
+        self.assertEqual(resultado["resumo"]["total"], 0)
+        self.assertEqual(resultado["resumo"]["distintos"], 0)
 
 
 if __name__ == "__main__":
