@@ -43,7 +43,17 @@ jobs:
             --config=cloudbuild.api.yaml \
             --substitutions=_IMAGE=us-central1-docker.pkg.dev/agrotop-cloudrun-teste/cloud-run-source-deploy/backend-api \
             --project=agrotop-cloudrun-teste \
+            --suppress-logs \
             .
+          # --suppress-logs: a SA do deployer não tem permissão de leitura no
+          # Cloud Logging, então `gcloud builds submit` falhava ao tentar
+          # STREAMAR os logs — mesmo com o build em si terminando com sucesso
+          # (confirmado via `gcloud builds describe`). O passo falhava e o
+          # deploy seguinte nunca rodava, embora a imagem já estivesse pronta.
+          # Achado em 2026-09-13: dois deploys (specs 0085 e 0088) never
+          # chegaram à produção por causa disso. `--suppress-logs` evita
+          # depender dessa permissão sem precisar ampliar o IAM da SA — o
+          # comando continua síncrono (só não imprime os logs ao vivo).
 
       - name: Deploy no Cloud Run
         run: |
