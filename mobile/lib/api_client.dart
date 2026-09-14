@@ -747,7 +747,7 @@ class ApiClient {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } on FormatException {
       throw ApiException(
-        'A API respondeu em formato inválido.',
+        'A resposta do servidor veio num formato inesperado.',
         statusCode: response.statusCode,
       );
     }

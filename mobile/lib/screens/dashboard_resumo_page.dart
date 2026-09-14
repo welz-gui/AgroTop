@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../app_colors.dart';
+import '../copy.dart';
+import '../formatters.dart';
 import '../models.dart';
 import 'alerts_page.dart';
 
@@ -49,7 +51,7 @@ class _DashboardResumoPageState extends State<DashboardResumoPage> {
       _handleError(error.message);
     } catch (_) {
       if (!mounted) return;
-      _handleError('API indisponível. Tente carregar o resumo novamente.');
+      _handleError(erroCarregamento('resumo do rebanho'));
     }
   }
 
@@ -405,5 +407,4 @@ Color _tokenColor(BuildContext context, String token) {
   return colors[token]!;
 }
 
-String _decimal(double value, int digits) =>
-    value.toStringAsFixed(digits).replaceAll('.', ',');
+String _decimal(double value, int digits) => formatDecimalBr(value, digits: digits);

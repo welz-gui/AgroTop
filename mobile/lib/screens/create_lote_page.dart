@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 
 class CreateLotePage extends StatefulWidget {
@@ -109,7 +110,7 @@ class _CreateLotePageState extends State<CreateLotePage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'API indisponível. Verifique a conexão e tente novamente.';
+        _error = kErroGenericoRede;
       });
     } finally {
       if (mounted) {

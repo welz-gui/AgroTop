@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../app_colors.dart';
+import '../copy.dart';
+import '../formatters.dart';
 import '../models.dart';
 
 enum AlertCategoria { sumidos, carencia, prontosParaAbate }
@@ -53,8 +55,7 @@ class _AlertsPageState extends State<AlertsPage> {
             alertsError = error.message;
           }
         } catch (_) {
-          alertsError =
-              'API indisponível. Os alertas não puderam ser carregados.';
+          alertsError = erroCarregamento('alertas');
         }
       }(),
       () async {
@@ -67,8 +68,7 @@ class _AlertsPageState extends State<AlertsPage> {
             recomendacoesError = error.message;
           }
         } catch (_) {
-          recomendacoesError =
-              'API indisponível. As recomendações não puderam ser carregadas.';
+          recomendacoesError = erroCarregamento('recomendações');
         }
       }(),
     ]);
@@ -85,7 +85,7 @@ class _AlertsPageState extends State<AlertsPage> {
         _recomendacoes = null;
         _alertsError = alertsError;
         _recomendacoesError = recomendacoesError;
-        _error = alertsError ?? recomendacoesError ?? 'API indisponível.';
+        _error = alertsError ?? recomendacoesError ?? kErroGenericoRede;
       });
       return;
     }
@@ -179,7 +179,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               (alert) => _AlertCard(
                                 title: '${alert.animalId} — ${alert.breed}',
                                 subtitle:
-                                    'Peso ${_weight(alert.pesoAtual)} · alvo ${_weight(alert.pesoAlvo)} · ${alert.arrobas.toStringAsFixed(2)} @',
+                                    'Peso ${_weight(alert.pesoAtual)} · alvo ${_weight(alert.pesoAlvo)} · ${formatDecimalBr(alert.arrobas, digits: 2)} @',
                               ),
                             )
                             .toList(growable: false),
@@ -210,7 +210,7 @@ class _AlertsPageState extends State<AlertsPage> {
                               (alert) => _AlertCard(
                                 title: '${alert.animalId} — ${alert.breed}',
                                 subtitle:
-                                    'Lote ${alert.loteId ?? '—'} · peso ${_weight(alert.pesoAtual)} · GMD ${alert.gmd.toStringAsFixed(3)} kg/dia · referência ${alert.gmdReferencia.toStringAsFixed(3)} kg/dia',
+                                    'Lote ${alert.loteId ?? '—'} · peso ${_weight(alert.pesoAtual)} · GMD ${formatDecimalBr(alert.gmd, digits: 3)} kg/dia · referência ${formatDecimalBr(alert.gmdReferencia, digits: 3)} kg/dia',
                               ),
                             )
                             .toList(growable: false),
@@ -232,10 +232,10 @@ class _AlertsPageState extends State<AlertsPage> {
   }
 }
 
-String _weight(double value) => '${value.toStringAsFixed(1)} kg';
+String _weight(double value) => '${formatDecimalBr(value, digits: 1)} kg';
 
 String _quantity(double value, String unit) =>
-    '${value.toStringAsFixed(1)} $unit';
+    '${formatDecimalBr(value, digits: 1)} $unit';
 
 Color _tokenColor(BuildContext context, String token) {
   final colors = Theme.of(context).brightness == Brightness.dark

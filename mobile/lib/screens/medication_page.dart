@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 import '../offline_queue.dart';
 
@@ -177,9 +178,7 @@ class _MedicationPageState extends State<MedicationPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Salvo. Será enviado quando houver conexão.'),
-          ),
+          SnackBar(content: Text(kOfflineEnfileirado)),
         );
         Navigator.of(context).pop<String?>('');
       }

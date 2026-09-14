@@ -344,7 +344,7 @@ void main() {
       await tester.tap(find.text('BR0001'));
       await tester.pumpAndSettle();
       expect(find.text('382.4 kg'), findsOneWidget);
-      expect(find.text('Sem restrição de carência'), findsOneWidget);
+      expect(find.text('Sem carência medicamentosa ativa'), findsOneWidget);
       if (captureGoldens) {
         await expectLater(
           find.byType(MaterialApp),
@@ -465,7 +465,7 @@ void main() {
           expect(find.text('Em carência até 2026-09-19'), findsOneWidget);
           expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
         } else {
-          expect(find.text('Sem restrição de carência'), findsOneWidget);
+          expect(find.text('Sem carência medicamentosa ativa'), findsOneWidget);
         }
 
         final historyCard = find.byKey(

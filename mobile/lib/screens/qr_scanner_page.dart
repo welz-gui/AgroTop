@@ -209,7 +209,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                         CircularProgressIndicator(),
                         SizedBox(height: 16),
                         Text(
-                          'Consultando animal na API…',
+                          'Consultando animal…',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                       ],

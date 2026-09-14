@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 
 const _statusLabels = {
@@ -80,10 +81,7 @@ class _DevicesPageState extends State<DevicesPage> {
       setState(() => _message = error.message);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _message =
-              'API indisponível. Verifique a conexão e tente novamente.',
-        );
+        setState(() => _message = kErroGenericoRede);
       }
     } finally {
       if (mounted) setState(() => _loading = false);

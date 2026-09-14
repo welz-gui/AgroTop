@@ -198,7 +198,7 @@ void main() {
 
       // Confirmação de salvo offline e retorno para a ficha sem erro bloqueante
       expect(
-        find.text('Salvo. Será enviado quando houver conexão.'),
+        find.text('Salvo neste aparelho. Envio pendente.'),
         findsOneWidget,
       );
       expect(await queue.countPending(), equals(1));
