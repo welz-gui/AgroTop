@@ -26,9 +26,9 @@ class TestIsolamentoDeProducao(unittest.TestCase):
         self.assertFalse(
             db.USE_PG,
             "a suíte está apontando para o Postgres de PRODUÇÃO. Rode com "
-            "`python -m unittest discover -s tests -t .` para que tests/__init__.py "
-            "seja importado e defina AGROTOP_FORCE_SQLITE=1 antes do import de "
-            "database.")
+            "`pytest tests` (ou `python -m unittest discover -s tests -t .`) para "
+            "que tests/__init__.py seja importado e defina AGROTOP_FORCE_SQLITE=1 "
+            "antes do import de database.")
         self.assertEqual(
             len(db.DATABASE_URL), 0,
             "DATABASE_URL deveria estar vazia durante os testes "
