@@ -948,6 +948,28 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
             ),
             const SizedBox(height: 12),
 
+            FilledButton.icon(
+              key: const ValueKey('open-weighing'),
+              onPressed: _openWeighing,
+              icon: const Icon(Icons.monitor_weight_outlined),
+              label: const Text('Registrar pesagem'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey('open-medication'),
+              onPressed: _openMedication,
+              icon: const Icon(Icons.medication_outlined),
+              label: const Text('Registrar medicamento'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey('open-movement'),
+              onPressed: _openMovement,
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('Mover de piquete'),
+            ),
+            const SizedBox(height: 12),
+
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -1057,27 +1079,6 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
               onUnauthorized: widget.onUnauthorized,
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              key: const ValueKey('open-medication'),
-              onPressed: _openMedication,
-              icon: const Icon(Icons.medication_outlined),
-              label: const Text('Registrar medicamento'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: const ValueKey('open-weighing'),
-              onPressed: _openWeighing,
-              icon: const Icon(Icons.monitor_weight_outlined),
-              label: const Text('Registrar pesagem'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: const ValueKey('open-movement'),
-              onPressed: _openMovement,
-              icon: const Icon(Icons.swap_horiz),
-              label: const Text('Mover de piquete'),
-            ),
-            const SizedBox(height: 12),
             const ListTile(
               leading: Icon(Icons.verified_outlined),
               title: Text('Indicadores calculados no servidor'),
