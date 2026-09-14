@@ -74,6 +74,8 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
   int? _alertCount;
   int _pendingQueueCount = 0;
   String? _cachedTime;
+  bool _offlineSearch = false;
+  String? _emptyMessage;
 
   @override
   void initState() {
@@ -172,15 +174,25 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
         q: query.isEmpty ? null : query,
       );
       if (!mounted || generation != _loadGeneration) return;
-      if (reset && _shallowCache != null) {
-        await _shallowCache.saveAnimals(page);
+      if (reset && query.isEmpty && _shallowCache != null) {
+        // A resposta já é válida para a tela mesmo que a persistência falhe.
+        // O cache é apenas uma etapa best-effort e nunca deve esconder dados
+        // que acabaram de chegar do servidor.
+        try {
+          if (mounted && generation == _loadGeneration) {
+            await _shallowCache.saveAnimals(page);
+          }
+        } catch (_) {}
       }
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         if (reset) _animals.clear();
         _animals.addAll(page);
         _hasMore = page.length == _pageSize;
         _error = null;
         _cachedTime = null;
+        _offlineSearch = false;
+        _emptyMessage = null;
       });
     } on ApiException catch (error) {
       if (!mounted || generation != _loadGeneration) return;
@@ -189,33 +201,13 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
         return;
       }
       if (reset && _shallowCache != null) {
-        final cached = _shallowCache.getAnimals();
-        if (cached != null && cached.data.isNotEmpty) {
-          setState(() {
-            _animals.clear();
-            _animals.addAll(cached.data);
-            _hasMore = false;
-            _cachedTime = cached.formattedTime;
-            _error = null;
-          });
-          return;
-        }
+        if (_showCachedAnimals(query)) return;
       }
       setState(() => _error = error.message);
     } catch (_) {
       if (mounted && generation == _loadGeneration) {
         if (reset && _shallowCache != null) {
-          final cached = _shallowCache.getAnimals();
-          if (cached != null && cached.data.isNotEmpty) {
-            setState(() {
-              _animals.clear();
-              _animals.addAll(cached.data);
-              _hasMore = false;
-              _cachedTime = cached.formattedTime;
-              _error = null;
-            });
-            return;
-          }
+          if (_showCachedAnimals(query)) return;
         }
         setState(
           () => _error =
@@ -232,11 +224,41 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     }
   }
 
+  bool _showCachedAnimals(String query) {
+    final cached = _shallowCache?.getAnimals();
+    if (cached == null) return false;
+    final normalizedQuery = query.toLowerCase();
+    final animals = normalizedQuery.isEmpty
+        ? cached.data
+        : cached.data
+              .where(
+                (animal) => animal.id.toLowerCase().contains(normalizedQuery),
+              )
+              .toList(growable: false);
+    setState(() {
+      _animals
+        ..clear()
+        ..addAll(animals);
+      _hasMore = false;
+      _cachedTime = cached.formattedTime;
+      _offlineSearch = normalizedQuery.isNotEmpty;
+      _emptyMessage = normalizedQuery.isEmpty || animals.isNotEmpty
+          ? null
+          : 'Nenhum resultado nos dados salvos';
+      _error = null;
+    });
+    return true;
+  }
+
   void _onQueryChanged(String value) {
     _searchDebounce?.cancel();
     // Invalidate an in-flight request so an old result cannot replace a newer query.
     _loadGeneration++;
-    setState(() => _query = value);
+    setState(() {
+      _query = value;
+      _offlineSearch = false;
+      _emptyMessage = null;
+    });
     if (value.trim().isEmpty) {
       _load(reset: true);
       return;
@@ -568,11 +590,17 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
-          if (_cachedTime != null)
+          if (_cachedTime != null) ...[
+            if (_offlineSearch)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('Busca nos dados disponíveis neste aparelho'),
+              ),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: OfflineCacheBanner(formattedTime: _cachedTime!),
             ),
+          ],
           TextField(
             key: const ValueKey('animal-search'),
             decoration: InputDecoration(
@@ -632,9 +660,11 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
             const SizedBox(height: 12),
           ],
           if (displayedAnimals.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: Text('Nenhum animal encontrado.')),
+              child: Center(
+                child: Text(_emptyMessage ?? 'Nenhum animal encontrado.'),
+              ),
             )
           else
             for (final animal in displayedAnimals) ...[
