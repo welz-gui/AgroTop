@@ -294,6 +294,28 @@ por categoria, e um quinto prova que a entrada pelo Drawer (sem filtro) não reg
 **Com isto, os dois últimos achados do parecer da auditoria de `DESIGN-IS-2026-09-10/`
 estão fechados — a fila está vazia de novo.**
 
+**0094-0097 escritas em 2026-09-14** — outra sessão entregou uma segunda proposta,
+`DESIGN-IS-2026-09-10/proposta-specs-redesign-para-revisao-claude.md` (14 itens RD00-RD13 +
+complementos de 0092/0093), pedindo revisão técnica antes de virar fila. Revisão feita:
+achados mais concretos (RD01, RD08, RD00) verificados linha a linha contra `app.py`/mobile
+antes de aceitar — todos bateram exatamente com a descrição. Resolvido RD00 direto (decisões
+técnicas, sem mudança de produto) em
+[`docs/redesign-web-contratos-e-decisoes.md`](../docs/redesign-web-contratos-e-decisoes.md):
+confirma Streamlit 1.57.0 (piso do `requirements.txt` é 1.37.0, seleção nativa de linha
+`on_select`/`selection_mode` é segura de usar), nenhuma coluna `theme` existe (tema web fica
+só em sessão por enquanto), inventário real da sidebar (20 destinos admin/4 operador) e
+confirma os achados de `page_rebanho`/`page_animal` citados na proposta. **0094** (RD01,
+mobile: busca sobrescreve o cache geral com a mesma chave — bug real, confirmado) e **0095**
+(RD08, web: seletor "Animal para detalhar" usa a lista sem filtro, não a tabela filtrada —
+bug real, confirmado) — ambas prioridade alta, código já lido e citado. **0096**/**0097**
+são os complementos que a própria proposta já previa para 0092/0093 (0092 nunca foi testada
+em telas pequenas; 0093 não indica qual filtro está ativo nem oferece "ver todos"). **O
+usuário confirmou que as três imagens-conceito do web (`propostas-web/*.png`) foram
+aprovadas por ele** — RD03 (linguagem pt-BR) e a cadeia RD04-RD09 (redesign das três telas
+web) ficam liberadas para virar spec a seguir, ainda não escritas nesta rodada por serem
+substancialmente maiores (cada uma toca uma página inteira de `app.py`) — não escrever tudo
+de uma vez preserva a qualidade de cada spec individual.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -598,6 +620,10 @@ estão fechados — a fila está vazia de novo.**
 | — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | ✅ [#403](https://github.com/welz-gui/AgroTop/pull/403) | | 2026-09-11 |
 | — | [0092](0092-mobile-acoes-da-ficha-no-topo.md) — Mobile: ações da ficha do animal promovidas para o topo 🔁 | — | ✅ [#408](https://github.com/welz-gui/AgroTop/pull/408) | | 2026-09-13 |
 | — | [0093](0093-mobile-dashboard-alertas-antes-e-tocaveis.md) — Mobile: dashboard mostra alertas antes dos indicadores, tocáveis 🏗️ | — | ✅ [#407](https://github.com/welz-gui/AgroTop/pull/407) | | 2026-09-13 |
+| — | [0094](0094-mobile-busca-cache-offline-coerente.md) — Mobile: busca e cache offline com escopo verdadeiro 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0095](0095-web-rebanho-selecao-coerente.md) — Web: seletor de animal do Rebanho respeita os filtros 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0096](0096-mobile-ficha-validar-telas-pequenas.md) — Mobile: validar ações da ficha em telas pequenas e fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-14 |
+| — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
