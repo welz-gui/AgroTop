@@ -257,8 +257,29 @@ mesmos números do teste novo em `test_tema.py`. `test_auditar_cores.py` atualiz
 
 **Com isto, toda a rodada de paridade/design mobile-web está fechada: 0084-0087 (pedido
 original do usuário) e 0088-0091 (achados da auditoria de `DESIGN-IS-2026-09-10/`), mais a
-correção de carência do PR #391 (fora da fila, bug de segurança). A fila está vazia de
-novo.**
+correção de carência do PR #391 (fora da fila, bug de segurança).**
+
+**0092/0093 escritas em 2026-09-13** — revisitando o parecer da auditoria (`03-verdict.md`)
+a pedido do usuário, dois achados das prioridades #2 e #3 nunca tinham virado spec (só a
+metade de navegação de cada um foi resolvida por 0084/0086):
+- **Item #2** pedia, além da navegação (0084, já feita), "tornar Registrar pesagem
+  imediatamente acessível" — os três botões de ação da ficha continuam no fim da tela,
+  depois de métricas/histórico/fotos (`animals_page.dart:1063` em 2026-09-13, mesma
+  hierarquia que a auditoria citou). **0092** promove os três para logo após o card de
+  carência, com "Registrar pesagem" primeiro e como ação primária (`FilledButton`).
+- **Item #3** pedia alertas antes dos indicadores secundários no dashboard, abrindo lista
+  filtrada ao tocar — nenhuma das specs 0085/0086 mexeu nisso, só adicionaram o gráfico de
+  raça. **0093** inverte a ordem (Alertas antes de Indicadores) e adiciona
+  `AlertsPage.focusCategoria` para abrir já filtrado.
+
+**Achado à parte, sem relação com design:** respondendo se as mudanças mobile já tinham
+chegado à produção, achado que `backend-api` no Cloud Run estava preso na revisão de
+2026-09-09 — os deploys automáticos das specs 0085 e 0088 falhavam silenciosamente
+(`gcloud builds submit` sem permissão para streamar logs do Cloud Build, saía com erro
+antes do `gcloud run deploy` seguinte rodar, apesar do build em si ter sucesso). Corrigido
+com `--suppress-logs` em `deploy-api.yml` ([PR #405](https://github.com/welz-gui/AgroTop/pull/405))
+e deploy manual da revisão atual pra fechar a lacuna imediatamente — confirmado por
+`curl`/OpenAPI que `distribuicao_por_raca` e o parâmetro `q` já respondem em produção.
 
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
@@ -562,6 +583,8 @@ novo.**
 | — | [0089](0089-mobile-usar-busca-do-servidor.md) — Mobile: usar a busca do servidor em vez de filtrar só a página carregada 🏗️ | — | ✅ [#401](https://github.com/welz-gui/AgroTop/pull/401) | | 2026-09-11 |
 | — | [0090](0090-mobile-refresh-falho-do-dashboard-visivel.md) — Mobile: refresh falho do dashboard nunca fica silencioso 🏗️ | — | ✅ [#400](https://github.com/welz-gui/AgroTop/pull/400) | | 2026-09-11 |
 | — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | ✅ [#403](https://github.com/welz-gui/AgroTop/pull/403) | | 2026-09-11 |
+| — | [0092](0092-mobile-acoes-da-ficha-no-topo.md) — Mobile: ações da ficha do animal promovidas para o topo 🔁 | — | 🟢 livre | | 2026-09-13 |
+| — | [0093](0093-mobile-dashboard-alertas-antes-e-tocaveis.md) — Mobile: dashboard mostra alertas antes dos indicadores, tocáveis 🏗️ | — | 🟢 livre | | 2026-09-13 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
