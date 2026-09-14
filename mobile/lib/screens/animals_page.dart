@@ -1081,7 +1081,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
               leading: Icon(Icons.verified_outlined),
               title: Text('Indicadores calculados no servidor'),
               subtitle: Text(
-                'O aplicativo apenas exibe os resultados recebidos da API.',
+                'O aplicativo apenas exibe os resultados calculados no servidor.',
               ),
             ),
           ],
