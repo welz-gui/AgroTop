@@ -288,4 +288,141 @@ void main() {
       );
     }
   });
+
+  group('Spec 0093 - focusCategoria em AlertsPage', () {
+    ApiClient createTestApi() {
+      final client = MockClient((request) async {
+        if (request.url.path == '/alertas') {
+          return _json(_allAlertsPayload());
+        }
+        if (request.url.path == '/recomendacoes') {
+          return _json(_recomendacoesPayload());
+        }
+        return _json({'detail': 'Not found'}, status: 404);
+      });
+
+      return ApiClient(
+        tokenStore: _TestTokenStore(),
+        httpClient: client,
+        baseUrl: 'http://mock.local',
+      );
+    }
+
+    testWidgets('focusCategoria null exibe todas as 5 seções e recomendações', (
+      tester,
+    ) async {
+      final api = createTestApi();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: AlertsPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Recomendações'), findsOneWidget);
+      expect(find.textContaining('Animais Sumidos'), findsOneWidget);
+      expect(find.textContaining('Em Período de Carência'), findsOneWidget);
+
+      final scrollable = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(
+        find.textContaining('Prontos para Abate'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(find.textContaining('Prontos para Abate'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.textContaining('Estoque Abaixo do Mínimo'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.textContaining('Baixo Desempenho'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(find.textContaining('Baixo Desempenho'), findsOneWidget);
+    });
+
+    testWidgets('focusCategoria sumidos exibe apenas Animais Sumidos', (
+      tester,
+    ) async {
+      final api = createTestApi();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: AlertsPage(
+            api: api,
+            onUnauthorized: () {},
+            focusCategoria: AlertCategoria.sumidos,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Animais Sumidos'), findsOneWidget);
+      expect(find.text('BR0001 — Nelore'), findsOneWidget);
+
+      expect(find.textContaining('Recomendações'), findsNothing);
+      expect(find.textContaining('Em Período de Carência'), findsNothing);
+      expect(find.textContaining('Prontos para Abate'), findsNothing);
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
+      expect(find.textContaining('Baixo Desempenho'), findsNothing);
+    });
+
+    testWidgets('focusCategoria carencia exibe apenas Em Período de Carência', (
+      tester,
+    ) async {
+      final api = createTestApi();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: AlertsPage(
+            api: api,
+            onUnauthorized: () {},
+            focusCategoria: AlertCategoria.carencia,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Em Período de Carência'), findsOneWidget);
+      expect(find.text('BR0002 — Angus'), findsOneWidget);
+
+      expect(find.textContaining('Recomendações'), findsNothing);
+      expect(find.textContaining('Animais Sumidos'), findsNothing);
+      expect(find.textContaining('Prontos para Abate'), findsNothing);
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
+      expect(find.textContaining('Baixo Desempenho'), findsNothing);
+    });
+
+    testWidgets('focusCategoria prontosParaAbate exibe apenas Prontos para Abate', (
+      tester,
+    ) async {
+      final api = createTestApi();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: AlertsPage(
+            api: api,
+            onUnauthorized: () {},
+            focusCategoria: AlertCategoria.prontosParaAbate,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Prontos para Abate'), findsOneWidget);
+      expect(find.text('BR0003 — Nelore'), findsOneWidget);
+
+      expect(find.textContaining('Recomendações'), findsNothing);
+      expect(find.textContaining('Animais Sumidos'), findsNothing);
+      expect(find.textContaining('Em Período de Carência'), findsNothing);
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
+      expect(find.textContaining('Baixo Desempenho'), findsNothing);
+    });
+  });
 }
