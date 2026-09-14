@@ -49,17 +49,24 @@ jobs:
       - name: Instalar dependências da API
         run: pip install -r backend_api/requirements.txt
 
+      # pytest roda os mesmos testes unittest sem alteração (tests/__init__.py
+      # continua sendo respeitado como pacote, igual ao `-t .` do unittest
+      # discover). A diferença é o plugin de anotação: em vez de qualquer
+      # falha virar 2 anotações genéricas e sem conteúdo — o padrão hoje,
+      # já visto num falso-alarme de infraestrutura em 14/09/2026 e num
+      # travamento de runner em 07/09/2026 — cada teste que falhar vira uma
+      # anotação real, com nome do teste e traceback, direto no resumo da run.
+      - name: Instalar pytest
+        run: pip install pytest pytest-github-actions-annotate-failures
+
       - name: Verificação de compilação
         run: python -m compileall app.py database.py repositories services ui tests tools
 
-      # `-t .` é obrigatório: faz `tests` ser importado como pacote, o que executa
-      # tests/__init__.py e isola a suíte do banco de produção. Sem isso, o teste
-      # tests/test_isolamento.py falha de propósito.
       - name: Testes — SQLite
         timeout-minutes: 10
         env:
           AGROTOP_FORCE_SQLITE: "1"
-        run: python -m unittest discover -s tests -t . -v
+        run: pytest tests -v
 
       - name: Preparar schema PostgreSQL efêmero
         env:
@@ -97,4 +104,4 @@ jobs:
         env:
           AGROTOP_TEST_POSTGRES: "1"
           DATABASE_URL: postgresql://agrotop_test:agrotop_test@localhost:5432/agrotop_test
-        run: python -m unittest discover -s tests -t . -v
+        run: pytest tests -v

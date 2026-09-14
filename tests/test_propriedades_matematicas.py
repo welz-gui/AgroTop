@@ -21,7 +21,14 @@ from services import (
 
 
 class TestPropriedadesRateio(unittest.TestCase):
-    @settings(derandomize=True, max_examples=100)
+    # deadline=None/suppress_health_check: mesma causa já documentada na
+    # PR #104 (geometria) — sob carga da suíte inteira (950+ testes), o
+    # deadline padrão do Hypothesis (200ms) estoura mesmo com a função sob
+    # teste sendo rápida; achado de verdade aqui (não especulação): rodar
+    # test_rateio_negativo_estorno_mantem_soma_negativa sozinho passa, mas
+    # falhou dentro da suíte completa. Ver ROADMAP/histórico da PR #104
+    # para o mesmo padrão em TestPropriedadesGeometria.
+    @settings(derandomize=True, max_examples=100, deadline=None, suppress_health_check=[HealthCheck.too_slow])
     @given(
         valor_total=st.integers(min_value=-5000000, max_value=5000000).map(lambda c: c / 100.0),
         animais=st.lists(
@@ -45,7 +52,7 @@ class TestPropriedadesRateio(unittest.TestCase):
             f"Soma {soma} não fecha com o total {v_arredondado}",
         )
 
-    @settings(derandomize=True, max_examples=100)
+    @settings(derandomize=True, max_examples=100, deadline=None, suppress_health_check=[HealthCheck.too_slow])
     @given(
         valor_negativo=st.integers(min_value=-5000000, max_value=-1).map(lambda c: c / 100.0),
         animais=st.lists(
