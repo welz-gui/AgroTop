@@ -400,6 +400,8 @@ void main() {
 
       // Fluxo de sanidade: abrir tela de medicamento
       final medicationButton = find.byKey(const ValueKey('open-medication'));
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, 1000));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         medicationButton,
         300,
@@ -457,13 +459,13 @@ void main() {
       expect(find.textContaining('Ivermectina 1% · 8.0 ml'), findsOneWidget);
 
       final weighingButton = find.byKey(const ValueKey('open-weighing'));
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, 1000));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         weighingButton,
         300,
         scrollable: find.byType(Scrollable).last,
       );
-      await tester.drag(find.byType(Scrollable).last, const Offset(0, -120));
-      await tester.pumpAndSettle();
       await tester.tap(weighingButton);
       await tester.pumpAndSettle();
       expect(find.text('Pesagem BR0001'), findsOneWidget);
@@ -488,13 +490,13 @@ void main() {
       expect(find.text('401.2 kg'), findsOneWidget);
 
       final movementButton = find.byKey(const ValueKey('open-movement'));
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, 1000));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         movementButton,
         300,
         scrollable: find.byType(Scrollable).last,
       );
-      await tester.drag(find.byType(Scrollable).last, const Offset(0, -120));
-      await tester.pumpAndSettle();
       await tester.tap(movementButton);
       await tester.pumpAndSettle();
       expect(find.text('Piquete de destino'), findsOneWidget);
