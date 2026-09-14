@@ -381,7 +381,7 @@ void main() {
       expect(find.text('0.742 kg/dia'), findsOneWidget);
 
       // Verifica exibição inicial de carência e histórico vazio
-      expect(find.text('Sem restrição de carência'), findsOneWidget);
+      expect(find.text('Sem carência medicamentosa ativa'), findsOneWidget);
       expect(
         find.text('Animal liberado para comercialização/abate.'),
         findsOneWidget,
@@ -543,7 +543,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('API indisponível. Verifique a conexão e tente novamente.'),
+      find.text('Não foi possível conectar. Verifique sua internet e tente novamente.'),
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);

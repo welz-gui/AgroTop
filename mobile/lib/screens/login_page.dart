@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../app.dart';
+import '../copy.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
@@ -48,10 +49,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
-        );
+        setState(() => _error = kErroGenericoRede);
       }
     } finally {
       if (mounted) setState(() => _loading = false);

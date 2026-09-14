@@ -471,7 +471,7 @@ void main() {
       // SnackBar exibido com mensagem genérica de rede
       expect(find.byType(SnackBar), findsOneWidget);
       expect(
-        find.text('API indisponível. Tente carregar o resumo novamente.'),
+        find.text('Não foi possível carregar resumo do rebanho. Tente novamente.'),
         findsOneWidget,
       );
     },

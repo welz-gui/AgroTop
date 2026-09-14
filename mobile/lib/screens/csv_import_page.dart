@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 
 class SelectedCsvFile {
@@ -95,10 +96,7 @@ class _CsvImportPageState extends State<CsvImportPage> {
       setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
-        );
+        setState(() => _error = kErroGenericoRede);
       }
     } finally {
       if (mounted) setState(() => _sending = false);

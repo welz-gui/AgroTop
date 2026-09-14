@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 
 class FeedingPage extends StatefulWidget {
@@ -44,10 +45,7 @@ class _FeedingPageState extends State<FeedingPage> {
       }
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Os tratos não puderam ser carregados.',
-        );
+        setState(() => _error = erroCarregamento('tratos'));
       }
     }
   }
@@ -114,11 +112,7 @@ class _FeedingPageState extends State<FeedingPage> {
         final messenger = ScaffoldMessenger.of(context);
         messenger.hideCurrentSnackBar();
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'API indisponível. Verifique a conexão e tente novamente.',
-            ),
-          ),
+          SnackBar(content: Text(kErroGenericoRede)),
         );
       }
     } finally {
@@ -387,10 +381,7 @@ class _FeedingConfirmationSheetState extends State<_FeedingConfirmationSheet> {
       }
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
-        );
+        setState(() => _error = kErroGenericoRede);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../api_client.dart';
 import '../app.dart';
+import '../copy.dart';
 import '../models.dart';
 import '../offline_queue.dart';
 import '../shallow_cache.dart';
@@ -217,10 +218,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
             return;
           }
         }
-        setState(
-          () => _error =
-              'API indisponível. Verifique a conexão e tente novamente.',
-        );
+        setState(() => _error = kErroGenericoRede);
       }
     } finally {
       if (mounted && generation == _loadGeneration) {
@@ -926,7 +924,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                 title: Text(
                   inWithdrawal
                       ? 'Em carência até ${medications.carenciaAte}'
-                      : 'Sem restrição de carência',
+                      : 'Sem carência medicamentosa ativa',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: inWithdrawal

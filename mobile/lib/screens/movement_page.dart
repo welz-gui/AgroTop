@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 import '../offline_queue.dart';
 import '../shallow_cache.dart';
@@ -138,9 +139,7 @@ class _MovementPageState extends State<MovementPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Salvo. Será enviado quando houver conexão.'),
-          ),
+          SnackBar(content: Text(kOfflineEnfileirado)),
         );
         Navigator.of(context).pop(true);
       }
@@ -184,7 +183,7 @@ class _MovementPageState extends State<MovementPage> {
         return _MovementError(
           message: error is ApiException
               ? error.message
-              : 'API indisponível. Os piquetes não puderam ser carregados.',
+              : erroCarregamento('piquetes'),
         );
       }
       final lotes = snapshot.data!;

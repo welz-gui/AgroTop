@@ -5,6 +5,7 @@ import 'package:image/image.dart' as image_lib;
 import 'package:image_picker/image_picker.dart';
 
 import '../api_client.dart';
+import '../copy.dart';
 import '../models.dart';
 
 typedef PhotoCapture = Future<Uint8List?> Function();
@@ -106,7 +107,7 @@ class _AnimalPhotoSectionState extends State<AnimalPhotoSection> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'API indisponível. Não foi possível carregar as fotos.';
+          _error = erroCarregamento('fotos');
         });
       }
     }
