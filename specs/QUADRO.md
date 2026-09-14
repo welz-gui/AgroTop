@@ -281,6 +281,19 @@ com `--suppress-logs` em `deploy-api.yml` ([PR #405](https://github.com/welz-gui
 e deploy manual da revisão atual pra fechar a lacuna imediatamente — confirmado por
 `curl`/OpenAPI que `distribuicao_por_raca` e o parâmetro `q` já respondem em produção.
 
+**0092 e 0093 concluídas em 2026-09-14 — [PR #408](https://github.com/welz-gui/AgroTop/pull/408)
+e [PR #407](https://github.com/welz-gui/AgroTop/pull/407).** 0092: os três botões movidos
+para logo após o card de carência, exatamente na ordem pedida (pesagem/`FilledButton`
+primeiro, depois medicamento/movimentação); testes de fluxo ajustados para a nova posição
+de rolagem (`tester.drag` antes do `scrollUntilVisible`, sinal de que rodaram de verdade
+contra a mudança, não só reescreveram por cima). 0093: seção Alertas movida antes de
+Indicadores (testado comparando a posição vertical dos dois títulos), `AlertCategoria`
+novo enum evita string solta entre `AlertsPage`/dashboard, `focusCategoria` some com
+Recomendações e as outras 4 seções quando setado — os 4 testes novos provam isso categoria
+por categoria, e um quinto prova que a entrada pelo Drawer (sem filtro) não regrediu.
+**Com isto, os dois últimos achados do parecer da auditoria de `DESIGN-IS-2026-09-10/`
+estão fechados — a fila está vazia de novo.**
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -583,8 +596,8 @@ e deploy manual da revisão atual pra fechar a lacuna imediatamente — confirma
 | — | [0089](0089-mobile-usar-busca-do-servidor.md) — Mobile: usar a busca do servidor em vez de filtrar só a página carregada 🏗️ | — | ✅ [#401](https://github.com/welz-gui/AgroTop/pull/401) | | 2026-09-11 |
 | — | [0090](0090-mobile-refresh-falho-do-dashboard-visivel.md) — Mobile: refresh falho do dashboard nunca fica silencioso 🏗️ | — | ✅ [#400](https://github.com/welz-gui/AgroTop/pull/400) | | 2026-09-11 |
 | — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | ✅ [#403](https://github.com/welz-gui/AgroTop/pull/403) | | 2026-09-11 |
-| — | [0092](0092-mobile-acoes-da-ficha-no-topo.md) — Mobile: ações da ficha do animal promovidas para o topo 🔁 | — | 🟢 livre | | 2026-09-13 |
-| — | [0093](0093-mobile-dashboard-alertas-antes-e-tocaveis.md) — Mobile: dashboard mostra alertas antes dos indicadores, tocáveis 🏗️ | — | 🟢 livre | | 2026-09-13 |
+| — | [0092](0092-mobile-acoes-da-ficha-no-topo.md) — Mobile: ações da ficha do animal promovidas para o topo 🔁 | — | ✅ [#408](https://github.com/welz-gui/AgroTop/pull/408) | | 2026-09-13 |
+| — | [0093](0093-mobile-dashboard-alertas-antes-e-tocaveis.md) — Mobile: dashboard mostra alertas antes dos indicadores, tocáveis 🏗️ | — | ✅ [#407](https://github.com/welz-gui/AgroTop/pull/407) | | 2026-09-13 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
