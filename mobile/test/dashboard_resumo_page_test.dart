@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:agrotop_mobile/api_client.dart';
 import 'package:agrotop_mobile/app_colors.dart';
+import 'package:agrotop_mobile/screens/alerts_page.dart';
 import 'package:agrotop_mobile/screens/animals_page.dart';
 import 'package:agrotop_mobile/screens/dashboard_resumo_page.dart';
 import 'package:agrotop_mobile/models.dart';
@@ -96,6 +97,54 @@ Map<String, dynamic> _emptyAlerts() => {
   'prontos_para_abate': [],
   'estoque_baixo': [],
   'baixo_desempenho': [],
+};
+
+Map<String, dynamic> _detailedAlerts() => {
+  'sumidos': [
+    {
+      'animal_id': 'BR0001',
+      'breed': 'Nelore',
+      'lote_id': 'P01',
+      'peso_atual': 382.4,
+      'dias_sem_pesagem': 34,
+    },
+  ],
+  'carencia': [
+    {
+      'animal_id': 'BR0002',
+      'breed': 'Angus',
+      'carencia_ate': '2026-09-20',
+      'dias_restantes': 15,
+    },
+  ],
+  'prontos_para_abate': [
+    {
+      'animal_id': 'BR0003',
+      'breed': 'Nelore',
+      'peso_atual': 510.0,
+      'peso_alvo': 500.0,
+      'arrobas': 17.68,
+    },
+  ],
+  'estoque_baixo': [
+    {
+      'insumo_id': 1,
+      'nome': 'Sal mineral',
+      'estoque_atual': 5.0,
+      'estoque_minimo': 10.0,
+      'unidade': 'kg',
+    },
+  ],
+  'baixo_desempenho': [
+    {
+      'animal_id': 'BR0004',
+      'breed': 'Brahman',
+      'lote_id': 'P02',
+      'peso_atual': 355.0,
+      'gmd': 0.31,
+      'meta_gmd': 0.5,
+    },
+  ],
 };
 
 void main() {
@@ -456,6 +505,191 @@ void main() {
       );
       // Nenhum SnackBar exibido na carga inicial
       expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Spec 0093: seção Alertas aparece visualmente antes de Indicadores do rebanho',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final alertasTop = tester.getTopLeft(find.text('Alertas')).dy;
+      final indicadoresTop =
+          tester.getTopLeft(find.text('Indicadores do rebanho')).dy;
+
+      expect(alertasTop, lessThan(indicadoresTop));
+    },
+  );
+
+  testWidgets(
+    'Spec 0093: tocar no card Sumidos abre AlertsPage filtrada para animais sumidos',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          if (request.url.path == '/alertas') return _json(_detailedAlerts());
+          if (request.url.path == '/recomendacoes') return _json([]);
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('dashboard-alert-sumidos')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.textContaining('Animais Sumidos'), findsOneWidget);
+      expect(find.text('BR0001 — Nelore'), findsOneWidget);
+
+      expect(find.textContaining('Recomendações'), findsNothing);
+      expect(find.textContaining('Em Período de Carência'), findsNothing);
+      expect(find.textContaining('Prontos para Abate'), findsNothing);
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
+      expect(find.textContaining('Baixo Desempenho'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Spec 0093: tocar no card Em carência abre AlertsPage filtrada para carência',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          if (request.url.path == '/alertas') return _json(_detailedAlerts());
+          if (request.url.path == '/recomendacoes') return _json([]);
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('dashboard-alert-carencia')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.textContaining('Em Período de Carência'), findsOneWidget);
+      expect(find.text('BR0002 — Angus'), findsOneWidget);
+
+      expect(find.textContaining('Recomendações'), findsNothing);
+      expect(find.textContaining('Animais Sumidos'), findsNothing);
+      expect(find.textContaining('Prontos para Abate'), findsNothing);
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
+      expect(find.textContaining('Baixo Desempenho'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Spec 0093: tocar no card Prontos para abate abre AlertsPage filtrada para prontos para abate',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          if (request.url.path == '/alertas') return _json(_detailedAlerts());
+          if (request.url.path == '/recomendacoes') return _json([]);
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('dashboard-alert-prontos')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.textContaining('Prontos para Abate'), findsOneWidget);
+      expect(find.text('BR0003 — Nelore'), findsOneWidget);
+
+      expect(find.textContaining('Recomendações'), findsNothing);
+      expect(find.textContaining('Animais Sumidos'), findsNothing);
+      expect(find.textContaining('Em Período de Carência'), findsNothing);
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
+      expect(find.textContaining('Baixo Desempenho'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Spec 0093: abrir AlertsPage pelo Drawer continua mostrando todas as seções',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/animais' ||
+              request.url.path == '/trato/pendentes') {
+            return _json([]);
+          }
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          if (request.url.path == '/alertas') return _json(_detailedAlerts());
+          if (request.url.path == '/recomendacoes') return _json([]);
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: AnimalsPage(
+            api: api,
+            themeMode: ThemeMode.light,
+            onThemeChanged: (_) {},
+            onUnauthorized: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _openDrawer(tester);
+      await _tapDrawerItem(tester, 'open-alerts');
+
+      expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.textContaining('Animais Sumidos'), findsOneWidget);
+      expect(find.textContaining('Em Período de Carência'), findsOneWidget);
+      expect(find.textContaining('Prontos para Abate'), findsOneWidget);
+
+      final scrollable = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(
+        find.textContaining('Estoque Abaixo do Mínimo'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(find.textContaining('Estoque Abaixo do Mínimo'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.textContaining('Baixo Desempenho'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(find.textContaining('Baixo Desempenho'), findsOneWidget);
     },
   );
 }

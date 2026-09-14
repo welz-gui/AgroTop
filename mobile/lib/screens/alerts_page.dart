@@ -4,15 +4,19 @@ import '../api_client.dart';
 import '../app_colors.dart';
 import '../models.dart';
 
+enum AlertCategoria { sumidos, carencia, prontosParaAbate }
+
 class AlertsPage extends StatefulWidget {
   const AlertsPage({
     super.key,
     required this.api,
     required this.onUnauthorized,
+    this.focusCategoria,
   });
 
   final ApiClient api;
   final VoidCallback onUnauthorized;
+  final AlertCategoria? focusCategoria;
 
   @override
   State<AlertsPage> createState() => _AlertsPageState();
@@ -114,93 +118,103 @@ class _AlertsPageState extends State<AlertsPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16),
                 children: [
-                  if (recomendacoes != null)
-                    _AlertSection(
-                      title: '🧭 Recomendações (${recomendacoes.length})',
-                      emptyMessage: '✅ Nenhuma recomendação no momento.',
-                      children: _sortRecomendacoes(recomendacoes)
-                          .map((rec) => _RecomendacaoCard(item: rec))
-                          .toList(growable: false),
-                    )
-                  else if (_recomendacoesError != null)
-                    _AlertSection(
-                      title: '🧭 Recomendações',
-                      emptyMessage: _recomendacoesError!,
-                      children: const [],
-                    ),
+                  if (widget.focusCategoria == null) ...[
+                    if (recomendacoes != null)
+                      _AlertSection(
+                        title: '🧭 Recomendações (${recomendacoes.length})',
+                        emptyMessage: '✅ Nenhuma recomendação no momento.',
+                        children: _sortRecomendacoes(recomendacoes)
+                            .map((rec) => _RecomendacaoCard(item: rec))
+                            .toList(growable: false),
+                      )
+                    else if (_recomendacoesError != null)
+                      _AlertSection(
+                        title: '🧭 Recomendações',
+                        emptyMessage: _recomendacoesError!,
+                        children: const [],
+                      ),
+                  ],
                   if (alerts != null) ...[
-                    _AlertSection(
-                      title: '🔴 Animais Sumidos (${alerts.sumidos.length})',
-                      emptyMessage: '✅ Nenhum animal sumido.',
-                      children: alerts.sumidos
-                          .map(
-                            (alert) => _AlertCard(
-                              title: '${alert.animalId} — ${alert.breed}',
-                              subtitle:
-                                  'Lote ${alert.loteId ?? '—'} · Último peso ${_weight(alert.pesoAtual)} · ${alert.diasSemPesagem} dias sem pesagem',
-                              statusColor: _tokenColor(context, 'perigo'),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    _AlertSection(
-                      title:
-                          '🟡 Em Período de Carência (${alerts.carencia.length})',
-                      emptyMessage: '✅ Nenhum animal em carência.',
-                      children: alerts.carencia
-                          .map(
-                            (alert) => _AlertCard(
-                              title: '${alert.animalId} — ${alert.breed}',
-                              subtitle:
-                                  'Carência até ${alert.carenciaAte} · ${alert.diasRestantes} dias restantes',
-                              statusColor: _tokenColor(context, 'atencao'),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    _AlertSection(
-                      title:
-                          '🟢 Prontos para Abate (${alerts.prontosParaAbate.length})',
-                      emptyMessage: '✅ Nenhum animal atingiu o peso-alvo ainda.',
-                      children: alerts.prontosParaAbate
-                          .map(
-                            (alert) => _AlertCard(
-                              title: '${alert.animalId} — ${alert.breed}',
-                              subtitle:
-                                  'Peso ${_weight(alert.pesoAtual)} · alvo ${_weight(alert.pesoAlvo)} · ${alert.arrobas.toStringAsFixed(2)} @',
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    _AlertSection(
-                      title:
-                          '📦 Estoque Abaixo do Mínimo (${alerts.estoqueBaixo.length})',
-                      emptyMessage: '✅ Todos os insumos com estoque adequado.',
-                      children: alerts.estoqueBaixo
-                          .map(
-                            (alert) => _AlertCard(
-                              title: alert.nome,
-                              subtitle:
-                                  'Estoque ${_quantity(alert.estoqueAtual, alert.unidade)} · mínimo ${_quantity(alert.estoqueMinimo, alert.unidade)}',
-                              statusColor: _tokenColor(context, 'atencao'),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    _AlertSection(
-                      title:
-                          '📉 Baixo Desempenho (${alerts.baixoDesempenho.length})',
-                      emptyMessage: '✅ Nenhum animal abaixo da meta de GMD.',
-                      children: alerts.baixoDesempenho
-                          .map(
-                            (alert) => _AlertCard(
-                              title: '${alert.animalId} — ${alert.breed}',
-                              subtitle:
-                                  'Lote ${alert.loteId ?? '—'} · peso ${_weight(alert.pesoAtual)} · GMD ${alert.gmd.toStringAsFixed(3)} kg/dia · referência ${alert.gmdReferencia.toStringAsFixed(3)} kg/dia',
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
+                    if (widget.focusCategoria == null ||
+                        widget.focusCategoria == AlertCategoria.sumidos)
+                      _AlertSection(
+                        title: '🔴 Animais Sumidos (${alerts.sumidos.length})',
+                        emptyMessage: '✅ Nenhum animal sumido.',
+                        children: alerts.sumidos
+                            .map(
+                              (alert) => _AlertCard(
+                                title: '${alert.animalId} — ${alert.breed}',
+                                subtitle:
+                                    'Lote ${alert.loteId ?? '—'} · Último peso ${_weight(alert.pesoAtual)} · ${alert.diasSemPesagem} dias sem pesagem',
+                                statusColor: _tokenColor(context, 'perigo'),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    if (widget.focusCategoria == null ||
+                        widget.focusCategoria == AlertCategoria.carencia)
+                      _AlertSection(
+                        title:
+                            '🟡 Em Período de Carência (${alerts.carencia.length})',
+                        emptyMessage: '✅ Nenhum animal em carência.',
+                        children: alerts.carencia
+                            .map(
+                              (alert) => _AlertCard(
+                                title: '${alert.animalId} — ${alert.breed}',
+                                subtitle:
+                                    'Carência até ${alert.carenciaAte} · ${alert.diasRestantes} dias restantes',
+                                statusColor: _tokenColor(context, 'atencao'),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    if (widget.focusCategoria == null ||
+                        widget.focusCategoria == AlertCategoria.prontosParaAbate)
+                      _AlertSection(
+                        title:
+                            '🟢 Prontos para Abate (${alerts.prontosParaAbate.length})',
+                        emptyMessage: '✅ Nenhum animal atingiu o peso-alvo ainda.',
+                        children: alerts.prontosParaAbate
+                            .map(
+                              (alert) => _AlertCard(
+                                title: '${alert.animalId} — ${alert.breed}',
+                                subtitle:
+                                    'Peso ${_weight(alert.pesoAtual)} · alvo ${_weight(alert.pesoAlvo)} · ${alert.arrobas.toStringAsFixed(2)} @',
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    if (widget.focusCategoria == null)
+                      _AlertSection(
+                        title:
+                            '📦 Estoque Abaixo do Mínimo (${alerts.estoqueBaixo.length})',
+                        emptyMessage: '✅ Todos os insumos com estoque adequado.',
+                        children: alerts.estoqueBaixo
+                            .map(
+                              (alert) => _AlertCard(
+                                title: alert.nome,
+                                subtitle:
+                                    'Estoque ${_quantity(alert.estoqueAtual, alert.unidade)} · mínimo ${_quantity(alert.estoqueMinimo, alert.unidade)}',
+                                statusColor: _tokenColor(context, 'atencao'),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    if (widget.focusCategoria == null)
+                      _AlertSection(
+                        title:
+                            '📉 Baixo Desempenho (${alerts.baixoDesempenho.length})',
+                        emptyMessage: '✅ Nenhum animal abaixo da meta de GMD.',
+                        children: alerts.baixoDesempenho
+                            .map(
+                              (alert) => _AlertCard(
+                                title: '${alert.animalId} — ${alert.breed}',
+                                subtitle:
+                                    'Lote ${alert.loteId ?? '—'} · peso ${_weight(alert.pesoAtual)} · GMD ${alert.gmd.toStringAsFixed(3)} kg/dia · referência ${alert.gmdReferencia.toStringAsFixed(3)} kg/dia',
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
                   ] else if (_alertsError != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 20),

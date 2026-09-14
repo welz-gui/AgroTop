@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../app_colors.dart';
 import '../models.dart';
+import 'alerts_page.dart';
 
 class DashboardResumoPage extends StatefulWidget {
   const DashboardResumoPage({
@@ -76,7 +77,11 @@ class _DashboardResumoPageState extends State<DashboardResumoPage> {
               onRefresh: _load,
               child: resumo.totalAnimais == 0
                   ? const _EmptyDashboard()
-                  : _DashboardContent(resumo: resumo),
+                  : _DashboardContent(
+                      resumo: resumo,
+                      api: widget.api,
+                      onUnauthorized: widget.onUnauthorized,
+                    ),
             ),
     );
   }
@@ -108,9 +113,27 @@ class _EmptyDashboard extends StatelessWidget {
 }
 
 class _DashboardContent extends StatelessWidget {
-  const _DashboardContent({required this.resumo});
+  const _DashboardContent({
+    required this.resumo,
+    required this.api,
+    required this.onUnauthorized,
+  });
 
   final DashboardResumo resumo;
+  final ApiClient api;
+  final VoidCallback onUnauthorized;
+
+  void _openAlerts(BuildContext context, AlertCategoria categoria) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AlertsPage(
+          api: api,
+          onUnauthorized: onUnauthorized,
+          focusCategoria: categoria,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +164,35 @@ class _DashboardContent extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
+        Text('Alertas', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        _AlertCountCard(
+          key: const ValueKey('dashboard-alert-sumidos'),
+          icon: Icons.person_search_outlined,
+          title: 'Sumidos',
+          count: resumo.alertas.sumidos,
+          color: _tokenColor(context, 'perigo'),
+          onTap: () => _openAlerts(context, AlertCategoria.sumidos),
+        ),
+        const SizedBox(height: 8),
+        _AlertCountCard(
+          key: const ValueKey('dashboard-alert-carencia'),
+          icon: Icons.medical_services_outlined,
+          title: 'Em carência',
+          count: resumo.alertas.carencia,
+          color: _tokenColor(context, 'atencao'),
+          onTap: () => _openAlerts(context, AlertCategoria.carencia),
+        ),
+        const SizedBox(height: 8),
+        _AlertCountCard(
+          key: const ValueKey('dashboard-alert-prontos'),
+          icon: Icons.check_circle_outline,
+          title: 'Prontos para abate',
+          count: resumo.alertas.prontosParaAbate,
+          color: _tokenColor(context, 'sucesso'),
+          onTap: () => _openAlerts(context, AlertCategoria.prontosParaAbate),
+        ),
+        const SizedBox(height: 24),
         Text(
           'Indicadores do rebanho',
           style: Theme.of(context).textTheme.titleLarge,
@@ -161,32 +213,6 @@ class _DashboardContent extends StatelessWidget {
           const SizedBox(height: 24),
           _BreedDonutChart(entries: resumo.distribuicaoPorRaca),
         ],
-        const SizedBox(height: 24),
-        Text('Alertas', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 12),
-        _AlertCountCard(
-          key: const ValueKey('dashboard-alert-sumidos'),
-          icon: Icons.person_search_outlined,
-          title: 'Sumidos',
-          count: resumo.alertas.sumidos,
-          color: _tokenColor(context, 'perigo'),
-        ),
-        const SizedBox(height: 8),
-        _AlertCountCard(
-          key: const ValueKey('dashboard-alert-carencia'),
-          icon: Icons.medical_services_outlined,
-          title: 'Em carência',
-          count: resumo.alertas.carencia,
-          color: _tokenColor(context, 'atencao'),
-        ),
-        const SizedBox(height: 8),
-        _AlertCountCard(
-          key: const ValueKey('dashboard-alert-prontos'),
-          icon: Icons.check_circle_outline,
-          title: 'Prontos para abate',
-          count: resumo.alertas.prontosParaAbate,
-          color: _tokenColor(context, 'sucesso'),
-        ),
       ],
     );
   }
@@ -322,12 +348,14 @@ class _AlertCountCard extends StatelessWidget {
     required this.title,
     required this.count,
     required this.color,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final int count;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -339,6 +367,7 @@ class _AlertCountCard extends StatelessWidget {
         '$count',
         style: Theme.of(context).textTheme.titleLarge?.copyWith(color: color),
       ),
+      onTap: onTap,
     ),
   );
 }
