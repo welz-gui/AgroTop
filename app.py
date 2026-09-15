@@ -2060,7 +2060,7 @@ def _cartao_de_evento(e: dict, correcoes: list[dict]):
                         st.error(f"🚫 {r.get('erro')}")
 
 
-def _render_tab_peso(ws):
+def _render_tab_peso(ws, target_weight=None):
     if len(ws)>=2:
         import numpy as np
         df_w=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
@@ -2075,6 +2075,12 @@ def _render_tab_peso(ws):
             line=dict(color=c["primaria"],width=2.5),
             marker=dict(size=10,color=c["primaria"],line=dict(width=2,color=c["fundo"])),
             hovertemplate="%{x|%d/%m/%Y}<br><b>%{y:.1f} kg</b><extra></extra>"))
+        if target_weight is not None and target_weight > 0:
+            fig.add_trace(go.Scatter(
+                x=[df_w["Data"].iloc[0], df_w["Data"].iloc[-1]],
+                y=[target_weight, target_weight], mode="lines",
+                name="Meta de peso", line=dict(dash="dash", color=c["info"], width=2),
+                hovertemplate=f"Meta: {_num_br(target_weight, 1)} kg<extra></extra>"))
         fig.update_layout(**PLOTLY,height=300,
             xaxis=dict(gridcolor=c["superficie"],title="Data"),
             yaxis=dict(gridcolor=c["superficie"],title="Peso (kg)"),
@@ -2170,25 +2176,35 @@ def page_animal():
     cat=db.get_age_category(animal.get("birth_date"))
     ul =_unit_label()
 
-    st.markdown(f"## 🐄 Ficha — {animal['id']}  {_status_badge(animal['status'])}",
-        unsafe_allow_html=True)
+    header, header_action = st.columns([3, 1])
+    with header:
+        st.markdown(f"## 🐄 Ficha — {animal['id']}  {_status_badge(animal['status'])}",
+            unsafe_allow_html=True)
+    with header_action:
+        if st.button("📱 Abrir no Campo", key=f"campo_header_{aid}",
+                     use_container_width=True):
+            st.session_state.campo_id=aid; _go("campo"); st.rerun()
 
-    m=st.columns(6)
-    m[0].metric("Raça",       animal["breed"])
-    m[1].metric("Categoria",  cat)
-    m[2].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
-    m[3].metric("Ganho",      f"{_num_br(gain, 1, sinal=True)} kg",
-                help="Peso atual menos o peso de entrada")
-    m[4].metric("@ Atuais",   f"{_num_br(arrobas, 2)} @",
-                help="Arrobas equivalentes ao peso vivo atual (rendimento de carcaça)")
+    target_weight = animal.get("target_weight")
+    if target_weight is not None:
+        target_weight = float(target_weight)
+    m=st.columns(3)
+    m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
     gmd_total = db.calculate_gmd_total(animal)
-    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd else "N/A"
-    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total else "N/A"
-    m[5].metric("GMD recente", gmd_txt,
-                delta=_num_br(gmd, 3) if gmd else None,
+    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
+    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
+    m[1].metric("GMD recente", gmd_txt,
+                delta=_num_br(gmd, 3) if gmd is not None else None,
                 help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
+    m[2].metric("Meta de peso", f"{_num_br(target_weight, 1)} kg"
+                if target_weight is not None and target_weight > 0
+                else "Sem meta definida")
     st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
                f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
+    st.caption(f"📋 Raça: **{animal['breed']}**  ·  **Categoria:** {cat}  ·  "
+               f"**Origem:** {animal.get('origem') or 'Não informada'}  ·  "
+               f"**Ganho:** {_num_br(gain, 1, sinal=True)} kg  ·  "
+               f"**@ atuais:** {_num_br(arrobas, 2)} @")
 
     src_label = db.AGE_SOURCES.get(animal.get("age_source","propriedade"),"—")
     doc_parts = []
@@ -2230,7 +2246,7 @@ def page_animal():
         _photo_section(aid, key_prefix="ficha_")
 
     with tl_peso:
-        _render_tab_peso(ws)
+        _render_tab_peso(ws, target_weight)
 
     with tl_med:
         _render_tab_med(meds)
@@ -2242,14 +2258,11 @@ def page_animal():
         _render_tab_fin(aid, animal, gain, yield_, cost_total, ul)
 
     st.markdown("---")
-    qa1,qa2,qa3=st.columns(3)
+    qa1,qa2=st.columns(2)
     with qa1:
-        if st.button("📱 Abrir no Campo",use_container_width=True):
-            st.session_state.campo_id=aid; _go("campo"); st.rerun()
-    with qa2:
         if st.button("📊 Dashboard",use_container_width=True):
             _go("dashboard"); st.rerun()
-    with qa3:
+    with qa2:
         if st.button("📋 Rebanho",use_container_width=True):
             _go("rebanho"); st.rerun()
 
