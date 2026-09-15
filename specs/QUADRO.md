@@ -337,6 +337,19 @@ ao investigar, alguns divergindo do que a proposta original media:
   `stMetricValue` usam o mesmo tamanho hoje (`1.55rem` os dois) — a spec separa KPI (maior)
   de título, conforme as imagens aprovadas pedem.
 
+**0094, 0095 e 0098 concluídas em 2026-09-14** — [PR #412](https://github.com/welz-gui/AgroTop/pull/412),
+[PR #414](https://github.com/welz-gui/AgroTop/pull/414) e [PR #413](https://github.com/welz-gui/AgroTop/pull/413).
+0094: cache geral e busca offline separados corretamente (gravação só com `query` vazia),
+mensagens distintas para "sem correspondência no cache" e "sem cache nenhum" — sem
+ressalvas na revisão. 0095: seletor do Rebanho passou a usar a tabela já filtrada; achado
+na revisão (não no código, no teste): `test_filtro_sem_resultado_desabilita_seletor_e_nao_abre_ficha`
+tentava `.click()` num botão `disabled=True` — o `AppTest` do Streamlit recusa simular
+clique em widget desabilitado (`AppTestError`), o mesmo que um navegador real faria;
+trocado por uma asserção direta em `btn.disabled`, sem mudar o `app.py`. 0098: os 10
+arquivos da spec corrigidos certo, mas a revisão achou **3 menções a "API" fora da lista**
+(`api_client.dart`, rodapé da ficha, tela do QR) que o próprio critério de aceite da spec
+(grep zerado em `mobile/lib/*.dart` inteiro) deveria ter pego — corrigidas antes do merge.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -641,11 +654,11 @@ ao investigar, alguns divergindo do que a proposta original media:
 | — | [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) — Web: contraste WCAG dos badges e CSS em tokens de tema 🔁 | — | ✅ [#403](https://github.com/welz-gui/AgroTop/pull/403) | | 2026-09-11 |
 | — | [0092](0092-mobile-acoes-da-ficha-no-topo.md) — Mobile: ações da ficha do animal promovidas para o topo 🔁 | — | ✅ [#408](https://github.com/welz-gui/AgroTop/pull/408) | | 2026-09-13 |
 | — | [0093](0093-mobile-dashboard-alertas-antes-e-tocaveis.md) — Mobile: dashboard mostra alertas antes dos indicadores, tocáveis 🏗️ | — | ✅ [#407](https://github.com/welz-gui/AgroTop/pull/407) | | 2026-09-13 |
-| — | [0094](0094-mobile-busca-cache-offline-coerente.md) — Mobile: busca e cache offline com escopo verdadeiro 🔁 | — | 🟢 livre | | 2026-09-14 |
-| — | [0095](0095-web-rebanho-selecao-coerente.md) — Web: seletor de animal do Rebanho respeita os filtros 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0094](0094-mobile-busca-cache-offline-coerente.md) — Mobile: busca e cache offline com escopo verdadeiro 🔁 | — | ✅ [#412](https://github.com/welz-gui/AgroTop/pull/412) | | 2026-09-14 |
+| — | [0095](0095-web-rebanho-selecao-coerente.md) — Web: seletor de animal do Rebanho respeita os filtros 🔁 | — | ✅ [#414](https://github.com/welz-gui/AgroTop/pull/414) | | 2026-09-14 |
 | — | [0096](0096-mobile-ficha-validar-telas-pequenas.md) — Mobile: validar ações da ficha em telas pequenas e fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | 🟢 livre | | 2026-09-14 |
-| — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | ✅ [#413](https://github.com/welz-gui/AgroTop/pull/413) | | 2026-09-14 |
 | — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | 🟢 livre | | 2026-09-14 |
 | — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | 🟢 livre | | 2026-09-14 |
 
