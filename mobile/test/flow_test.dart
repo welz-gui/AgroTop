@@ -90,6 +90,40 @@ Map<String, dynamic> _alertsResponse({required bool empty}) {
   };
 }
 
+ApiClient _carenciaApi() => ApiClient(
+  tokenStore: MemoryTokenStore()
+    ..tokens = const StoredTokens(
+      accessToken: 'access-live',
+      refreshToken: 'refresh-valid',
+    ),
+  baseUrl: 'http://mock.local',
+  httpClient: MockClient((request) async {
+    if (request.method == 'GET' && request.url.path == '/animais/BR0001') {
+      return _json({
+        'id': 'BR0001',
+        'breed': 'Nelore',
+        'sex': 'M',
+        'birth_date': '2024-03-10',
+        'entry_weight': 278.2,
+        'current_weight': 382.4,
+        'target_weight': 500.0,
+        'status': 'ativo',
+        'lote_id': 'P01',
+        'lot_name': 'Piquete Central',
+        'animal_uuid': '123e4567-e89b-12d3-a456-426614174000',
+      });
+    }
+    if (request.method == 'GET' &&
+        request.url.path == '/animais/BR0001/medicamentos') {
+      return _json({
+        'carencia_ate': '2026-09-30',
+        'aplicacoes': <Map<String, dynamic>>[],
+      });
+    }
+    return _json({'detail': 'Não encontrado'}, status: 404);
+  }),
+);
+
 Uint8List _testPhoto() {
   final photo = image_lib.Image(width: 1200, height: 800);
   for (var y = 0; y < photo.height; y++) {
@@ -543,7 +577,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Não foi possível conectar. Verifique sua internet e tente novamente.'),
+      find.text(
+        'Não foi possível conectar. Verifique sua internet e tente novamente.',
+      ),
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -970,4 +1006,103 @@ void main() {
       expect(find.text('Tentar novamente'), findsOneWidget);
     },
   );
+
+  testWidgets('ficha em carência mantém ações acessíveis em telas pequenas', (
+    tester,
+  ) async {
+    final widths = [320.0, 360.0, 390.0, 430.0];
+    final scales = [1.0, 1.3, 2.0];
+    final layoutErrors = <String>[];
+    void collectException(
+      double width,
+      double height,
+      double scale,
+      String phase,
+    ) {
+      final exception = tester.takeException();
+      if (exception != null) {
+        layoutErrors.add(
+          '${width}x$height, escala $scale ($phase): $exception',
+        );
+      }
+    }
+
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final width in widths) {
+      final height = width == 320 ? 693.0 : 844.0;
+      tester.view.physicalSize = Size(width, height);
+
+      for (final scale in scales) {
+        final api = _carenciaApi();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: AnimalDetailPage(
+              api: api,
+              id: 'BR0001',
+              onUnauthorized: () {},
+              onMovementCompleted: () {},
+            ),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        collectException(width, height, scale, 'carga');
+
+        final carencia = find.byKey(const ValueKey('carencia-status-card'));
+        final weighing = find.byKey(const ValueKey('open-weighing'));
+        final medication = find.byKey(const ValueKey('open-medication'));
+        final movement = find.byKey(const ValueKey('open-movement'));
+        final actionRects = <Rect>[];
+        expect(carencia, findsOneWidget);
+
+        // ListView monta sob demanda; tornar cada ação visível prova que ela
+        // continua acessível mesmo quando a escala empurra os botões para
+        // baixo, em vez de confundir isso com ausência na árvore.
+        for (final action in [weighing, medication, movement]) {
+          await tester.scrollUntilVisible(
+            action,
+            300,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          collectException(width, height, scale, 'rolagem para ação');
+          expect(action, findsOneWidget);
+          actionRects.add(tester.getRect(action));
+        }
+        await tester.drag(find.byType(Scrollable).last, const Offset(0, 1000));
+        await tester.pumpAndSettle();
+        collectException(width, height, scale, 'retorno ao card');
+        expect(carencia, findsOneWidget);
+        await tester.ensureVisible(carencia);
+        await tester.pumpAndSettle();
+        collectException(width, height, scale, 'card visível');
+        expect(actionRects, hasLength(3));
+        expect(
+          find.text('Abate e comercialização restritos durante este período.'),
+          findsOneWidget,
+        );
+
+        final carenciaRect = tester.getRect(carencia);
+        if (carenciaRect.top < 0 || carenciaRect.bottom > height) {
+          layoutErrors.add(
+            '${width}x$height, escala $scale (card cortado): $carenciaRect',
+          );
+        }
+      }
+    }
+
+    expect(
+      layoutErrors,
+      isEmpty,
+      reason: 'achados de layout nas combinações: $layoutErrors',
+    );
+  });
 }
