@@ -686,7 +686,7 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | ✅ [#424](https://github.com/welz-gui/AgroTop/pull/424) | | 2026-09-14 |
 | — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | ✅ [#420](https://github.com/welz-gui/AgroTop/pull/420) | | 2026-09-14 |
 | — | [0101](0101-mobile-dashboard-estado-desatualizado.md) — Mobile: dashboard mostra quando os dados ficaram desatualizados 🔁 | — | ✅ [#423](https://github.com/welz-gui/AgroTop/pull/423) | | 2026-09-14 |
-| — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | 🟢 livre | | 2026-09-14 |
+| — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | ✅ [#425](https://github.com/welz-gui/AgroTop/pull/425) | | 2026-09-14 |
 | — | [0103](0103-web-navegacao-agrupada-por-tarefa.md) — Web: sidebar agrupada por tarefa, sem perder destinos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0104](0104-mobile-ficha-overflow-telas-pequenas.md) — Mobile: corrige overflow da ficha em telas pequenas/fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-15 |
 | — | [0105](0105-web-dashboard-hierarquia-e-acoes.md) — Web: dashboard com prioridades e alertas acionáveis 🏗️ | — | 🟢 livre | | 2026-09-15 |
@@ -695,6 +695,16 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0108](0108-mobile-dashboard-compacto-e-grafico.md) — Mobile: dashboard compacta indicadores sem perder nenhum 🏗️ | — | 🟢 livre | | 2026-09-15 |
 | — | [0109](0109-redesign-estados-e-acessibilidade.md) — Redesign: fecha lacunas de estados e acessibilidade ⚙️ | — | 🟢 livre | | 2026-09-15 |
 | — | [0110](0110-redesign-homologacao-visual-funcional.md) — Redesign: homologação da versão e evidências de conclusão ⚙️ | — | 🟢 livre | | 2026-09-15 |
+
+> **0102 revisada em 2026-09-15 — [PR #425](https://github.com/welz-gui/AgroTop/pull/425).**
+> Implementação correta (`tema_ativo = st.context.theme.type or TEMA_PADRAO`, propagado a
+> `cores`/`css_variaveis`/`plotly_layout`), com a verificação manual exigida no critério de
+> aceite #1 feita de verdade (API confirmada retornando `'light'` num probe real). CI falhou
+> por um efeito colateral esperado: `tests.ui_base_visual_prova` (spec 0100) checava a string
+> literal `"c = cores()"`, que deixou de existir quando 0102 mudou a chamada para
+> `c = cores(tema_ativo)` — a garantia real (`cores()` chamada uma única vez) continuava
+> válida, só o texto exato do teste ficou desatualizado. Corrigi a asserção para checar o
+> prefixo `"c = cores("` em vez do texto exato e mesclei.
 
 > **0105-0110 escritas em 2026-09-15** — RD07/RD09/RD10-13 da proposta de redesign, a pedido
 > do usuário. Verifiquei cada uma contra o estado real do código antes de escrever, não contra
