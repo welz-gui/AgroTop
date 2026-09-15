@@ -683,9 +683,9 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0096](0096-mobile-ficha-validar-telas-pequenas.md) — Mobile: validar ações da ficha em telas pequenas e fonte ampliada ⚙️ | — | ✅ [#417](https://github.com/welz-gui/AgroTop/pull/417) | | 2026-09-14 |
 | — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | ✅ [#418](https://github.com/welz-gui/AgroTop/pull/418) | | 2026-09-14 |
 | — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | ✅ [#413](https://github.com/welz-gui/AgroTop/pull/413) | | 2026-09-14 |
-| — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | ✅ [#424](https://github.com/welz-gui/AgroTop/pull/424) | | 2026-09-14 |
 | — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | ✅ [#420](https://github.com/welz-gui/AgroTop/pull/420) | | 2026-09-14 |
-| — | [0101](0101-mobile-dashboard-estado-desatualizado.md) — Mobile: dashboard mostra quando os dados ficaram desatualizados 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0101](0101-mobile-dashboard-estado-desatualizado.md) — Mobile: dashboard mostra quando os dados ficaram desatualizados 🔁 | — | ✅ [#423](https://github.com/welz-gui/AgroTop/pull/423) | | 2026-09-14 |
 | — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0103](0103-web-navegacao-agrupada-por-tarefa.md) — Web: sidebar agrupada por tarefa, sem perder destinos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0104](0104-mobile-ficha-overflow-telas-pequenas.md) — Mobile: corrige overflow da ficha em telas pequenas/fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-15 |
