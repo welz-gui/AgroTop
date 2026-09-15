@@ -320,6 +320,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.widgetWithText(AppBar, 'Alertas operacionais'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsNothing);
       expect(find.textContaining('Recomendações'), findsOneWidget);
       expect(find.textContaining('Animais Sumidos'), findsOneWidget);
       expect(find.textContaining('Em Período de Carência'), findsOneWidget);
@@ -363,7 +365,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Animais Sumidos'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Animais Sumidos'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.textContaining('🔴 Animais Sumidos'), findsOneWidget);
       expect(find.text('BR0001 — Nelore'), findsOneWidget);
 
       expect(find.textContaining('Recomendações'), findsNothing);
@@ -389,7 +393,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Em Período de Carência'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Em Período de Carência'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.textContaining('🟡 Em Período de Carência'), findsOneWidget);
       expect(find.text('BR0002 — Angus'), findsOneWidget);
 
       expect(find.textContaining('Recomendações'), findsNothing);
@@ -415,7 +421,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Prontos para Abate'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Prontos para Abate'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.textContaining('🟢 Prontos para Abate'), findsOneWidget);
       expect(find.text('BR0003 — Nelore'), findsOneWidget);
 
       expect(find.textContaining('Recomendações'), findsNothing);
@@ -424,5 +432,36 @@ void main() {
       expect(find.textContaining('Estoque Abaixo do Mínimo'), findsNothing);
       expect(find.textContaining('Baixo Desempenho'), findsNothing);
     });
+
+    testWidgets(
+      'Spec 0097: tocar em Ver todos os alertas abre AlertsPage completa via pushReplacement',
+      (tester) async {
+        final api = createTestApi();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppThemes.light,
+            home: AlertsPage(
+              api: api,
+              onUnauthorized: () {},
+              focusCategoria: AlertCategoria.sumidos,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.widgetWithText(AppBar, 'Animais Sumidos'), findsOneWidget);
+        expect(find.text('Ver todos os alertas'), findsOneWidget);
+        expect(find.textContaining('Recomendações'), findsNothing);
+
+        await tester.tap(find.text('Ver todos os alertas'));
+        await tester.pumpAndSettle();
+
+        expect(find.widgetWithText(AppBar, 'Alertas operacionais'), findsOneWidget);
+        expect(find.text('Ver todos os alertas'), findsNothing);
+        expect(find.textContaining('Recomendações'), findsOneWidget);
+        expect(find.textContaining('🔴 Animais Sumidos'), findsOneWidget);
+        expect(find.textContaining('🟡 Em Período de Carência'), findsOneWidget);
+      },
+    );
   });
 }

@@ -558,7 +558,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertsPage), findsOneWidget);
-      expect(find.textContaining('Animais Sumidos'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Animais Sumidos'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.textContaining('🔴 Animais Sumidos'), findsOneWidget);
       expect(find.text('BR0001 — Nelore'), findsOneWidget);
 
       expect(find.textContaining('Recomendações'), findsNothing);
@@ -593,7 +595,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertsPage), findsOneWidget);
-      expect(find.textContaining('Em Período de Carência'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Em Período de Carência'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.textContaining('🟡 Em Período de Carência'), findsOneWidget);
       expect(find.text('BR0002 — Angus'), findsOneWidget);
 
       expect(find.textContaining('Recomendações'), findsNothing);
@@ -628,7 +632,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertsPage), findsOneWidget);
-      expect(find.textContaining('Prontos para Abate'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Prontos para Abate'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.textContaining('🟢 Prontos para Abate'), findsOneWidget);
       expect(find.text('BR0003 — Nelore'), findsOneWidget);
 
       expect(find.textContaining('Recomendações'), findsNothing);
@@ -672,6 +678,8 @@ void main() {
       await _tapDrawerItem(tester, 'open-alerts');
 
       expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Alertas operacionais'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsNothing);
       expect(find.textContaining('Animais Sumidos'), findsOneWidget);
       expect(find.textContaining('Em Período de Carência'), findsOneWidget);
       expect(find.textContaining('Prontos para Abate'), findsOneWidget);
@@ -690,6 +698,50 @@ void main() {
         scrollable: scrollable,
       );
       expect(find.textContaining('Baixo Desempenho'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Spec 0097: tocar em Ver todos os alertas abre AlertsPage completa e voltar retorna ao dashboard',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          if (request.url.path == '/alertas') return _json(_detailedAlerts());
+          if (request.url.path == '/recomendacoes') return _json([]);
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('dashboard-alert-sumidos')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertsPage), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Animais Sumidos'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+
+      await tester.tap(find.text('Ver todos os alertas'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppBar, 'Alertas operacionais'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsNothing);
+      expect(find.textContaining('🔴 Animais Sumidos'), findsOneWidget);
+      expect(find.textContaining('🟡 Em Período de Carência'), findsOneWidget);
+      expect(find.textContaining('🟢 Prontos para Abate'), findsOneWidget);
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DashboardResumoPage), findsOneWidget);
+      expect(find.byType(AlertsPage), findsNothing);
     },
   );
 }
