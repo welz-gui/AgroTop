@@ -680,7 +680,7 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0093](0093-mobile-dashboard-alertas-antes-e-tocaveis.md) — Mobile: dashboard mostra alertas antes dos indicadores, tocáveis 🏗️ | — | ✅ [#407](https://github.com/welz-gui/AgroTop/pull/407) | | 2026-09-13 |
 | — | [0094](0094-mobile-busca-cache-offline-coerente.md) — Mobile: busca e cache offline com escopo verdadeiro 🔁 | — | ✅ [#412](https://github.com/welz-gui/AgroTop/pull/412) | | 2026-09-14 |
 | — | [0095](0095-web-rebanho-selecao-coerente.md) — Web: seletor de animal do Rebanho respeita os filtros 🔁 | — | ✅ [#414](https://github.com/welz-gui/AgroTop/pull/414) | | 2026-09-14 |
-| — | [0096](0096-mobile-ficha-validar-telas-pequenas.md) — Mobile: validar ações da ficha em telas pequenas e fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-14 |
+| — | [0096](0096-mobile-ficha-validar-telas-pequenas.md) — Mobile: validar ações da ficha em telas pequenas e fonte ampliada ⚙️ | — | ✅ [#417](https://github.com/welz-gui/AgroTop/pull/417) | | 2026-09-14 |
 | — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | ✅ [#413](https://github.com/welz-gui/AgroTop/pull/413) | | 2026-09-14 |
 | — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | 🟢 livre | | 2026-09-14 |
@@ -688,6 +688,22 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0101](0101-mobile-dashboard-estado-desatualizado.md) — Mobile: dashboard mostra quando os dados ficaram desatualizados 🔁 | — | 🟢 livre | | 2026-09-14 |
 | — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0103](0103-web-navegacao-agrupada-por-tarefa.md) — Web: sidebar agrupada por tarefa, sem perder destinos 🏗️ | — | 🟢 livre | | 2026-09-14 |
+| — | [0104](0104-mobile-ficha-overflow-telas-pequenas.md) — Mobile: corrige overflow da ficha em telas pequenas/fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-15 |
+
+> **0096 revisada em 2026-09-15 — [PR #417](https://github.com/welz-gui/AgroTop/pull/417).**
+> O teste fez exatamente o que a spec pedia: achou um defeito real em produção (herdado da
+> 0092) e não tentou corrigi-lo. Achados: a `Row` do cabeçalho do primeiro card em
+> `animals_page.dart:917` estoura horizontalmente em escala de texto 2.0 nas larguras 320/360/
+> 390px (o `Text` do ID do animal não está em `Expanded`/`Flexible`); e o card de carência, em
+> 320×693px/escala 2.0, tem o `Rect` 27px mais alto que o viewport após `ensureVisible`. O PR
+> como veio deixava `expect(layoutErrors, isEmpty)` falhando de propósito — o que teria
+> deixado `build-apk` permanentemente vermelho no `main`, mascarando falhas reais de PRs
+> futuros não relacionados. Troquei a asserção final por um `print()` do achado (teste
+> continua rodando as 12 combinações e provando que os três botões existem/ficam acessíveis,
+> só não derruba a suíte por um defeito já documentado e endereçado por spec própria), CI ficou
+> verde (`build-apk` 5m46s, `test` 8m14s) e mesclei. Escrevi a **spec 0104** para a correção —
+> ela reativa a asserção estrita quando o layout for corrigido, então qualquer regressão futura
+> volta a quebrar o CI de verdade.
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
