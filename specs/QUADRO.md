@@ -689,6 +689,40 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0103](0103-web-navegacao-agrupada-por-tarefa.md) — Web: sidebar agrupada por tarefa, sem perder destinos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0104](0104-mobile-ficha-overflow-telas-pequenas.md) — Mobile: corrige overflow da ficha em telas pequenas/fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0105](0105-web-dashboard-hierarquia-e-acoes.md) — Web: dashboard com prioridades e alertas acionáveis 🏗️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0106](0106-web-ficha-manejo-e-historico.md) — Web: ficha do animal prioriza manejo, preserva histórico 🏗️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0107](0107-mobile-ficha-metricas-responsivas.md) — Mobile: métricas da ficha adaptam à largura real 🏗️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0108](0108-mobile-dashboard-compacto-e-grafico.md) — Mobile: dashboard compacta indicadores sem perder nenhum 🏗️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0109](0109-redesign-estados-e-acessibilidade.md) — Redesign: fecha lacunas de estados e acessibilidade ⚙️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0110](0110-redesign-homologacao-visual-funcional.md) — Redesign: homologação da versão e evidências de conclusão ⚙️ | — | 🟢 livre | | 2026-09-15 |
+
+> **0105-0110 escritas em 2026-09-15** — RD07/RD09/RD10-13 da proposta de redesign, a pedido
+> do usuário. Verifiquei cada uma contra o estado real do código antes de escrever, não contra
+> a evidência da proposta original (que aponta commits antigos em vários pontos):
+> - **0105 (RD07)**: a composição do dashboard web já está na ordem certa (KPIs → alertas →
+>   gráficos → tabela); o problema real é só que os três cards de alerta são `st.markdown`
+>   decorativo sem ação nenhuma — vira `st.button` de verdade com destino filtrado.
+> - **0106 (RD09)**: **retifico a cadeia de dependência da proposta original** — ela marca RD09
+>   como dependente do RD08 completo (seleção nativa + painel contextual no Rebanho), mas isso
+>   nunca foi implementado, só o bug de identidade (spec 0095/PR #414). O único motivo real
+>   para essa dependência era garantir ID estável chegando à ficha, e isso já está garantido —
+>   então escrevi 0106 sem esperar pelo RD08 completo, documentando a diferença na própria
+>   spec.
+> - **0107 (RD10)**: cuidado para quem for implementar — **não é a mesma coisa que a 0104**
+>   (que corrige overflow real achado pela 0096). A 0107 é sobre largura adaptativa e
+>   prioridade visual das `MetricCard`s. Também retifico a proposta original: o bloco de dados
+>   cadastrais (UUID/fornecedor) **já está separado** das métricas hoje, ao contrário do que
+>   ela descrevia — não precisa repetir esse trabalho.
+> - **0108 (RD11)**: a proposta original descreve uma versão bem mais antiga do dashboard
+>   mobile — alertas antes dos indicadores (spec 0093), grid de 2 colunas e legenda completa
+>   do gráfico de raça **já existem**. O que sobra é bem mais estreito: compactar machos/fêmeas
+>   num único card e adicionar `Semantics` ao gráfico de rosca (hoje sem nenhum rótulo pra
+>   leitor de tela).
+> - **0109 (RD12)** e **0110 (RD13)** são specs de auditoria/homologação — dependem de
+>   0105-0108 mescladas antes de começar (não faz sentido auditar/homologar um conjunto
+>   parcialmente redesenhado). A 0109 explicitamente não fecha a lista de arquivos a alterar
+>   de antemão (a própria proposta original pede isso) — a primeira fase dela é auditoria
+>   documentada, só depois vem correção pontual.
 
 > **0100 revisada em 2026-09-15 — [PR #420](https://github.com/welz-gui/AgroTop/pull/420).**
 > Diff conferido linha a linha contra o contrato: `.page-title` 1.875rem, `stMetricValue`
