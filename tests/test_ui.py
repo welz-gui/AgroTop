@@ -55,6 +55,7 @@ PROVAS = [
     "tests.ui_campo_chuva_prova", # registro rápido de chuva no Modo Campo
     "tests.ui_rebanho_prova", # seletor respeita filtros (Spec 0095)
     "tests.ui_base_visual_prova", # escala tipográfica, espaçamento e raio (Spec 0100)
+    "tests.ui_tema_nativo_prova", # CSS e Plotly recebem o tema nativo (Spec 0102)
 ]
 
 

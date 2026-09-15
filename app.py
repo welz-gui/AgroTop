@@ -85,6 +85,7 @@ from ui.tema import (
     cores,
     css_variaveis,
     plotly_layout,
+    TEMA_PADRAO,
     SERIES,
     ESCALA_RUIM_BOM,
     ESCALA_BOM_RUIM,
@@ -101,10 +102,11 @@ st.set_page_config(
 
 db.init_db()
 db.refresh_carencia_status()
-c = cores()
+tema_ativo = st.context.theme.type or TEMA_PADRAO
+c = cores(tema_ativo)
 
 # ─── CSS ──────────────────────────────────────────────────────────────────────
-st.markdown(css_variaveis(), unsafe_allow_html=True)
+st.markdown(css_variaveis(tema_ativo), unsafe_allow_html=True)
 st.markdown("""
 <style>
 /* Escala visual fixa: corpo 15px, apoio 13px, seção 19px, título 30px, KPI 32px;
@@ -176,7 +178,7 @@ COST_TYPES = ["compra","insumo","operacional","veterinário","outro"]
 # Cotação padrão centralizada (usada no Simulador e no Relatório Financeiro)
 DEFAULT_PRICE_ARROBA = 320.0   # R$ por arroba (boi gordo)
 DEFAULT_PRICE_KG     = 10.0    # R$ por kg de boi vivo
-PLOTLY = plotly_layout()
+PLOTLY = plotly_layout(tema_ativo)
 
 def _layout(**overrides):
     """Mescla o layout padrão PLOTLY com overrides (evita conflito de kwargs)."""
@@ -1456,7 +1458,7 @@ def _tab_obito(animal):
 
 
 def _tab_historico(animal):
-    paleta = cores()
+    paleta = c
     h1,h2=st.columns(2)
     with h1:
         st.markdown("**⚖️ Pesagens**")
@@ -7287,7 +7289,7 @@ def _try_restore_session():
             st.session_state.page = "dashboard" if u["role"] == "admin" else "campo"
 
 def main():
-    tema = cores("escuro")
+    tema = c
     st.markdown(
         f"""
         <link rel="manifest" href="/app/static/manifest.json">
