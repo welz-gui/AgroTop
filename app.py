@@ -210,9 +210,9 @@ def _status_badge(status):
 
 def _gmd_badge(gmd):
     if gmd is None: return '<span class="badge-gray">— N/D</span>'
-    if gmd > 0:     return f'<span class="badge-green">▲ {gmd:.3f} kg/dia</span>'
-    if gmd < 0:     return f'<span class="badge-red">▼ {gmd:.3f} kg/dia</span>'
-    return f'<span class="badge-yellow">= {gmd:.3f} kg/dia</span>'
+    if gmd > 0:     return f'<span class="badge-green">▲ {_num_br(gmd, 3)} kg/dia</span>'
+    if gmd < 0:     return f'<span class="badge-red">▼ {_num_br(gmd, 3)} kg/dia</span>'
+    return f'<span class="badge-yellow">= {_num_br(gmd, 3)} kg/dia</span>'
 
 # ─── Helpers de unidade (kg / @) ─────────────────────────────────────────────
 def _use_arroba() -> bool:
@@ -237,7 +237,7 @@ def _live_weight(kg: float, yield_: float = 0.52) -> float:
 def _fmt_live(kg: float, yield_: float = 0.52) -> str:
     """Formata peso vivo na unidade configurada."""
     val = _live_weight(kg, yield_)
-    return f"{val:.2f} {_unit_label()}" if _use_arroba() else f"{val:.1f} kg"
+    return f"{_num_br(val, 2)} {_unit_label()}" if _use_arroba() else f"{_num_br(val, 1)} kg"
 
 def _cost_per_unit_label() -> str:
     # Deixa explícito que é sobre o PESO VIVO ATUAL (não sobre o ganho)
@@ -257,12 +257,24 @@ def _plural(n, singular: str, plural: str = None) -> str:
     plural = plural or (singular + "s")
     return f"{n} {singular if n == 1 else plural}"
 
-def _num_br(v, casas: int = 1) -> str:
+def _num_br(v, casas: int = 1, sinal: bool = False) -> str:
     """Número no padrão brasileiro: 10.0 -> '10,0'."""
     try:
-        return f"{float(v):.{casas}f}".replace(".", ",")
+        fmt = f"{float(v):+.{casas}f}" if sinal else f"{float(v):.{casas}f}"
+        return fmt.replace(".", ",")
     except (TypeError, ValueError):
         return str(v)
+
+def _data_br(value) -> str:
+    """Formata datas para o padrão brasileiro DD/MM/AAAA. Retorna '—' para vazio/None."""
+    if value is None or value == "":
+        return "—"
+    if isinstance(value, (date, datetime)):
+        return value.strftime("%d/%m/%Y")
+    try:
+        return date.fromisoformat(str(value)[:10]).strftime("%d/%m/%Y")
+    except (TypeError, ValueError):
+        return str(value)
 
 def _fmt_dose(dose, unit: str) -> str:
     """Dose + unidade formatadas: '10,0 ml', '2,0 doses', '1,0 comprimido'."""
@@ -311,13 +323,13 @@ def _renderizar_previsao_tempo(loc: dict) -> None:
     })
     hoje = df.iloc[0]; amanha = df.iloc[1] if len(df) > 1 else df.iloc[0]
     mk = st.columns(4)
-    mk[0].metric("Hoje", f"{hoje['Máx (°C)']:.0f}° / {hoje['Mín (°C)']:.0f}°",
+    mk[0].metric("Hoje", f"{_num_br(hoje['Máx (°C)'], 0)}° / {_num_br(hoje['Mín (°C)'], 0)}°",
                  help="Máxima / mínima")
-    mk[1].metric("Chuva hoje", f"{hoje['Chuva (mm)']:.0f} mm",
-                 delta=f"{hoje['Prob. chuva (%)']:.0f}% prob.")
-    mk[2].metric("Chuva amanhã", f"{amanha['Chuva (mm)']:.0f} mm",
-                 delta=f"{amanha['Prob. chuva (%)']:.0f}% prob.")
-    mk[3].metric("Chuva prevista (7 dias)", f"{sum(d['precipitation_sum']):.0f} mm")
+    mk[1].metric("Chuva hoje", f"{_num_br(hoje['Chuva (mm)'], 0)} mm",
+                 delta=f"{_num_br(hoje['Prob. chuva (%)'], 0)}% prob.")
+    mk[2].metric("Chuva amanhã", f"{_num_br(amanha['Chuva (mm)'], 0)} mm",
+                 delta=f"{_num_br(amanha['Prob. chuva (%)'], 0)}% prob.")
+    mk[3].metric("Chuva prevista (7 dias)", f"{_num_br(sum(d['precipitation_sum']), 0)} mm")
 
     fig = px.bar(df, x="Data", y="Chuva (mm)", color="Prob. chuva (%)",
         color_continuous_scale=[c["texto_secundario"], c["info"], c["info_secundario"]],
@@ -331,7 +343,7 @@ def _renderizar_previsao_tempo(loc: dict) -> None:
                        for col in ["Chuva (mm)","Prob. chuva (%)","Mín (°C)","Máx (°C)"]})
     nomes = ", ".join(p["nome"] for p in loc["propriedades"])
     st.caption(f"Fonte: Open-Meteo · previsão para {nomes} "
-               f"({loc['lat']:.4f}, {loc['lon']:.4f}).")
+               f"({_num_br(loc['lat'], 4)}, {_num_br(loc['lon'], 4)}).")
 
 # ─── Câmera: imagem, QR Code e OCR ───────────────────────────────────────────
 def _compress_image(raw: bytes, max_side: int = 1000, quality: int = 75) -> bytes:
@@ -538,14 +550,7 @@ def _df_to_pdf(title: str, df: pd.DataFrame) -> bytes:
 
 def _evidencias_data(value) -> str:
     """Formata datas de registros para o padrão usado no pacote externo."""
-    if value is None or value == "":
-        return "—"
-    if isinstance(value, (date, datetime)):
-        return value.strftime("%d/%m/%Y")
-    try:
-        return date.fromisoformat(str(value)[:10]).strftime("%d/%m/%Y")
-    except (TypeError, ValueError):
-        return str(value)
+    return _data_br(value)
 
 
 def _vendas_para_evidencias(vendas: list[dict]) -> list[dict]:
@@ -817,16 +822,16 @@ def _sidebar():
         if stats.total > 0:
             # Usa a MESMA fonte da página (_use_arroba) — sempre consistente
             if _use_arroba():
-                prod_str = f"🏷️ <b style='color:{c['atencao']}'>{stats.arrobas_prod:.1f} @</b> ganhas"
+                prod_str = f"🏷️ <b style='color:{c['atencao']}'>{_num_br(stats.arrobas_prod, 1)} @</b> ganhas"
             else:
                 total_gain_kg = db.get_total_gain_kg(status="ativo")
-                prod_str = f"📦 <b style='color:{c['atencao']}'>{total_gain_kg:.0f} kg</b> ganhos"
+                prod_str = f"📦 <b style='color:{c['atencao']}'>{_num_br(total_gain_kg, 0)} kg</b> ganhos"
 
             st.markdown(f"""
             <div style="font-size:.78rem;color:{c["texto_terciario"]};text-align:center;line-height:2">
                 🐄 <b style="color:{c["texto"]}">{stats.total}</b> animais ativos &nbsp;
-                ⚖️ <b style="color:{c["texto"]}">{stats.avg_weight:.0f} kg</b> médio<br>
-                📈 GMD <b style="color:{c["primaria"]}">{stats.avg_gmd:.3f} kg/dia</b> &nbsp;
+                ⚖️ <b style="color:{c["texto"]}">{_num_br(stats.avg_weight, 0)} kg</b> médio<br>
+                📈 GMD <b style="color:{c["primaria"]}">{_num_br(stats.avg_gmd, 3)} kg/dia</b> &nbsp;
                 {prod_str}
             </div>""", unsafe_allow_html=True)
         st.markdown("---")
@@ -884,7 +889,7 @@ def _dash_kpis(stats, animals):
     # Produção na unidade configurada
     if _use_arroba():
         prod_label = "🏷️ @ Ganhas"
-        prod_value = f"{stats.arrobas_prod:.1f} @"
+        prod_value = f"{_num_br(stats.arrobas_prod, 1)} @"
     else:
         # Avoid python loop if animals matches the default "ativo" filter without other filters
         # Or safely do the python sum if we can't guarantee it.
@@ -892,14 +897,14 @@ def _dash_kpis(stats, animals):
         # To be perfectly robust for any future filtered list:
         total_gain_kg = sum(a["current_weight"]-a["entry_weight"] for a in animals)
         prod_label = "📦 Ganho Total"
-        prod_value = f"{total_gain_kg:.0f} kg"
+        prod_value = f"{_num_br(total_gain_kg, 0)} kg"
 
     k = st.columns(7)
     k[0].metric("🐄 Animais",    stats.total)
-    k[1].metric("⚖️ Peso Médio", f"{stats.avg_weight:.1f} kg")
-    k[2].metric("📈 GMD Médio",  f"{stats.avg_gmd:.3f} kg/dia")
+    k[1].metric("⚖️ Peso Médio", f"{_num_br(stats.avg_weight, 1)} kg")
+    k[2].metric("📈 GMD Médio",  f"{_num_br(stats.avg_gmd, 3)} kg/dia")
     k[3].metric(prod_label,      prod_value)
-    k[4].metric("🌿 Lotação",    f"{stats.lotacao_ua_ha:.2f} UA/ha")
+    k[4].metric("🌿 Lotação",    f"{_num_br(stats.lotacao_ua_ha, 2)} UA/ha")
     k[5].metric("♂ Machos",      stats.males)
     k[6].metric("♀ Fêmeas",      stats.females)
 
@@ -1005,7 +1010,7 @@ def _dash_summary_table(animals):
             "Peso Atual (kg)":a["current_weight"],
             f"Ganho ({ul})":_prod_weight(gain),
             "GMD (kg/dia)":gmd,"Status":a["status"],
-            "Carência até":wd.isoformat() if wd else "—"})
+            "Carência até":_data_br(wd) if wd else "—"})
     df_sum=pd.DataFrame(rows)
     gain_col = f"Ganho ({ul})"
     fmt_gain = "%.2f" if _use_arroba() else "%.1f"
@@ -1049,7 +1054,7 @@ def _dash_conformidade():
     aberto_por_padrao = resultado["faixa"] not in ("completo", "bom")
 
     with st.expander(
-        f"🛡️ Conformidade PNIB — {emoji} {rotulo} ({resultado['escore']:.1f}/100)",
+        f"🛡️ Conformidade PNIB — {emoji} {rotulo} ({_num_br(resultado['escore'], 1)}/100)",
         expanded=aberto_por_padrao):
         st.caption("Indicador de gestão a partir dos dados cadastrados — não substitui "
                    "avaliação de conformidade legal nem certificação oficial.")
@@ -1154,7 +1159,7 @@ def _dash_completude():
         if alertas_ultimo_mes:
             for al in alertas_ultimo_mes:
                 st.warning(f"⚠️ **{al['indicador']}** em "
-                          f"{al['valor']*100:.0f}% (mínimo {al['minimo']*100:.0f}%) "
+                          f"{_num_br(al['valor']*100, 0)}% (mínimo {_num_br(al['minimo']*100, 0)}%) "
                           f"em {mes_label} — {al['mensagem']}")
         else:
             st.success(f"✅ Todos os indicadores dentro do mínimo em {mes_label}.")
@@ -1178,7 +1183,7 @@ def _campo_trato():
     if pendentes_total == 0:
         st.success("✅ Todos os tratos do período já foram confirmados. Bom trabalho!")
     else:
-        st.markdown(f"**🌾 Trato do dia — {hoje.strftime('%d/%m/%Y')}** · "
+        st.markdown(f"**🌾 Trato do dia — {_data_br(hoje)}** · "
                     f"{pendentes_total} item(ns) pendente(s)")
 
     for lid in lotes_ids:
@@ -1196,13 +1201,13 @@ def _campo_trato():
             if p["done_this_period"]:
                 st.markdown(
                     f'<div class="hist-item" style="border-left-color:{c["sucesso_escuro"]};opacity:.7">'
-                    f'✅ <b>{p["product_name"]}</b> — {p["quantity"]:.0f} {p["unit"]} '
+                    f'✅ <b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
                     f'· {freq} · <span style="color:{c["primaria"]}">confirmado</span> '
                     f'(último: {p["last_check"] or "—"})</div>', unsafe_allow_html=True)
                 continue
 
             with st.form(f"trato_{p['id']}", clear_on_submit=True):
-                st.markdown(f'**{p["product_name"]}** — aplicar **{p["quantity"]:.0f} {p["unit"]}** · '
+                st.markdown(f'**{p["product_name"]}** — aplicar **{_num_br(p["quantity"], 0)} {p["unit"]}** · '
                             f'{freq}')
                 fc1, fc2, fc3 = st.columns([2,2,2])
                 with fc1:
@@ -1242,7 +1247,7 @@ def _campo_chuva():
     leituras_hoje = db.get_rain(hoje.isoformat(), hoje.isoformat())
     if leituras_hoje:
         total_hoje = sum(r["rain_mm"] for r in leituras_hoje)
-        st.info(f"💧 Já registrado hoje: **{total_hoje:.1f} mm** "
+        st.info(f"💧 Já registrado hoje: **{_num_br(total_hoje, 1)} mm** "
                 f"({len(leituras_hoje)} leitura(s)). Pode registrar outra se for de "
                 f"outro piquete ou outro horário.")
 
@@ -1258,7 +1263,7 @@ def _campo_chuva():
                                  use_container_width=True):
             db.add_rain(hoje.isoformat(), rmm, lote_sel["id"] if lote_sel else None,
                         st.session_state.user["name"])
-            st.success(f"✅ {rmm:.1f} mm registrados para hoje.")
+            st.success(f"✅ {_num_br(rmm, 1)} mm registrados para hoje.")
             st.rerun()
 
 
@@ -1293,7 +1298,7 @@ def _tab_pesagem(animal):
     if pend:
         met_lbl = db.WEIGH_METHODS.get(pend.get("method"),"estimativa")
         st.info(f"📋 Última pesagem foi **{met_lbl.lower()}**: "
-                f"**{pend['weight']:.1f} kg** em {pend['weigh_date']}. "
+                f"**{_num_br(pend['weight'], 1)} kg** em {_data_br(pend['weigh_date'])}. "
                 f"Se pesar agora na balança, o app mostra a diferença.")
 
     # Método fora do form para reagir à escolha
@@ -1314,7 +1319,7 @@ def _tab_pesagem(animal):
             comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
                 max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
         nw = db.estimate_weight_by_measurement(pt, comp)
-        st.success(f"⚖️ Peso estimado por medição: **{nw:.1f} kg**")
+        st.success(f"⚖️ Peso estimado por medição: **{_num_br(nw, 1)} kg**")
         medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
     else:
         medida_nota = ""
@@ -1332,7 +1337,7 @@ def _tab_pesagem(animal):
                 st.session_state.user["name"], _pend_alerta["notas"],
                 method=_pend_alerta["metodo"])
             st.session_state.pop(f"alerta_peso_{animal['id']}", None)
-            st.success(f"✅ {_pend_alerta['peso']:.1f} kg salvo."); st.rerun()
+            st.success(f"✅ {_num_br(_pend_alerta['peso'], 1)} kg salvo."); st.rerun()
         if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
                        use_container_width=True):
             st.session_state.pop(f"alerta_peso_{animal['id']}", None); st.rerun()
@@ -1373,13 +1378,13 @@ def _tab_pesagem(animal):
                 st.session_state.user["name"], notes_p, method=metodo_peso)
             for _a in _alertas:
                 st.warning(f"⚠️ {_a['mensagem']}")
-            msg = f"✅ {nw_final:.1f} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
+            msg = f"✅ {_num_br(nw_final, 1)} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
             # Comparação estimativa × pesagem real
             if metodo_peso == "pesado" and pend:
                 err = nw_final - pend["weight"]
                 pct = (err/pend["weight"]*100) if pend["weight"] else 0
                 msg += (f" · Diferença para a estimativa anterior "
-                        f"({pend['weight']:.1f} kg): {err:+.1f} kg ({pct:+.1f}%)")
+                        f"({_num_br(pend['weight'], 1)} kg): {_num_br(err, 1, sinal=True)} kg ({_num_br(pct, 1, sinal=True)}%)")
             st.success(msg)
             st.rerun()
 
@@ -1390,7 +1395,7 @@ def _tab_medicamento(animal):
     with st.form("f_med",clear_on_submit=True):
         use_stock=st.toggle("Usar do Estoque",value=bool(insumos))
         if use_stock and insumos:
-            ins_sel=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.0f} {x['unit']} em estoque)")
+            ins_sel=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({_num_br(x['current_stock'], 0)} {x['unit']} em estoque)")
             med_name=ins_sel["name"]; unit_def=ins_sel["unit"]; insumo_id=ins_sel["id"]
         else:
             med_name=st.text_input("Medicamento *",placeholder="Ex: Ivermectina 1%")
@@ -1476,8 +1481,8 @@ def _tab_historico(animal):
             mbadge = {"pesado":'<span class="badge-green">balança</span>',
                       "estimado":'<span class="badge-yellow">estimado</span>',
                       "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
-            st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
-                f'<span style="color:{paleta["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
+            st.markdown(f'<div class="hist-item"><b>{_num_br(w["weight"], 1)} kg</b> {mbadge}'
+                f'<span style="color:{paleta["texto_terciario"]};font-size:.8rem;float:right">{_data_br(w["weigh_date"])}</span><br>'
                 f'<span style="color:{paleta["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
                 unsafe_allow_html=True)
     with h2:
@@ -1562,7 +1567,7 @@ def _campo_animal():
     idade=db.get_age_display(animal)
 
     carencia_html = (f'<div style="color:{c["atencao"]};font-size:.82rem;margin-top:.3rem">'
-                     f'⚠️ Carência até {wd.isoformat()}</div>') if wd else ''
+                     f'⚠️ Carência até {_data_br(wd)}</div>') if wd else ''
     sex_sym = "♂" if animal['sex']=='M' else "♀"
     gmd_txt = f'{gmd:+.3f} kg/dia' if gmd is not None else '— sem dados'
     st.markdown(
@@ -1577,7 +1582,7 @@ def _campo_animal():
         f'</div>{carencia_html}</div>'
         f'<div style="text-align:right">'
         f'<div style="font-size:2.4rem;font-weight:900;color:{c["texto"]};line-height:1">'
-        f'{animal["current_weight"]:.1f}<span style="font-size:1rem;color:{c["texto_terciario"]}"> kg</span></div>'
+        f'{_num_br(animal["current_weight"], 1)}<span style="font-size:1rem;color:{c["texto_terciario"]}"> kg</span></div>'
         f'<div style="color:{c["atencao"]};font-size:.85rem">{_fmt_live(animal["current_weight"])}</div>'
         f'<div style="color:{gc};font-size:.88rem;font-weight:600">GMD: {gmd_txt}</div>'
         f'</div></div></div>',
@@ -1737,7 +1742,7 @@ def page_rebanho():
             "Peso Atual (kg)":a["current_weight"],
             f"Ganho ({ul})":_prod_weight(a["current_weight"]-a["entry_weight"]),
             "GMD (kg/dia)":gmd,
-            "Carência até":wd.isoformat() if wd else "—",
+            "Carência até":_data_br(wd) if wd else "—",
             "Fornecedor":a.get("fornecedor_name") or "—"})
     df=pd.DataFrame(rows)
 
@@ -2096,8 +2101,8 @@ def _render_tab_med(meds):
                 f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
                 f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
                 f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                f'{m_["med_date"]} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
-                f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+end_.isoformat()+")" if m_["withdrawal_days"] else ""}'
+                f'{_data_br(m_["med_date"])} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
+                f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+_data_br(end_)+")" if m_["withdrawal_days"] else ""}'
                 f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
                 f'</span></div>',unsafe_allow_html=True)
     else:
@@ -2171,16 +2176,16 @@ def page_animal():
     m=st.columns(6)
     m[0].metric("Raça",       animal["breed"])
     m[1].metric("Categoria",  cat)
-    m[2].metric("Peso Atual", f"{animal['current_weight']:.1f} kg")
-    m[3].metric("Ganho",      f"{gain:+.1f} kg",
+    m[2].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
+    m[3].metric("Ganho",      f"{_num_br(gain, 1, sinal=True)} kg",
                 help="Peso atual menos o peso de entrada")
-    m[4].metric("@ Atuais",   f"{arrobas:.2f} @",
+    m[4].metric("@ Atuais",   f"{_num_br(arrobas, 2)} @",
                 help="Arrobas equivalentes ao peso vivo atual (rendimento de carcaça)")
     gmd_total = db.calculate_gmd_total(animal)
-    gmd_txt = f"{gmd:.3f} kg/dia" if gmd else "N/A"
-    tot_txt = f"{gmd_total:.3f} kg/dia" if gmd_total else "N/A"
+    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd else "N/A"
+    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total else "N/A"
     m[5].metric("GMD recente", gmd_txt,
-                delta=f"{gmd:.3f}" if gmd else None,
+                delta=_num_br(gmd, 3) if gmd else None,
                 help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
     st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
                f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
@@ -2205,7 +2210,7 @@ def page_animal():
                 st.rerun()
 
     if wd:
-        st.warning(f"⚠️ Animal em carência até **{wd.isoformat()}** "
+        st.warning(f"⚠️ Animal em carência até **{_data_br(wd)}** "
                    f"({(wd-date.today()).days} dias restantes). Não pode ser abatido.")
 
     st.markdown("---")
@@ -2400,11 +2405,11 @@ def _render_secao_ndvi_lote(lote: dict) -> None:
                 m1, m2, m3 = st.columns(3)
                 m1.metric(
                     "Última imagem utilizável",
-                    resultado.serie[-1].data.strftime("%d/%m/%Y"),
+                    _data_br(resultado.serie[-1].data),
                 )
                 m2.metric(
                     "NDVI mais recente",
-                    f"{resultado.serie[-1].ndvi_medio:.3f}",
+                    _num_br(resultado.serie[-1].ndvi_medio, 3),
                 )
                 m3.metric(
                     "Maior vão sem imagem",
@@ -2478,12 +2483,12 @@ def _render_tab_visao_geral(lotes):
 
         # Ocupação: só mostra % quando há capacidade definida (> 0)
         if has_cap:
-            ocup_txt = f"{ua:.1f} / {cap:.0f} UA ({pct:.0f}%)"
-            cap_txt  = f"Cap. {cap:.0f} UA"
+            ocup_txt = f"{_num_br(ua, 1)} / {_num_br(cap, 0)} UA ({_num_br(pct, 0)}%)"
+            cap_txt  = f"Cap. {_num_br(cap, 0)} UA"
             barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
                      f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
         else:
-            ocup_txt = f"{ua:.1f} UA · sem capacidade definida"
+            ocup_txt = f"{_num_br(ua, 1)} UA · sem capacidade definida"
             cap_txt  = "Sem capacidade de pasto (curral/manejo)"
             barra = ""
 
@@ -2633,7 +2638,7 @@ def _lotes_transferir_animais(lotes):
         st.info(f"Nenhum animal ativo em {origem['name']} para transferir.")
         return
 
-    opts = {f"{a['id']} · {a['breed']} · {a['current_weight']:.0f}kg": a["id"]
+    opts = {f"{a['id']} · {a['breed']} · {_num_br(a['current_weight'], 0)}kg": a["id"]
             for a in animais_origem}
     selecionados = st.multiselect("Animais a transferir", list(opts.keys()),
         key="transf_animais")
@@ -2721,7 +2726,7 @@ def _fin_venda(animals):
                     value=date.today()+timedelta(days=30), key="venda_primeira_parcela")
 
         # Seleção de animais
-        opts = {f"{a['id']} · {a['breed']} · {a['current_weight']:.0f}kg · {db.get_age_category(a.get('birth_date'))}": a['id']
+        opts = {f"{a['id']} · {a['breed']} · {_num_br(a['current_weight'], 0)}kg · {db.get_age_category(a.get('birth_date'))}": a['id']
                 for a in animals}
         multi = modo in ("lote",) or True   # sempre permite múltiplos
         sel = st.multiselect("Animais a vender", list(opts.keys()),
@@ -2741,7 +2746,7 @@ def _fin_venda(animals):
                     value=float(sug), format="%.2f",
                     help="Sugerido pela tabela de categoria; ajuste se necessário")
                 if peso_total:
-                    st.caption(f"Peso total selecionado: **{peso_total:.0f} kg** → "
+                    st.caption(f"Peso total selecionado: **{_num_br(peso_total, 0)} kg** → "
                                f"receita estimada: **R$ {peso_total*valor:,.2f}**")
             elif modo == "cabeca":
                 valor = st.number_input("Valor por cabeça (R$)", min_value=0.0, step=50.0, format="%.2f",
@@ -2752,7 +2757,7 @@ def _fin_venda(animals):
                 valor = st.number_input("Valor TOTAL do lote (R$)", min_value=0.0, step=100.0, format="%.2f",
                     help="Valor fechado do grupo; será rateado proporcionalmente ao peso")
                 if peso_total:
-                    st.caption(f"{len(sel_animals)} animais, {peso_total:.0f} kg → "
+                    st.caption(f"{len(sel_animals)} animais, {_num_br(peso_total, 0)} kg → "
                                "rateio proporcional ao peso")
             c1, c2 = st.columns(2)
             with c1: sale_date = st.date_input("Data da venda", value=date.today())
@@ -3120,7 +3125,7 @@ def _fin_contas_a_pagar():
         with st.expander("💳 Marcar como paga"):
             conta_sel = st.selectbox("Conta", pendentes,
                 format_func=lambda c: f"{c['descricao']} ({c['parcela_numero']}/{c['parcela_total']}) — "
-                    f"R$ {c['valor']:.2f}, vence {c['vencimento']}",
+                    f"R$ {_num_br(c['valor'], 2)}, vence {_data_br(c['vencimento'])}",
                 key="pag_conta_selecionada")
             pg1, pg2 = st.columns(2)
             with pg1:
@@ -3173,7 +3178,7 @@ def _fin_contas_a_receber():
         with st.expander("💳 Marcar como recebida"):
             conta_sel = st.selectbox("Conta", pendentes,
                 format_func=lambda c: f"{c['descricao']} ({c['parcela_numero']}/{c['parcela_total']}) — "
-                    f"R$ {c['valor']:.2f}, vence {c['vencimento']}",
+                    f"R$ {_num_br(c['valor'], 2)}, vence {_data_br(c['vencimento'])}",
                 key="rec_conta_selecionada")
             rg1, rg2 = st.columns(2)
             with rg1:
@@ -3355,7 +3360,7 @@ def _fin_dre():
     st.markdown("<hr style='margin:.3rem 0'>", unsafe_allow_html=True)
     _linha("= Lucro Bruto", dre["lucro_bruto"], negrito=True)
     if dre["margem_bruta_pct"] is not None:
-        st.caption(f"Margem bruta: {dre['margem_bruta_pct']:.1f}%")
+        st.caption(f"Margem bruta: {_num_br(dre['margem_bruta_pct'], 1)}%")
     for rotulo, valor in dre["despesas_operacionais"].items():
         _linha(f"(–) {rotulo}", -valor, indent=True)
     st.markdown("<hr style='margin:.3rem 0'>", unsafe_allow_html=True)
@@ -3367,7 +3372,7 @@ def _fin_dre():
     st.markdown("</div>", unsafe_allow_html=True)
 
     if dre["margem_liquida_pct"] is not None:
-        st.metric("Margem Líquida", f"{dre['margem_liquida_pct']:.1f}%")
+        st.metric("Margem Líquida", f"{_num_br(dre['margem_liquida_pct'], 1)}%")
 
     with st.expander("Por que o CPV não é igual à 'Compra de animais' do Resultado (Caixa)?"):
         st.markdown(
@@ -3390,7 +3395,7 @@ def _fin_mortalidade():
 
     k = st.columns(4)
     k[0].metric("Óbitos no período", m["n_deaths"])
-    k[1].metric("Taxa de mortalidade", f"{m['taxa_geral']:.1f}%",
+    k[1].metric("Taxa de mortalidade", f"{_num_br(m['taxa_geral'], 1)}%",
                 help=f"{m['n_deaths']} mortes ÷ {m['expostos']} animais que entraram até a data")
     k[2].metric("Animais expostos", m["expostos"])
     k[3].metric("Perda financeira", f"R$ {m['perda_total']:,.2f}")
@@ -3496,9 +3501,9 @@ def _fin_custos_por_animal(animals):
     tot_gnh = df_f[f"Ganho ({ul})"].sum()
     kk=st.columns(4)
     kk[0].metric("Custo Total do Rebanho", f"R$ {tot_tc:,.2f}")
-    kk[1].metric(f"Total {ul} no Rebanho", f"{tot_prod:.1f} {ul}")
-    kk[2].metric(f"Total {ul} Ganhos",     f"{tot_gnh:.1f} {ul}")
-    kk[3].metric(_cost_per_unit_label(),    f"R$ {tot_tc/tot_prod:.2f}" if tot_prod else "—")
+    kk[1].metric(f"Total {ul} no Rebanho", f"{_num_br(tot_prod, 1)} {ul}")
+    kk[2].metric(f"Total {ul} Ganhos",     f"{_num_br(tot_gnh, 1)} {ul}")
+    kk[3].metric(_cost_per_unit_label(),    f"R$ {_num_br(tot_tc/tot_prod, 2)}" if tot_prod else "—")
 
     prod_col = f"Prod. ({ul})"
     cpu_col  = _cost_per_unit_label()
@@ -3636,7 +3641,7 @@ def _fin_simulador(animals):
             sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
             st.markdown(
                 f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
-                f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {cotacao:.2f}/{ul}</div>'
+                f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {_num_br(cotacao, 2)}/{ul}</div>'
                 f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
                 unsafe_allow_html=True)
     else:  # categoria
@@ -3653,7 +3658,7 @@ def _fin_simulador(animals):
             for sex in ("M","F"):
                 p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
                 if p > 0:
-                    linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {p:.2f}/kg")
+                    linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {_num_br(p, 2)}/kg")
         if linhas:
             st.caption("Preços aplicados: " + "  |  ".join(linhas))
 
@@ -3707,8 +3712,8 @@ def _fin_simulador(animals):
     sk[1].metric("Custo Total",   f"R$ {tot_cost:,.2f}")
     sk[2].metric("Lucro / Prejuízo Total", f"R$ {tot_luc:,.2f}",
         delta=f"{tot_luc:+,.2f}", delta_color="normal")
-    sk[3].metric("Margem Média", f"{margem_media:.1f}%",
-        delta=f"{margem_media:+.1f}%", delta_color="normal")
+    sk[3].metric("Margem Média", f"{_num_br(margem_media, 1)}%",
+        delta=f"{_num_br(margem_media, 1, sinal=True)}%", delta_color="normal")
 
     if tot_luc < 0:
         st.error(f"⚠️ Projeção de **PREJUÍZO** de R$ {abs(tot_luc):,.2f}. "
@@ -3807,7 +3812,7 @@ def _fin_desempenho_origem():
         melhor=next((r for r in rank if r["arrobas_produzidas"]>0),None)
         if melhor:
             st.success(f"🥇 Melhor GMD médio: **{rank[0]['fornecedor']}** "
-                       f"({rank[0]['gmd_medio']:.3f} kg/dia). "
+                       f"({_num_br(rank[0]['gmd_medio'], 3)} kg/dia). "
                        f"Compare com o **custo por @** e a **mortalidade** na tabela para "
                        f"decidir de quem vale a pena comprar de novo.")
 
@@ -3938,14 +3943,14 @@ def _render_tab_inventario(insumos):
 
 def _render_tab_entrada_estoque(insumos):
     with st.form("f_entrada",clear_on_submit=True):
-        ins=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({x['current_stock']:.1f} {x['unit']})")
+        ins=st.selectbox("Insumo",insumos,format_func=lambda x:f"{x['name']} ({_num_br(x['current_stock'], 1)} {x['unit']})")
         ec1,ec2=st.columns(2)
         with ec1: qty=st.number_input("Quantidade",min_value=0.01,step=1.0,format="%.2f")
         with ec2: cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f",
             value=float(ins["cost_per_unit"]) if ins else 0.0)
         if st.form_submit_button("✅ Registrar Entrada",type="primary",use_container_width=True):
             db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"])
-            st.success(f"✅ +{qty:.1f} {ins['unit']} de {ins['name']}"); st.rerun()
+            st.success(f"✅ +{_num_br(qty, 1)} {ins['unit']} de {ins['name']}"); st.rerun()
 
 def _render_tab_novo_insumo():
     with st.form("f_new_ins",clear_on_submit=True):
@@ -4071,8 +4076,8 @@ def _estoque_compra_com_nota(insumos):
         for idx, item in enumerate(itens_atuais):
             rc1, rc2 = st.columns([5, 1])
             with rc1:
-                st.write(f"{item['insumo_nome']}: {item['quantidade']:.2f} "
-                    f"{item['unidade']} × R$ {item['custo_unitario']:.2f} = "
+                st.write(f"{item['insumo_nome']}: {_num_br(item['quantidade'], 2)} "
+                    f"{item['unidade']} × R$ {_num_br(item['custo_unitario'], 2)} = "
                     f"R$ {item['quantidade']*item['custo_unitario']:,.2f}")
             with rc2:
                 if st.button("🗑️", key=f"compra_remover_{idx}"):
@@ -4292,8 +4297,8 @@ def _alertas_operacionais():
         for i in low:
             pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 0
             st.markdown(f'<div class="card-yellow">⚠️ <b>{i["name"]}</b> — '
-                f'Estoque: <b>{i["current_stock"]:.1f} {i["unit"]}</b> '
-                f'(mínimo: {i["min_stock"]:.0f}) — <b>{pct:.0f}% do mínimo</b></div>',
+                f'Estoque: <b>{_num_br(i["current_stock"], 1)} {i["unit"]}</b> '
+                f'(mínimo: {_num_br(i["min_stock"], 0)}) — <b>{_num_br(pct, 0)}% do mínimo</b></div>',
                 unsafe_allow_html=True)
         if st.button("📦 Ir para Estoque",type="primary"):
             _go("estoque"); st.rerun()
@@ -4305,7 +4310,7 @@ def _alertas_operacionais():
     meta = db.get_gmd_target()
     low_perf = db.get_low_performance(meta)
     st.subheader(f"📉 Baixo Desempenho ({len(low_perf)})")
-    st.caption(f"Animais com GMD abaixo da meta ({meta:.3f} kg/dia).")
+    st.caption(f"Animais com GMD abaixo da meta ({_num_br(meta, 3)} kg/dia).")
     if low_perf:
         df_lp = pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],
             "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
@@ -4377,7 +4382,7 @@ def page_relatorios():
                 "Fornecedor":a.get("fornecedor_name") or "",
                 "NF":a.get("nf_number") or "",
                 "GTA":a.get("gta_number") or "",
-                "Carência até":wd.isoformat() if wd else ""})
+                "Carência até":_data_br(wd) if wd else ""})
         df_inv=pd.DataFrame(rows_inv)
         st.dataframe(df_inv,use_container_width=True,hide_index=True,height=350)
         _download_row("Inventário",df_inv,"inventario")
@@ -4417,7 +4422,7 @@ def page_relatorios():
                 f"Prod. ({ul})":prod,
                 "Custo Total (R$)":tc,
                 _breakeven_label():be,
-                f"Receita @ R${cotacao_r:.0f}/{ul}":receita,
+                f"Receita @ R${_num_br(cotacao_r, 0)}/{ul}":receita,
                 "Lucro Estimado (R$)":lucro})
         df_fin=pd.DataFrame(rows_fin)
         if not df_fin.empty:
@@ -4722,7 +4727,7 @@ def _cadastro_compra():
                 value=150.0,step=1.0,key="cad_comp")
         entry_weight = db.estimate_weight_by_measurement(pt_c, comp_c)
         with pm3:
-            st.metric("Peso estimado", f"{entry_weight:.1f} kg")
+            st.metric("Peso estimado", f"{_num_br(entry_weight, 1)} kg")
         medida_nota = f"PT={pt_c:.0f}cm Comp={comp_c:.0f}cm"
     else:
         lbl = "Peso na balança (kg) *" if peso_metodo=="pesado" else "Peso estimado (kg) *"
@@ -4742,7 +4747,7 @@ def _cadastro_compra():
                     preco_kg_compra = st.number_input("Preço por kg (R$)",
                         min_value=0.0, step=0.10, format="%.2f")
                     purchase_price = round(entry_weight * preco_kg_compra, 2)
-                    st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({entry_weight:.0f} kg × R\\$ {preco_kg_compra:.2f})")
+                    st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({_num_br(entry_weight, 0)} kg × R\\$ {_num_br(preco_kg_compra, 2)})")
                 else:
                     purchase_price=st.number_input("Valor de Compra (R$)",
                         min_value=0.0,step=10.0,format="%.2f")
@@ -4797,7 +4802,7 @@ def _cadastro_compra():
                 ))
                 cat = db.get_age_category(birth_date_str)
                 st.success(f"✅ Animal **{aid}** cadastrado! Categoria: **{cat}** · "
-                           f"Peso: {entry_weight:.1f} kg ({db.WEIGH_METHODS[peso_metodo]})")
+                           f"Peso: {_num_br(entry_weight, 1)} kg ({db.WEIGH_METHODS[peso_metodo]})")
                 st.balloons()
 
     # Cadastrar Fornecedor rápido
@@ -4972,7 +4977,7 @@ def page_clima():
                 db.add_rain(rdate.strftime("%Y-%m-%d"), rmm,
                     lote_sel["id"] if lote_sel else None,
                     st.session_state.user["name"], rnotes)
-                st.success(f"✅ {rmm:.1f} mm registrados."); st.rerun()
+                st.success(f"✅ {_num_br(rmm, 1)} mm registrados."); st.rerun()
 
     # ── Histórico de chuva ────────────────────────────────────────────────────
     with ct3:
@@ -4981,7 +4986,7 @@ def page_clima():
         with h2: end = st.date_input("Até", value=date.today(), key="rain_end")
         chuvas = db.get_rain(start.isoformat(), end.isoformat())
         total = db.get_rain_total(start.isoformat(), end.isoformat())
-        st.metric("🌧️ Chuva acumulada no período", f"{total:.0f} mm")
+        st.metric("🌧️ Chuva acumulada no período", f"{_num_br(total, 0)} mm")
         if chuvas:
             df = pd.DataFrame(chuvas)
             df["read_date"] = pd.to_datetime(df["read_date"])
@@ -5033,7 +5038,7 @@ def page_sanitario():
             plan = db.get_protocol_plan(p)
             freq = db.PROTOCOL_FREQUENCIES.get(p["frequency"], p["frequency"])
             sexo = db.SEX_TARGETS.get(p["sex_target"], p["sex_target"])
-            dose_desc = (f"{p['dose_value']:g} {p['dose_unit']} a cada {p['dose_ref_kg']:.0f} kg"
+            dose_desc = (f"{p['dose_value']:g} {p['dose_unit']} a cada {_num_br(p['dose_ref_kg'], 0)} kg"
                          if (p.get("dose_ref_kg") or 0) > 0
                          else f"{p['dose_value']:g} {p['dose_unit']} por animal")
             st.markdown(f"#### 💉 {p['name']}")
@@ -5267,7 +5272,7 @@ def _render_tab_simulador_terminacao(animals):
         st.info("Informe um GMD maior que zero em pelo menos um cenário.")
     else:
         ganho = round(peso_meta - peso_atual, 1)
-        st.markdown(f"Ganho necessário: **{ganho:.0f} kg** por cabeça.")
+        st.markdown(f"Ganho necessário: **{_num_br(ganho, 0)} kg** por cabeça.")
         rows = [{"Estratégia":s["nome"],"Dias no trato":s["dias"],
                  "@ produzidas":s["arrobas_produzidas"],
                  "Custo alimentar (R$)":s["custo_alimentar"],
@@ -5332,7 +5337,7 @@ def _render_tab_correlacao_chuva_gmd():
         resultado = correlacao_chuva_gmd(series)
         k1, k2 = st.columns(2)
         k1.metric("Coeficiente de correlação",
-                 f"{resultado['coeficiente']:.2f}"
+                 f"{_num_br(resultado['coeficiente'], 2)}"
                  if resultado["coeficiente"] is not None else "—")
         k2.metric("Períodos avaliados", resultado["n"])
         st.info(f"ℹ️ {resultado['interpretacao']}")
@@ -5374,7 +5379,7 @@ def _render_tab_meta_gmd():
 
     low = db.get_low_performance(meta_atual)
     st.markdown(f"**{_plural(len(low),'animal','animais')} abaixo da meta "
-                f"({meta_atual:.3f} kg/dia)**")
+                f"({_num_br(meta_atual, 3)} kg/dia)**")
     if low:
         rows = [{"ID":a["id"],"Raça":a["breed"],
                  "Categoria":db.get_age_category(a.get("birth_date")),
@@ -5467,9 +5472,9 @@ def page_nutricao():
                     with c1:
                         st.markdown(
                             f'<div class="hist-item">'
-                            f'<b>{p["product_name"]}</b> — {p["quantity"]:.0f} {p["unit"]} '
+                            f'<b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
                             f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo} '
-                            f'· desde {p["vigente_de"]}'
+                            f'· desde {_data_br(p["vigente_de"])}'
                             f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
                             f'</div>', unsafe_allow_html=True)
                     with c2:
@@ -5530,7 +5535,7 @@ def page_nutricao():
                     unid = st.selectbox("Unidade", ["kg","ton","saco","litro","g"])
                     ins_link = st.selectbox("Vincular a insumo (opcional)",
                         [None]+insumos,
-                        format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({x['current_stock']:.0f} {x['unit']})",
+                        format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({_num_br(x['current_stock'], 0)} {x['unit']})",
                         help="Se vinculado, a confirmação do operador pode baixar do estoque")
                 notes = st.text_input("Observações", placeholder="Opcional")
                 if st.form_submit_button("✅ Adicionar ao Plano", type="primary", use_container_width=True):
@@ -5591,8 +5596,8 @@ def _nutricao_historico_da_dieta(lotes):
                          f"{'versão' if len(versoes)==1 else 'versões'}",
                          expanded=any(v["vigente_ate"] is None for v in versoes)):
             rows = [{
-                "Vigência": f"{v['vigente_de']} → {v['vigente_ate'] or 'hoje'}",
-                "Quantidade": f"{v['quantity']:.1f} {v['unit']}",
+                "Vigência": f"{_data_br(v['vigente_de'])} → {_data_br(v['vigente_ate']) if v['vigente_ate'] else 'hoje'}",
+                "Quantidade": f"{_num_br(v['quantity'], 1)} {v['unit']}",
                 "Frequência": db.FEEDING_FREQUENCIES.get(v["frequency"], v["frequency"]),
                 "Situação": "🟢 Vigente" if v["vigente_ate"] is None else "⚪ Encerrada",
             } for v in versoes]
@@ -5630,7 +5635,7 @@ def _nutricao_custo_por_piquete(lotes, insumos):
         resultado = custo_por_cabeca_dia(ingredientes)
 
         with st.expander(f"🌿 {lid} — {lote_nome} · {cabecas} cabeça(s) · "
-                         f"R$ {resultado['custo_dia']:.2f}/cabeça/dia"):
+                         f"R$ {_num_br(resultado['custo_dia'], 2)}/cabeça/dia"):
             if cabecas == 0:
                 st.warning("Piquete sem animais ativos — custo por cabeça não se "
                           "aplica (os planos continuam ativos, mas ninguém consome).")
@@ -5650,11 +5655,11 @@ def _nutricao_custo_por_piquete(lotes, insumos):
                 resultado["custo_dia"], gmd_medio, rendimento_medio)
 
             k1, k2, k3, k4 = st.columns(4)
-            k1.metric("Custo/cabeça/dia", f"R$ {resultado['custo_dia']:.2f}")
-            k2.metric("Matéria natural/dia", f"{resultado['kg_materia_natural']:.2f} kg")
-            k3.metric("Matéria seca/dia", f"{resultado['kg_materia_seca']:.2f} kg")
+            k1.metric("Custo/cabeça/dia", f"R$ {_num_br(resultado['custo_dia'], 2)}")
+            k2.metric("Matéria natural/dia", f"{_num_br(resultado['kg_materia_natural'], 2)} kg")
+            k3.metric("Matéria seca/dia", f"{_num_br(resultado['kg_materia_seca'], 2)} kg")
             k4.metric("Custo/@ produzida",
-                     f"R$ {custo_arroba:.2f}" if custo_arroba is not None else "—",
+                     f"R$ {_num_br(custo_arroba, 2)}" if custo_arroba is not None else "—",
                      help="Precisa de GMD positivo no piquete para calcular.")
 
             if resultado["participacao"]:
@@ -6582,7 +6587,7 @@ def _propriedades_editar(props):
         g1, g2, g3 = st.columns(3)
         g1.metric("Área", f"{_num_br(geometria_area_ha(anel), 2)} ha")
         g2.metric("Perímetro", f"{_num_br(geometria_perimetro_m(anel), 0)} m")
-        g3.metric("Centro", f"{lat:.4f}, {lon:.4f}")
+        g3.metric("Centro", f"{_num_br(lat, 4)}, {_num_br(lon, 4)}")
 
     pode = (bool(nome) and not erro_leitura and not problemas
             and (situacao != "encerrada" or bool(encerramento)))
@@ -7232,7 +7237,7 @@ def page_admin():
         else:
             st.markdown("**Banco de Dados:** SQLite local `agrotop.db` — funciona offline")
             if os.path.exists(db.DB_PATH):
-                st.metric("Tamanho",f"{os.path.getsize(db.DB_PATH)/1024:.1f} KB")
+                st.metric("Tamanho",f"{_num_br(os.path.getsize(db.DB_PATH)/1024, 1)} KB")
 
         st.markdown("---")
         st.subheader("💾 Backup dos Dados")
