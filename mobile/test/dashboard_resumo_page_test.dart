@@ -744,4 +744,310 @@ void main() {
       expect(find.byType(AlertsPage), findsNothing);
     },
   );
+
+  testWidgets(
+    'Spec 0101: carga inicial com sucesso -> refresh falha -> banner aparece com horário correto e SnackBar',
+    (tester) async {
+      var requests = 0;
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          requests++;
+          if (requests == 1) {
+            return _json(_resumo(total: 12));
+          }
+          return _json({'detail': 'Erro no servidor'}, status: 500);
+        }),
+      );
+      final fixedTime = DateTime(2026, 9, 15, 14, 30);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(
+            api: api,
+            onUnauthorized: () {},
+            nowProvider: () => fixedTime,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('12'), findsOneWidget);
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsNothing);
+
+      // Executa pull to refresh
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(requests, 2);
+      expect(find.text('12'), findsOneWidget);
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Erro no servidor'), findsOneWidget);
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsOneWidget);
+      expect(
+        find.text(
+          'Não foi possível atualizar — última tentativa bem-sucedida antes de 14:30',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-stale-retry-button')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Spec 0101: após sumiço do SnackBar, o banner de dados desatualizados permanece visível',
+    (tester) async {
+      var requests = 0;
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          requests++;
+          if (requests == 1) return _json(_resumo(total: 12));
+          return _json({'detail': 'Falha temporária'}, status: 500);
+        }),
+      );
+      final fixedTime = DateTime(2026, 9, 15, 9, 5);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(
+            api: api,
+            onUnauthorized: () {},
+            nowProvider: () => fixedTime,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsOneWidget);
+
+      // Avança além da duração do SnackBar (4 segundos) e animação de saída
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // SnackBar sumiu, mas banner continua visível
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsOneWidget);
+      expect(
+        find.text(
+          'Não foi possível atualizar — última tentativa bem-sucedida antes de 09:05',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Spec 0101: falhas repetidas em sequência não reiniciam _staleSince',
+    (tester) async {
+      var requests = 0;
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          requests++;
+          if (requests == 1) return _json(_resumo(total: 12));
+          return _json({'detail': 'Falha #$requests'}, status: 500);
+        }),
+      );
+      var currentTime = DateTime(2026, 9, 15, 10, 0);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(
+            api: api,
+            onUnauthorized: () {},
+            nowProvider: () => currentTime,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Primeira falha às 10:00
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Não foi possível atualizar — última tentativa bem-sucedida antes de 10:00',
+        ),
+        findsOneWidget,
+      );
+
+      // Passam 45 minutos e ocorre nova tentativa que falha
+      currentTime = DateTime(2026, 9, 15, 10, 45);
+      await tester.tap(
+        find.byKey(const ValueKey('dashboard-stale-retry-button')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      // O horário no banner DEVE continuar sendo 10:00 (primeira falha da sequência)
+      expect(
+        find.text(
+          'Não foi possível atualizar — última tentativa bem-sucedida antes de 10:00',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Não foi possível atualizar — última tentativa bem-sucedida antes de 10:45',
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'Spec 0101: retry bem-sucedido remove o banner e atualiza os dados',
+    (tester) async {
+      var requests = 0;
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          requests++;
+          if (requests == 1) return _json(_resumo(total: 12));
+          if (requests == 2) return _json({'detail': 'Falha'}, status: 500);
+          return _json(_resumo(total: 18));
+        }),
+      );
+      final fixedTime = DateTime(2026, 9, 15, 11, 15);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(
+            api: api,
+            onUnauthorized: () {},
+            nowProvider: () => fixedTime,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('12'), findsOneWidget);
+
+      // Refresh falha
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsOneWidget);
+
+      // Tenta novamente pelo botão do banner e tem sucesso
+      await tester.tap(
+        find.byKey(const ValueKey('dashboard-stale-retry-button')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(requests, 3);
+      // Banner sumiu
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsNothing);
+      // Novos dados na tela
+      expect(find.text('18'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Spec 0101: carga inicial com falha exibe _LoadError em tela cheia sem banner',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          expect(request.url.path, '/dashboard/resumo');
+          return _json({'detail': 'Falha na conexão inicial'}, status: 500);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Falha na conexão inicial'), findsOneWidget);
+      expect(find.text('Tentar novamente'), findsOneWidget);
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Spec 0101: 401 durante refresh chama onUnauthorized sem exibir banner',
+    (tester) async {
+      var requests = 0;
+      var unauthorizedCalled = false;
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/auth/refresh') {
+            return _json({'detail': 'Token inválido'}, status: 401);
+          }
+          if (request.url.path == '/dashboard/resumo') {
+            requests++;
+            if (requests == 1) return _json(_resumo(total: 12));
+            return _json({'detail': 'Unauthorized'}, status: 401);
+          }
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(
+            api: api,
+            onUnauthorized: () => unauthorizedCalled = true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('12'), findsOneWidget);
+
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(unauthorizedCalled, isTrue);
+      expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsNothing);
+    },
+  );
 }

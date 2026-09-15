@@ -1451,6 +1451,104 @@ void main() {
     }
   });
 
+  testWidgets(
+    'dashboard com estado desatualizado após refresh falho nos três temas',
+    (tester) async {
+      final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+      if (captureGoldens) await loadAppFonts();
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final fixedTime = DateTime(2026, 9, 15, 10, 30);
+
+      for (final mode in ThemeMode.values) {
+        final store = GoldenTokenStore()
+          ..tokens = const StoredTokens(
+            accessToken: 'access-live',
+            refreshToken: 'refresh-valid',
+          );
+        var requests = 0;
+        final api = ApiClient(
+          tokenStore: store,
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.method == 'GET' &&
+                request.url.path == '/dashboard/resumo') {
+              requests++;
+              if (requests == 1) {
+                return _json({
+                  'total_animais': 12,
+                  'peso_medio_kg': 412.5,
+                  'gmd_medio_kg_dia': 0.65,
+                  'arrobas_produzidas': 28.4,
+                  'lotacao_ua_ha': 1.25,
+                  'machos': 7,
+                  'femeas': 5,
+                  'distribuicao_por_raca': [
+                    {'raca': 'Nelore', 'quantidade': 7},
+                    {'raca': 'Angus', 'quantidade': 3},
+                    {'raca': 'Brangus', 'quantidade': 2},
+                  ],
+                  'alertas': {
+                    'sumidos': 1,
+                    'carencia': 2,
+                    'prontos_para_abate': 3,
+                  },
+                });
+              }
+              return _json({'detail': 'Falha na conexão'}, status: 500);
+            }
+            return _json({'detail': 'Não encontrado'}, status: 404);
+          }),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppThemes.light,
+            darkTheme: AppThemes.dark,
+            themeMode: mode,
+            home: DashboardResumoPage(
+              api: api,
+              onUnauthorized: () {},
+              nowProvider: () => fixedTime,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Pull to refresh que falha
+        await tester.fling(
+          find.byKey(const ValueKey('dashboard-resumo-list')),
+          const Offset(0, 400),
+          1000,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        // Avança para o SnackBar sumir e o banner persistente ficar em destaque
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('dashboard-stale-banner')),
+          findsOneWidget,
+        );
+
+        if (captureGoldens) {
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile(
+              'goldens/${mode.name}-30b-dashboard-desatualizado.png',
+            ),
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
   testWidgets('tela de relatórios cobre inventário e pesagens nos três temas', (
     tester,
   ) async {
