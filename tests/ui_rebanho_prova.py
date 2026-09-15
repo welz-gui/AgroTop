@@ -123,11 +123,12 @@ class TestTelaRebanho(unittest.TestCase):
         self.assertEqual(seletor.options, [])
         self.assertIsNone(seletor.value)
 
-        # Clicar no botão 'Abrir Ficha' não navega nem abre nenhum animal
+        # 'Abrir Ficha' fica desabilitado — um usuário real não consegue
+        # clicar nele. AppTest recusa até simular o clique num widget
+        # desabilitado (AppTestError), então a prova aqui é o estado do
+        # widget, não uma tentativa de clique que o próprio framework proíbe.
         btn = self._botao_abrir_ficha(at)
-        btn.click()
-        at.run()
-        self.assertEqual(list(at.exception), [])
+        self.assertTrue(btn.disabled, "botão 'Abrir Ficha' deveria estar desabilitado sem resultados")
         # Continua na página rebanho, sem definir animal_detail
         self.assertEqual(at.session_state["page"], "rebanho")
         self.assertTrue("animal_detail" not in at.session_state or at.session_state["animal_detail"] is None)
