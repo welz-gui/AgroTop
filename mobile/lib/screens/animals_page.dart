@@ -918,9 +918,12 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                       children: [
                         const Icon(Icons.pets),
                         const SizedBox(width: 12),
-                        Text(
-                          animal.id,
-                          style: Theme.of(context).textTheme.headlineSmall,
+                        Expanded(
+                          child: Text(
+                            animal.id,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
