@@ -15,10 +15,12 @@ class DashboardResumoPage extends StatefulWidget {
     super.key,
     required this.api,
     required this.onUnauthorized,
+    this.nowProvider,
   });
 
   final ApiClient api;
   final VoidCallback onUnauthorized;
+  final DateTime Function()? nowProvider;
 
   @override
   State<DashboardResumoPage> createState() => _DashboardResumoPageState();
@@ -27,6 +29,10 @@ class DashboardResumoPage extends StatefulWidget {
 class _DashboardResumoPageState extends State<DashboardResumoPage> {
   DashboardResumo? _resumo;
   String? _error;
+  DateTime? _staleSince;
+  String? _staleMessage;
+
+  DateTime _now() => (widget.nowProvider ?? DateTime.now)();
 
   @override
   void initState() {
@@ -40,6 +46,8 @@ class _DashboardResumoPageState extends State<DashboardResumoPage> {
       if (!mounted) return;
       setState(() {
         _resumo = resumo;
+        _staleSince = null;
+        _staleMessage = null;
         _error = null;
       });
     } on ApiException catch (error) {
@@ -59,6 +67,10 @@ class _DashboardResumoPageState extends State<DashboardResumoPage> {
     if (_resumo == null) {
       setState(() => _error = message);
     } else {
+      setState(() {
+        _staleSince ??= _now();
+        _staleMessage = message;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -74,17 +86,87 @@ class _DashboardResumoPageState extends State<DashboardResumoPage> {
           ? _error == null
                 ? const Center(child: CircularProgressIndicator())
                 : _LoadError(message: _error!, onRetry: _load)
-          : RefreshIndicator(
-              key: const ValueKey('dashboard-resumo-refresh'),
-              onRefresh: _load,
-              child: resumo.totalAnimais == 0
-                  ? const _EmptyDashboard()
-                  : _DashboardContent(
-                      resumo: resumo,
-                      api: widget.api,
-                      onUnauthorized: widget.onUnauthorized,
-                    ),
+          : Column(
+              children: [
+                if (_staleSince != null)
+                  _StaleDashboardBanner(
+                    staleSince: _staleSince!,
+                    staleMessage: _staleMessage,
+                    onRetry: _load,
+                  ),
+                Expanded(
+                  child: RefreshIndicator(
+                    key: const ValueKey('dashboard-resumo-refresh'),
+                    onRefresh: _load,
+                    child: resumo.totalAnimais == 0
+                        ? const _EmptyDashboard()
+                        : _DashboardContent(
+                            resumo: resumo,
+                            api: widget.api,
+                            onUnauthorized: widget.onUnauthorized,
+                          ),
+                  ),
+                ),
+              ],
             ),
+    );
+  }
+}
+
+class _StaleDashboardBanner extends StatelessWidget {
+  const _StaleDashboardBanner({
+    required this.staleSince,
+    this.staleMessage,
+    required this.onRetry,
+  });
+
+  final DateTime staleSince;
+  final String? staleMessage;
+  final VoidCallback onRetry;
+
+  String get _formattedTime {
+    final h = staleSince.hour.toString().padLeft(2, '0');
+    final m = staleSince.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      key: const ValueKey('dashboard-stale-banner'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: colorScheme.surfaceContainerHighest,
+      child: Row(
+        children: [
+          Tooltip(
+            message: staleMessage ?? 'Não foi possível atualizar',
+            child: Icon(
+              Icons.cloud_off_outlined,
+              size: 20,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Não foi possível atualizar — última tentativa bem-sucedida antes de $_formattedTime',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            key: const ValueKey('dashboard-stale-retry-button'),
+            onPressed: onRetry,
+            child: const Text('Tentar novamente'),
+          ),
+        ],
+      ),
     );
   }
 }
