@@ -99,14 +99,50 @@ class _AlertsPageState extends State<AlertsPage> {
     });
   }
 
+  String _titleForCategoria(AlertCategoria categoria) {
+    switch (categoria) {
+      case AlertCategoria.sumidos:
+        return 'Animais Sumidos';
+      case AlertCategoria.carencia:
+        return 'Em Período de Carência';
+      case AlertCategoria.prontosParaAbate:
+        return 'Prontos para Abate';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final alerts = _alerts;
     final recomendacoes = _recomendacoes;
     final hasContent = alerts != null || recomendacoes != null;
+    final title = widget.focusCategoria != null
+        ? _titleForCategoria(widget.focusCategoria!)
+        : 'Alertas operacionais';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Alertas operacionais')),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (widget.focusCategoria != null)
+            Tooltip(
+              message: 'Ver todos os alertas',
+              child: TextButton(
+                key: const ValueKey('alerts-ver-todos'),
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => AlertsPage(
+                        api: widget.api,
+                        onUnauthorized: widget.onUnauthorized,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Ver todos os alertas'),
+              ),
+            ),
+        ],
+      ),
       body: !hasContent
           ? _error == null
                 ? const Center(child: CircularProgressIndicator())

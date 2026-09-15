@@ -759,6 +759,62 @@ void main() {
     }
   });
 
+  testWidgets('alertas com filtro por categoria nos três temas', (
+    tester,
+  ) async {
+    final captureGoldens = Platform.environment['CAPTURE_GOLDENS'] == '1';
+    if (captureGoldens) await loadAppFonts();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final mode in ThemeMode.values) {
+      final store = GoldenTokenStore()
+        ..tokens = const StoredTokens(
+          accessToken: 'access-live',
+          refreshToken: 'refresh-valid',
+        );
+      final api = ApiClient(
+        tokenStore: store,
+        baseUrl: 'http://mock.local',
+        httpClient: _client(
+          alerts: _alertsResponse(withItems: true),
+          recomendacoes: _recomendacoesResponse(withItems: true),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppThemes.light,
+          darkTheme: AppThemes.dark,
+          themeMode: mode,
+          home: AlertsPage(
+            api: api,
+            onUnauthorized: () {},
+            focusCategoria: AlertCategoria.sumidos,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppBar, 'Animais Sumidos'), findsOneWidget);
+      expect(find.text('Ver todos os alertas'), findsOneWidget);
+      expect(find.text('🔴 Animais Sumidos (1)'), findsOneWidget);
+      expect(find.text('BR0099 — Nelore'), findsOneWidget);
+
+      if (captureGoldens) {
+        await expectLater(
+          find.byType(MaterialApp),
+          matchesGoldenFile('goldens/${mode.name}-17b-alertas-filtrado.png'),
+        );
+      }
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
+
   testWidgets(
     'indicador de pendências na fila offline (vazia e com itens) nos três temas',
     (tester) async {
