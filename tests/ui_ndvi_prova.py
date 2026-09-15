@@ -131,8 +131,8 @@ class TestUiNdvi(unittest.TestCase):
 
         valores_metricas = [m.value for m in at.metric]
         self.assertTrue(
-            any("0.712" in str(v) for v in valores_metricas),
-            f"métrica com valor 0.712 não encontrada: {valores_metricas}",
+            any("0,712" in str(v) for v in valores_metricas),
+            f"métrica com valor 0,712 não encontrada: {valores_metricas}",
         )
 
         textos_info = [info.value for info in at.info]
