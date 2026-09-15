@@ -53,6 +53,7 @@ PROVAS = [
     "tests.ui_car_prova", # cruzamento visual propriedade × CAR (Spec 0082)
     "tests.ui_assistente_prova", # consulta IA: privacidade e acesso (Spec 0083)
     "tests.ui_campo_chuva_prova", # registro rápido de chuva no Modo Campo
+    "tests.ui_rebanho_prova", # seletor respeita filtros (Spec 0095)
 ]
 
 

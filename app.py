@@ -1758,12 +1758,19 @@ def page_rebanho():
 
     st.markdown("---")
     r1,r2=st.columns([2,1])
+    ids_filtrados = df["ID"].tolist()
     with r1:
-        sel=st.selectbox("Animal para detalhar",[a["id"] for a in animals_all])
+        sel = st.selectbox(
+            "Animal para detalhar",
+            ids_filtrados,
+            disabled=len(ids_filtrados) == 0,
+        )
     with r2:
-        st.markdown("<br>",unsafe_allow_html=True)
-        if st.button("📂 Abrir Ficha",type="primary",use_container_width=True):
-            _go("animal",sel); st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("📂 Abrir Ficha", type="primary", use_container_width=True, disabled=len(ids_filtrados) == 0):
+            if sel:
+                _go("animal", sel)
+                st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FICHA DO ANIMAL  (Linha do Tempo)
