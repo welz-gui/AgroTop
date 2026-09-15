@@ -684,11 +684,22 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | ✅ [#418](https://github.com/welz-gui/AgroTop/pull/418) | | 2026-09-14 |
 | — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | ✅ [#413](https://github.com/welz-gui/AgroTop/pull/413) | | 2026-09-14 |
 | — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | 🟢 livre | | 2026-09-14 |
-| — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | ✅ [#420](https://github.com/welz-gui/AgroTop/pull/420) | | 2026-09-14 |
 | — | [0101](0101-mobile-dashboard-estado-desatualizado.md) — Mobile: dashboard mostra quando os dados ficaram desatualizados 🔁 | — | 🟢 livre | | 2026-09-14 |
 | — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0103](0103-web-navegacao-agrupada-por-tarefa.md) — Web: sidebar agrupada por tarefa, sem perder destinos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 | — | [0104](0104-mobile-ficha-overflow-telas-pequenas.md) — Mobile: corrige overflow da ficha em telas pequenas/fonte ampliada ⚙️ | — | 🟢 livre | | 2026-09-15 |
+
+> **0100 revisada em 2026-09-15 — [PR #420](https://github.com/welz-gui/AgroTop/pull/420).**
+> Diff conferido linha a linha contra o contrato: `.page-title` 1.875rem, `stMetricValue`
+> 2rem, `.texto-apoio`/`.titulo-secao` com o CSS exato da spec, raio unificado em 12px nos 7
+> seletores listados, espaçamento mapeado pra escala 4/8/12/16/24/32, `c = cores()` duplicado
+> removido, nada tocado em `ui/tema.py::ESCURO`/`CLARO`. Prova de UI nova (`ui_base_visual_prova.py`)
+> cobre isso com asserções de valor exato, não só presença. O PR não anexou capturas
+> antes/depois nos dois temas como a Entrega pedia — dado o CSS ser inteiramente coberto por
+> teste com valores exatos (baixo risco de regressão silenciosa), mesclei sem bloquear por
+> isso, mas registre aqui para quem for construir RD07/RD08/RD09 em cima desta base: vale
+> abrir o app e olhar de verdade antes de assumir que a hierarquia visual "parece" certa.
 
 > **0096 revisada em 2026-09-15 — [PR #417](https://github.com/welz-gui/AgroTop/pull/417).**
 > O teste fez exatamente o que a spec pedia: achou um defeito real em produção (herdado da
