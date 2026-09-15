@@ -681,7 +681,7 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0094](0094-mobile-busca-cache-offline-coerente.md) — Mobile: busca e cache offline com escopo verdadeiro 🔁 | — | ✅ [#412](https://github.com/welz-gui/AgroTop/pull/412) | | 2026-09-14 |
 | — | [0095](0095-web-rebanho-selecao-coerente.md) — Web: seletor de animal do Rebanho respeita os filtros 🔁 | — | ✅ [#414](https://github.com/welz-gui/AgroTop/pull/414) | | 2026-09-14 |
 | — | [0096](0096-mobile-ficha-validar-telas-pequenas.md) — Mobile: validar ações da ficha em telas pequenas e fonte ampliada ⚙️ | — | ✅ [#417](https://github.com/welz-gui/AgroTop/pull/417) | | 2026-09-14 |
-| — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | 🟢 livre | | 2026-09-14 |
+| — | [0097](0097-mobile-alertas-indicador-de-filtro.md) — Mobile: AlertsPage mostra qual filtro está ativo e permite ver todos 🏗️ | — | ✅ [#418](https://github.com/welz-gui/AgroTop/pull/418) | | 2026-09-14 |
 | — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | ✅ [#413](https://github.com/welz-gui/AgroTop/pull/413) | | 2026-09-14 |
 | — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | 🟢 livre | | 2026-09-14 |
 | — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | 🟢 livre | | 2026-09-14 |
