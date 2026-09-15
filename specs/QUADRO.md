@@ -350,6 +350,30 @@ arquivos da spec corrigidos certo, mas a revisão achou **3 menções a "API" fo
 (`api_client.dart`, rodapé da ficha, tela do QR) que o próprio critério de aceite da spec
 (grep zerado em `mobile/lib/*.dart` inteiro) deveria ter pego — corrigidas antes do merge.
 
+**0101-0103 escritas em 2026-09-14** — continuação da fila de redesign a pedido do usuário.
+**0101** é RD02 (a proposta), achado que eu mesmo tinha deixado passar numa rodada anterior
+(escrevi 0094-0100 sem cobrir RD02) — corrigido agora: dashboard mostra "não foi possível
+atualizar — última tentativa bem-sucedida antes de HH:MM" persistente, complementando o
+`SnackBar` transitório da 0090. **0102** é RD05 (tema web) — achado que muda o design da
+proposta original: o Streamlit **já tem** seletor de tema nativo (menu ⋮ → Settings →
+Theme) com persistência pelo próprio navegador; não é preciso criar seletor nem
+`session_state` novo, só ler `st.context.theme.type` (API confirmada na versão instalada,
+1.57.0) para os gráficos Plotly e o CSS customizado acompanharem o que o usuário já escolheu
+nativamente. **0103** é RD06 (navegação agrupada) — os 20 destinos do admin/4 do operador já
+confirmados em `docs/redesign-web-contratos-e-decisoes.md` §3, agrupados em 5 categorias sem
+collapse/expand (mais simples que a proposta original, e sem risco de esconder a página
+ativa).
+
+**Achado da revisão do "Plano de Prioridades" (fora da fila de specs)**: ao investigar o que
+falta de verdade (pedido do usuário em resposta à análise desse documento), eu tinha listado
+"evidências em armazenamento de objeto" como gap genuíno. **Retratado**: é uma decisão já
+tomada e documentada, não um esquecimento — [ADR 0002](../docs/adr/0002-fronteira-de-portabilidade.md)
+já avaliou Supabase Storage explicitamente e decidiu "evitar enquanto `bytea` atender", com
+gatilho de revisão definido (quando `bytea` não atender mais) e até o método certo já
+decidido para quando isso acontecer (API S3-compatível, nunca o SDK proprietário). Não virou
+spec. RFID e comando por voz continuam genuinamente sem spec, mas também sem hardware/fluxo
+concreto definido para fundamentar uma — aguardando o usuário trazer um caso de uso real.
+
 **Fora da fila de specs, 2026-08-31:** a **camada de conexão mudou** (pool, `init_db` uma vez por processo, commit só em escrita) e a **cadeia de migrations voltou a replayar** — as duas coisas afetam quem for mexer em `repositories/conexao.py`, em `database.py` ou no baseline. Ver a nota logo abaixo, antes da Fila.
 
 > **0051 fechada em 2026-08-24.** [PR #188](https://github.com/welz-gui/AgroTop/pull/188)
@@ -661,6 +685,9 @@ arquivos da spec corrigidos certo, mas a revisão achou **3 menções a "API" fo
 | — | [0098](0098-mobile-linguagem-operacional-pt-br.md) — Mobile: linguagem operacional e formatos pt-BR 🔁 | — | ✅ [#413](https://github.com/welz-gui/AgroTop/pull/413) | | 2026-09-14 |
 | — | [0099](0099-web-formatacao-pt-br.md) — Web: formatação pt-BR consistente de números e datas 🔁 | — | 🟢 livre | | 2026-09-14 |
 | — | [0100](0100-web-base-visual-componentes.md) — Web: escala tipográfica, espaçamento e variantes de componente 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0101](0101-mobile-dashboard-estado-desatualizado.md) — Mobile: dashboard mostra quando os dados ficaram desatualizados 🔁 | — | 🟢 livre | | 2026-09-14 |
+| — | [0102](0102-web-tema-coerente-com-widgets-nativos.md) — Web: gráficos e CSS seguem o tema nativo do Streamlit 🏗️ | — | 🟢 livre | | 2026-09-14 |
+| — | [0103](0103-web-navegacao-agrupada-por-tarefa.md) — Web: sidebar agrupada por tarefa, sem perder destinos 🏗️ | — | 🟢 livre | | 2026-09-14 |
 
 > **0054 concluída em 2026-08-24 — [PR #233](https://github.com/welz-gui/AgroTop/pull/233).**
 > `GET /trato/pendentes` + `POST /trato/{plano_id}/confirmar`, expondo
