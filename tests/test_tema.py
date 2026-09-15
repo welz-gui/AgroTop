@@ -57,6 +57,17 @@ class TestParidadeDeTemas(unittest.TestCase):
 
         self.assertEqual(re.findall(r"#[0-9a-fA-F]{6}", bloco), [])
 
+    def test_base_visual_fixa_hierarquia_e_raio(self):
+        caminho = os.path.join(RAIZ, "app.py")
+        with open(caminho, encoding="utf-8") as arquivo:
+            bloco = arquivo.read().split("# ─── CSS", 1)[1].split("</style>", 1)[0]
+
+        self.assertIn(".page-title{font-size:1.875rem", bloco)
+        self.assertIn('div[data-testid="stMetricValue"]{font-size:2rem!important}', bloco)
+        self.assertIn(".texto-apoio{font-size:.8125rem", bloco)
+        self.assertIn(".titulo-secao{font-size:1.1875rem", bloco)
+        self.assertEqual(bloco.count("border-radius:12px"), 9)
+
     def test_mesmos_tokens_nos_dois_temas(self):
         so_escuro = sorted(set(tema.ESCURO) - set(tema.CLARO))
         so_claro = sorted(set(tema.CLARO) - set(tema.ESCURO))
