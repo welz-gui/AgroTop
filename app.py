@@ -102,44 +102,47 @@ st.set_page_config(
 db.init_db()
 db.refresh_carencia_status()
 c = cores()
-c = cores()
 
 # ─── CSS ──────────────────────────────────────────────────────────────────────
 st.markdown(css_variaveis(), unsafe_allow_html=True)
 st.markdown("""
 <style>
-.main .block-container{padding-top:.8rem;padding-bottom:2rem}
+/* Escala visual fixa: corpo 15px, apoio 13px, seção 19px, título 30px, KPI 32px;
+   espaçamento 4/8/12/16/24/32px e raio base 12px. */
+.main .block-container{padding-top:.75rem;padding-bottom:2rem}
 section[data-testid="stSidebar"]{background:var(--fundo_alt)!important}
 
 /* Botões grandes — uso ao sol */
-.stButton>button{min-height:2.75rem;font-size:1rem;font-weight:600;border-radius:10px;transition:all .15s}
+.stButton>button{min-height:2.75rem;font-size:1rem;font-weight:600;border-radius:12px;transition:all .15s}
 .stButton>button:hover{transform:translateY(-1px)}
 
 /* Métricas */
-div[data-testid="stMetric"]{background:var(--superficie);border:1px solid var(--borda);border-radius:14px;padding:1rem 1.2rem}
-div[data-testid="stMetricValue"]{font-size:1.55rem!important}
+div[data-testid="stMetric"]{background:var(--superficie);border:1px solid var(--borda);border-radius:12px;padding:1rem}
+div[data-testid="stMetricValue"]{font-size:2rem!important}
 
 /* Título de página */
-.page-title{font-size:1.55rem;font-weight:800;color:var(--primaria);border-left:4px solid var(--primaria);padding-left:.75rem;margin-bottom:1.4rem}
+.page-title{font-size:1.875rem;font-weight:800;color:var(--primaria);border-left:4px solid var(--primaria);padding-left:.75rem;margin-bottom:1.5rem}
+.texto-apoio{font-size:.8125rem;color:var(--texto_secundario)}
+.titulo-secao{font-size:1.1875rem;font-weight:700;color:var(--texto)}
 
 /* Cards */
-.card{background:var(--superficie);border:1px solid var(--borda);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-green{background:linear-gradient(135deg,var(--sucesso_fundo),var(--fundo));border:1px solid var(--sucesso_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-yellow{background:linear-gradient(135deg,var(--atencao_fundo),var(--fundo));border:1px solid var(--atencao_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
-.card-red{background:linear-gradient(135deg,var(--perigo_fundo),var(--fundo));border:1px solid var(--perigo_escuro);border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.card{background:var(--superficie);border:1px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.card-green{background:linear-gradient(135deg,var(--sucesso_fundo),var(--fundo));border:1px solid var(--sucesso_escuro);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.card-yellow{background:linear-gradient(135deg,var(--atencao_fundo),var(--fundo));border:1px solid var(--atencao_escuro);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.card-red{background:linear-gradient(135deg,var(--perigo_fundo),var(--fundo));border:1px solid var(--perigo_escuro);border-radius:12px;padding:1rem;margin-bottom:1rem}
 
 /* Badges */
-.badge-green {background:var(--sucesso_fundo);color:var(--sucesso);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-yellow{background:var(--atencao_fundo_alt);color:var(--atencao);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-red   {background:var(--perigo_fundo);color:var(--perigo);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-blue  {background:var(--info_fundo);color:var(--info_texto);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
-.badge-gray  {background:var(--superficie);color:var(--texto_secundario);padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-green {background:var(--sucesso_fundo);color:var(--sucesso);padding:4px 8px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-yellow{background:var(--atencao_fundo_alt);color:var(--atencao);padding:4px 8px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-red   {background:var(--perigo_fundo);color:var(--perigo);padding:4px 8px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-blue  {background:var(--info_fundo);color:var(--info_texto);padding:4px 8px;border-radius:999px;font-size:.78rem;font-weight:700}
+.badge-gray  {background:var(--superficie);color:var(--texto_secundario);padding:4px 8px;border-radius:999px;font-size:.78rem;font-weight:700}
 
 /* Linha de histórico */
-.hist-item{background:var(--fundo);border-left:3px solid var(--primaria);border-radius:8px;padding:.45rem .9rem;margin-bottom:.35rem}
+.hist-item{background:var(--fundo);border-left:3px solid var(--primaria);border-radius:12px;padding:.5rem 1rem;margin-bottom:.5rem}
 
 /* Teclado numérico */
-.keypad-display{font-size:3rem;font-weight:900;color:var(--primaria);text-align:center;background:var(--fundo);border:2px solid var(--borda);border-radius:14px;padding:1rem;margin-bottom:.5rem;letter-spacing:.1em}
+.keypad-display{font-size:3rem;font-weight:900;color:var(--primaria);text-align:center;background:var(--fundo);border:2px solid var(--borda);border-radius:12px;padding:1rem;margin-bottom:.5rem;letter-spacing:.1em}
 
 /* Ocultar elementos padrão (mantendo o botão de abrir o menu lateral) */
 #MainMenu,footer{visibility:hidden}
@@ -154,14 +157,13 @@ header[data-testid="stHeader"]{background:transparent}
 [data-testid="collapsedControl"] button{
     background:var(--primaria)!important;
     color:var(--fundo)!important;
-    border-radius:8px;
+    border-radius:12px;
 }
 
 /* Mobile */
 @media(max-width:640px){
-  .main .block-container{padding-left:.4rem;padding-right:.4rem}
-  .stButton>button{min-height:3.2rem;font-size:1.1rem}
-  div[data-testid="stMetricValue"]{font-size:1.3rem!important}
+  .main .block-container{padding-left:.5rem;padding-right:.5rem}
+  .stButton>button{min-height:3rem;font-size:1.1rem}
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1454,7 +1456,7 @@ def _tab_obito(animal):
 
 
 def _tab_historico(animal):
-    c = cores()
+    paleta = cores()
     h1,h2=st.columns(2)
     with h1:
         st.markdown("**⚖️ Pesagens**")
@@ -1463,9 +1465,9 @@ def _tab_historico(animal):
             df_hw=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
             df_hw.columns=["Data","Peso (kg)"]; df_hw["Data"]=pd.to_datetime(df_hw["Data"])
             fig_hw=px.line(df_hw,x="Data",y="Peso (kg)",markers=True,
-                color_discrete_sequence=[c["primaria"]])
-            fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=c["superficie"]),
-                yaxis=dict(gridcolor=c["superficie"]))
+                color_discrete_sequence=[paleta["primaria"]])
+            fig_hw.update_layout(**PLOTLY,height=150,xaxis=dict(gridcolor=paleta["superficie"]),
+                yaxis=dict(gridcolor=paleta["superficie"]))
             st.plotly_chart(fig_hw,use_container_width=True)
         for w in ws[:5]:
             met = w.get("method") or "pesado"
@@ -1473,25 +1475,25 @@ def _tab_historico(animal):
                       "estimado":'<span class="badge-yellow">estimado</span>',
                       "medicao":'<span class="badge-blue">medição</span>'}.get(met,"")
             st.markdown(f'<div class="hist-item"><b>{w["weight"]:.1f} kg</b> {mbadge}'
-                f'<span style="color:{c["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
-                f'<span style="color:{c["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
+                f'<span style="color:{paleta["texto_terciario"]};font-size:.8rem;float:right">{w["weigh_date"]}</span><br>'
+                f'<span style="color:{paleta["texto_secundario"]};font-size:.78rem">{w["operator"] or "—"}</span></div>',
                 unsafe_allow_html=True)
     with h2:
         st.markdown("**💉 Medicamentos**")
         for m in db.get_medications(animal["id"], limit=5):
             end_=datetime.strptime(m["med_date"],"%Y-%m-%d").date()+timedelta(days=m["withdrawal_days"] or 0)
             badge='<span class="badge-yellow">Carência</span>' if m["withdrawal_days"] and end_>=date.today() else ""
-            st.markdown(f'<div class="hist-item" style="border-left-color:{c["info"]}">'
+            st.markdown(f'<div class="hist-item" style="border-left-color:{paleta["info"]}">'
                 f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
-                f'<span style="color:{c["texto_terciario"]};font-size:.78rem">'
+                f'<span style="color:{paleta["texto_terciario"]};font-size:.78rem">'
                 f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
                 f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
                 f'</span></div>',unsafe_allow_html=True)
         st.markdown("**🚚 Movimentações**")
         for mv in db.get_movements(animal["id"], limit=4):
-            st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
+            st.markdown(f'<div class="hist-item" style="border-left-color:{paleta["destaque"]}">'
                 f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
-                f'<span style="color:{c["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
+                f'<span style="color:{paleta["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
                 f'</div>',unsafe_allow_html=True)
 
 
