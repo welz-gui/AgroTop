@@ -66,10 +66,10 @@ class TestBaseVisual(unittest.TestCase):
         self.assertNotIn("background", regra.group(1))
 
     def test_cores_e_inicializada_uma_so_vez(self):
-        self.assertEqual(self.css.split("</style>", 1)[0].count("c = cores()"), 0)
+        self.assertEqual(self.css.split("</style>", 1)[0].count("c = cores("), 0)
         with open(os.path.join(RAIZ, "app.py"), encoding="utf-8") as arquivo:
             codigo = arquivo.read()
-        self.assertEqual(codigo.count("c = cores()"), 1)
+        self.assertEqual(codigo.count("c = cores("), 1)
 
 
 if __name__ == "__main__":
