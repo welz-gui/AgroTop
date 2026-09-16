@@ -2202,7 +2202,7 @@ def page_animal():
     st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
                f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
     st.caption(f"📋 Raça: **{animal['breed']}**  ·  **Categoria:** {cat}  ·  "
-               f"**Origem:** {animal.get('origem') or 'Não informada'}  ·  "
+               f"**Origem:** {animal.get('fornecedor_name') or 'Não informada'}  ·  "
                f"**Ganho:** {_num_br(gain, 1, sinal=True)} kg  ·  "
                f"**@ atuais:** {_num_br(arrobas, 2)} @")
 
