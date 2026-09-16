@@ -191,6 +191,7 @@ _DEFAULTS = dict(
     authenticated=False, user=None, page="dashboard",
     animal_detail=None, campo_id="", keypad_value="",
     unit_pref="kg",   # "kg" ou "@"
+    alertas_foco=None, rebanho_status="Todos",
 )
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -899,14 +900,16 @@ def _dash_kpis(stats, animals):
         prod_label = "📦 Ganho Total"
         prod_value = f"{_num_br(total_gain_kg, 0)} kg"
 
-    k = st.columns(7)
-    k[0].metric("🐄 Animais",    stats.total)
-    k[1].metric("⚖️ Peso Médio", f"{_num_br(stats.avg_weight, 1)} kg")
-    k[2].metric("📈 GMD Médio",  f"{_num_br(stats.avg_gmd, 3)} kg/dia")
-    k[3].metric(prod_label,      prod_value)
-    k[4].metric("🌿 Lotação",    f"{_num_br(stats.lotacao_ua_ha, 2)} UA/ha")
-    k[5].metric("♂ Machos",      stats.males)
-    k[6].metric("♀ Fêmeas",      stats.females)
+    k_main = st.columns(4)
+    k_main[0].metric("🐄 Animais",    stats.total)
+    k_main[1].metric("⚖️ Peso Médio", f"{_num_br(stats.avg_weight, 1)} kg")
+    k_main[2].metric("📈 GMD Médio",  f"{_num_br(stats.avg_gmd, 3)} kg/dia")
+    k_main[3].metric(prod_label,      prod_value)
+
+    k_sec = st.columns(3)
+    k_sec[0].metric("🌿 Lotação",    f"{_num_br(stats.lotacao_ua_ha, 2)} UA/ha")
+    k_sec[1].metric("♂ Machos",      stats.males)
+    k_sec[2].metric("♀ Fêmeas",      stats.females)
 
 
 def _dash_alerts(alerts):
@@ -919,16 +922,28 @@ def _dash_alerts(alerts):
                 <b style="color:{c['perigo']}">🔴 {n_sum} Sumidos</b><br>
                 <span style="color:{c['texto_secundario']};font-size:.85rem">Sem pesagem há +30 dias</span>
             </div>""", unsafe_allow_html=True)
+            if st.button("Ver Sumidos", key="dash_btn_sumidos", use_container_width=True):
+                st.session_state.alertas_foco = "sumidos"
+                _go("alertas")
+                st.rerun()
         with ac2:
             st.markdown(f"""<div class="card-yellow">
                 <b style="color:{c['atencao']}">🟡 {n_car} Em Carência</b><br>
                 <span style="color:{c['texto_secundario']};font-size:.85rem">Não podem ser abatidos</span>
             </div>""", unsafe_allow_html=True)
+            if st.button("Ver em Carência", key="dash_btn_carencia", use_container_width=True):
+                st.session_state.rebanho_status = "carencia"
+                _go("rebanho")
+                st.rerun()
         with ac3:
             st.markdown(f"""<div class="card-green">
                 <b style="color:{c['primaria']}">🟢 {n_pro} Prontos para Abate</b><br>
                 <span style="color:{c['texto_secundario']};font-size:.85rem">Peso-alvo atingido</span>
             </div>""", unsafe_allow_html=True)
+            if st.button("Ver Prontos para Abate", key="dash_btn_prontos", use_container_width=True):
+                st.session_state.alertas_foco = "prontos"
+                _go("alertas")
+                st.rerun()
         st.markdown("---")
 
 
@@ -1722,7 +1737,14 @@ def page_rebanho():
         fcat=st.selectbox("Categoria",["Todas"]+AGE_BANDS)
     with f4:
         statuses=["Todos","ativo","vendido","morto","carencia"]
-        fs=st.selectbox("Status",statuses)
+        current_status = st.session_state.get("rebanho_status", "Todos")
+        if current_status not in statuses:
+            current_status = "Todos"
+        idx_s = statuses.index(current_status)
+        fs = st.selectbox("Status", statuses, index=idx_s)
+        if fs != current_status:
+            st.session_state.rebanho_status = fs
+            st.rerun()
     with f5:
         lotes_opts=["Todos"]+sorted({a.get("lote_id","") or "—" for a in animals_all})
         fl=st.selectbox("Lote",lotes_opts)
@@ -1757,6 +1779,15 @@ def page_rebanho():
     if fcat!="Todas": df=df[df["Categoria"]==fcat]
     if fs!="Todos": df=df[df["Status"]==fs]
     if fl!="Todos": df=df[df["Lote"]==fl]
+
+    if fs == "carencia":
+        c_alr1, c_alr2 = st.columns([4, 1])
+        with c_alr1:
+            st.info("⚠️ Filtrando rebanho por status: **Carência**")
+        with c_alr2:
+            if st.button("Ver todos", key="btn_limpar_filtro_rebanho", use_container_width=True):
+                st.session_state.rebanho_status = "Todos"
+                st.rerun()
 
     st.markdown(f"**{len(df)}** registro(s)")
     fmt_gain = "%.2f" if _use_arroba() else "%.1f"
@@ -4213,100 +4244,124 @@ def page_alertas():
 
 
 def _alertas_operacionais():
-    # ── Recomendações do motor de regras (services/recomendacoes.py) ──────────
-    st.subheader("🧭 Recomendações")
-    st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "
-               "motivo e os números que a dispararam.")
-    try:
-        recs = avaliar_recomendacoes(db.contexto_recomendacoes())
-    except Exception as e:   # regra nova com dado faltando não pode derrubar a página
-        recs = []
-        st.warning(f"Não foi possível avaliar as recomendações: {e}")
-
-    if recs:
-        ordem = {"alta": 0, "media": 1, "baixa": 2}
-        for r in sorted(recs, key=lambda x: ordem.get(x.get("severidade"), 9)):
-            classe = _GRAVIDADE_CARD.get(r.get("severidade"), "card-yellow")
-            acao = r.get("acao")
-            st.markdown(
-                f'<div class="{classe}"><b>{r.get("titulo","")}</b><br>'
-                f'{r.get("motivo","")}'
-                + (f'<br><i>👉 {acao}</i>' if acao else "")
-                + '</div>', unsafe_allow_html=True)
-    else:
-        st.success("✅ Nenhuma recomendação no momento.")
-
-    st.markdown("---")
+    foco = st.session_state.get("alertas_foco")
+    rotulos = {
+        "sumidos": "Animais Sumidos",
+        "prontos": "Prontos para Abate",
+        "carencia": "Em Período de Carência",
+    }
+    if foco in rotulos:
+        c_foco1, c_foco2 = st.columns([4, 1])
+        with c_foco1:
+            st.info(f"🔍 Filtrando alertas: **{rotulos[foco]}**")
+        with c_foco2:
+            if st.button("Ver todos os alertas", key="btn_limpar_foco_alertas", use_container_width=True):
+                st.session_state.alertas_foco = None
+                st.rerun()
 
     alerts=db.get_alert_animals()
     low   =db.check_low_stock()
 
-    # Sumidos
-    st.subheader(f"🔴 Animais Sumidos ({len(alerts['sumidos'])})")
-    st.caption("Sem pesagem registrada há mais de 30 dias.")
-    if alerts["sumidos"]:
-        df_sum=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],"Lote":a.get("lote_id") or "—",
-            "Último Peso (kg)":a["current_weight"],
-            "Dias sem Pesagem":a["days_since_weighing"]} for a in alerts["sumidos"]])
-        st.dataframe(df_sum,use_container_width=True,hide_index=True)
-        for a in alerts["sumidos"]:
-            c1,c2=st.columns([3,1])
-            with c1:
-                st.markdown(f'<div class="card-red">🔴 <b>{a["id"]}</b> — {a["breed"]} — '
-                    f'Sem pesagem há <b>{a["days_since_weighing"]} dias</b></div>',
-                    unsafe_allow_html=True)
-            with c2:
-                if st.button("📱 Ir para Campo",key=f"alr_sum_{a['id']}",use_container_width=True):
-                    st.session_state.campo_id=a["id"]; _go("campo"); st.rerun()
-    else:
-        st.success("✅ Nenhum animal sumido.")
+    if not foco:
+        # ── Recomendações do motor de regras (services/recomendacoes.py) ──────────
+        st.subheader("🧭 Recomendações")
+        st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "
+                   "motivo e os números que a dispararam.")
+        try:
+            recs = avaliar_recomendacoes(db.contexto_recomendacoes())
+        except Exception as e:   # regra nova com dado faltando não pode derrubar a página
+            recs = []
+            st.warning(f"Não foi possível avaliar as recomendações: {e}")
 
-    st.markdown("---")
+        if recs:
+            ordem = {"alta": 0, "media": 1, "baixa": 2}
+            for r in sorted(recs, key=lambda x: ordem.get(x.get("severidade"), 9)):
+                classe = _GRAVIDADE_CARD.get(r.get("severidade"), "card-yellow")
+                acao = r.get("acao")
+                st.markdown(
+                    f'<div class="{classe}"><b>{r.get("titulo","")}</b><br>'
+                    f'{r.get("motivo","")}'
+                    + (f'<br><i>👉 {acao}</i>' if acao else "")
+                    + '</div>', unsafe_allow_html=True)
+        else:
+            st.success("✅ Nenhuma recomendação no momento.")
+
+        st.markdown("---")
+
+    # Sumidos
+    if not foco or foco == "sumidos":
+        st.subheader(f"🔴 Animais Sumidos ({len(alerts['sumidos'])})")
+        st.caption("Sem pesagem registrada há mais de 30 dias.")
+        if alerts["sumidos"]:
+            df_sum=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],"Lote":a.get("lote_id") or "—",
+                "Último Peso (kg)":a["current_weight"],
+                "Dias sem Pesagem":a["days_since_weighing"]} for a in alerts["sumidos"]])
+            st.dataframe(df_sum,use_container_width=True,hide_index=True)
+            for a in alerts["sumidos"]:
+                c1,c2=st.columns([3,1])
+                with c1:
+                    st.markdown(f'<div class="card-red">🔴 <b>{a["id"]}</b> — {a["breed"]} — '
+                        f'Sem pesagem há <b>{a["days_since_weighing"]} dias</b></div>',
+                        unsafe_allow_html=True)
+                with c2:
+                    if st.button("📱 Ir para Campo",key=f"alr_sum_{a['id']}",use_container_width=True):
+                        st.session_state.campo_id=a["id"]; _go("campo"); st.rerun()
+        else:
+            st.success("✅ Nenhum animal sumido.")
+
+        if not foco:
+            st.markdown("---")
 
     # Carência
-    st.subheader(f"🟡 Em Período de Carência ({len(alerts['carencia'])})")
-    if alerts["carencia"]:
-        for a in alerts["carencia"]:
-            st.markdown(f'<div class="card-yellow">🟡 <b>{a["id"]}</b> — {a["breed"]} — '
-                f'Carência até <b>{a["withdrawal_end"]}</b> '
-                f'(<b>{a["days_remaining"]} dias restantes</b>)</div>',
-                unsafe_allow_html=True)
-    else:
-        st.success("✅ Nenhum animal em carência.")
+    if not foco or foco == "carencia":
+        st.subheader(f"🟡 Em Período de Carência ({len(alerts['carencia'])})")
+        if alerts["carencia"]:
+            for a in alerts["carencia"]:
+                st.markdown(f'<div class="card-yellow">🟡 <b>{a["id"]}</b> — {a["breed"]} — '
+                    f'Carência até <b>{a["withdrawal_end"]}</b> '
+                    f'(<b>{a["days_remaining"]} dias restantes</b>)</div>',
+                    unsafe_allow_html=True)
+        else:
+            st.success("✅ Nenhum animal em carência.")
 
-    st.markdown("---")
+        if not foco:
+            st.markdown("---")
 
     # Prontos para abate
-    st.subheader(f"🟢 Prontos para Abate ({len(alerts['prontos'])})")
-    st.caption("Atingiram o peso-alvo e estão livres de carência.")
-    if alerts["prontos"]:
-        df_pro=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],
-            "Peso Atual (kg)":a["current_weight"],"Peso-Alvo (kg)":a.get("target_weight") or 500,
-            "@ Atuais":a["arrobas"]} for a in alerts["prontos"]])
-        st.dataframe(df_pro,use_container_width=True,hide_index=True,
-            column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
-                "@ Atuais":st.column_config.NumberColumn(format="%.2f")})
-    else:
-        st.info("Nenhum animal atingiu o peso-alvo ainda.")
+    if not foco or foco == "prontos":
+        st.subheader(f"🟢 Prontos para Abate ({len(alerts['prontos'])})")
+        st.caption("Atingiram o peso-alvo e estão livres de carência.")
+        if alerts["prontos"]:
+            df_pro=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],
+                "Peso Atual (kg)":a["current_weight"],"Peso-Alvo (kg)":a.get("target_weight") or 500,
+                "@ Atuais":a["arrobas"]} for a in alerts["prontos"]])
+            st.dataframe(df_pro,use_container_width=True,hide_index=True,
+                column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
+                    "@ Atuais":st.column_config.NumberColumn(format="%.2f")})
+        else:
+            st.info("Nenhum animal atingiu o peso-alvo ainda.")
 
-    st.markdown("---")
+        if not foco:
+            st.markdown("---")
 
     # Estoque crítico
-    st.subheader(f"📦 Estoque Abaixo do Mínimo ({len(low)})")
-    if low:
-        for i in low:
-            pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 0
-            st.markdown(f'<div class="card-yellow">⚠️ <b>{i["name"]}</b> — '
-                f'Estoque: <b>{_num_br(i["current_stock"], 1)} {i["unit"]}</b> '
-                f'(mínimo: {_num_br(i["min_stock"], 0)}) — <b>{_num_br(pct, 0)}% do mínimo</b></div>',
-                unsafe_allow_html=True)
-        if st.button("📦 Ir para Estoque",type="primary"):
-            _go("estoque"); st.rerun()
-    else:
-        st.success("✅ Todos os insumos com estoque adequado.")
+    if not foco:
+        st.subheader(f"📦 Estoque Abaixo do Mínimo ({len(low)})")
+        if low:
+            for i in low:
+                pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 0
+                st.markdown(f'<div class="card-yellow">⚠️ <b>{i["name"]}</b> — '
+                    f'Estoque: <b>{_num_br(i["current_stock"], 1)} {i["unit"]}</b> '
+                    f'(mínimo: {_num_br(i["min_stock"], 0)}) — <b>{_num_br(pct, 0)}% do mínimo</b></div>',
+                    unsafe_allow_html=True)
+            if st.button("📦 Ir para Estoque",type="primary"):
+                _go("estoque"); st.rerun()
+        else:
+            st.success("✅ Todos os insumos com estoque adequado.")
 
     # Baixo desempenho (GMD abaixo da meta) — só admin gerencia a meta
-    st.markdown("---")
+    if not foco:
+        st.markdown("---")
     meta = db.get_gmd_target()
     low_perf = db.get_low_performance(meta)
     st.subheader(f"📉 Baixo Desempenho ({len(low_perf)})")
