@@ -221,28 +221,6 @@ class _DashboardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = [
-      _Metric('Total de animais', '${resumo.totalAnimais}', 'total-animais'),
-      _Metric(
-        'Peso médio',
-        '${_decimal(resumo.pesoMedioKg, 1)} kg',
-        'peso-medio',
-      ),
-      _Metric(
-        'GMD médio',
-        '${_decimal(resumo.gmdMedioKgDia, 3)} kg/dia',
-        'gmd-medio',
-      ),
-      _Metric(
-        'Arrobas produzidas',
-        '${_decimal(resumo.arrobasProduzidas, 1)} @',
-        'arrobas-produzidas',
-      ),
-      _Metric('Lotação', '${_decimal(resumo.lotacaoUaHa, 2)} UA/ha', 'lotacao'),
-      _Metric('Machos', '${resumo.machos}', 'machos'),
-      _Metric('Fêmeas', '${resumo.femeas}', 'femeas'),
-    ];
-
     return ListView(
       key: const ValueKey('dashboard-resumo-list'),
       physics: const AlwaysScrollableScrollPhysics(),
@@ -282,17 +260,7 @@ class _DashboardContent extends StatelessWidget {
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.4,
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          children: metrics
-              .map((metric) => _MetricCard(metric: metric))
-              .toList(growable: false),
-        ),
+        _IndicadoresSection(resumo: resumo),
         if (resumo.distribuicaoPorRaca.isNotEmpty) ...[
           const SizedBox(height: 24),
           _BreedDonutChart(entries: resumo.distribuicaoPorRaca),
@@ -302,11 +270,213 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
+class _IndicadoresSection extends StatelessWidget {
+  const _IndicadoresSection({required this.resumo});
+
+  final DashboardResumo resumo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const ValueKey('dashboard-indicadores-section'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GridView.count(
+          key: const ValueKey('dashboard-kpi-grid'),
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.4,
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          children: [
+            _MetricCard(
+              metric: _Metric(
+                'Total de animais',
+                '${resumo.totalAnimais}',
+                'total-animais',
+              ),
+            ),
+            _SexCompositionCard(
+              machos: resumo.machos,
+              femeas: resumo.femeas,
+            ),
+            _MetricCard(
+              metric: _Metric(
+                'Peso médio',
+                '${_decimal(resumo.pesoMedioKg, 1)} kg',
+                'peso-medio',
+              ),
+            ),
+            _MetricCard(
+              metric: _Metric(
+                'GMD médio',
+                '${_decimal(resumo.gmdMedioKgDia, 3)} kg/dia',
+                'gmd-medio',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _SecondaryMetricCard(
+                label: 'Arrobas produzidas',
+                value: '${_decimal(resumo.arrobasProduzidas, 1)} @',
+                keySuffix: 'arrobas-produzidas',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _SecondaryMetricCard(
+                label: 'Lotação',
+                value: '${_decimal(resumo.lotacaoUaHa, 2)} UA/ha',
+                keySuffix: 'lotacao',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SexCompositionCard extends StatelessWidget {
+  const _SexCompositionCard({
+    required this.machos,
+    required this.femeas,
+  });
+
+  final int machos;
+  final int femeas;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      key: const ValueKey('dashboard-kpi-sexo'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Machos e fêmeas',
+                style: theme.textTheme.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '♂ ',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  Text(
+                    '$machos',
+                    key: const ValueKey('dashboard-kpi-machos'),
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  Text(
+                    ' · ',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                  Text(
+                    '♀ ',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  Text(
+                    '$femeas',
+                    key: const ValueKey('dashboard-kpi-femeas'),
+                    style: theme.textTheme.titleLarge,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryMetricCard extends StatelessWidget {
+  const _SecondaryMetricCard({
+    required this.label,
+    required this.value,
+    required this.keySuffix,
+  });
+
+  final String label;
+  final String value;
+  final String keySuffix;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      key: ValueKey('dashboard-kpi-$keySuffix'),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BreedDonutChart extends StatelessWidget {
   const _BreedDonutChart({required this.entries})
     : super(key: const ValueKey('dashboard-breed-donut'));
 
   final List<RacaContagem> entries;
+
+  String get _semanticsLabel {
+    final total = entries.fold<int>(0, (sum, entry) => sum + entry.quantidade);
+    final summary = entries.map((entry) {
+      final pct = total > 0 ? ((entry.quantidade / total) * 100).round() : 0;
+      return '${entry.raca} $pct%';
+    }).join(', ');
+    return 'Gráfico de distribuição por raça: $summary';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -326,8 +496,11 @@ class _BreedDonutChart extends StatelessWidget {
               child: SizedBox(
                 width: 144,
                 height: 144,
-                child: CustomPaint(
-                  painter: _BreedDonutPainter(entries: entries),
+                child: Semantics(
+                  label: _semanticsLabel,
+                  child: CustomPaint(
+                    painter: _BreedDonutPainter(entries: entries),
+                  ),
                 ),
               ),
             ),
@@ -412,14 +585,26 @@ class _MetricCard extends StatelessWidget {
     key: ValueKey('dashboard-kpi-${metric.keySuffix}'),
     child: Padding(
       padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(metric.label, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 6),
-          Text(metric.value, style: Theme.of(context).textTheme.titleLarge),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              metric.label,
+              style: Theme.of(context).textTheme.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              metric.value,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ],
+        ),
       ),
     ),
   );
