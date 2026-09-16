@@ -1050,4 +1050,282 @@ void main() {
       expect(find.byKey(const ValueKey('dashboard-stale-banner')), findsNothing);
     },
   );
+
+
+  testWidgets(
+    'Spec 0108: Machos e Fêmeas são exibidos em card único de composição preservando ambas as chaves',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') {
+            return _json(_resumo(machos: 14, femeas: 9));
+          }
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Card de composição único
+      expect(find.byKey(const ValueKey('dashboard-kpi-sexo')), findsOneWidget);
+      expect(find.text('Machos e fêmeas'), findsOneWidget);
+
+      // Ambas as chaves continuam acessíveis
+      expect(find.byKey(const ValueKey('dashboard-kpi-machos')), findsOneWidget);
+      expect(find.byKey(const ValueKey('dashboard-kpi-femeas')), findsOneWidget);
+      expect(find.text('14'), findsOneWidget);
+      expect(find.text('9'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Spec 0108: Lotação e Arrobas produzidas possuem apresentação secundária',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Chaves existentes mantidas
+      final arrobasFinder = find.byKey(
+        const ValueKey('dashboard-kpi-arrobas-produzidas'),
+      );
+      final lotacaoFinder = find.byKey(
+        const ValueKey('dashboard-kpi-lotacao'),
+      );
+      expect(arrobasFinder, findsOneWidget);
+      expect(lotacaoFinder, findsOneWidget);
+
+      // Apresentação secundária: Cards com elevation 0 e surfaceContainerLow
+      final arrobasCard = tester.widget<Card>(arrobasFinder);
+      final lotacaoCard = tester.widget<Card>(lotacaoFinder);
+      expect(arrobasCard.elevation, 0);
+      expect(lotacaoCard.elevation, 0);
+    },
+  );
+
+  testWidgets(
+    'Spec 0108: _BreedDonutChart possui Semantics com resumo textual e mantém legenda',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') {
+            return _json(_resumo(distribuicao: _tresRacas));
+          }
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('dashboard-breed-donut')),
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+
+      // Semantics presente com resumo formatado
+      final semanticsFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label ==
+                'Gráfico de distribuição por raça: Nelore 58%, Angus 25%, Brangus 17%',
+      );
+      expect(semanticsFinder, findsOneWidget);
+
+      // Legenda textual continua preservada
+      expect(find.text('Nelore (7)'), findsOneWidget);
+      expect(find.text('Angus (3)'), findsOneWidget);
+      expect(find.text('Brangus (2)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Spec 0108: _BreedDonutChart com raça única calcula 100% no Semantics',
+    (tester) async {
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') {
+            return _json(
+              _resumo(
+                distribuicao: [
+                  {'raca': 'Nelore', 'quantidade': 10},
+                ],
+              ),
+            );
+          }
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('dashboard-breed-donut')),
+        find.byKey(const ValueKey('dashboard-resumo-list')),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+
+      final semanticsFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label ==
+                'Gráfico de distribuição por raça: Nelore 100%',
+      );
+      expect(semanticsFinder, findsOneWidget);
+      expect(find.text('Nelore (10)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Spec 0108: largura 320px e escala de texto ampliada 2.0x não causam overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(2.0),
+          ),
+          child: MaterialApp(
+            theme: AppThemes.light,
+            home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Nenhuma exceção de overflow de layout
+      expect(tester.takeException(), isNull);
+
+      final scrollable = find.byKey(const ValueKey('dashboard-resumo-list'));
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('dashboard-kpi-total-animais')),
+        scrollable,
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+
+      // Todos os 7 KPIs continuam visíveis na árvore
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-total-animais')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-peso-medio')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-gmd-medio')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-sexo')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-machos')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-femeas')),
+        findsOneWidget,
+      );
+
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('dashboard-kpi-arrobas-produzidas')),
+        scrollable,
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-arrobas-produzidas')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard-kpi-lotacao')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Spec 0108: medição de altura do grupo de indicadores comprova redução significativa',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final api = _api(
+        MockClient((request) async {
+          if (request.url.path == '/dashboard/resumo') return _json(_resumo());
+          return _json({'detail': 'Not found'}, status: 404);
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemes.light,
+          home: DashboardResumoPage(api: api, onUnauthorized: () {}),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final sectionFinder = find.byKey(
+        const ValueKey('dashboard-indicadores-section'),
+      );
+      expect(sectionFinder, findsOneWidget);
+
+      final size = tester.getSize(sectionFinder);
+      // Imprime altura exata medida para relatório de aceitação
+      debugPrint('Altura medida do grupo de indicadores compacto: ${size.height}px (anterior: ~530px)');
+      // Redução superior a 150px
+      expect(size.height, lessThan(380.0));
+      expect(size.height, greaterThan(250.0));
+    },
+  );
 }
