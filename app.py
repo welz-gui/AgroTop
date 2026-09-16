@@ -748,6 +748,40 @@ def page_login():
 # ══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
+SIDEBAR_GROUPS = (
+    ("Visão geral", (
+        ("📊", "Dashboard", "dashboard"),
+        ("📈", "Desempenho", "desempenho"),
+        ("🔔", "Alertas", "alertas"),
+    )),
+    ("Operação", (
+        ("📱", "Modo Campo", "campo"),
+        ("📋", "Rebanho", "rebanho"),
+        ("➕", "Cadastrar Animal", "cadastrar"),
+        ("🌿", "Lotes / Pastagem", "lotes"),
+        ("🌾", "Nutrição", "nutricao"),
+        ("💉", "Sanitário", "sanitario"),
+        ("🌧️", "Clima & Chuva", "clima"),
+    )),
+    ("Gestão", (
+        ("💰", "Financeiro", "financeiro"),
+        ("📦", "Estoque", "estoque"),
+        ("📄", "Relatórios", "relatorios"),
+    )),
+    ("Rastreabilidade", (
+        ("🏷️", "Brincos", "brincos"),
+        ("🚚", "Movimentação", "movimentacao"),
+        ("🏞️", "Propriedades", "propriedades"),
+        ("📜", "Regras", "regras"),
+        ("📡", "Sincronização", "sincronizacao"),
+    )),
+    ("Apoio e administração", (
+        ("🤖", "Assistente IA", "assistente"),
+        ("⚙️", "Admin", "admin"),
+    )),
+)
+
+
 def _sidebar():
     alerts  = db.get_alert_animals()
     low_stk  = db.check_low_stock()
@@ -770,44 +804,23 @@ def _sidebar():
         </div>""", unsafe_allow_html=True)
         st.markdown("---")
 
-        if user["role"] == "admin":
-            pages = [
-                ("📊","Dashboard","dashboard",""),
-                ("📱","Modo Campo","campo",""),
-                ("📋","Rebanho","rebanho",""),
-                ("🌿","Lotes / Pastagem","lotes",""),
-                ("📈","Desempenho","desempenho",""),
-                ("💰","Financeiro","financeiro",""),
-                ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
-                ("🏷️","Brincos","brincos",""),
-                ("🚚","Movimentação","movimentacao",""),
-                ("🏞️","Propriedades","propriedades",""),
-                ("📜","Regras","regras",""),
-                ("🤖","Assistente IA","assistente",""),
-                ("📡","Sincronização","sincronizacao",""),
-                ("🌾","Nutrição","nutricao",""),
-                ("💉","Sanitário","sanitario",""),
-                ("🌧️","Clima & Chuva","clima",""),
-                ("🔔","Alertas","alertas",f" 🔴{n_alerts}" if n_alerts else ""),
-                ("📄","Relatórios","relatorios",""),
-                ("➕","Cadastrar Animal","cadastrar",""),
-                ("⚙️","Admin","admin",""),
-            ]
-        else:
-            # Operador: apenas manejo de campo, cadastro e estoque
-            pages = [
-                ("📱","Modo Campo","campo",""),
-                ("➕","Cadastrar Animal","cadastrar",""),
-                ("📦","Estoque","estoque",f" 🔴{len(low_stk)}" if low_stk else ""),
-                ("🏷️","Brincos","brincos",""),
-            ]
-
-        for icon, label, key, badge in pages:
-            active = st.session_state.page == key
-            if st.button(f"{icon}  {label}{badge}", key=f"nav_{key}",
-                         use_container_width=True,
-                         type="primary" if active else "secondary"):
-                _go(key); st.rerun()
+        badges = {
+            "estoque": f" 🔴{len(low_stk)}" if low_stk else "",
+            "alertas": f" 🔴{n_alerts}" if n_alerts else "",
+        }
+        for group_label, group_pages in SIDEBAR_GROUPS:
+            pages = group_pages if user["role"] == "admin" else tuple(
+                page for page in group_pages if page[2] in OPERATOR_PAGES
+            )
+            if not pages:
+                continue
+            st.markdown(f"**{group_label}**")
+            for icon, label, key in pages:
+                active = st.session_state.page == key
+                if st.button(f"{icon}  {label}{badges.get(key, '')}", key=f"nav_{key}",
+                             use_container_width=True,
+                             type="primary" if active else "secondary"):
+                    _go(key); st.rerun()
 
         st.markdown("---")
 

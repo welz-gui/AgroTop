@@ -56,6 +56,7 @@ PROVAS = [
     "tests.ui_rebanho_prova", # seletor respeita filtros (Spec 0095)
     "tests.ui_base_visual_prova", # escala tipográfica, espaçamento e raio (Spec 0100)
     "tests.ui_tema_nativo_prova", # CSS e Plotly recebem o tema nativo (Spec 0102)
+    "tests.ui_sidebar_grupos_prova", # sidebar por tarefa preserva as rotas (Spec 0103)
     "tests.ui_dashboard_acoes_prova", # dashboard com prioridades e alertas acionáveis (Spec 0105)
 ]
 
