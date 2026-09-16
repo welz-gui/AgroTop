@@ -8,9 +8,10 @@
 - **Pré-requisito:** [spec 0105](0105-web-dashboard-hierarquia-e-acoes.md) (RD07),
   [spec 0106](0106-web-ficha-manejo-e-historico.md) (RD09),
   [spec 0107](0107-mobile-ficha-metricas-responsivas.md) (RD10),
-  [spec 0108](0108-mobile-dashboard-compacto-e-grafico.md) (RD11) — **todas mescladas antes de
-  começar**; esta spec audita o conjunto integrado, não faz sentido rodar contra telas
-  parcialmente redesenhadas
+  [spec 0108](0108-mobile-dashboard-compacto-e-grafico.md) (RD11),
+  [spec 0111](0111-web-rebanho-selecao-nativa-e-painel.md) (RD08 completo) — **todas mescladas
+  antes de começar**; esta spec audita o conjunto integrado, não faz sentido rodar contra
+  telas parcialmente redesenhadas
 
 ---
 
@@ -38,7 +39,7 @@ mesmo que cada uma isoladamente "funcione").
   baseado só em contraste de paleta; contraste é uma dimensão entre várias (foco visível,
   navegação por teclado, rótulos, texto alternativo a cor).
 - **Telas em escopo** (todas já tocadas pelo redesign): Dashboard web (spec 0105/0091),
-  Rebanho web (spec 0095), Ficha web (spec 0106/0091), sidebar web (spec 0103), tema web
+  Rebanho web (spec 0095/0111), Ficha web (spec 0106/0091), sidebar web (spec 0103), tema web
   (spec 0102), AlertsPage mobile (spec 0097/0093), Dashboard mobile (spec 0108/0101/0093/
   0086), Ficha mobile (spec 0107/0104/0096/0092), linguagem mobile (spec 0098).
 
