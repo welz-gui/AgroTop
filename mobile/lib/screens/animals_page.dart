@@ -1001,36 +1001,59 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
             ),
             const SizedBox(height: 12),
 
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                MetricCard(
-                  icon: Icons.monitor_weight_outlined,
-                  label: 'Peso atual',
-                  value: _metric(animal.currentWeight, 'kg'),
-                ),
-                MetricCard(
-                  icon: Icons.login,
-                  label: 'Peso de entrada',
-                  value: _metric(animal.entryWeight, 'kg'),
-                ),
-                MetricCard(
-                  icon: Icons.trending_up,
-                  label: 'GMD recente',
-                  value: _metric(animal.gmdRecent, 'kg/dia', decimals: 3),
-                ),
-                MetricCard(
-                  icon: Icons.timeline,
-                  label: 'GMD total',
-                  value: _metric(animal.gmdTotal, 'kg/dia', decimals: 3),
-                ),
-                MetricCard(
-                  icon: Icons.flag_outlined,
-                  label: 'Peso-alvo',
-                  value: _metric(animal.targetWeight, 'kg'),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final textScale = MediaQuery.textScalerOf(context).scale(1);
+                const double spacing = 12;
+                final bool fitsTwoColumns =
+                    (constraints.maxWidth - spacing) / 2 >=
+                    (textScale >= 1.5 ? 240.0 : 165.0);
+                final int columns = fitsTwoColumns ? 2 : 1;
+                final double cardWidth =
+                    (constraints.maxWidth - (columns - 1) * spacing) / columns;
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    MetricCard(
+                      width: cardWidth,
+                      isPrimary: true,
+                      icon: Icons.monitor_weight_outlined,
+                      label: 'Peso atual',
+                      value: _metric(animal.currentWeight, 'kg'),
+                    ),
+                    MetricCard(
+                      width: cardWidth,
+                      isPrimary: false,
+                      icon: Icons.login,
+                      label: 'Peso de entrada',
+                      value: _metric(animal.entryWeight, 'kg'),
+                    ),
+                    MetricCard(
+                      width: cardWidth,
+                      isPrimary: true,
+                      icon: Icons.trending_up,
+                      label: 'GMD recente',
+                      value: _metric(animal.gmdRecent, 'kg/dia', decimals: 3),
+                    ),
+                    MetricCard(
+                      width: cardWidth,
+                      isPrimary: false,
+                      icon: Icons.timeline,
+                      label: 'GMD total',
+                      value: _metric(animal.gmdTotal, 'kg/dia', decimals: 3),
+                    ),
+                    MetricCard(
+                      width: cardWidth,
+                      isPrimary: true,
+                      icon: Icons.flag_outlined,
+                      label: 'Peso-alvo',
+                      value: _metric(animal.targetWeight, 'kg'),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
 
@@ -1130,31 +1153,77 @@ class MetricCard extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.width,
+    this.isPrimary = false,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final double? width;
+  final bool isPrimary;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 170,
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 12),
-            Text(label, style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Text(value, style: Theme.of(context).textTheme.titleMedium),
-          ],
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    return SizedBox(
+      width: width ?? 170,
+      child: Card(
+        elevation: isPrimary ? 1.0 : 0.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: isPrimary
+                ? colorScheme.primary.withValues(alpha: 0.3)
+                : colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isPrimary ? colorScheme.primary : colorScheme.outline,
+                size: 24,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                style: isPrimary
+                    ? textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      )
+                    : textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.outline,
+                      ),
+                softWrap: true,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: isPrimary
+                    ? textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      )
+                    : textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                softWrap: true,
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class ErrorState extends StatelessWidget {

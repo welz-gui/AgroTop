@@ -1115,4 +1115,164 @@ void main() {
           'Layout da ficha do animal não deve apresentar overflows ou cortes indevidos: $layoutErrors',
     );
   });
+
+  testWidgets(
+    'Spec 0107: métricas da ficha adaptam à largura e escala sem overflow em larguras 320 a 600px',
+    (tester) async {
+      final widths = [320.0, 360.0, 390.0, 430.0, 600.0];
+      final scales = [1.0, 1.3, 2.0];
+      final layoutErrors = <String>[];
+      void collectException(
+        double width,
+        double height,
+        double scale,
+        String phase,
+      ) {
+        final exception = tester.takeException();
+        if (exception != null) {
+          layoutErrors.add(
+            '${width}x$height, escala $scale ($phase): $exception',
+          );
+        }
+      }
+
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      ApiClient createApi({required bool extremeValues}) {
+        return ApiClient(
+          tokenStore: MemoryTokenStore()
+            ..tokens = const StoredTokens(
+              accessToken: 'access-live',
+              refreshToken: 'refresh-valid',
+            ),
+          baseUrl: 'http://mock.local',
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/animais/BR0001/medicamentos') {
+              return _json({
+                'carencia_ate': null,
+                'aplicacoes': <Map<String, dynamic>>[],
+              });
+            }
+            if (request.url.path == '/animais/BR0001' ||
+                request.url.path.startsWith('/animais/')) {
+              return _json({
+                'id': extremeValues
+                    ? 'BR-9999999999-EXTREMAMENTE-LONGO'
+                    : 'BR0001',
+                'breed': 'Nelore',
+                'sex': 'M',
+                'birth_date': '2023-01-15',
+                'status': 'Ativo',
+                'lote_id': 'P01',
+                'lot_name': 'Piquete 1',
+                'animal_uuid': 'uuid-1234-5678',
+                'entry_date': '2024-01-10',
+                'current_weight': extremeValues ? 999.9 : 382.4,
+                'entry_weight': extremeValues ? null : 280.0,
+                'target_weight': extremeValues ? 999.9 : 520.0,
+                'gmd_recent_kg_day': extremeValues ? 1.850 : 0.950,
+                'gmd_total_kg_day': extremeValues ? null : 0.820,
+                'fornecedor_name': extremeValues
+                    ? 'Fazenda Fornecedora de Gado Extensivo do Pantanal Sul LTDA'
+                    : 'Fazenda Modelo',
+              });
+            }
+            return _json({'detail': 'Not found'}, status: 404);
+          }),
+        );
+      }
+
+      for (final width in widths) {
+        final height = width == 320 ? 693.0 : (width == 600 ? 900.0 : 844.0);
+        tester.view.physicalSize = Size(width, height);
+
+        for (final scale in scales) {
+          final isExtreme =
+              (width == 320.0 && scale == 2.0) ||
+              (width == 430.0 && scale == 1.0);
+          final api = createApi(extremeValues: isExtreme);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: AnimalDetailPage(
+                api: api,
+                id: 'BR0001',
+                onUnauthorized: () {},
+                onMovementCompleted: () {},
+              ),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          collectException(width, height, scale, 'carga');
+
+          final metricLabels = [
+            'Peso atual',
+            'Peso de entrada',
+            'GMD recente',
+            'GMD total',
+            'Peso-alvo',
+          ];
+
+          for (final label in metricLabels) {
+            final labelFinder = find.text(label);
+            await tester.scrollUntilVisible(
+              labelFinder,
+              150,
+              scrollable: find.byType(Scrollable).last,
+            );
+            await tester.pumpAndSettle();
+            collectException(width, height, scale, 'rolagem $label');
+
+            expect(labelFinder, findsOneWidget);
+            final cardFinder = find.ancestor(
+              of: labelFinder,
+              matching: find.byType(MetricCard),
+            );
+            expect(cardFinder, findsOneWidget);
+            final rect = tester.getRect(cardFinder);
+            expect(rect.width, greaterThan(0));
+            expect(rect.height, greaterThan(0));
+          }
+
+          final metricWidgets =
+              tester.widgetList<MetricCard>(find.byType(MetricCard)).toList();
+          for (final card in metricWidgets) {
+            if (card.label == 'Peso atual' ||
+                card.label == 'GMD recente' ||
+                card.label == 'Peso-alvo') {
+              expect(
+                card.isPrimary,
+                isTrue,
+                reason: '${card.label} deve ter destaque primário',
+              );
+            } else {
+              expect(
+                card.isPrimary,
+                isFalse,
+                reason: '${card.label} deve ser secundário',
+              );
+            }
+          }
+
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      }
+
+      expect(
+        layoutErrors,
+        isEmpty,
+        reason:
+            'Métricas da ficha não devem produzir overflow em nenhuma largura ou escala: $layoutErrors',
+      );
+    },
+  );
 }
