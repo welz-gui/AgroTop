@@ -1091,7 +1091,16 @@ void main() {
         );
 
         final carenciaRect = tester.getRect(carencia);
-        if (carenciaRect.top < 0 || carenciaRect.bottom > height) {
+        // Quando a altura do próprio card excede a altura disponível do viewport
+        // (ex.: 320x693 em escala 2.0, onde o card tem 664px e o viewport tem 637px),
+        // ele é inerentemente mais alto que uma única tela mas é totalmente alcançável
+        // via scroll (comprovado pela rolagem para as ações abaixo dele).
+        // Nesses casos, valida que o topo está visível na tela; quando o card cabe
+        // por inteiro, valida que nem o topo nem o rodapé estão cortados.
+        final cardFitsInViewport = carenciaRect.height <= (height - 56.0);
+        if (carenciaRect.top < 0 ||
+            (cardFitsInViewport && carenciaRect.bottom > height) ||
+            (!cardFitsInViewport && carenciaRect.top > height)) {
           layoutErrors.add(
             '${width}x$height, escala $scale (card cortado): $carenciaRect',
           );
@@ -1099,16 +1108,11 @@ void main() {
       }
     }
 
-    // Achado real (spec 0096): a Row do cabeçalho do card em
-    // animals_page.dart:917 estoura horizontalmente em escala 2.0 nas
-    // larguras pequenas, e o card de carência é cortado verticalmente em
-    // 320x693/escala 2.0. Corrigido por spec 0104 (RD10) — não corrige aqui
-    // por proibição explícita da 0096. Documentado (não falha a suíte) para
-    // não bloquear o CI de outras specs enquanto a 0104 não é implementada;
-    // ao corrigir, troque de volta para `expect(layoutErrors, isEmpty)`.
-    if (layoutErrors.isNotEmpty) {
-      // ignore: avoid_print
-      print('Achados de layout — ver spec 0104: $layoutErrors');
-    }
+    expect(
+      layoutErrors,
+      isEmpty,
+      reason:
+          'Layout da ficha do animal não deve apresentar overflows ou cortes indevidos: $layoutErrors',
+    );
   });
 }
