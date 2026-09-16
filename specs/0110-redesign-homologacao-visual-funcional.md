@@ -8,7 +8,8 @@
   para cobrir um cenário que hoje não tem prova automatizada
 - **Pré-requisito:** todas as specs do redesign na versão candidata —
   [0091](0091-web-contraste-de-badges-e-css-em-tokens.md) a
-  [0109](0109-redesign-estados-e-acessibilidade.md) — mescladas
+  [0109](0109-redesign-estados-e-acessibilidade.md), incluindo
+  [0111](0111-web-rebanho-selecao-nativa-e-painel.md) (RD08 completo) — mescladas
 
 ---
 
@@ -38,7 +39,7 @@ Execute e documente evidência para cada um dos 8 cenários ponta a ponta:
 
 1. Administrador: dashboard → alerta → lista filtrada → limpar filtro (spec 0105/RD07).
 2. Rebanho: pesquisar → filtrar → ordenar → selecionar → ficha → operação do mesmo animal →
-   retorno com contexto (specs 0095, 0106).
+   retorno com contexto (specs 0095, 0106, 0111).
 3. Operador: os 4 destinos preservados; rota administrativa continua protegida (guard central,
    sem mudança nesta versão).
 4. Mobile: pesquisa fora da primeira página → offline → outra consulta → reconexão (spec

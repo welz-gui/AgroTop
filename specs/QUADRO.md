@@ -695,6 +695,16 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0108](0108-mobile-dashboard-compacto-e-grafico.md) — Mobile: dashboard compacta indicadores sem perder nenhum 🏗️ | — | ✅ [#434](https://github.com/welz-gui/AgroTop/pull/434) | | 2026-09-15 |
 | — | [0109](0109-redesign-estados-e-acessibilidade.md) — Redesign: fecha lacunas de estados e acessibilidade ⚙️ | — | 🟢 livre | | 2026-09-15 |
 | — | [0110](0110-redesign-homologacao-visual-funcional.md) — Redesign: homologação da versão e evidências de conclusão ⚙️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0111](0111-web-rebanho-selecao-nativa-e-painel.md) — Web: Rebanho com seleção nativa de linha e painel contextual 🏗️ | — | 🟢 livre | | 2026-09-16 |
+
+> **0111 escrita em 2026-09-16** — RD08 completo da proposta de redesign, o único item das 14
+> fases (RD00-RD13) que ainda não tinha spec própria. As specs 0095 e 0106 já documentavam
+> explicitamente que só resolveram o bug de identidade do RD08 (seletor usando a lista errada),
+> não o mecanismo de seleção nativa nem o painel contextual — essa era a "spec separada" que
+> ambas previram. Atualizei os pré-requisitos de 0109 (RD12) e 0110 (RD13) para incluir 0111,
+> já que ela toca a mesma tela (Rebanho) que entra na auditoria/homologação. Com esta spec, as
+> 14 fases da proposta de redesign (RD00-RD13) têm todas uma spec escrita e mesclada ou na
+> fila — falta implementar 0109, 0110 e 0111.
 
 > **0103/0104/0105/0106 revisadas em 2026-09-15 — [PR #429](https://github.com/welz-gui/AgroTop/pull/429),
 > [#428](https://github.com/welz-gui/AgroTop/pull/428), [#431](https://github.com/welz-gui/AgroTop/pull/431),
