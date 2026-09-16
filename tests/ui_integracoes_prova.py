@@ -126,6 +126,30 @@ class TestIdentificadores(BaseTela):
                          "botão travado com rfid de 15 dígitos, que é válido")
 
 
+class TestFichaManejo(BaseTela):
+    def test_ficha_prioriza_resumo_manejo_e_mantem_meta_opcional(self):
+        animal = self._ativo()
+        self._sql("UPDATE animals SET target_weight=NULL WHERE id=?", (animal["id"],))
+        at = self._tela("animal", animal_detail=animal["id"])
+        metricas = {m.label: m.value for m in at.metric}
+        self.assertIn("Peso Atual", metricas)
+        self.assertIn("GMD recente", metricas)
+        self.assertEqual(metricas["Meta de peso"], "Sem meta definida")
+        self.assertEqual(
+            sum(1 for button in at.button if "Abrir no Campo" in (button.label or "")),
+            1,
+        )
+
+    def test_curva_de_peso_recebe_meta_quando_definida(self):
+        animal = self._ativo()
+        self._sql("UPDATE animals SET target_weight=600 WHERE id=?", (animal["id"],))
+        at = self._tela("animal", animal_detail=animal["id"])
+        charts = at.get("plotly_chart")
+        self.assertTrue(charts, "a ficha não renderizou a curva de peso")
+        self.assertIn('"name":"Meta de peso"', charts[0].proto.spec)
+        self.assertIn('600.0', charts[0].proto.spec)
+
+
 class TestConsistencia(BaseTela):
     def test_nascimento_no_futuro_aparece_na_ficha(self):
         a = self._ativo()
