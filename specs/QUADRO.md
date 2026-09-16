@@ -691,8 +691,8 @@ concreto definido para fundamentar uma — aguardando o usuário trazer um caso 
 | — | [0104](0104-mobile-ficha-overflow-telas-pequenas.md) — Mobile: corrige overflow da ficha em telas pequenas/fonte ampliada ⚙️ | — | ✅ [#428](https://github.com/welz-gui/AgroTop/pull/428) | | 2026-09-15 |
 | — | [0105](0105-web-dashboard-hierarquia-e-acoes.md) — Web: dashboard com prioridades e alertas acionáveis 🏗️ | — | ✅ [#431](https://github.com/welz-gui/AgroTop/pull/431) | | 2026-09-15 |
 | — | [0106](0106-web-ficha-manejo-e-historico.md) — Web: ficha do animal prioriza manejo, preserva histórico 🏗️ | — | ✅ [#430](https://github.com/welz-gui/AgroTop/pull/430) | | 2026-09-15 |
-| — | [0107](0107-mobile-ficha-metricas-responsivas.md) — Mobile: métricas da ficha adaptam à largura real 🏗️ | — | 🟢 livre | | 2026-09-15 |
-| — | [0108](0108-mobile-dashboard-compacto-e-grafico.md) — Mobile: dashboard compacta indicadores sem perder nenhum 🏗️ | — | 🟢 livre | | 2026-09-15 |
+| — | [0107](0107-mobile-ficha-metricas-responsivas.md) — Mobile: métricas da ficha adaptam à largura real 🏗️ | — | ✅ [#433](https://github.com/welz-gui/AgroTop/pull/433) | | 2026-09-15 |
+| — | [0108](0108-mobile-dashboard-compacto-e-grafico.md) — Mobile: dashboard compacta indicadores sem perder nenhum 🏗️ | — | ✅ [#434](https://github.com/welz-gui/AgroTop/pull/434) | | 2026-09-15 |
 | — | [0109](0109-redesign-estados-e-acessibilidade.md) — Redesign: fecha lacunas de estados e acessibilidade ⚙️ | — | 🟢 livre | | 2026-09-15 |
 | — | [0110](0110-redesign-homologacao-visual-funcional.md) — Redesign: homologação da versão e evidências de conclusão ⚙️ | — | 🟢 livre | | 2026-09-15 |
 
