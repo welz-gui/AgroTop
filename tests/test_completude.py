@@ -24,10 +24,12 @@ class TestCompletudeMensal(unittest.TestCase):
                 _pesagem("b", "2026-01-01"),
                 _pesagem("b", "2026-01-31"),
             ],
-            31,
-            31,
-            5,
-            5,
+            {
+                "dias_lote_planejados": 31,
+                "dias_lote_executados": 31,
+                "semanas_com_chuva": 5,
+                "semanas_no_mes": 5,
+            },
         )
 
         for indicador in (
@@ -46,10 +48,12 @@ class TestCompletudeMensal(unittest.TestCase):
             1,
             2,
             [_pesagem("a", "2026-01-31")],
-            31,
-            31,
-            5,
-            5,
+            {
+                "dias_lote_planejados": 31,
+                "dias_lote_executados": 31,
+                "semanas_com_chuva": 5,
+                "semanas_no_mes": 5,
+            },
         )
 
         self.assertEqual(resultado["animais_com_pesagem_em_dia"], 0.5)
@@ -63,7 +67,15 @@ class TestCompletudeMensal(unittest.TestCase):
         self.assertIn("Pese", alerta["mensagem"])
 
     def test_mes_sem_dados_retorna_zero_e_alertas(self):
-        resultado = avaliar_mes(2026, 2, 0, [], 0, 0, 0, 0)
+        resultado = avaliar_mes(
+            2026, 2, 0, [],
+            {
+                "dias_lote_planejados": 0,
+                "dias_lote_executados": 0,
+                "semanas_com_chuva": 0,
+                "semanas_no_mes": 0,
+            }
+        )
 
         for indicador in (
             "animais_com_pesagem_em_dia",
@@ -87,10 +99,12 @@ class TestCompletudeMensal(unittest.TestCase):
                 _pesagem("b", "2026-03-01"),
                 _pesagem("b", "2026-03-15"),
             ],
-            31,
-            31,
-            5,
-            5,
+            {
+                "dias_lote_planejados": 31,
+                "dias_lote_executados": 31,
+                "semanas_com_chuva": 5,
+                "semanas_no_mes": 5,
+            },
         )
 
         self.assertEqual(resultado["intervalos_uteis_gmd"], 0.5)
@@ -104,10 +118,12 @@ class TestCompletudeMensal(unittest.TestCase):
                 _pesagem("dentro", "2026-01-30"),
                 _pesagem("fora", "2026-01-29"),
             ],
-            1,
-            1,
-            1,
-            1,
+            {
+                "dias_lote_planejados": 1,
+                "dias_lote_executados": 1,
+                "semanas_com_chuva": 1,
+                "semanas_no_mes": 1,
+            },
         )
 
         self.assertEqual(resultado["animais_com_pesagem_em_dia"], 0.5)
@@ -121,10 +137,12 @@ class TestCompletudeMensal(unittest.TestCase):
                 _pesagem("a", "2026-01-01"),
                 _pesagem("a", "2026-01-31", method=" "),
             ],
-            1,
-            1,
-            1,
-            1,
+            {
+                "dias_lote_planejados": 1,
+                "dias_lote_executados": 1,
+                "semanas_com_chuva": 1,
+                "semanas_no_mes": 1,
+            },
         )
 
         self.assertEqual(resultado["contexto_da_pesagem"], 0.5)
@@ -139,10 +157,12 @@ class TestCompletudeMensal(unittest.TestCase):
                 _pesagem("a", "2026-01-31"),
                 _pesagem("b", "2026-01-31"),
             ],
-            1,
-            2,
-            1,
-            1,
+            {
+                "dias_lote_planejados": 1,
+                "dias_lote_executados": 2,
+                "semanas_com_chuva": 1,
+                "semanas_no_mes": 1,
+            },
         )
 
         self.assertEqual(resultado["animais_com_pesagem_em_dia"], 1.0)

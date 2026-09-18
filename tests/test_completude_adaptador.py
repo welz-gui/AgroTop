@@ -115,7 +115,7 @@ class TestCompletudeAdaptador(unittest.TestCase):
             3,
             animais_ativos=4,
             pesagens=pesagens,
-            **janela,
+            janela=janela,
         )
 
         self.assertIn("alertas", resultado)
