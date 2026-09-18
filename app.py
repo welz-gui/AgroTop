@@ -71,7 +71,7 @@ from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca, por_lote_de_venda
 from services.completude_adaptador import normalizar_pesagens, janela_do_mes
 from services.completude import avaliar_mes
-from services.conformidade_adaptador import montar_rebanho
+from services.conformidade_adaptador import FonteRebanho, montar_rebanho
 from services.conformidade import avaliar as conformidade_avaliar
 from services.dieta_adaptador import ingredientes_por_cabeca
 from services.dieta import custo_por_cabeca_dia, custo_por_arroba_produzida
@@ -1072,10 +1072,12 @@ def _dash_conformidade():
     movimentacoes_abertas = db.movimentacoes.abertas()
     referencia = date.today().isoformat()
 
-    rebanho = montar_rebanho(
+    fonte = FonteRebanho(
         animais=animais, identificadores_ativos=identificadores_ativos,
         dispositivos=dispositivos, eventos_pendentes=eventos_pendentes,
-        movimentacoes_abertas=movimentacoes_abertas, referencia=referencia)
+        movimentacoes_abertas=movimentacoes_abertas, referencia=referencia
+    )
+    rebanho = montar_rebanho(fonte)
     resultado = conformidade_avaliar(rebanho, referencia)
 
     emoji, rotulo = _FAIXA_CONFORMIDADE.get(resultado["faixa"], ("⚪", resultado["faixa"]))
