@@ -4741,13 +4741,13 @@ def _cadastro_nascimento():
 
     if st.button("✅ Registrar nascimento", type="primary", disabled=not pode,
                  key="nasc_salvar"):
-        r = db.nascimentos.registrar(
-            mae["uuid"], data_parto.isoformat(), crias,
+        r = db.nascimentos.registrar(db.nascimentos.RegistroParto(
+            mae_uuid=mae["uuid"], data=data_parto.isoformat(), crias=crias,
             hora=hora, tipo_parto=tipo_parto, condicao=condicao,
             propriedade_id=mae.get("property_id"),
             responsavel=st.session_state.user["name"],
             data_estimada=data_estimada, observacoes=obs,
-            ignorar_alertas=confirmado)
+            ignorar_alertas=confirmado))
 
         if r.get("ok"):
             nomes = ", ".join(brincos)
