@@ -2130,23 +2130,23 @@ def admin_apply_changes(table: str, updates: list[dict],
         # Atualizações
         for row in updates:
             pkv = row.get(pk)
-            fields = {k: v for k, v in row.items() if k in valid and k != pk}
+            fields = {k: row[k] for k in cols if k in row and k != pk}
             if not fields:
                 continue
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
-            # Seguro: qt, sets e qpk são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: qt, sets e qpk são validados via cols e scappados via _quote_ident.
             con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
         # Inserções
         for row in inserts:
-            fields = {k: v for k, v in row.items()
-                      if k in valid and v is not None and str(v) != ""}
+            fields = {k: row[k] for k in cols
+                      if k in row and row[k] is not None and str(row[k]) != ""}
             if not fields:
                 continue
             placeholders = ", ".join("?" for _ in fields)
             cols_str = ", ".join(_quote_ident(k) for k in fields)
-            # Seguro: qt e cols_str são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: qt e cols_str são validados via cols e scappados via _quote_ident.
             con.execute(
                 f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))
