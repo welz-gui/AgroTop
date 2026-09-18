@@ -19,6 +19,7 @@ import database as db
 from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
+from services.zootecnia import calculate_gmd_total
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
 from services.recomendacoes import avaliar as avaliar_recomendacoes
@@ -2234,7 +2235,7 @@ def page_animal():
         target_weight = float(target_weight)
     m=st.columns(3)
     m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
-    gmd_total = db.calculate_gmd_total(animal)
+    gmd_total = calculate_gmd_total(animal)
     gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
     tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
     m[1].metric("GMD recente", gmd_txt,
