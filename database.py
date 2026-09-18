@@ -25,6 +25,20 @@ class InsumoCreate:
     min_stock: float
     cost_per_unit: float
 
+
+@dataclass
+class FeedingCheckData:
+    plan_id: int
+    lote_id: str
+    check_date: str
+    status: str
+    actual_quantity: Optional[float] = None
+    operator: str = ""
+    notes: str = ""
+    deduct_stock: bool = False
+    insumo_id: Optional[int] = None
+    quantity_unit: str = "kg"
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
@@ -1924,36 +1938,33 @@ def delete_feeding_plan(plan_id: int) -> None:
 
 
 @_writes
-def add_feeding_check(plan_id, lote_id, check_date, status,
-                      actual_quantity=None, operator="", notes="",
-                      deduct_stock=False, insumo_id=None,
-                      quantity_unit="kg") -> None:
+def add_feeding_check(data: FeedingCheckData) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO feeding_checks
                (plan_id,lote_id,check_date,status,actual_quantity,operator,notes)
                VALUES(?,?,?,?,?,?,?)""",
-            (plan_id, lote_id, check_date, status, actual_quantity, operator, notes),
+            (data.plan_id, data.lote_id, data.check_date, data.status, data.actual_quantity, data.operator, data.notes),
         )
         # Baixa opcional no estoque quando o trato é confirmado
-        if deduct_stock and insumo_id and actual_quantity and status != "nao_feito":
+        if data.deduct_stock and data.insumo_id and data.actual_quantity and data.status != "nao_feito":
             ins = con.execute(
-                "SELECT unit FROM insumos WHERE id=?", (insumo_id,)
+                "SELECT unit FROM insumos WHERE id=?", (data.insumo_id,)
             ).fetchone()
-            stock_unit = ins["unit"] if ins else quantity_unit
+            stock_unit = ins["unit"] if ins else data.quantity_unit
             # Converte a quantidade aplicada (unidade do plano) para a unidade do estoque
-            deduct = convert_quantity(actual_quantity, quantity_unit, stock_unit)
+            deduct = convert_quantity(data.actual_quantity, data.quantity_unit, stock_unit)
             if deduct is None:
-                deduct = actual_quantity   # unidades incompatíveis: baixa direta
+                deduct = data.actual_quantity   # unidades incompatíveis: baixa direta
             con.execute(
                 "UPDATE insumos SET current_stock = MAX(0, current_stock - ?) WHERE id=?",
-                (deduct, insumo_id),
+                (deduct, data.insumo_id),
             )
             con.execute(
                 """INSERT INTO insumo_transactions
                    (insumo_id,type,quantity,reason,transaction_date,operator,lote_id)
                    VALUES(?,?,?,?,?,?,?)""",
-                (insumo_id, "saida", deduct, "trato_lote", check_date, operator, lote_id),
+                (data.insumo_id, "saida", deduct, "trato_lote", data.check_date, data.operator, data.lote_id),
             )
 
 
