@@ -5592,7 +5592,7 @@ def page_nutricao():
                                     st.error("A quantidade deve ser maior que zero.")
                                 else:
                                     r = db.nova_versao_feeding_plan(
-                                        p["id"], quantity=nv_qtd, frequency=nv_freq)
+                                        p["id"], db.FeedingPlanUpdate(quantity=nv_qtd, frequency=nv_freq))
                                     if r["ok"]:
                                         st.success("✅ Nova versão salva.")
                                         st.rerun()
