@@ -5623,8 +5623,16 @@ def page_nutricao():
                     if not prod or qtd<=0:
                         st.error("Informe o produto e a quantidade.")
                     else:
-                        db.add_feeding_plan(lote_sel["id"], prod.strip(), qtd, unid, freq,
-                            insumo_id=ins_link["id"] if ins_link else None, notes=notes)
+                        plan = db.FeedingPlanCreate(
+                            lote_id=lote_sel["id"],
+                            product_name=prod.strip(),
+                            quantity=qtd,
+                            unit=unid,
+                            frequency=freq,
+                            insumo_id=ins_link["id"] if ins_link else None,
+                            notes=notes
+                        )
+                        db.add_feeding_plan(plan)
                         st.success(f"✅ {prod} adicionado ao {lote_sel['name']} ({db.FEEDING_FREQUENCIES[freq]})")
                         st.rerun()
 
