@@ -53,7 +53,6 @@ from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
 )
-from services.previsao_estoque import prever as previsao_estoque_prever
 from services.previsao_estoque_adaptador import (
     consumo_diario_planejado,
     montar_insumos as previsao_estoque_montar_insumos,
