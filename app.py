@@ -55,7 +55,6 @@ from services.estados_dispositivo import (
 )
 from services.previsao_estoque import prever as previsao_estoque_prever
 from services.previsao_estoque_adaptador import (
-    consumo_diario_planejado,
     montar_insumos as previsao_estoque_montar_insumos,
 )
 from services.arquivo_dispositivos import (
