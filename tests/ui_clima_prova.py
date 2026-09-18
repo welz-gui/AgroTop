@@ -77,9 +77,13 @@ class TestPrevisaoPorPropriedade(unittest.TestCase):
         de verdade distantes — cada uma com sua própria previsão."""
         produtor_id = db.propriedades.padrao()["produtor_id"]
         db.propriedades.criar_propriedade(
-            produtor_id, "Fazenda Norte", latitude=-12.0, longitude=-55.0)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor_id, nome="Fazenda Norte",
+                latitude=-12.0, longitude=-55.0))
         db.propriedades.criar_propriedade(
-            produtor_id, "Fazenda Sul", latitude=-20.0, longitude=-52.0)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor_id, nome="Fazenda Sul",
+                latitude=-20.0, longitude=-52.0))
         db.clear_cache()
         at = self._tela()
         rotulos = [t.label for t in at.tabs]
@@ -97,11 +101,17 @@ class TestPrevisaoPorPropriedade(unittest.TestCase):
         ruído de aba)."""
         produtor_id = db.propriedades.padrao()["produtor_id"]
         db.propriedades.criar_propriedade(
-            produtor_id, "Sede A", latitude=-14.0, longitude=-54.0)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor_id, nome="Sede A",
+                latitude=-14.0, longitude=-54.0))
         db.propriedades.criar_propriedade(
-            produtor_id, "Sede B", latitude=-14.0, longitude=-54.0)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor_id, nome="Sede B",
+                latitude=-14.0, longitude=-54.0))
         db.propriedades.criar_propriedade(
-            produtor_id, "Fazenda Distante", latitude=-22.0, longitude=-48.0)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor_id, nome="Fazenda Distante",
+                latitude=-22.0, longitude=-48.0))
         db.clear_cache()
         at = self._tela()
         rotulos = [t.label for t in at.tabs]

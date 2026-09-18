@@ -131,7 +131,9 @@ class TestMovimentacaoEntrePropriedades(BaseB4):
     def test_animal_acompanha_a_propriedade_do_piquete_de_destino(self):
         """Hoje o animal segue o piquete. Tratar isso como trânsito é a B6."""
         outra = propriedades.criar_propriedade(
-            propriedades.padrao()["produtor_id"], "Segunda propriedade")
+            propriedades.PropriedadeCreate(
+                produtor_id=propriedades.padrao()["produtor_id"],
+                nome="Segunda propriedade"))
         db.add_lote(db.LoteData("PZ", "Piquete da segunda", 10.0, 12.0, property_id=outra))
         db.clear_cache()
 

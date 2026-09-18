@@ -6812,7 +6812,9 @@ def _propriedade_nova():
     if st.button("➕ Cadastrar propriedade", type="primary", disabled=not nome,
                  key="propn_salvar"):
         db.propriedades.criar_propriedade(
-            produtor, nome, codigo_oficial=codigo, municipio=municipio, uf=uf)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor, nome=nome,
+                codigo_oficial=codigo, municipio=municipio, uf=uf))
         db.clear_cache()
         st.success(f"✅ Propriedade **{nome}** cadastrada. "
                    "O perímetro pode ser desenhado na aba **Cadastradas**.")
