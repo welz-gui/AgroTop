@@ -91,8 +91,7 @@ class TestRecomendacoes(BaseTela):
         lote = db.get_all_lotes()[0]
         # Consumo alto o bastante para o saldo não cobrir 15 dias.
         diario = max(float(insumo["current_stock"]) / 5.0, 1.0)
-        db.add_feeding_plan(lote["id"], "Trato de teste", diario,
-                            insumo["unit"], "diario", insumo_id=insumo["id"])
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=lote["id"], product_name="Trato de teste", quantity=diario, unit=insumo["unit"], frequency="diario", insumo_id=insumo["id"]))
         db.clear_cache()
 
         at = self._tela("alertas")

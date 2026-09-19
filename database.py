@@ -25,6 +25,16 @@ class InsumoCreate:
     min_stock: float
     cost_per_unit: float
 
+@dataclass
+class FeedingPlanCreate:
+    lote_id: int
+    product_name: str
+    quantity: float
+    unit: str
+    frequency: str
+    insumo_id: Optional[int] = None
+    notes: str = ""
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
@@ -1805,15 +1815,14 @@ def convert_quantity(qty: float, from_unit: str, to_unit: str) -> Optional[float
 
 
 @_writes
-def add_feeding_plan(lote_id, product_name, quantity, unit, frequency,
-                     insumo_id=None, notes="") -> None:
+def add_feeding_plan(plan: FeedingPlanCreate) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO feeding_plans
                (lote_id,product_name,insumo_id,quantity,unit,frequency,notes,
                 vigente_de,vigente_ate)
                VALUES(?,?,?,?,?,?,?,?,NULL)""",
-            (lote_id, product_name, insumo_id or None, quantity, unit, frequency, notes,
+            (plan.lote_id, plan.product_name, plan.insumo_id or None, plan.quantity, plan.unit, plan.frequency, plan.notes,
              date.today().isoformat()),
         )
 
