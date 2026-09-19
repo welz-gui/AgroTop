@@ -35,6 +35,7 @@ from services.geometria import (
 )
 from services.ndvi import ndvi_do_piquete, NdviIndisponivelError
 from services.importacao_geometria import ler_geojson, ler_kml
+from services.terminacao import simular_terminacao
 from services.importacao_car import (
     CamadaCar,
     area_camada_ha,
@@ -5349,7 +5350,7 @@ def _render_tab_simulador_terminacao(animals):
             st.success("Cenários e preço da @ salvos!"); st.rerun()
 
     cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
-    sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+    sim = simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
 
     if peso_meta - peso_atual <= 0:
         st.warning("O peso de abate precisa ser maior que o peso atual.")

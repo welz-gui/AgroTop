@@ -55,7 +55,7 @@ from services.zootecnia import (  # noqa: F401
     kg_to_arrobas, estimate_weight_by_measurement,
 )
 from services.terminacao import (  # noqa: F401
-    TERMINACAO_DEFAULTS, simular_terminacao,
+    TERMINACAO_DEFAULTS,
 )
 from services.seguranca import (  # noqa: F401
     _hash, _is_legacy_hash, _verify_password,
