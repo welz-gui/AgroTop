@@ -68,7 +68,7 @@ from services.rentabilidade_adaptador import montar_ciclos
 from services.rentabilidade import ranking_por_raca, por_lote_de_venda
 from services.completude_adaptador import normalizar_pesagens, janela_do_mes
 from services.completude import avaliar_mes
-from services.conformidade_adaptador import montar_rebanho
+from services.conformidade_adaptador import FonteRebanho, montar_rebanho
 from services.conformidade import avaliar as conformidade_avaliar
 from services.dieta_adaptador import ingredientes_por_cabeca
 from services.dieta import custo_por_cabeca_dia, custo_por_arroba_produzida
@@ -1069,10 +1069,12 @@ def _dash_conformidade():
     movimentacoes_abertas = db.movimentacoes.abertas()
     referencia = date.today().isoformat()
 
-    rebanho = montar_rebanho(
+    fonte = FonteRebanho(
         animais=animais, identificadores_ativos=identificadores_ativos,
         dispositivos=dispositivos, eventos_pendentes=eventos_pendentes,
-        movimentacoes_abertas=movimentacoes_abertas, referencia=referencia)
+        movimentacoes_abertas=movimentacoes_abertas, referencia=referencia
+    )
+    rebanho = montar_rebanho(fonte)
     resultado = conformidade_avaliar(rebanho, referencia)
 
     emoji, rotulo = _FAIXA_CONFORMIDADE.get(resultado["faixa"], ("⚪", resultado["faixa"]))
@@ -1155,7 +1157,7 @@ def _dash_completude():
                 start_date=inicio.isoformat(), end_date=fim.isoformat())
             janela = janela_do_mes(ano, mes, checagens_de_trato=checagens,
                                    leituras_de_chuva=chuvas)
-            r = avaliar_mes(ano, mes, animais_ativos, pesagens, **janela)
+            r = avaliar_mes(ano, mes, animais_ativos, pesagens, janela)
             linhas.append({
                 "Mês": f"{mes:02d}/{ano}",
                 "Pesagem em dia": round(r["animais_com_pesagem_em_dia"] * 100, 1),
@@ -2166,7 +2168,13 @@ def _render_tab_mov(movs):
     else:
         st.info("Nenhuma movimentação registrada.")
 
-def _render_tab_fin(aid, animal, gain, yield_, cost_total, ul):
+def _render_tab_fin(animal):
+    aid = animal["id"]
+    cost_total = db.get_total_cost(aid)
+    yield_ = animal.get("carcass_yield") or 0.52
+    gain = round(animal["current_weight"] - animal["entry_weight"], 1)
+    ul = _unit_label()
+
     costs=db.get_animal_costs(aid)
     prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
     cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
@@ -2209,7 +2217,6 @@ def page_animal():
     ws  =db.get_weighings(aid)
     meds=db.get_medications(aid)
     movs=db.get_movements(aid)
-    cost_total=db.get_total_cost(aid)
     yield_     =animal.get("carcass_yield") or 0.52
     arrobas    =db.kg_to_arrobas(animal["current_weight"], yield_)
     gain       =round(animal["current_weight"]-animal["entry_weight"],1)
@@ -2296,7 +2303,7 @@ def page_animal():
         _render_tab_mov(movs)
 
     with tl_fin:
-        _render_tab_fin(aid, animal, gain, yield_, cost_total, ul)
+        _render_tab_fin(animal)
 
     st.markdown("---")
     qa1,qa2=st.columns(2)
@@ -6817,7 +6824,9 @@ def _propriedade_nova():
     if st.button("➕ Cadastrar propriedade", type="primary", disabled=not nome,
                  key="propn_salvar"):
         db.propriedades.criar_propriedade(
-            produtor, nome, codigo_oficial=codigo, municipio=municipio, uf=uf)
+            db.propriedades.PropriedadeCreate(
+                produtor_id=produtor, nome=nome,
+                codigo_oficial=codigo, municipio=municipio, uf=uf))
         db.clear_cache()
         st.success(f"✅ Propriedade **{nome}** cadastrada. "
                    "O perímetro pode ser desenhado na aba **Cadastradas**.")

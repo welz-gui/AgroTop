@@ -75,10 +75,7 @@ def avaliar_mes(
     mes: int,
     animais_ativos: int,
     pesagens: list[dict],
-    dias_lote_planejados: int,
-    dias_lote_executados: int,
-    semanas_com_chuva: int,
-    semanas_no_mes: int,
+    janela: dict,
 ) -> dict:
     """Indicadores de completude de um mês. Nada de banco aqui — tudo injetado.
 
@@ -114,10 +111,10 @@ def avaliar_mes(
             pesagens_com_contexto, len(pesagens)
         ),
         "execucao_nutricional": _proporcao(
-            dias_lote_executados, dias_lote_planejados
+            janela.get("dias_lote_executados", 0), janela.get("dias_lote_planejados", 0)
         ),
         "cobertura_ambiental": _proporcao(
-            semanas_com_chuva, semanas_no_mes
+            janela.get("semanas_com_chuva", 0), janela.get("semanas_no_mes", 0)
         ),
     }
 

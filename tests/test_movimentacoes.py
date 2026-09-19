@@ -62,7 +62,9 @@ class BaseB6(unittest.TestCase):
 
         self.origem = propriedades.padrao()
         self.destino_id = propriedades.criar_propriedade(
-            self.origem["produtor_id"], "Propriedade de destino")
+            propriedades.PropriedadeCreate(
+                produtor_id=self.origem["produtor_id"],
+                nome="Propriedade de destino"))
         db.clear_cache()
 
         ativos = db.get_all_animals(status="ativo")
