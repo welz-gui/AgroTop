@@ -2167,7 +2167,13 @@ def _render_tab_mov(movs):
     else:
         st.info("Nenhuma movimentação registrada.")
 
-def _render_tab_fin(aid, animal, gain, yield_, cost_total, ul):
+def _render_tab_fin(animal):
+    aid = animal["id"]
+    cost_total = db.get_total_cost(aid)
+    yield_ = animal.get("carcass_yield") or 0.52
+    gain = round(animal["current_weight"] - animal["entry_weight"], 1)
+    ul = _unit_label()
+
     costs=db.get_animal_costs(aid)
     prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
     cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
@@ -2210,7 +2216,6 @@ def page_animal():
     ws  =db.get_weighings(aid)
     meds=db.get_medications(aid)
     movs=db.get_movements(aid)
-    cost_total=db.get_total_cost(aid)
     yield_     =animal.get("carcass_yield") or 0.52
     arrobas    =db.kg_to_arrobas(animal["current_weight"], yield_)
     gain       =round(animal["current_weight"]-animal["entry_weight"],1)
@@ -2297,7 +2302,7 @@ def page_animal():
         _render_tab_mov(movs)
 
     with tl_fin:
-        _render_tab_fin(aid, animal, gain, yield_, cost_total, ul)
+        _render_tab_fin(animal)
 
     st.markdown("---")
     qa1,qa2=st.columns(2)
