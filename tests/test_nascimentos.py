@@ -53,10 +53,10 @@ class BaseB3(unittest.TestCase):
 
 class TestPartoSimples(BaseB3):
     def test_registra_cria_e_parto(self):
-        r = nascimentos.registrar(
+        r = nascimentos.registrar(nascimentos.RegistroParto(
             self.mae, _dias_atras(10),
             [{"id": "C1", "sexo": "M", "raca": "Nelore", "peso": 32.0}],
-            responsavel="op1")
+            responsavel="op1"))
         self.assertTrue(r["ok"], r)
         self.assertEqual(len(r["crias"]), 1)
 
@@ -68,52 +68,52 @@ class TestPartoSimples(BaseB3):
 
     def test_pai_e_opcional_e_persiste_quando_informado(self):
         """§4.3: pai "quando conhecido" — sem pai não é erro, com pai persiste."""
-        nascimentos.registrar(self.mae, _dias_atras(10),
-                              [{"id": "SEMPAI", "sexo": "M", "raca": "Nelore"}])
+        nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
+                              [{"id": "SEMPAI", "sexo": "M", "raca": "Nelore"}]))
         sem_pai = self._linhas("SELECT * FROM animals WHERE id='SEMPAI'")[0]
         self.assertIsNone(sem_pai["pai_uuid"])
 
         pai_uuid = self._criar_femea_adulta("TOURO1")  # helper só cria o animal
-        nascimentos.registrar(
+        nascimentos.registrar(nascimentos.RegistroParto(
             self.mae, _dias_atras(10),
-            [{"id": "COMPAI", "sexo": "F", "raca": "Nelore", "pai_uuid": pai_uuid}])
+            [{"id": "COMPAI", "sexo": "F", "raca": "Nelore", "pai_uuid": pai_uuid}]))
         com_pai = self._linhas("SELECT * FROM animals WHERE id='COMPAI'")[0]
         self.assertEqual(com_pai["pai_uuid"], pai_uuid)
 
     def test_propriedade_de_nascimento_e_preenchida(self):
         """§4.3: onde nasceu é diferente de onde está — e não muda depois."""
-        nascimentos.registrar(self.mae, _dias_atras(10),
-                              [{"id": "C2", "sexo": "F", "raca": "Nelore"}])
+        nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
+                              [{"id": "C2", "sexo": "F", "raca": "Nelore"}]))
         c = self._linhas("SELECT * FROM animals WHERE id='C2'")[0]
         self.assertTrue(c["propriedade_nascimento_id"])
         self.assertEqual(c["propriedade_nascimento_id"], c["property_id"])
 
     def test_nascimento_gera_evento(self):
-        r = nascimentos.registrar(self.mae, _dias_atras(10),
-                                  [{"id": "C3", "sexo": "M", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
+                                  [{"id": "C3", "sexo": "M", "raca": "Nelore"}]))
         tipos = [e["tipo"] for e in eventos.do_animal(r["crias"][0])]
         self.assertIn("nascimento", tipos)
 
     def test_data_futura_e_recusada(self):
         amanha = (HOJE + timedelta(days=1)).isoformat()
-        r = nascimentos.registrar(self.mae, amanha,
-                                  [{"id": "CF", "sexo": "M", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(self.mae, amanha,
+                                  [{"id": "CF", "sexo": "M", "raca": "Nelore"}]))
         self.assertFalse(r["ok"])
         self.assertEqual(self._linhas("SELECT id FROM animals WHERE id='CF'"), [])
 
     def test_sem_cria_e_recusado(self):
-        self.assertFalse(nascimentos.registrar(self.mae, _dias_atras(5), [])["ok"])
+        self.assertFalse(nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(5), []))["ok"])
 
 
 class TestGemeos(BaseB3):
     """§7.2: gêmeos devem gerar animais distintos ligados ao MESMO parto."""
 
     def test_duas_crias_ficam_no_mesmo_parto(self):
-        r = nascimentos.registrar(
+        r = nascimentos.registrar(nascimentos.RegistroParto(
             self.mae, _dias_atras(10),
             [{"id": "G1", "sexo": "M", "raca": "Nelore"},
              {"id": "G2", "sexo": "F", "raca": "Nelore"}],
-            responsavel="op1")
+            responsavel="op1"))
         self.assertTrue(r["ok"], r)
 
         crias = self._linhas("SELECT id, parto_id FROM animals WHERE id IN ('G1','G2')")
@@ -122,15 +122,15 @@ class TestGemeos(BaseB3):
                          "gêmeos ficaram em partos diferentes")
 
     def test_so_existe_um_parto_para_os_gemeos(self):
-        nascimentos.registrar(self.mae, _dias_atras(10),
+        nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
                               [{"id": "G3", "sexo": "M", "raca": "Nelore"},
-                               {"id": "G4", "sexo": "F", "raca": "Nelore"}])
+                               {"id": "G4", "sexo": "F", "raca": "Nelore"}]))
         self.assertEqual(len(nascimentos.partos_da_mae(self.mae)), 1)
 
     def test_crias_do_parto_devolve_os_dois(self):
-        r = nascimentos.registrar(self.mae, _dias_atras(10),
+        r = nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
                                   [{"id": "G5", "sexo": "M", "raca": "Nelore"},
-                                   {"id": "G6", "sexo": "F", "raca": "Nelore"}])
+                                   {"id": "G6", "sexo": "F", "raca": "Nelore"}]))
         self.assertEqual(len(nascimentos.crias_do_parto(r["parto_id"])), 2)
 
 
@@ -144,8 +144,8 @@ class TestValidacaoLigada(BaseB3):
         con.commit(); con.close()
         db.clear_cache()
 
-        r = nascimentos.registrar(macho, _dias_atras(10),
-                                  [{"id": "CX", "sexo": "M", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(macho, _dias_atras(10),
+                                  [{"id": "CX", "sexo": "M", "raca": "Nelore"}]))
         self.assertFalse(r["ok"])
         self.assertEqual(self._linhas("SELECT id FROM animals WHERE id='CX'"), [],
                          "cria foi gravada apesar do bloqueio")
@@ -158,26 +158,26 @@ class TestValidacaoLigada(BaseB3):
         con.commit(); con.close()
         db.clear_cache()
 
-        r = nascimentos.registrar(jovem, _dias_atras(1),
-                                  [{"id": "CY", "sexo": "M", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(jovem, _dias_atras(1),
+                                  [{"id": "CY", "sexo": "M", "raca": "Nelore"}]))
         self.assertFalse(r["ok"])
 
     def test_alerta_pede_confirmacao_mas_nao_bloqueia(self):
         """§7.2: alerta 'sem substituir a avaliação técnica'."""
-        nascimentos.registrar(self.mae, _dias_atras(200),
-                              [{"id": "P1", "sexo": "M", "raca": "Nelore"}])
+        nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(200),
+                              [{"id": "P1", "sexo": "M", "raca": "Nelore"}]))
         db.clear_cache()
 
         # Segundo parto cedo demais — intervalo curto é ALERTA, não bloqueio.
-        r = nascimentos.registrar(self.mae, _dias_atras(20),
-                                  [{"id": "P2", "sexo": "F", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(20),
+                                  [{"id": "P2", "sexo": "F", "raca": "Nelore"}]))
         self.assertFalse(r["ok"])
         self.assertTrue(r.get("exige_confirmacao"),
                         f"alerta virou bloqueio: {r}")
 
-        r2 = nascimentos.registrar(self.mae, _dias_atras(20),
+        r2 = nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(20),
                                    [{"id": "P2", "sexo": "F", "raca": "Nelore"}],
-                                   ignorar_alertas=True)
+                                   ignorar_alertas=True))
         self.assertTrue(r2["ok"], "confirmação não liberou o registro")
 
     def test_avaliar_nao_grava_nada(self):
@@ -190,15 +190,15 @@ class TestVinculoMaternoAuditado(BaseB3):
     """§7.2: alterações no vínculo materno devem ser auditadas."""
 
     def test_alteracao_exige_motivo(self):
-        r = nascimentos.registrar(self.mae, _dias_atras(10),
-                                  [{"id": "V1", "sexo": "M", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
+                                  [{"id": "V1", "sexo": "M", "raca": "Nelore"}]))
         cria = r["crias"][0]
         self.assertFalse(nascimentos.vincular_mae(
             cria, None, motivo="  ", usuario="admin")["ok"])
 
     def test_alteracao_fica_na_trilha_com_antes_e_depois(self):
-        r = nascimentos.registrar(self.mae, _dias_atras(10),
-                                  [{"id": "V2", "sexo": "M", "raca": "Nelore"}])
+        r = nascimentos.registrar(nascimentos.RegistroParto(self.mae, _dias_atras(10),
+                                  [{"id": "V2", "sexo": "M", "raca": "Nelore"}]))
         cria = r["crias"][0]
         outra = self._criar_femea_adulta("MAE2")
 

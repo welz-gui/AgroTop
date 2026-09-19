@@ -1,7 +1,7 @@
 import unittest
 
 from services.conformidade import avaliar
-from services.conformidade_adaptador import montar_rebanho
+from services.conformidade_adaptador import FonteRebanho, montar_rebanho
 
 
 class MontarRebanhoTests(unittest.TestCase):
@@ -11,7 +11,7 @@ class MontarRebanhoTests(unittest.TestCase):
             {"uuid": "a2", "status": "ativo", "property_id": None, "origem": "nascido", "birth_estimated": True, "mae_uuid": None},
             {"uuid": "a3", "status": "ativo", "property_id": "p1", "origem": "comprado", "birth_estimated": True, "mae_uuid": None},
         ]
-        resultado = montar_rebanho(
+        fonte = FonteRebanho(
             animais=animais,
             identificadores_ativos=[
                 {"animal_uuid": "a1", "tipo": "oficial_pnib"},
@@ -29,6 +29,7 @@ class MontarRebanhoTests(unittest.TestCase):
             ],
             referencia="2033-01-01",
         )
+        resultado = montar_rebanho(fonte)
 
         self.assertEqual(
             resultado,
@@ -47,7 +48,7 @@ class MontarRebanhoTests(unittest.TestCase):
         self.assertEqual(avaliar(resultado, "2033-01-01")["escore"], 46.67)
 
     def test_ignora_inativos_em_todos_os_indicadores(self):
-        resultado = montar_rebanho(
+        fonte = FonteRebanho(
             animais=[
                 {"uuid": "ativo", "status": "ativo", "property_id": "p1", "origem": "comprado", "birth_estimated": False, "mae_uuid": "m"},
                 {"uuid": "inativo", "status": "vendido", "property_id": "p2", "origem": "nascido", "birth_estimated": True, "mae_uuid": None},
@@ -61,6 +62,7 @@ class MontarRebanhoTests(unittest.TestCase):
             movimentacoes_abertas=[],
             referencia="2033-01-01",
         )
+        resultado = montar_rebanho(fonte)
 
         self.assertEqual(resultado["animais_ativos"], 1)
         self.assertEqual(resultado["com_propriedade"], 1)
@@ -70,7 +72,7 @@ class MontarRebanhoTests(unittest.TestCase):
         self.assertEqual(resultado["nascidos_sem_mae"], 0)
 
     def test_propriedade_atual_nao_e_propriedade_de_nascimento(self):
-        resultado = montar_rebanho(
+        fonte = FonteRebanho(
             animais=[
                 {
                     "uuid": "a1",
@@ -88,11 +90,12 @@ class MontarRebanhoTests(unittest.TestCase):
             movimentacoes_abertas=[],
             referencia="2033-01-01",
         )
+        resultado = montar_rebanho(fonte)
         self.assertEqual(resultado["com_propriedade"], 0)
         self.assertEqual(resultado["nascidos_sem_mae"], 1)
 
     def test_conta_so_movimentacao_aberta_vencida(self):
-        resultado = montar_rebanho(
+        fonte = FonteRebanho(
             animais=[],
             identificadores_ativos=[],
             dispositivos=[],
@@ -106,11 +109,12 @@ class MontarRebanhoTests(unittest.TestCase):
             ],
             referencia="2033-01-01",
         )
+        resultado = montar_rebanho(fonte)
         self.assertEqual(resultado["movimentacoes_abertas_vencidas"], 1)
         self.assertEqual(resultado["eventos_pendentes_sincronizacao"], 7)
 
     def test_vazio_e_todos_pendentes_sao_validos_no_avaliador(self):
-        vazio = montar_rebanho(
+        fonte_vazio = FonteRebanho(
             animais=[],
             identificadores_ativos=[],
             dispositivos=[],
@@ -118,10 +122,11 @@ class MontarRebanhoTests(unittest.TestCase):
             movimentacoes_abertas=[],
             referencia="2033-01-01",
         )
+        vazio = montar_rebanho(fonte_vazio)
         self.assertTrue(all(valor == 0 for valor in vazio.values()))
         self.assertEqual(avaliar(vazio, "2033-01-01")["escore"], 100.0)
 
-        perfeito = montar_rebanho(
+        fonte_perfeito = FonteRebanho(
             animais=[
                 {"uuid": "p1", "status": "ativo", "property_id": "fazenda", "origem": "nascido", "birth_estimated": False, "mae_uuid": "mae"}
             ],
@@ -134,9 +139,10 @@ class MontarRebanhoTests(unittest.TestCase):
             movimentacoes_abertas=[],
             referencia="2033-01-01",
         )
+        perfeito = montar_rebanho(fonte_perfeito)
         self.assertEqual(avaliar(perfeito, "2033-01-01")["escore"], 100.0)
 
-        pendente = montar_rebanho(
+        fonte_pendente = FonteRebanho(
             animais=[
                 {"uuid": "a1", "status": "ativo", "property_id": None, "origem": "nascido", "birth_estimated": True, "mae_uuid": None}
             ],
@@ -146,6 +152,7 @@ class MontarRebanhoTests(unittest.TestCase):
             movimentacoes_abertas=[{"status": "liberada", "data_prevista": "2032-01-01"}],
             referencia="2033-01-01",
         )
+        pendente = montar_rebanho(fonte_pendente)
         self.assertEqual(avaliar(pendente, "2033-01-01")["escore"], 0.0)
 
 

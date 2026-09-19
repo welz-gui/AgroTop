@@ -51,7 +51,9 @@ class TestTelaMovimentacao(unittest.TestCase):
         cls.origem = db.propriedades.padrao()
         assert cls.origem, "seed não criou propriedade"
         cls.destino_id = db.propriedades.criar_propriedade(
-            cls.origem["produtor_id"], "Fazenda Destino")
+            db.propriedades.PropriedadeCreate(
+                produtor_id=cls.origem["produtor_id"],
+                nome="Fazenda Destino"))
         db.clear_cache()
 
         cls.animais = [a for a in db.get_all_animals(status="ativo")

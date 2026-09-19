@@ -67,7 +67,7 @@ class TestConformidadeNaTela(unittest.TestCase):
 
     def _cadeia(self):
         """Reproduz exatamente o que `_dash_conformidade()` monta."""
-        from services.conformidade_adaptador import montar_rebanho
+        from services.conformidade_adaptador import FonteRebanho, montar_rebanho
         from services.conformidade import avaliar
 
         animais = db.get_all_animals(status=None)
@@ -80,10 +80,12 @@ class TestConformidadeNaTela(unittest.TestCase):
         movimentacoes_abertas = db.movimentacoes.abertas()
         referencia = date.today().isoformat()
 
-        rebanho = montar_rebanho(
+        fonte = FonteRebanho(
             animais=animais, identificadores_ativos=identificadores_ativos,
             dispositivos=dispositivos, eventos_pendentes=eventos_pendentes,
-            movimentacoes_abertas=movimentacoes_abertas, referencia=referencia)
+            movimentacoes_abertas=movimentacoes_abertas, referencia=referencia
+        )
+        rebanho = montar_rebanho(fonte)
         return avaliar(rebanho, referencia)
 
     # ── testes ───────────────────────────────────────────────────────────────

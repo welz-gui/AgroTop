@@ -1,6 +1,17 @@
 """Monta os indicadores de conformidade a partir do rebanho em memória."""
 
+from dataclasses import dataclass
 from datetime import date
+
+
+@dataclass
+class FonteRebanho:
+    animais: list[dict]
+    identificadores_ativos: list[dict]
+    dispositivos: list[dict]
+    eventos_pendentes: int
+    movimentacoes_abertas: list[dict]
+    referencia: str
 
 
 _STATUS_ATIVO = "ativo"
@@ -18,29 +29,21 @@ def _data_anterior(data_prevista: object, referencia: str) -> bool:
         return False
 
 
-def montar_rebanho(
-    *,
-    animais: list[dict],
-    identificadores_ativos: list[dict],
-    dispositivos: list[dict],
-    eventos_pendentes: int,
-    movimentacoes_abertas: list[dict],
-    referencia: str,
-) -> dict:
+def montar_rebanho(fonte: FonteRebanho) -> dict:
     """Traduz os registros do rebanho para o contrato de conformidade."""
 
-    ativos = [animal for animal in animais if animal.get("status") == _STATUS_ATIVO]
+    ativos = [animal for animal in fonte.animais if animal.get("status") == _STATUS_ATIVO]
     uuids_ativos = {animal.get("uuid") for animal in ativos}
 
     identificados_oficial = {
         item.get("animal_uuid")
-        for item in identificadores_ativos
+        for item in fonte.identificadores_ativos
         if item.get("animal_uuid") in uuids_ativos
         and item.get("tipo") == "oficial_pnib"
     }
     identificados_manejo = {
         item.get("animal_uuid")
-        for item in identificadores_ativos
+        for item in fonte.identificadores_ativos
         if item.get("animal_uuid") in uuids_ativos and item.get("tipo") == "manejo"
     }
 
@@ -54,20 +57,20 @@ def montar_rebanho(
             for animal in ativos
             if animal.get("origem") == "nascido" and not animal.get("mae_uuid")
         ),
-        "eventos_pendentes_sincronizacao": eventos_pendentes,
+        "eventos_pendentes_sincronizacao": fonte.eventos_pendentes,
         "com_nascimento_estimado": sum(
             1 for animal in ativos if animal.get("birth_estimated")
         ),
         "dispositivos_com_divergencia": sum(
             1
-            for dispositivo in dispositivos
+            for dispositivo in fonte.dispositivos
             if dispositivo.get("animal_uuid") in uuids_ativos
             and dispositivo.get("divergencia") is not None
         ),
         "movimentacoes_abertas_vencidas": sum(
             1
-            for movimentacao in movimentacoes_abertas
+            for movimentacao in fonte.movimentacoes_abertas
             if movimentacao.get("status") in _MOVIMENTACOES_ABERTAS
-            and _data_anterior(movimentacao.get("data_prevista"), referencia)
+            and _data_anterior(movimentacao.get("data_prevista"), fonte.referencia)
         ),
     }

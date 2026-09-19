@@ -3,6 +3,7 @@
 import csv
 import re
 import unicodedata
+from dataclasses import dataclass
 
 from services.estados_dispositivo import conferir_codigos
 
@@ -16,6 +17,17 @@ _COLUNAS = (
     "lote",
     "data_fabricacao",
 )
+
+
+@dataclass
+class ContextoProcessamento:
+    separador: str
+    quantidade_esperada: int
+    tem_cabecalho: bool
+    indices: dict
+    vistos: set[str]
+    duplicados: set[str]
+    resultado: dict
 
 
 def _normalizar_coluna(valor: str) -> str:
@@ -103,57 +115,51 @@ def _configurar_colunas(primeira: list[str] | None) -> tuple[bool, dict, int, li
 def _processar_linha(
     conteudo: str,
     numero: int,
-    separador: str,
-    quantidade_esperada: int,
-    tem_cabecalho: bool,
-    indices: dict,
-    vistos: set[str],
-    duplicados: set[str],
-    resultado: dict,
+    contexto: ContextoProcessamento,
 ) -> None:
     if not conteudo.strip():
-        _rejeitar(resultado, numero, conteudo, "linha vazia")
+        _rejeitar(contexto.resultado, numero, conteudo, "linha vazia")
         return
     if _eh_rodape(conteudo):
-        _rejeitar(resultado, numero, conteudo, "rodapé de totais não é um dispositivo")
+        _rejeitar(contexto.resultado, numero, conteudo, "rodapé de totais não é um dispositivo")
         return
 
-    valores = _ler_colunas(conteudo, separador)
+    valores = _ler_colunas(conteudo, contexto.separador)
     if valores is None:
-        _rejeitar(resultado, numero, conteudo, "CSV inválido")
+        _rejeitar(contexto.resultado, numero, conteudo, "CSV inválido")
         return
-    if len(valores) != quantidade_esperada:
-        motivo = f"esperado {quantidade_esperada} colunas, encontrado {len(valores)}"
-        _rejeitar(resultado, numero, conteudo, motivo)
+    if len(valores) != contexto.quantidade_esperada:
+        motivo = f"esperado {contexto.quantidade_esperada} colunas, encontrado {len(valores)}"
+        _rejeitar(contexto.resultado, numero, conteudo, motivo)
         return
-    if not tem_cabecalho and quantidade_esperada > len(_COLUNAS):
-        _rejeitar(resultado, numero, conteudo, f"máximo de {len(_COLUNAS)} colunas reconhecidas")
+    if not contexto.tem_cabecalho and contexto.quantidade_esperada > len(_COLUNAS):
+        _rejeitar(contexto.resultado, numero, conteudo, f"máximo de {len(_COLUNAS)} colunas reconhecidas")
         return
 
     item = {nome: "" for nome in _COLUNAS}
-    for nome, indice in indices.items():
+    for nome, indice in contexto.indices.items():
         item[nome] = valores[indice].strip()
 
     codigo_visual = item["codigo_visual"]
     if not codigo_visual:
-        _rejeitar(resultado, numero, conteudo, "código visual vazio")
+        _rejeitar(contexto.resultado, numero, conteudo, "código visual vazio")
         return
 
     chave = codigo_visual.casefold()
-    if chave in vistos:
-        if chave not in duplicados:
-            resultado["duplicados_no_arquivo"].append(codigo_visual)
-            duplicados.add(chave)
+    if chave in contexto.vistos:
+        if chave not in contexto.duplicados:
+            contexto.resultado["duplicados_no_arquivo"].append(codigo_visual)
+            contexto.duplicados.add(chave)
         _rejeitar(
-            resultado,
+            contexto.resultado,
             numero,
             conteudo,
             f"código visual duplicado no arquivo: {codigo_visual}"
         )
         return
 
-    vistos.add(chave)
-    resultado["aceitos"].append(item)
+    contexto.vistos.add(chave)
+    contexto.resultado["aceitos"].append(item)
 
 
 def ler(texto: str) -> dict:
@@ -200,6 +206,16 @@ def ler(texto: str) -> dict:
     vistos: set[str] = set()
     duplicados: set[str] = set()
 
+    contexto = ContextoProcessamento(
+        separador=separador,
+        quantidade_esperada=quantidade_esperada,
+        tem_cabecalho=tem_cabecalho,
+        indices=indices,
+        vistos=vistos,
+        duplicados=duplicados,
+        resultado=resultado,
+    )
+
     for indice_linha, conteudo in enumerate(linhas):
         if tem_cabecalho and indice_linha == indice_modelo:
             continue
@@ -210,13 +226,7 @@ def ler(texto: str) -> dict:
         _processar_linha(
             conteudo,
             numero,
-            separador,
-            quantidade_esperada,
-            tem_cabecalho,
-            indices,
-            vistos,
-            duplicados,
-            resultado,
+            contexto,
         )
 
     return resultado

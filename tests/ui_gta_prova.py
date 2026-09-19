@@ -55,7 +55,9 @@ class TestConferirGtaNaTela(unittest.TestCase):
         # ui_movimentacao_prova.py.
         cls.origem = db.propriedades.padrao()
         cls.destino_id = db.propriedades.criar_propriedade(
-            cls.origem["produtor_id"], "Fazenda Destino GTA")
+            db.propriedades.PropriedadeCreate(
+                produtor_id=cls.origem["produtor_id"],
+                nome="Fazenda Destino GTA"))
         db.clear_cache()
         cls.animais = [a for a in db.get_all_animals(status="ativo")
                        if a.get("property_id") == cls.origem["id"]][:2]
