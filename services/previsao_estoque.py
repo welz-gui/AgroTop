@@ -22,6 +22,20 @@ def _safe_int(val, default: int = 0) -> int:
         return default
 
 
+_ORDEM_URGENCIA = {"critica": 0, "atencao": 1, "sem_dados": 2, "ok": 3}
+
+
+def _chave_ordenacao(item: dict):
+    prio = _ORDEM_URGENCIA.get(item.get("urgencia"), 4)
+    comprar_str = item.get("comprar_ate") or "9999-12-31"
+    dias_val = (
+        item.get("dias_restantes")
+        if item.get("dias_restantes") is not None
+        else 999999.0
+    )
+    return (prio, comprar_str, dias_val, item.get("nome", ""))
+
+
 def prever(insumos: list[dict], hoje: str) -> list[dict]:
     """Dias restantes e data de ruptura por insumo.
 
@@ -103,22 +117,5 @@ def prever(insumos: list[dict], hoje: str) -> list[dict]:
             "urgencia": urgencia,
         })
 
-    # Ordem de prioridade de urgência:
-    # 1. critica (0)
-    # 2. atencao (1)
-    # 3. sem_dados (2) - insumos sem consumo registrado ficam antes dos seguros (ok) para evitar riscos ocultos
-    # 4. ok (3)
-    ordem_urgencia = {"critica": 0, "atencao": 1, "sem_dados": 2, "ok": 3}
-
-    def chave_ordenacao(item: dict):
-        prio = ordem_urgencia.get(item["urgencia"], 4)
-        comprar_str = item.get("comprar_ate") or "9999-12-31"
-        dias_val = (
-            item.get("dias_restantes")
-            if item.get("dias_restantes") is not None
-            else 999999.0
-        )
-        return (prio, comprar_str, dias_val, item.get("nome", ""))
-
-    resultado.sort(key=chave_ordenacao)
+    resultado.sort(key=_chave_ordenacao)
     return resultado

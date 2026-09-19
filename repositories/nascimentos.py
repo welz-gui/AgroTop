@@ -22,6 +22,22 @@ from . import eventos
 from .animais import novo_uuid
 from .conexao import _cache, _conn, _writes
 
+from dataclasses import dataclass
+
+@dataclass
+class RegistroParto:
+    mae_uuid: Optional[str]
+    data: str
+    crias: list[dict]
+    hora: str = ""
+    tipo_parto: str = "normal"
+    condicao: str = "nascido_vivo"
+    propriedade_id: Optional[str] = None
+    responsavel: str = ""
+    data_estimada: bool = False
+    observacoes: str = ""
+    ignorar_alertas: bool = False
+
 ORIGENS = ("nascido", "comprado", "transferido", "importado")
 TIPOS_PARTO = ("normal", "assistido", "cesarea")
 CONDICOES = ("nascido_vivo", "natimorto")
@@ -76,13 +92,7 @@ def avaliar(mae_uuid: Optional[str], nascimento: str,
 
 
 @_writes
-def registrar(mae_uuid: Optional[str], data: str, crias: list[dict], *,
-              hora: str = "", tipo_parto: str = "normal",
-              condicao: str = "nascido_vivo",
-              propriedade_id: Optional[str] = None,
-              responsavel: str = "", data_estimada: bool = False,
-              observacoes: str = "",
-              ignorar_alertas: bool = False) -> dict:
+def registrar(dados: RegistroParto) -> dict:
     """Registra um parto e as crias dele.
 
     `crias`: [{"id": brinco, "sexo": "M"|"F", "raca": str,
@@ -93,6 +103,17 @@ def registrar(mae_uuid: Optional[str], data: str, crias: list[dict], *,
     "emitir alerta, sem substituir a avaliação técnica". `ignorar_alertas=True`
     é a confirmação de quem avaliou.
     """
+    mae_uuid = dados.mae_uuid
+    data = dados.data
+    crias = dados.crias
+    hora = dados.hora
+    tipo_parto = dados.tipo_parto
+    condicao = dados.condicao
+    propriedade_id = dados.propriedade_id
+    responsavel = dados.responsavel
+    data_estimada = dados.data_estimada
+    observacoes = dados.observacoes
+    ignorar_alertas = dados.ignorar_alertas
     if not crias:
         return {"ok": False, "erro": "Nenhuma cria informada."}
     if data > date.today().isoformat():

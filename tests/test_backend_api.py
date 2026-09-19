@@ -891,12 +891,14 @@ class TestTratoEndpoint(BackendApiTestCase):
     def _create_plan(self, *, active=True, insumo_id=None, quantity=8.0):
         lote = db.get_all_lotes()[0]
         db.add_feeding_plan(
-            str(lote["id"]),
-            "Trato API",
-            quantity,
-            "kg",
-            "diario",
-            insumo_id=insumo_id,
+            db.FeedingPlanCreate(
+                lote_id=str(lote["id"]),
+                product_name="Trato API",
+                quantity=quantity,
+                unit="kg",
+                frequency="diario",
+                insumo_id=insumo_id
+            )
         )
         with _conn() as con:
             plan_id = con.execute(
