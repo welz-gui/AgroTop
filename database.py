@@ -25,6 +25,16 @@ class InsumoCreate:
     min_stock: float
     cost_per_unit: float
 
+@dataclass
+class FeedingPlanCreate:
+    lote_id: int
+    product_name: str
+    quantity: float
+    unit: str
+    frequency: str
+    insumo_id: Optional[int] = None
+    notes: str = ""
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
@@ -32,8 +42,8 @@ from services.constantes import (  # noqa: F401
     CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT,
 )
 from services.zootecnia import (  # noqa: F401
-    _months_between, get_age_months, get_age_category,
-    kg_to_arrobas, estimate_weight_by_measurement, calculate_gmd_total,
+    get_age_months, get_age_category,
+    kg_to_arrobas, estimate_weight_by_measurement,
 )
 from services.terminacao import (  # noqa: F401
     TERMINACAO_DEFAULTS, simular_terminacao,
@@ -1805,15 +1815,14 @@ def convert_quantity(qty: float, from_unit: str, to_unit: str) -> Optional[float
 
 
 @_writes
-def add_feeding_plan(lote_id, product_name, quantity, unit, frequency,
-                     insumo_id=None, notes="") -> None:
+def add_feeding_plan(plan: FeedingPlanCreate) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO feeding_plans
                (lote_id,product_name,insumo_id,quantity,unit,frequency,notes,
                 vigente_de,vigente_ate)
                VALUES(?,?,?,?,?,?,?,?,NULL)""",
-            (lote_id, product_name, insumo_id or None, quantity, unit, frequency, notes,
+            (plan.lote_id, plan.product_name, plan.insumo_id or None, plan.quantity, plan.unit, plan.frequency, plan.notes,
              date.today().isoformat()),
         )
 
@@ -2134,7 +2143,12 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
-            # Seguro: qt, sets e qpk são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: B608 falso positivo. O nome da tabela (qt)
+            # whitelist (ADMIN_TABLES) antes desta função. As colunas (sets)
+            # e pk vêm diretamente do esquema do banco (PRAGMA table_info/),
+            # todas filtradas pelo set 'valid' e seguramente escapadas com
+            # _quote_ident. Os dados manipulados são estritamente binds SQL
+            # passados como parâmetros, neutralizando qualquer injeção.
             con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
@@ -2146,7 +2160,11 @@ def admin_apply_changes(table: str, updates: list[dict],
                 continue
             placeholders = ", ".join("?" for _ in fields)
             cols_str = ", ".join(_quote_ident(k) for k in fields)
-            # Seguro: qt e cols_str são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: B608 falso positivo. O nome da tabela e as colunas
+            # inseridas obedecem estritamente à whitelist de ADMIN_TABLES
+            # e ao esquema da tabela retornado pela query protegida do
+            # banco, escapadas adequadamente com _quote_ident. Valores
+            # injetados são puramente binds SQL (?/%s).
             con.execute(
                 f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))
