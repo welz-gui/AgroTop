@@ -24,7 +24,6 @@ sys.path.insert(0, RAIZ)
 import database as db  # noqa: E402
 from services.zootecnia import estimate_weight_by_measurement  # noqa: E402
 from repositories.animais import get_animal  # noqa: E402
-from services.zootecnia import calculate_gmd_total  # noqa: E402
 
 HOJE = date.today()
 
@@ -160,38 +159,38 @@ class TestGMD(BaseRegras):
     def test_gmd_total_de_vida(self):
         a = {"entry_date": _dias_atras(100), "entry_weight": 300.0,
              "current_weight": 400.0}
-        self.assertEqual(calculate_gmd_total(a), 1.0)
+        self.assertEqual(db.calculate_gmd_total(a), 1.0)
 
     def test_gmd_total_sem_dias_decorridos(self):
         a = {"entry_date": HOJE.isoformat(), "entry_weight": 300.0,
              "current_weight": 300.0}
-        self.assertIsNone(calculate_gmd_total(a))
+        self.assertIsNone(db.calculate_gmd_total(a))
 
     def test_gmd_total_data_invalida(self):
-        self.assertIsNone(calculate_gmd_total(
+        self.assertIsNone(db.calculate_gmd_total(
             {"entry_date": "31/12/2025", "entry_weight": 300.0,
              "current_weight": 400.0}))
 
     def test_gmd_total_chaves_ausentes(self):
         """Testa o comportamento de calculate_gmd_total quando faltam chaves (KeyError)."""
         a_sem_entry_date = {"entry_weight": 300.0, "current_weight": 400.0}
-        self.assertIsNone(calculate_gmd_total(a_sem_entry_date))
+        self.assertIsNone(db.calculate_gmd_total(a_sem_entry_date))
 
         a_sem_entry_weight = {"entry_date": _dias_atras(100), "current_weight": 400.0}
-        self.assertIsNone(calculate_gmd_total(a_sem_entry_weight))
+        self.assertIsNone(db.calculate_gmd_total(a_sem_entry_weight))
 
         a_sem_current_weight = {"entry_date": _dias_atras(100), "entry_weight": 300.0}
-        self.assertIsNone(calculate_gmd_total(a_sem_current_weight))
+        self.assertIsNone(db.calculate_gmd_total(a_sem_current_weight))
 
     def test_gmd_total_tipos_invalidos(self):
         """Testa o comportamento de calculate_gmd_total quando tipos são inválidos (TypeError)."""
-        self.assertIsNone(calculate_gmd_total(None))
+        self.assertIsNone(db.calculate_gmd_total(None))
 
         a_tipos_invalidos_peso = {"entry_date": _dias_atras(100), "entry_weight": "texto", "current_weight": 400.0}
-        self.assertIsNone(calculate_gmd_total(a_tipos_invalidos_peso))
+        self.assertIsNone(db.calculate_gmd_total(a_tipos_invalidos_peso))
 
         a_tipos_invalidos_data = {"entry_date": None, "entry_weight": 300.0, "current_weight": 400.0}
-        self.assertIsNone(calculate_gmd_total(a_tipos_invalidos_data))
+        self.assertIsNone(db.calculate_gmd_total(a_tipos_invalidos_data))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

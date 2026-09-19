@@ -20,7 +20,6 @@ from services.zootecnia import estimate_weight_by_measurement
 from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
-from services.zootecnia import calculate_gmd_total
 from services.identificadores import REGRAS_PADRAO, validar as validar_formato_id
 from services.validacao_regulatoria import validar_animal
 from services.recomendacoes import avaliar as avaliar_recomendacoes
@@ -54,6 +53,11 @@ from services.sincronizacao import (
 from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
+)
+from services.previsao_estoque import prever as previsao_estoque_prever
+from services.previsao_estoque_adaptador import (
+    consumo_diario_planejado,
+    montar_insumos as previsao_estoque_montar_insumos,
 )
 from services.arquivo_dispositivos import (
     ler as arquivo_dispositivos_ler,
@@ -2231,7 +2235,7 @@ def page_animal():
         target_weight = float(target_weight)
     m=st.columns(3)
     m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
-    gmd_total = calculate_gmd_total(animal)
+    gmd_total = db.calculate_gmd_total(animal)
     gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
     tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
     m[1].metric("GMD recente", gmd_txt,
