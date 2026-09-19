@@ -1521,14 +1521,14 @@ def _tab_historico(animal):
             st.markdown(f'<div class="hist-item" style="border-left-color:{paleta["info"]}">'
                 f'<b>{html.escape(str(m["medication_name"]))}</b> {badge}<br>'
                 f'<span style="color:{paleta["texto_terciario"]};font-size:.78rem">'
-                f'{_fmt_dose(m["dose"], m["unit"])} · {m["application_route"]} · {m["med_date"]}'
+                f'{_fmt_dose(m["dose"], m["unit"])} · {html.escape(str(m["application_route"]))} · {m["med_date"]}'
                 f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
                 f'</span></div>',unsafe_allow_html=True)
         st.markdown("**🚚 Movimentações**")
         for mv in db.get_movements(animal["id"], limit=4):
             st.markdown(f'<div class="hist-item" style="border-left-color:{paleta["destaque"]}">'
-                f'<b>{mv.get("from_name") or "—"} → {mv.get("to_name","?")}</b><br>'
-                f'<span style="color:{paleta["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {mv["reason"]}</span>'
+                f'<b>{html.escape(str(mv.get("from_name") or "—"))} → {html.escape(str(mv.get("to_name", "?")))}</b><br>'
+                f'<span style="color:{paleta["texto_terciario"]};font-size:.78rem">{mv["movement_date"]} · {html.escape(str(mv["reason"]))}</span>'
                 f'</div>',unsafe_allow_html=True)
 
 
