@@ -1156,7 +1156,7 @@ def _dash_completude():
                 start_date=inicio.isoformat(), end_date=fim.isoformat())
             janela = janela_do_mes(ano, mes, checagens_de_trato=checagens,
                                    leituras_de_chuva=chuvas)
-            r = avaliar_mes(ano, mes, animais_ativos, pesagens, **janela)
+            r = avaliar_mes(ano, mes, animais_ativos, pesagens, janela)
             linhas.append({
                 "Mês": f"{mes:02d}/{ano}",
                 "Pesagem em dia": round(r["animais_com_pesagem_em_dia"] * 100, 1),
