@@ -605,7 +605,7 @@ class TestDietaVigencia(BaseRegras):
         db.add_feeding_plan(db.FeedingPlanCreate(lote_id=lid, product_name="Ração", quantity=10.0, unit="kg", frequency="diario"))
         antiga = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
 
-        r = db.nova_versao_feeding_plan(antiga["id"], quantity=15.0, frequency="semanal")
+        r = db.nova_versao_feeding_plan(antiga["id"], updates=db.FeedingPlanUpdate(quantity=15.0, frequency="semanal"))
         self.assertTrue(r["ok"])
 
         historico = db.get_feeding_plan_historico(lid)
@@ -626,7 +626,7 @@ class TestDietaVigencia(BaseRegras):
         db.add_feeding_plan(db.FeedingPlanCreate(lote_id=lid, product_name="Ração", quantity=10.0, unit="kg", frequency="diario", notes="obs original"))
         antiga = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
 
-        db.nova_versao_feeding_plan(antiga["id"], quantity=20.0)  # só a quantidade muda
+        db.nova_versao_feeding_plan(antiga["id"], updates=db.FeedingPlanUpdate(quantity=20.0))  # só a quantidade muda
         nova = [h for h in db.get_feeding_plan_historico(lid) if h["vigente_ate"] is None][0]
         self.assertEqual(nova["quantity"], 20.0)
         self.assertEqual(nova["frequency"], "diario")
@@ -638,7 +638,7 @@ class TestDietaVigencia(BaseRegras):
         p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
         db.encerrar_feeding_plan(p["id"])
 
-        r = db.nova_versao_feeding_plan(p["id"], quantity=99.0)
+        r = db.nova_versao_feeding_plan(p["id"], updates=db.FeedingPlanUpdate(quantity=99.0))
         self.assertFalse(r["ok"])
 
     def test_encerrar_fecha_vigencia_sem_apagar_a_linha(self):

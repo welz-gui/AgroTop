@@ -35,6 +35,15 @@ class FeedingPlanCreate:
     insumo_id: Optional[int] = None
     notes: str = ""
 
+
+@dataclass
+class FeedingPlanUpdate:
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    frequency: Optional[str] = None
+    insumo_id: Optional[int] = None
+    notes: Optional[str] = None
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
@@ -1828,8 +1837,7 @@ def add_feeding_plan(plan: FeedingPlanCreate) -> None:
 
 
 @_writes
-def nova_versao_feeding_plan(plan_id: int, *, quantity=None, unit=None,
-                             frequency=None, insumo_id=None, notes=None) -> dict:
+def nova_versao_feeding_plan(plan_id: int, updates: FeedingPlanUpdate) -> dict:
     """Altera um item de trato criando OUTRA VERSÃO — nunca sobrescrevendo.
 
     Mesmo princípio de `regras.nova_versao()`: editar no lugar reescreveria
@@ -1861,10 +1869,10 @@ def nova_versao_feeding_plan(plan_id: int, *, quantity=None, unit=None,
                 active,vigente_de,vigente_ate)
                VALUES(?,?,?,?,?,?,?,1,?,NULL)""",
             (atual["lote_id"], atual["product_name"],
-             insumo_id if insumo_id is not None else atual["insumo_id"],
-             quantity if quantity is not None else atual["quantity"],
-             unit or atual["unit"], frequency or atual["frequency"],
-             notes if notes is not None else atual["notes"],
+             updates.insumo_id if updates.insumo_id is not None else atual["insumo_id"],
+             updates.quantity if updates.quantity is not None else atual["quantity"],
+             updates.unit or atual["unit"], updates.frequency or atual["frequency"],
+             updates.notes if updates.notes is not None else atual["notes"],
              hoje.isoformat()))
     return {"ok": True}
 
