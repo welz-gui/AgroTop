@@ -47,6 +47,16 @@ class TestCustoMedioPonderado(unittest.TestCase):
         )
         self.assertEqual(resultado, 4.5)
 
+    def test_custo_atual_zero_com_saldo(self):
+        """Testa entrada quando o custo atual é zero, mas há saldo positivo."""
+        resultado = custo_medio_ponderado(
+            saldo_atual=100.0,
+            custo_atual=0.0,
+            quantidade_entrada=50.0,
+            custo_entrada=6.0,
+        )
+        self.assertAlmostEqual(resultado, 2.0, places=3)
+
     def test_custo_entrada_zero_doacao_ou_brinde(self):
         """Testa entrada com custo zero (doação/brinde é entrada válida)."""
         resultado = custo_medio_ponderado(
