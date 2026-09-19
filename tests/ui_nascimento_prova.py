@@ -200,10 +200,10 @@ class TestTelaNascimento(unittest.TestCase):
         que é ALERTA — biologicamente improvável não é impossível.
         """
         mae = self._mae_apta()
-        r = db.nascimentos.registrar(
+        r = db.nascimentos.registrar(db.nascimentos.RegistroParto(
             mae["uuid"], _dias_atras(60),
             [{"id": "PREV1", "sexo": "M", "raca": "Nelore"}],
-            responsavel="op1", ignorar_alertas=True)
+            responsavel="op1", ignorar_alertas=True))
         self.assertTrue(r["ok"], r)
         db.clear_cache()
 

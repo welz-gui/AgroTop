@@ -79,8 +79,7 @@ class TestDietaPorPiqueteNaTela(unittest.TestCase):
         db.clear_cache()
         insumo = next(i for i in db.get_all_insumos()
                       if i["name"] == "Ração Prova Dieta")
-        db.add_feeding_plan(lote["id"], "Ração Prova Dieta", 40.0, "kg", "diario",
-                            insumo_id=insumo["id"])
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=lote["id"], product_name="Ração Prova Dieta", quantity=40.0, unit="kg", frequency="diario", insumo_id=insumo["id"]))
         db.clear_cache()
         entrada = (date.today() - timedelta(days=60)).isoformat()
         db.add_animal(db.AnimalData("DIETA1", "Nelore", "M", None, entrada,
@@ -113,7 +112,7 @@ class TestDietaPorPiqueteNaTela(unittest.TestCase):
             db.clear_cache()
             vazio = db.get_all_lotes()[-1]
 
-        db.add_feeding_plan(vazio["id"], "Sal mineral", 5.0, "kg", "diario")
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=vazio["id"], product_name="Sal mineral", quantity=5.0, unit="kg", frequency="diario"))
         db.clear_cache()
 
         at = self._tela()  # não pode estourar

@@ -10,7 +10,9 @@ from pathlib import Path
 import database as db
 from repositories import propriedades
 from services.importacao_car import (
+    CamadaCar,
     area_camada_ha,
+    camada_para_geojson,
     ler_shapefile_car,
     percentual_sobreposicao,
 )
@@ -44,6 +46,40 @@ class TestImportacaoCar(unittest.TestCase):
         car = [(-51.23, -30.03), (-51.225, -30.03),
                (-51.225, -30.02), (-51.23, -30.02)]
         self.assertAlmostEqual(percentual_sobreposicao(propriedade, [car]), 50.0, delta=0.2)
+
+    def test_camada_para_geojson_poligono_simples(self):
+        camada = CamadaCar(
+            tipo="Área do Imóvel",
+            poligonos=[[(-51.23, -30.03), (-51.22, -30.03), (-51.22, -30.02), (-51.23, -30.02), (-51.23, -30.03)]]
+        )
+        geojson_str = camada_para_geojson(camada)
+        geojson = json.loads(geojson_str)
+
+        esperado = {
+            "type": "Polygon",
+            "coordinates": [[[-51.23, -30.03], [-51.22, -30.03], [-51.22, -30.02], [-51.23, -30.02], [-51.23, -30.03]]]
+        }
+        self.assertEqual(geojson, esperado)
+
+    def test_camada_para_geojson_multipoligono(self):
+        camada = CamadaCar(
+            tipo="Área do Imóvel",
+            poligonos=[
+                [(-51.23, -30.03), (-51.22, -30.03), (-51.22, -30.02), (-51.23, -30.02), (-51.23, -30.03)],
+                [(-50.0, -30.0), (-49.0, -30.0), (-49.0, -29.0), (-50.0, -29.0), (-50.0, -30.0)]
+            ]
+        )
+        geojson_str = camada_para_geojson(camada)
+        geojson = json.loads(geojson_str)
+
+        esperado = {
+            "type": "MultiPolygon",
+            "coordinates": [
+                [[[-51.23, -30.03], [-51.22, -30.03], [-51.22, -30.02], [-51.23, -30.02], [-51.23, -30.03]]],
+                [[[-50.0, -30.0], [-49.0, -30.0], [-49.0, -29.0], [-50.0, -29.0], [-50.0, -30.0]]]
+            ]
+        }
+        self.assertEqual(geojson, esperado)
 
 
 class TestPersistenciaCar(unittest.TestCase):
