@@ -283,9 +283,9 @@ def _fmt_dose(dose, unit: str) -> str:
     try:
         d = float(dose)
     except (TypeError, ValueError):
-        return f"{dose} {unit}"
+        return html.escape(f"{dose} {unit}")
     u = plurais.get(unit, unit) if d != 1 else unit
-    return f"{_num_br(d)} {u}"
+    return html.escape(f"{_num_br(d)} {u}")
 
 # ─── Previsão do tempo (Open-Meteo, gratuito e sem chave) ────────────────────
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1221,7 +1221,7 @@ def _campo_trato():
 
         # Cabeçalho do piquete
         st.markdown(f'<div class="card" style="margin-bottom:.4rem">'
-                    f'<b style="font-size:1.05rem;color:{c["primaria"]}">🌿 {lid} — {lote_nome}</b>'
+                    f'<b style="font-size:1.05rem;color:{c["primaria"]}">🌿 {html.escape(str(lid))} — {html.escape(str(lote_nome))}</b>'
                     f'</div>', unsafe_allow_html=True)
 
         for p in itens:
@@ -1229,9 +1229,9 @@ def _campo_trato():
             if p["done_this_period"]:
                 st.markdown(
                     f'<div class="hist-item" style="border-left-color:{c["sucesso_escuro"]};opacity:.7">'
-                    f'✅ <b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
-                    f'· {freq} · <span style="color:{c["primaria"]}">confirmado</span> '
-                    f'(último: {p["last_check"] or "—"})</div>', unsafe_allow_html=True)
+                    f'✅ <b>{html.escape(str(p["product_name"]))}</b> — {_num_br(p["quantity"], 0)} {html.escape(str(p["unit"]))} '
+                    f'· {html.escape(str(freq))} · <span style="color:{c["primaria"]}">confirmado</span> '
+                    f'(último: {html.escape(str(p["last_check"] or "—"))})</div>', unsafe_allow_html=True)
                 continue
 
             with st.form(f"trato_{p['id']}", clear_on_submit=True):
@@ -2151,9 +2151,9 @@ def _render_tab_med(meds):
                 f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
                 f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
                 f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                f'{_data_br(m_["med_date"])} · {_fmt_dose(m_["dose"], m_["unit"])} · {m_["application_route"]}'
+                f'{_data_br(m_["med_date"])} · {_fmt_dose(m_["dose"], m_["unit"])} · {html.escape(str(m_["application_route"]))}'
                 f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+_data_br(end_)+")" if m_["withdrawal_days"] else ""}'
-                f'{"  ·  por: "+m_["applied_by"] if m_["applied_by"] else ""}'
+                f'{"  ·  por: "+html.escape(str(m_["applied_by"])) if m_["applied_by"] else ""}'
                 f'</span></div>',unsafe_allow_html=True)
     else:
         st.info("Nenhum medicamento registrado.")
@@ -2162,9 +2162,9 @@ def _render_tab_mov(movs):
     if movs:
         for mv in movs:
             st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
-                f'<b>{mv.get("from_name") or "Entrada"} → {mv.get("to_name","?")}</b><br>'
+                f'<b>{html.escape(str(mv.get("from_name") or "Entrada"))} → {html.escape(str(mv.get("to_name", "?")))}</b><br>'
                 f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
-                f'{mv["movement_date"]} · {mv["reason"]} · {mv.get("operator") or "—"}'
+                f'{mv["movement_date"]} · {html.escape(str(mv["reason"]))} · {html.escape(str(mv.get("operator") or "—"))}'
                 f'</span></div>',unsafe_allow_html=True)
     else:
         st.info("Nenhuma movimentação registrada.")
