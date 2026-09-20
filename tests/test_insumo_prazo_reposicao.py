@@ -13,62 +13,56 @@ class TestInsumoPrazoReposicao(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, f"test_db_prazo_{id(self)}.sqlite3")
-
-        self.old_env_path = os.environ.get("AGROTOP_SQLITE_PATH")
-        self.old_db_path = db._conexao.DB_PATH
-        self.old_init = db._INICIALIZADO_EM
-
-        os.environ["AGROTOP_SQLITE_PATH"] = self.db_path
-        db._conexao.DB_PATH = self.db_path
-        db._INICIALIZADO_EM = None  # Force init
+        # configurar_sqlite() (não mutação direta de db._conexao.DB_PATH) é o
+        # jeito certo de trocar de banco em teste — ela fecha o pool antigo
+        # antes de apontar pro novo caminho. Sem isso, uma conexão SQLite
+        # ociosa continua com o arquivo antigo aberto, e no Windows isso
+        # impede o tempfile.TemporaryDirectory de apagar o diretório no
+        # tearDown (PermissionError: arquivo em uso).
+        db.configurar_sqlite(self.db_path)
         db.init_db(forcar=True)
         db.clear_cache()
 
     def tearDown(self):
-        if self.old_env_path is not None:
-            os.environ["AGROTOP_SQLITE_PATH"] = self.old_env_path
-        else:
-            if "AGROTOP_SQLITE_PATH" in os.environ:
-                del os.environ["AGROTOP_SQLITE_PATH"]
-
-        db._conexao.DB_PATH = self.old_db_path
-        db._INICIALIZADO_EM = self.old_init
+        db.configurar_sqlite(":memory:")
         db.clear_cache()
         self.temp_dir.cleanup()
 
     def test_migration_existing_database(self):
         """Migration should add prazo_reposicao_dias with DEFAULT 0."""
         db_path_old = os.path.join(self.temp_dir.name, f"test_db_old_{id(self)}.sqlite3")
-        try:
-            # Change paths for this specific test
-            os.environ["AGROTOP_SQLITE_PATH"] = db_path_old
-            db._conexao.DB_PATH = db_path_old
-            db._INICIALIZADO_EM = None
-            db.init_db(forcar=True)
+        db.configurar_sqlite(db_path_old)
+        db.init_db(forcar=True)
 
+        # `sqlite3.Connection` como context manager só gerencia a transação
+        # (commit/rollback) — não fecha a conexão. Sem `.close()` explícito,
+        # o handle do arquivo continua aberto, e o Windows recusa apagar o
+        # diretório temporário no tearDown (funciona "por acaso" no Linux,
+        # que permite deletar arquivo aberto).
+        con = sqlite3.connect(db_path_old)
+        con.row_factory = sqlite3.Row
+        try:
             # Now drop the column
-            with sqlite3.connect(db_path_old) as con:
-                con.execute("CREATE TABLE insumos_old AS SELECT id, name, category, unit, current_stock, min_stock, cost_per_unit, supplier, notes, created_at FROM insumos")
-                con.execute("DROP TABLE insumos")
-                con.execute("ALTER TABLE insumos_old RENAME TO insumos")
-                con.execute("INSERT INTO insumos (name, category, unit, current_stock, min_stock, cost_per_unit) VALUES ('Old Insumo', 'medicamento', 'ml', 0, 0, 0)")
+            con.execute("CREATE TABLE insumos_old AS SELECT id, name, category, unit, current_stock, min_stock, cost_per_unit, supplier, notes, created_at FROM insumos")
+            con.execute("DROP TABLE insumos")
+            con.execute("ALTER TABLE insumos_old RENAME TO insumos")
+            con.execute("INSERT INTO insumos (name, category, unit, current_stock, min_stock, cost_per_unit) VALUES ('Old Insumo', 'medicamento', 'ml', 0, 0, 0)")
+            con.commit()
 
             # Now trigger migration
-            with sqlite3.connect(db_path_old) as _c:
-                _c.row_factory = sqlite3.Row
-                db._migrate(_c)
+            db._migrate(con)
+            con.commit()
 
             # Verify the column was added and the old row has default 0
-            with sqlite3.connect(db_path_old) as con:
-                con.row_factory = sqlite3.Row
-                row = con.execute("SELECT * FROM insumos WHERE name='Old Insumo'").fetchone()
-                self.assertIn("prazo_reposicao_dias", row.keys())
-                self.assertEqual(row["prazo_reposicao_dias"], 0)
+            row = con.execute("SELECT * FROM insumos WHERE name='Old Insumo'").fetchone()
+            self.assertIn("prazo_reposicao_dias", row.keys())
+            self.assertEqual(row["prazo_reposicao_dias"], 0)
         finally:
-            # Restore paths back to what setUp did (tearDown will handle final cleanup)
-            os.environ["AGROTOP_SQLITE_PATH"] = self.db_path
-            db._conexao.DB_PATH = self.db_path
-            db._INICIALIZADO_EM = None
+            con.close()
+
+        # Volta pro banco da spec desta classe.
+        db.configurar_sqlite(self.db_path)
+        db.init_db(forcar=True)
 
     def test_create_read_roundtrip_with_nonzero_prazo(self):
         """We can create an insumo with a specific prazo and read it back."""
