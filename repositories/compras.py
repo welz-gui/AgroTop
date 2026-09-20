@@ -61,77 +61,48 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
              documento_serie, data_emissao, data_recebimento, valor_total,
              operator, notes))
 
-        insumos_db = {}
-        insumo_ids = list({item["insumo_id"] for item in itens})
-        if insumo_ids:
-            placeholders = ",".join("?" for _ in insumo_ids)
-            rows = con.execute(
-                f"SELECT id, current_stock, cost_per_unit FROM insumos WHERE id IN ({placeholders})",
-                insumo_ids).fetchall()
-
-            for r in rows:
-                insumos_db[r["id"]] = {
-                    "current_stock": float(r["current_stock"] or 0),
-                    "cost_per_unit": float(r["cost_per_unit"] or 0)
-                }
-
-        compra_itens_params = []
-        insumo_updates = []
-        insumo_tx_params = []
-
         for item in itens:
             insumo_id = item["insumo_id"]
             quantidade = float(item["quantidade"])
             custo_unitario = float(item["custo_unitario"])
             subtotal = round(quantidade * custo_unitario, 2)
 
-            compra_itens_params.append((compra_id, insumo_id, quantidade, custo_unitario, subtotal))
+            con.execute(
+                """INSERT INTO compra_itens
+                   (compra_id, insumo_id, quantidade, custo_unitario, subtotal)
+                   VALUES (?,?,?,?,?)""",
+                (compra_id, insumo_id, quantidade, custo_unitario, subtotal))
 
-            atual = insumos_db.get(insumo_id, {"current_stock": 0.0, "cost_per_unit": 0.0})
+            atual = con.execute(
+                "SELECT current_stock, cost_per_unit FROM insumos WHERE id=?",
+                (insumo_id,)).fetchone()
             novo_custo = custo_medio_ponderado(
-                atual["current_stock"],
-                atual["cost_per_unit"],
+                float(atual["current_stock"] or 0) if atual else 0.0,
+                float(atual["cost_per_unit"] or 0) if atual else 0.0,
                 quantidade, custo_unitario)
-
-            atual["current_stock"] += quantidade
-            atual["cost_per_unit"] = novo_custo
-
-            insumo_updates.append((quantidade, novo_custo, insumo_id))
-
-            insumo_tx_params.append((
-                insumo_id, "entrada", quantidade, "compra", data_recebimento,
-                operator, f"compra {compra_id}", compra_id))
-
-        con.executemany(
-            """INSERT INTO compra_itens
-               (compra_id, insumo_id, quantidade, custo_unitario, subtotal)
-               VALUES (?,?,?,?,?)""", compra_itens_params)
-
-        con.executemany(
-            "UPDATE insumos SET current_stock=current_stock+?, cost_per_unit=? WHERE id=?",
-            insumo_updates)
-
-        con.executemany(
-            """INSERT INTO insumo_transactions
-               (insumo_id, type, quantity, reason, transaction_date, operator,
-                notes, compra_id)
-               VALUES (?,?,?,?,?,?,?,?)""", insumo_tx_params)
+            con.execute(
+                "UPDATE insumos SET current_stock=current_stock+?, cost_per_unit=? WHERE id=?",
+                (quantidade, novo_custo, insumo_id))
+            con.execute(
+                """INSERT INTO insumo_transactions
+                   (insumo_id, type, quantity, reason, transaction_date, operator,
+                    notes, compra_id)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (insumo_id, "entrada", quantidade, "compra", data_recebimento,
+                 operator, f"compra {compra_id}", compra_id))
 
         rotulo_fornecedor = fornecedor_nome or "fornecedor não informado"
         rotulo_doc = documento_numero or compra_id[:8]
-        contas_params = []
         for p in parcelas:
-            contas_params.append((
-                compra_id, fornecedor_nome,
-                f"Compra {rotulo_doc} — {rotulo_fornecedor}",
-                p["valor"], p["vencimento"], p["numero"], p["total"],
-                "aberto", operator))
-
-        con.executemany(
-            """INSERT INTO contas_pagar
-               (compra_id, fornecedor_nome, descricao, valor, vencimento,
-                parcela_numero, parcela_total, status, operator)
-               VALUES (?,?,?,?,?,?,?,?,?)""", contas_params)
+            con.execute(
+                """INSERT INTO contas_pagar
+                   (compra_id, fornecedor_nome, descricao, valor, vencimento,
+                    parcela_numero, parcela_total, status, operator)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (compra_id, fornecedor_nome,
+                 f"Compra {rotulo_doc} — {rotulo_fornecedor}",
+                 p["valor"], p["vencimento"], p["numero"], p["total"],
+                 "aberto", operator))
 
     return {"ok": True, "compra_id": compra_id, "valor_total": valor_total,
             "parcelas": len(parcelas)}

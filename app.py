@@ -16,6 +16,8 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from services.zootecnia import estimate_weight_by_measurement
+from services.zootecnia import get_age_display
 from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
@@ -34,6 +36,7 @@ from services.geometria import (
 )
 from services.ndvi import ndvi_do_piquete, NdviIndisponivelError
 from services.importacao_geometria import ler_geojson, ler_kml
+from services.terminacao import simular_terminacao
 from services.importacao_car import (
     CamadaCar,
     area_camada_ha,
@@ -53,6 +56,11 @@ from services.sincronizacao import (
 from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
+)
+from services.previsao_estoque import prever as previsao_estoque_prever
+from services.previsao_estoque_adaptador import (
+    consumo_diario_planejado,
+    montar_insumos as previsao_estoque_montar_insumos,
 )
 from services.arquivo_dispositivos import (
     ler as arquivo_dispositivos_ler,
@@ -658,7 +666,7 @@ def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
             sexo = animal.get("sex") or venda.get("sex") or "—"
             texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
             texto("Categoria", db.get_age_category(animal.get("birth_date")))
-            texto("Idade", db.get_age_display(animal) if animal else "—")
+            texto("Idade", get_age_display(animal) if animal else "—")
             texto("Fornecedor", animal.get("fornecedor_name") or "—")
             texto("NF", animal.get("nf_number") or "—")
             texto("GTA", animal.get("gta_number") or "—")
@@ -1348,7 +1356,7 @@ def _tab_pesagem(animal):
         with mm2:
             comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
                 max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
-        nw = db.estimate_weight_by_measurement(pt, comp)
+        nw = estimate_weight_by_measurement(pt, comp)
         st.success(f"⚖️ Peso estimado por medição: **{_num_br(nw, 1)} kg**")
         medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
     else:
@@ -1594,7 +1602,7 @@ def _campo_animal():
     wd =db.get_withdrawal_end(animal["id"])
     gc =c["primaria"] if (gmd and gmd>0) else c["perigo"] if (gmd and gmd<0) else c["texto_secundario"]
     cat=db.get_age_category(animal.get("birth_date"))
-    idade=db.get_age_display(animal)
+    idade=get_age_display(animal)
 
     carencia_html = (f'<div style="color:{c["atencao"]};font-size:.82rem;margin-top:.3rem">'
                      f'⚠️ Carência até {_data_br(wd)}</div>') if wd else ''
@@ -1774,7 +1782,7 @@ def page_rebanho():
         wd =wd_batch.get(a["id"])
         rows.append({"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
             "Categoria":db.get_age_category(a.get("birth_date")),
-            "Idade":db.get_age_display(a),
+            "Idade":get_age_display(a),
             "Lote":a.get("lote_id") or "—","Status":a["status"],
             "Peso Atual (kg)":a["current_weight"],
             f"Ganho ({ul})":_prod_weight(a["current_weight"]-a["entry_weight"]),
@@ -4456,7 +4464,7 @@ def page_relatorios():
             rows_inv.append({"ID":a["id"],"Raça":a["breed"],
                 "Sexo":"M" if a["sex"]=="M" else "F",
                 "Categoria":db.get_age_category(a.get("birth_date")),
-                "Idade":db.get_age_display(a),
+                "Idade":get_age_display(a),
                 "Data Nascimento":a.get("birth_date") or "",
                 "Nasc. Estimado":"Sim" if a.get("birth_estimated") else "Não",
                 "Origem Idade":db.AGE_SOURCES.get(a.get("age_source","propriedade"),""),
@@ -4813,7 +4821,7 @@ def _cadastro_compra():
         with pm2:
             comp_c=st.number_input("Comprimento corporal (cm)",min_value=0.0,max_value=350.0,
                 value=150.0,step=1.0,key="cad_comp")
-        entry_weight = db.estimate_weight_by_measurement(pt_c, comp_c)
+        entry_weight = estimate_weight_by_measurement(pt_c, comp_c)
         with pm3:
             st.metric("Peso estimado", f"{_num_br(entry_weight, 1)} kg")
         medida_nota = f"PT={pt_c:.0f}cm Comp={comp_c:.0f}cm"
@@ -5352,7 +5360,7 @@ def _render_tab_simulador_terminacao(animals):
             st.success("Cenários e preço da @ salvos!"); st.rerun()
 
     cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
-    sim = db.simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+    sim = simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
 
     if peso_meta - peso_atual <= 0:
         st.warning("O peso de abate precisa ser maior que o peso atual.")
