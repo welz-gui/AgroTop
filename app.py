@@ -58,11 +58,6 @@ from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
 )
-from services.previsao_estoque import prever as previsao_estoque_prever
-from services.previsao_estoque_adaptador import (
-    consumo_diario_planejado,
-    montar_insumos as previsao_estoque_montar_insumos,
-)
 from services.arquivo_dispositivos import (
     ler as arquivo_dispositivos_ler,
     conferir_pareamento as arquivo_dispositivos_conferir_pareamento,
@@ -4041,9 +4036,10 @@ def _render_tab_novo_insumo():
             ni_stk=st.number_input("Estoque Inicial",min_value=0.0,step=1.0,format="%.1f")
         ni_min=st.number_input("Estoque Mínimo (alerta)",min_value=0.0,step=1.0,format="%.1f")
         ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
+        ni_prazo=st.number_input("Prazo de Reposição (dias)",min_value=0,step=1,value=0,help="Quantos dias demora para chegar após comprar")
         if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
             if ni_name:
-                insumo_data = db.InsumoCreate(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu)
+                insumo_data = db.InsumoCreate(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu,ni_prazo)
                 db.add_new_insumo(insumo_data)
                 st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
             else:

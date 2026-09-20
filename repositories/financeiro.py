@@ -213,7 +213,25 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
               if (pricing_mode == "lote" or len(animais) > 1) else None
 
     tot_receita = tot_custo = 0.0
+    sales_data = []
+
     with _conn() as con:
+        # Optimization: batch costs by passing a list of IDs using an IN clause.
+        # But we need to use _conn() inside our query to fetch costs for these specific animals.
+        # To avoid the abstraction leak with events, we will keep calling eventos.registrar_em().
+        # We can still batch the sales insert and the animal updates.
+
+        # Batch fetching costs
+        qmarks = ",".join("?" for _ in animais)
+        animal_ids_tuple = tuple(a["id"] for a in animais)
+        rows = con.execute(
+            f"""SELECT a.id AS animal_id, COALESCE(SUM(c.amount),0) AS total
+               FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
+               WHERE a.id IN ({qmarks})
+               GROUP BY a.id""", animal_ids_tuple
+        ).fetchall()
+        costs_dict = {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
+
         for a in animais:
             if pricing_mode == "kg":
                 ppk = value
@@ -225,29 +243,34 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
                 ppk = None
                 val = round(value * a["current_weight"] / peso_total, 2)
 
-            custo = get_total_cost(a["id"])
+            custo = costs_dict.get(a["id"], 0.0)
             lucro = round(val - custo, 2)
             tot_receita += val
             tot_custo += custo
 
-            con.execute(
-                """INSERT INTO sales
-                   (animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
-                    price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
-                    operator,notes,a_prazo)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (a["uuid"], sale_date, sale_type, pricing_mode,
-                 a["current_weight"], ppk,
-                 val, buyer or None, lot_ref, custo, lucro, operator, notes,
-                 1 if a_prazo else 0),
-            )
-            con.execute("UPDATE animals SET status='vendido' WHERE id=?", (a["id"],))
+            sales_data.append((
+                a["uuid"], sale_date, sale_type, pricing_mode,
+                a["current_weight"], ppk,
+                val, buyer or None, lot_ref, custo, lucro, operator, notes,
+                1 if a_prazo else 0
+            ))
+
             # Venda e obito mudam status por SQL direto, sem passar por
             # update_animal_status -- entao o evento precisa ser registrado aqui.
             eventos.registrar_em(
                 con, a["uuid"], "venda", ocorrido_em=sale_date,
                 usuario_registro=operator, documento=lot_ref,
                 observacoes=f"R$ {val:.2f} para {buyer or 'comprador nao informado'}")
+
+        con.executemany(
+            """INSERT INTO sales
+               (animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
+                price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
+                operator,notes,a_prazo)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            sales_data,
+        )
+        con.execute(f"UPDATE animals SET status='vendido' WHERE id IN ({qmarks})", animal_ids_tuple)
 
         n_parcelas_receber = 0
         if a_prazo and tot_receita > 0:

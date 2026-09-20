@@ -24,6 +24,7 @@ class InsumoCreate:
     initial_stock: float
     min_stock: float
     cost_per_unit: float
+    prazo_reposicao_dias: int = 0
 
 @dataclass
 class FeedingPlanCreate:
@@ -489,16 +490,17 @@ _SCHEMA_SQL = """
 
             -- Insumos (estoque)
             CREATE TABLE IF NOT EXISTS insumos (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                name          TEXT NOT NULL,
-                category      TEXT NOT NULL DEFAULT 'medicamento',
-                unit          TEXT NOT NULL DEFAULT 'ml',
-                current_stock REAL NOT NULL DEFAULT 0,
-                min_stock     REAL NOT NULL DEFAULT 0,
-                cost_per_unit REAL DEFAULT 0,
-                supplier      TEXT,
-                notes         TEXT,
-                created_at    TEXT DEFAULT (datetime('now','localtime'))
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                name                 TEXT NOT NULL,
+                category             TEXT NOT NULL DEFAULT 'medicamento',
+                unit                 TEXT NOT NULL DEFAULT 'ml',
+                current_stock        REAL NOT NULL DEFAULT 0,
+                min_stock            REAL NOT NULL DEFAULT 0,
+                cost_per_unit        REAL DEFAULT 0,
+                prazo_reposicao_dias INTEGER NOT NULL DEFAULT 0,
+                supplier             TEXT,
+                notes                TEXT,
+                created_at           TEXT DEFAULT (datetime('now','localtime'))
             );
 
             -- Medicamentos / Vacinas aplicados
@@ -1103,6 +1105,9 @@ def _migrate(con) -> None:
     if "poligono" not in lcols:
         # Migration 0015 — perímetro do piquete, destrava services.lotacao.sobrepostos().
         con.execute("ALTER TABLE lotes ADD COLUMN poligono TEXT")
+    icols = {r["name"] for r in con.execute("PRAGMA table_info(insumos)").fetchall()}
+    if "prazo_reposicao_dias" not in icols:
+        con.execute("ALTER TABLE insumos ADD COLUMN prazo_reposicao_dias INTEGER NOT NULL DEFAULT 0")
     pcols = {r["name"] for r in con.execute("PRAGMA table_info(properties)").fetchall()}
     if "car_numero" not in pcols:
         con.execute("ALTER TABLE properties ADD COLUMN car_numero TEXT")
@@ -1771,8 +1776,8 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
 def add_new_insumo(insumo: InsumoCreate) -> None:
     with _conn() as con:
         con.execute(
-            "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit) VALUES(?,?,?,?,?,?)",
-            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit),
+            "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit,prazo_reposicao_dias) VALUES(?,?,?,?,?,?,?)",
+            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit, insumo.prazo_reposicao_dias),
         )
 
 # ─── Custos por Animal ───────────────────────────────────────────────────────
@@ -2162,7 +2167,12 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
-            # Seguro: qt, sets e qpk são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: B608 falso positivo. O nome da tabela (qt)
+            # whitelist (ADMIN_TABLES) antes desta função. As colunas (sets)
+            # e pk vêm diretamente do esquema do banco (PRAGMA table_info/),
+            # todas filtradas pelo set 'valid' e seguramente escapadas com
+            # _quote_ident. Os dados manipulados são estritamente binds SQL
+            # passados como parâmetros, neutralizando qualquer injeção.
             con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
@@ -2174,7 +2184,11 @@ def admin_apply_changes(table: str, updates: list[dict],
                 continue
             placeholders = ", ".join("?" for _ in fields)
             cols_str = ", ".join(_quote_ident(k) for k in fields)
-            # Seguro: qt e cols_str são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: B608 falso positivo. O nome da tabela e as colunas
+            # inseridas obedecem estritamente à whitelist de ADMIN_TABLES
+            # e ao esquema da tabela retornado pela query protegida do
+            # banco, escapadas adequadamente com _quote_ident. Valores
+            # injetados são puramente binds SQL (?/%s).
             con.execute(
                 f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))
@@ -2761,9 +2775,7 @@ def previsao_estoque() -> list[dict]:
     """Previsão de ruptura por insumo — dias restantes, data de ruptura, urgência.
 
     Liga `services/previsao_estoque.py::prever` através do adaptador da spec 0039.
-    `prazo_reposicao_dias` não existe no schema ainda (fora do escopo daquela spec)
-    — todo insumo entra com prazo 0, que `prever()` já trata como "desconhecido",
-    não como erro.
+    O `prazo_reposicao_dias` é lido do schema, passando `0` (desconhecido) como fallback.
     """
     from services.previsao_estoque import prever as previsao_estoque_prever
     from services.previsao_estoque_adaptador import (
@@ -2772,7 +2784,8 @@ def previsao_estoque() -> list[dict]:
 
     insumos = get_all_insumos()
     consumo = _consumo_diario_por_insumo()
-    montados = previsao_estoque_montar_insumos(insumos, consumo)
+    prazos_de_reposicao = {i["id"]: i.get("prazo_reposicao_dias", 0) for i in insumos}
+    montados = previsao_estoque_montar_insumos(insumos, consumo, prazos_de_reposicao)
     resultado = previsao_estoque_prever(montados, date.today().isoformat())
     for item in resultado:
         if "id" in item and "insumo_id" not in item:
