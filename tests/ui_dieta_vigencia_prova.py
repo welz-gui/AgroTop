@@ -79,7 +79,7 @@ class TestDietaComVigenciaNaTela(unittest.TestCase):
         self.assertTrue(any("Histórico da Dieta" in r for r in rotulos), rotulos)
 
     def test_nova_versao_pela_tela_encerra_a_antiga(self):
-        db.add_feeding_plan(self.lote["id"], "Silagem", 10.0, "kg", "diario")
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=self.lote["id"], product_name="Silagem", quantity=10.0, unit="kg", frequency="diario"))
         db.clear_cache()
         antiga = db.get_feeding_plans(lote_id=self.lote["id"], active_only=True)[0]
 
@@ -101,7 +101,7 @@ class TestDietaComVigenciaNaTela(unittest.TestCase):
         self.assertEqual(encerrada["quantity"], 10.0)
 
     def test_encerrar_pela_tela_some_dos_planos_ativos_mas_fica_no_historico(self):
-        db.add_feeding_plan(self.lote["id"], "Sal Mineral", 5.0, "kg", "diario")
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=self.lote["id"], product_name="Sal Mineral", quantity=5.0, unit="kg", frequency="diario"))
         db.clear_cache()
         p = db.get_feeding_plans(lote_id=self.lote["id"], active_only=True)[0]
 

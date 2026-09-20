@@ -139,15 +139,17 @@ def _normalizar_conta_receber(cr: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
-def normalizar(
-    *,
-    vendas: Iterable[dict] = (),
-    custos_fixos: Iterable[dict] = (),
-    custos_animal: Iterable[dict] = (),
-    compras_insumo: Iterable[dict] = (),
-    contas_pagar: Iterable[dict] = (),
-    contas_receber: Iterable[dict] = (),
-) -> list[dict]:
+_NORMALIZADORES = {
+    "vendas": _normalizar_venda,
+    "custos_fixos": _normalizar_custo_fixo,
+    "custos_animal": _normalizar_custo_animal,
+    "compras_insumo": _normalizar_compra_insumo,
+    "contas_pagar": _normalizar_conta_pagar,
+    "contas_receber": _normalizar_conta_receber,
+}
+
+
+def normalizar(**kwargs: Iterable[dict]) -> list[dict]:
     """Normaliza lançamentos para a estrutura esperada por `services.caixa`.
 
     Parâmetros:
@@ -176,40 +178,18 @@ def normalizar(
     """
     resultado = []
 
-    if vendas:
-        for v in vendas:
-            norm = _normalizar_venda(v)
-            if norm:
-                resultado.append(norm)
+    for chave, normalizador_fn in _NORMALIZADORES.items():
+        itens = kwargs.pop(chave, None)
+        if itens:
+            for item in itens:
+                norm = normalizador_fn(item)
+                if norm:
+                    resultado.append(norm)
 
-    if custos_fixos:
-        for cf in custos_fixos:
-            norm = _normalizar_custo_fixo(cf)
-            if norm:
-                resultado.append(norm)
-
-    if custos_animal:
-        for ca in custos_animal:
-            norm = _normalizar_custo_animal(ca)
-            if norm:
-                resultado.append(norm)
-
-    if compras_insumo:
-        for ci in compras_insumo:
-            norm = _normalizar_compra_insumo(ci)
-            if norm:
-                resultado.append(norm)
-
-    if contas_pagar:
-        for cp in contas_pagar:
-            norm = _normalizar_conta_pagar(cp)
-            if norm:
-                resultado.append(norm)
-
-    if contas_receber:
-        for cr in contas_receber:
-            norm = _normalizar_conta_receber(cr)
-            if norm:
-                resultado.append(norm)
+    if kwargs:
+        unexpected = next(iter(kwargs.keys()))
+        raise TypeError(
+            f"normalizar() got an unexpected keyword argument '{unexpected}'"
+        )
 
     return resultado

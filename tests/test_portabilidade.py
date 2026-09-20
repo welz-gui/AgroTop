@@ -35,9 +35,10 @@ class BloqueiaStreamlit(MetaPathFinder):
 sys.meta_path.insert(0, BloqueiaStreamlit())
 
 import database as db
+from services.terminacao import simular_terminacao, TERMINACAO_DEFAULTS
 
 # Regras de negócio puras precisam funcionar sem o framework de UI.
-sim = db.simular_terminacao(380, 500, 300, db.TERMINACAO_DEFAULTS)
+sim = simular_terminacao(380, 500, 300, TERMINACAO_DEFAULTS)
 assert sim and sim[0]["lucro"] is not None, "simular_terminacao falhou"
 assert db.kg_to_arrobas(450) == 15.6, "kg_to_arrobas divergente"
 

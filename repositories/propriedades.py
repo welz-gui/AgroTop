@@ -13,9 +13,24 @@ Camada de dados (ROADMAP R1/R9): aqui mora o SQL, e só aqui.
 """
 
 import uuid as _uuid
+from dataclasses import dataclass
 from typing import Optional
 
 from .conexao import _cache, _conn, _writes
+
+@dataclass
+class PropriedadeCreate:
+    produtor_id: str
+    nome: str
+    codigo_oficial: str = ""
+    municipio: str = ""
+    uf: str = ""
+    endereco: str = ""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    atividade: str = ""
+    inicio: str = ""
+
 
 # Nome da propriedade criada automaticamente quando o banco ainda não tem
 # nenhuma. Genérico de propósito: inventar um nome de fazenda seria pior que
@@ -101,12 +116,7 @@ def criar_produtor(organizacao_id: str, nome: str, *, documento: str = "",
 
 
 @_writes
-def criar_propriedade(produtor_id: str, nome: str, *,
-                      codigo_oficial: str = "", municipio: str = "",
-                      uf: str = "", endereco: str = "",
-                      latitude: Optional[float] = None,
-                      longitude: Optional[float] = None,
-                      atividade: str = "", inicio: str = "") -> str:
+def criar_propriedade(dados: PropriedadeCreate) -> str:
     prid = novo_id()
     with _conn() as con:
         con.execute(
@@ -114,9 +124,11 @@ def criar_propriedade(produtor_id: str, nome: str, *,
                (id,produtor_id,nome,codigo_oficial,municipio,uf,endereco,
                 latitude,longitude,atividade,inicio)
                VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-            (prid, produtor_id, nome, codigo_oficial or None, municipio or None,
-             uf or None, endereco or None, latitude, longitude,
-             atividade or None, inicio or None))
+            (prid, dados.produtor_id, dados.nome,
+             dados.codigo_oficial or None, dados.municipio or None,
+             dados.uf or None, dados.endereco or None,
+             dados.latitude, dados.longitude,
+             dados.atividade or None, dados.inicio or None))
     return prid
 
 

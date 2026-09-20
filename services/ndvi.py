@@ -16,6 +16,7 @@ Regra de ouro (ROADMAP Trilha 4 / Spec 0079):
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
 import os
@@ -42,6 +43,9 @@ STAC_COLLECTION = "sentinel-2-l2a"
 # 4: vegetação, 5: solo não vegetado, 6: água, 7: neve/gelo não derretido.
 # Nuvens (8, 9), cirrus (10), sombra (3), saturação (1) e nodata (0) saem.
 SCL_VALID_CLASSES = (4, 5, 6, 7)
+
+# Número máximo de downloads simultâneos de COGs do Sentinel-2.
+MAX_CONCURRENT_DOWNLOADS = 10
 
 
 class NdviError(Exception):
@@ -283,22 +287,35 @@ def ndvi_do_piquete(
 
     cenas_utilizaveis.sort(key=lambda c: (c["date"], c["scene_id"]))
 
+    def _process_cena(cena: Dict[str, Any]) -> NdviPonto:
+        ndvi_val = calcular_ndvi_cena(cena["assets"], poligono_shapely)
+        return NdviPonto(
+            data=cena["date"],
+            ndvi_medio=round(ndvi_val, 4),
+            nuvem_pct_cena=round(cena["cloud_cover"], 2),
+            id_da_cena=cena["scene_id"],
+        )
+
     serie: List[NdviPonto] = []
-    for cena in cenas_utilizaveis:
-        try:
-            ndvi_val = calcular_ndvi_cena(cena["assets"], poligono_shapely)
-            serie.append(NdviPonto(
-                data=cena["date"],
-                ndvi_medio=round(ndvi_val, 4),
-                nuvem_pct_cena=round(cena["cloud_cover"], 2),
-                id_da_cena=cena["scene_id"],
-            ))
-        except ValueError:
-            # Piquete coberto por nuvem local ou sem pixels válidos
-            continue
-        except NdviIndisponivelError:
-            # Falha de rede no download/leitura parcial dos COGs
-            raise
+
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOWNLOADS) as executor:
+        future_to_cena = {
+            executor.submit(_process_cena, cena): cena
+            for cena in cenas_utilizaveis
+        }
+
+        for future in as_completed(future_to_cena):
+            try:
+                ponto = future.result()
+                serie.append(ponto)
+            except ValueError:
+                # Piquete coberto por nuvem local ou sem pixels válidos
+                continue
+            except NdviIndisponivelError:
+                # Falha de rede no download/leitura parcial dos COGs
+                raise
+
+    serie.sort(key=lambda p: (p.data, p.id_da_cena))
 
     datas_serie = [p.data for p in serie]
     maior_vao = calcular_maior_vao(datas_serie, inicio, fim)

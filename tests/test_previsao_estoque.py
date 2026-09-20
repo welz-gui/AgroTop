@@ -227,6 +227,42 @@ class TestPrevisaoEstoque(unittest.TestCase):
         self.assertEqual(_safe_int({}, 5), 5)
         self.assertEqual(_safe_int("12.34"), 0)
 
+    def test_chave_ordenacao(self):
+        from services.previsao_estoque import _chave_ordenacao
+
+        # Caso crítico com todos os dados
+        item_critico = {
+            "urgencia": "critica",
+            "comprar_ate": "2026-08-01",
+            "dias_restantes": 2.0,
+            "nome": "A"
+        }
+        self.assertEqual(_chave_ordenacao(item_critico), (0, "2026-08-01", 2.0, "A"))
+
+        # Caso sem_dados
+        item_sem_dados = {
+            "urgencia": "sem_dados",
+            "nome": "B"
+        }
+        # dias_restantes None deve usar 999999.0 e comprar_ate deve usar "9999-12-31"
+        self.assertEqual(_chave_ordenacao(item_sem_dados), (2, "9999-12-31", 999999.0, "B"))
+
+        # Caso atencao
+        item_atencao = {
+            "urgencia": "atencao",
+            "comprar_ate": "2026-08-10",
+            "dias_restantes": 12.0,
+            "nome": "C"
+        }
+        self.assertEqual(_chave_ordenacao(item_atencao), (1, "2026-08-10", 12.0, "C"))
+
+        # Caso fallback urgencia desconhecida ou ausente e nome ausente
+        item_incompleto = {
+            "comprar_ate": "2026-09-01",
+            "dias_restantes": 30.0
+        }
+        self.assertEqual(_chave_ordenacao(item_incompleto), (4, "2026-09-01", 30.0, ""))
+
 
 if __name__ == "__main__":
     unittest.main()

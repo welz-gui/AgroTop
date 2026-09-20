@@ -124,7 +124,7 @@ class TestCompletudeDeDadosNaTela(unittest.TestCase):
 
         janela = janela_do_mes(hoje.year, hoje.month, checagens_de_trato=checagens,
                                leituras_de_chuva=chuvas)
-        r = avaliar_mes(hoje.year, hoje.month, animais_ativos, pesagens, **janela)
+        r = avaliar_mes(hoje.year, hoje.month, animais_ativos, pesagens, janela)
 
         self.assertIn("alertas", r)
         for chave in ("animais_com_pesagem_em_dia", "intervalos_uteis_gmd",

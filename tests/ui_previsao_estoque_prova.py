@@ -75,8 +75,7 @@ class TestPrevisaoDeEstoqueNaTela(unittest.TestCase):
 
     def test_insumo_com_consumo_diario_mostra_dias_restantes(self):
         ins = self._insumo("Sal Mineral Prova", saldo=20.0, minimo=5.0)
-        db.add_feeding_plan(self.lote_id, "Sal", 2.0, "kg", "diario",
-                            insumo_id=ins["id"])
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=self.lote_id, product_name="Sal", quantity=2.0, unit="kg", frequency="diario", insumo_id=ins["id"]))
         db.clear_cache()
 
         at = self._tela()
@@ -93,8 +92,7 @@ class TestPrevisaoDeEstoqueNaTela(unittest.TestCase):
         (plano ignorado, consumo 0), o insumo entra como 'sem dados'.
         """
         ins = self._insumo("Nucleo Proteico Prova", saldo=100.0, minimo=10.0)
-        db.add_feeding_plan(self.lote_id, "Nucleo", 14.0, "kg", "quinzenal",
-                            insumo_id=ins["id"])
+        db.add_feeding_plan(db.FeedingPlanCreate(lote_id=self.lote_id, product_name="Nucleo", quantity=14.0, unit="kg", frequency="quinzenal", insumo_id=ins["id"]))
         db.clear_cache()
 
         at = self._tela()
