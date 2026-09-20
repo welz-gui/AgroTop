@@ -8,6 +8,7 @@ sanidade/carência e fotos dos animais.
 import inspect
 import json
 import os
+from services.zootecnia import get_age_display  # noqa: E402
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone
@@ -891,12 +892,14 @@ class TestTratoEndpoint(BackendApiTestCase):
     def _create_plan(self, *, active=True, insumo_id=None, quantity=8.0):
         lote = db.get_all_lotes()[0]
         db.add_feeding_plan(
-            str(lote["id"]),
-            "Trato API",
-            quantity,
-            "kg",
-            "diario",
-            insumo_id=insumo_id,
+            db.FeedingPlanCreate(
+                lote_id=str(lote["id"]),
+                product_name="Trato API",
+                quantity=quantity,
+                unit="kg",
+                frequency="diario",
+                insumo_id=insumo_id
+            )
         )
         with _conn() as con:
             plan_id = con.execute(
@@ -2607,7 +2610,7 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
             self.assertEqual(item["raca"], a.get("breed") or None)
             self.assertEqual(item["sexo"], a.get("sex") or None)
             self.assertEqual(item["categoria_idade"], db.get_age_category(a.get("birth_date")))
-            self.assertEqual(item["idade_display"], db.get_age_display(a))
+            self.assertEqual(item["idade_display"], get_age_display(a))
             self.assertEqual(item["data_nascimento"], a.get("birth_date") or None)
             self.assertEqual(item["nascimento_estimado"], bool(a.get("birth_estimated")))
 

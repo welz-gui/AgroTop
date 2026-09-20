@@ -118,6 +118,7 @@ class TestZootecniaGetAgeMonths(unittest.TestCase):
         self.assertIsNone(get_age_months("invalid-date"))
         self.assertIsNone(get_age_months("01/01/2021"))
         self.assertIsNone(get_age_months("2021-13-45"))
+        self.assertIsNone(get_age_months("2021-02-29"))
 
     @patch("services.zootecnia.date")
     def test_age_months_calculation(self, mock_date):
