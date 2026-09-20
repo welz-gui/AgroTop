@@ -16,6 +16,7 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
 from repositories.animais import get_animal
@@ -660,7 +661,7 @@ def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
             texto("Raça", animal.get("breed") or venda.get("breed") or "—")
             sexo = animal.get("sex") or venda.get("sex") or "—"
             texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
-            texto("Categoria", db.get_age_category(animal.get("birth_date")))
+            texto("Categoria", get_age_category(animal.get("birth_date")))
             texto("Idade", get_age_display(animal) if animal else "—")
             texto("Fornecedor", animal.get("fornecedor_name") or "—")
             texto("NF", animal.get("nf_number") or "—")
@@ -1032,7 +1033,7 @@ def _dash_summary_table(animals):
         gain = round(a["current_weight"]-a["entry_weight"], 1)
         rows.append({"ID":a["id"],"Raça":a["breed"],
             "Sexo":"♂" if a["sex"]=="M" else "♀",
-            "Categoria":db.get_age_category(a.get("birth_date")),
+            "Categoria":get_age_category(a.get("birth_date")),
             "Lote":a.get("lote_id") or "—",
             "Peso Atual (kg)":a["current_weight"],
             f"Ganho ({ul})":_prod_weight(gain),
@@ -1596,7 +1597,7 @@ def _campo_animal():
     gmd=db.calculate_gmd(animal["id"])
     wd =db.get_withdrawal_end(animal["id"])
     gc =c["primaria"] if (gmd and gmd>0) else c["perigo"] if (gmd and gmd<0) else c["texto_secundario"]
-    cat=db.get_age_category(animal.get("birth_date"))
+    cat=get_age_category(animal.get("birth_date"))
     idade=get_age_display(animal)
 
     carencia_html = (f'<div style="color:{c["atencao"]};font-size:.82rem;margin-top:.3rem">'
@@ -1776,7 +1777,7 @@ def page_rebanho():
         gmd=gmd_batch.get(a["id"])
         wd =wd_batch.get(a["id"])
         rows.append({"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
-            "Categoria":db.get_age_category(a.get("birth_date")),
+            "Categoria":get_age_category(a.get("birth_date")),
             "Idade":get_age_display(a),
             "Lote":a.get("lote_id") or "—","Status":a["status"],
             "Peso Atual (kg)":a["current_weight"],
@@ -2227,7 +2228,7 @@ def page_animal():
     arrobas    =db.kg_to_arrobas(animal["current_weight"], yield_)
     gain       =round(animal["current_weight"]-animal["entry_weight"],1)
     wd =db.get_withdrawal_end(aid)
-    cat=db.get_age_category(animal.get("birth_date"))
+    cat=get_age_category(animal.get("birth_date"))
     ul =_unit_label()
 
     header, header_action = st.columns([3, 1])
@@ -2276,7 +2277,7 @@ def page_animal():
                 st.error(f"❌ {err2}")
             else:
                 db.update_animal_age(aid, bd2, est2, src2)
-                st.success(f"✅ Idade atualizada · Categoria: **{db.get_age_category(bd2)}**")
+                st.success(f"✅ Idade atualizada · Categoria: **{get_age_category(bd2)}**")
                 st.rerun()
 
     if wd:
@@ -2793,7 +2794,7 @@ def _fin_venda(animals):
                     value=date.today()+timedelta(days=30), key="venda_primeira_parcela")
 
         # Seleção de animais
-        opts = {f"{a['id']} · {a['breed']} · {_num_br(a['current_weight'], 0)}kg · {db.get_age_category(a.get('birth_date'))}": a['id']
+        opts = {f"{a['id']} · {a['breed']} · {_num_br(a['current_weight'], 0)}kg · {get_age_category(a.get('birth_date'))}": a['id']
                 for a in animals}
         multi = modo in ("lote",) or True   # sempre permite múltiplos
         sel = st.multiselect("Animais a vender", list(opts.keys()),
@@ -2808,7 +2809,7 @@ def _fin_venda(animals):
                 sug = 0.0
                 if sel_animals:
                     sug = db.get_expected_price_kg(
-                        db.get_age_category(sel_animals[0].get("birth_date")), sel_animals[0]["sex"])
+                        get_age_category(sel_animals[0].get("birth_date")), sel_animals[0]["sex"])
                 valor = st.number_input("Preço por kg (R$)", min_value=0.0, step=0.10,
                     value=float(sug), format="%.2f",
                     help="Sugerido pela tabela de categoria; ajuste se necessário")
@@ -3745,7 +3746,7 @@ def _fin_simulador(animals):
     costs = db._costs_by_animal()
     for a in animals:
         tc  = costs.get(a["id"], 0.0) + rateio_fixo
-        band = db.get_age_category(a.get("birth_date"))
+        band = get_age_category(a.get("birth_date"))
         if base == "categoria":
             price_kg = precos_cat.get((band, a["sex"]), 0.0) * (1+ajuste_pct/100)
             receita  = round(a["current_weight"] * price_kg, 2)
@@ -4459,7 +4460,7 @@ def page_relatorios():
             wd=wd_batch.get(a["id"])
             rows_inv.append({"ID":a["id"],"Raça":a["breed"],
                 "Sexo":"M" if a["sex"]=="M" else "F",
-                "Categoria":db.get_age_category(a.get("birth_date")),
+                "Categoria":get_age_category(a.get("birth_date")),
                 "Idade":get_age_display(a),
                 "Data Nascimento":a.get("birth_date") or "",
                 "Nasc. Estimado":"Sim" if a.get("birth_estimated") else "Não",
@@ -4604,7 +4605,7 @@ def _age_inputs(entry_date, key_prefix=""):
         bd_str = db.birth_date_from_age(int(meses), date.today())
         estimated = 1
         st.info(f"📌 Nascimento estimado: **{bd_str}** · Categoria: "
-                f"**{db.get_age_category(bd_str)}**")
+                f"**{get_age_category(bd_str)}**")
 
     elif metodo == "nf_gta":
         st.caption("Informe a idade que consta na NF / GTA e a data do documento.")
@@ -4619,7 +4620,7 @@ def _age_inputs(entry_date, key_prefix=""):
         estimated = 1
         st.info(f"📌 Nascimento estimado: **{bd_str}** · Idade hoje: "
                 f"**{db.get_age_months(bd_str)} meses** · Categoria: "
-                f"**{db.get_age_category(bd_str)}**")
+                f"**{get_age_category(bd_str)}**")
 
     return bd_str, estimated, metodo, err
 
@@ -4892,7 +4893,7 @@ def _cadastro_compra():
                     weight_method=peso_metodo,
                     purchase_mode=compra_modo,
                 ))
-                cat = db.get_age_category(birth_date_str)
+                cat = get_age_category(birth_date_str)
                 st.success(f"✅ Animal **{aid}** cadastrado! Categoria: **{cat}** · "
                            f"Peso: {_num_br(entry_weight, 1)} kg ({db.WEIGH_METHODS[peso_metodo]})")
                 st.balloons()
@@ -5474,7 +5475,7 @@ def _render_tab_meta_gmd():
                 f"({_num_br(meta_atual, 3)} kg/dia)**")
     if low:
         rows = [{"ID":a["id"],"Raça":a["breed"],
-                 "Categoria":db.get_age_category(a.get("birth_date")),
+                 "Categoria":get_age_category(a.get("birth_date")),
                  "Lote":a.get("lote_id") or "—","Peso (kg)":a["current_weight"],
                  "GMD (kg/dia)":round(a["gmd"],3)} for a in low]
         df = pd.DataFrame(rows)
@@ -6857,7 +6858,7 @@ def _casos_do_rebanho():
         casos.append({
             "id": a["id"],
             "especie": "bovino",
-            "categoria": db.get_age_category(a.get("birth_date"), a.get("sex")),
+            "categoria": get_age_category(a.get("birth_date"), a.get("sex")),
             "sexo": a.get("sex"),
             "idade_meses": db.get_age_months(a.get("birth_date")),
             "peso": a.get("last_weight"),

@@ -66,7 +66,7 @@ from services.constantes import (  # noqa: F401
     CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT,
 )
 from services.zootecnia import (  # noqa: F401
-    get_age_months, get_age_category,
+    get_age_months,
     kg_to_arrobas,
 )
 from services.terminacao import (  # noqa: F401
