@@ -2167,7 +2167,12 @@ def admin_apply_changes(table: str, updates: list[dict],
             if not fields:
                 continue
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
-            # Seguro: qt, sets e qpk são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: B608 falso positivo. O nome da tabela (qt)
+            # whitelist (ADMIN_TABLES) antes desta função. As colunas (sets)
+            # e pk vêm diretamente do esquema do banco (PRAGMA table_info/),
+            # todas filtradas pelo set 'valid' e seguramente escapadas com
+            # _quote_ident. Os dados manipulados são estritamente binds SQL
+            # passados como parâmetros, neutralizando qualquer injeção.
             con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
@@ -2179,7 +2184,11 @@ def admin_apply_changes(table: str, updates: list[dict],
                 continue
             placeholders = ", ".join("?" for _ in fields)
             cols_str = ", ".join(_quote_ident(k) for k in fields)
-            # Seguro: qt e cols_str são validados (k in valid) e scappados via _quote_ident.
+            # Seguro: B608 falso positivo. O nome da tabela e as colunas
+            # inseridas obedecem estritamente à whitelist de ADMIN_TABLES
+            # e ao esquema da tabela retornado pela query protegida do
+            # banco, escapadas adequadamente com _quote_ident. Valores
+            # injetados são puramente binds SQL (?/%s).
             con.execute(
                 f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))

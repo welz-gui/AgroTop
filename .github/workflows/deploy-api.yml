@@ -43,17 +43,35 @@ jobs:
             --config=cloudbuild.api.yaml \
             --substitutions=_IMAGE=us-central1-docker.pkg.dev/agrotop-cloudrun-teste/cloud-run-source-deploy/backend-api \
             --project=agrotop-cloudrun-teste \
-            --suppress-logs \
+            --gcs-log-dir=gs://agrotop-cloudrun-teste_cloudbuild/logs \
             .
-          # --suppress-logs: a SA do deployer não tem permissão de leitura no
-          # Cloud Logging, então `gcloud builds submit` falhava ao tentar
-          # STREAMAR os logs — mesmo com o build em si terminando com sucesso
-          # (confirmado via `gcloud builds describe`). O passo falhava e o
-          # deploy seguinte nunca rodava, embora a imagem já estivesse pronta.
-          # Achado em 2026-09-13: dois deploys (specs 0085 e 0088) never
-          # chegaram à produção por causa disso. `--suppress-logs` evita
-          # depender dessa permissão sem precisar ampliar o IAM da SA — o
-          # comando continua síncrono (só não imprime os logs ao vivo).
+          # Achado em 2026-09-13 (specs 0085/0088 nunca chegaram à produção por
+          # causa disso): o bucket PADRÃO de log do Cloud Build exige
+          # `roles/viewer` de projeto pra ser lido (confirmado na doc oficial,
+          # docs.cloud.google.com/build/docs/securing-builds/store-manage-build-logs)
+          # — não basta `roles/logging.viewer`, e a SA do deployer não tinha
+          # nenhum dos dois. A correção anterior (--suppress-logs, PR #405) só
+          # suprimia a impressão no stdout, não a checagem de permissão em si —
+          # confirmado que o deploy continuou falhando com o mesmo erro mesmo
+          # com a flag (run 34862325740, 2026-09-14).
+          #
+          # Correção real: aponta os logs pra um bucket GCS próprio em vez do
+          # bucket padrão do Cloud Build — a leitura de um bucket GCS normal
+          # usa permissão de Storage, e a SA já tem `roles/storage.admin`
+          # (concedido pra outra finalidade), então nenhum IAM novo foi
+          # necessário. Reusa o bucket que o Cloud Build já cria sozinho pra
+          # staging do source (`agrotop-cloudrun-teste_cloudbuild`), só um
+          # prefixo `logs/` novo dentro dele — não precisou criar bucket.
+          #
+          # ⚠️ Esta correção (PR #462) foi acidentalmente revertida pelo merge
+          # da PR #443 em 2026-09-19 — uma branch do Jules, desatualizada,
+          # carregou a versão antiga deste arquivo numa resolução de conflito
+          # silenciosa (sem marcador, então passou despercebida numa varredura
+          # que só olhou os arquivos Python envolvidos). Restaurado no mesmo
+          # commit que devolve tests/test_admin_security.py, apagado pelo
+          # mesmo merge. Lição: depois de qualquer `git merge` pra resolver
+          # conflito, cheque `git status` completo — não só os arquivos que
+          # você espera que tenham mudado.
 
       - name: Deploy no Cloud Run
         run: |
