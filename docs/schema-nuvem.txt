@@ -281,6 +281,7 @@ insumos.unit
 insumos.current_stock
 insumos.min_stock
 insumos.cost_per_unit
+insumos.prazo_reposicao_dias
 insumos.supplier
 insumos.notes
 insumos.created_at

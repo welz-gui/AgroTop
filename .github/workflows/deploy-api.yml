@@ -62,6 +62,16 @@ jobs:
           # necessário. Reusa o bucket que o Cloud Build já cria sozinho pra
           # staging do source (`agrotop-cloudrun-teste_cloudbuild`), só um
           # prefixo `logs/` novo dentro dele — não precisou criar bucket.
+          #
+          # ⚠️ Esta correção (PR #462) foi acidentalmente revertida pelo merge
+          # da PR #443 em 2026-09-19 — uma branch do Jules, desatualizada,
+          # carregou a versão antiga deste arquivo numa resolução de conflito
+          # silenciosa (sem marcador, então passou despercebida numa varredura
+          # que só olhou os arquivos Python envolvidos). Restaurado no mesmo
+          # commit que devolve tests/test_admin_security.py, apagado pelo
+          # mesmo merge. Lição: depois de qualquer `git merge` pra resolver
+          # conflito, cheque `git status` completo — não só os arquivos que
+          # você espera que tenham mudado.
 
       - name: Deploy no Cloud Run
         run: |

@@ -24,6 +24,7 @@ class InsumoCreate:
     initial_stock: float
     min_stock: float
     cost_per_unit: float
+    prazo_reposicao_dias: int = 0
 
 @dataclass
 class FeedingPlanCreate:
@@ -35,6 +36,29 @@ class FeedingPlanCreate:
     insumo_id: Optional[int] = None
     notes: str = ""
 
+
+@dataclass
+class FeedingPlanUpdate:
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    frequency: Optional[str] = None
+    insumo_id: Optional[int] = None
+    notes: Optional[str] = None
+
+
+@dataclass
+class FeedingCheckData:
+    plan_id: int
+    lote_id: str
+    check_date: str
+    status: str
+    actual_quantity: Optional[float] = None
+    operator: str = ""
+    notes: str = ""
+    deduct_stock: bool = False
+    insumo_id: Optional[int] = None
+    quantity_unit: str = "kg"
+
 # ─── Reexportação da camada de regras (Fase A2) ──────────────────────────────
 # Mantém `db.kg_to_arrobas`, `db._hash`, `db.CARCASS_YIELD` etc. funcionando para
 # os chamadores existentes. Código novo deve importar de `services/` diretamente.
@@ -42,11 +66,11 @@ from services.constantes import (  # noqa: F401
     CARCASS_YIELD, KG_PER_ARROBA, UA_WEIGHT,
 )
 from services.zootecnia import (  # noqa: F401
-    get_age_months, get_age_category, get_age_display,
-    kg_to_arrobas, estimate_weight_by_measurement,
+    get_age_months,
+    kg_to_arrobas,
 )
 from services.terminacao import (  # noqa: F401
-    TERMINACAO_DEFAULTS, simular_terminacao,
+    TERMINACAO_DEFAULTS,
 )
 from services.seguranca import (  # noqa: F401
     _hash, _is_legacy_hash, _verify_password,
@@ -466,16 +490,17 @@ _SCHEMA_SQL = """
 
             -- Insumos (estoque)
             CREATE TABLE IF NOT EXISTS insumos (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                name          TEXT NOT NULL,
-                category      TEXT NOT NULL DEFAULT 'medicamento',
-                unit          TEXT NOT NULL DEFAULT 'ml',
-                current_stock REAL NOT NULL DEFAULT 0,
-                min_stock     REAL NOT NULL DEFAULT 0,
-                cost_per_unit REAL DEFAULT 0,
-                supplier      TEXT,
-                notes         TEXT,
-                created_at    TEXT DEFAULT (datetime('now','localtime'))
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                name                 TEXT NOT NULL,
+                category             TEXT NOT NULL DEFAULT 'medicamento',
+                unit                 TEXT NOT NULL DEFAULT 'ml',
+                current_stock        REAL NOT NULL DEFAULT 0,
+                min_stock            REAL NOT NULL DEFAULT 0,
+                cost_per_unit        REAL DEFAULT 0,
+                prazo_reposicao_dias INTEGER NOT NULL DEFAULT 0,
+                supplier             TEXT,
+                notes                TEXT,
+                created_at           TEXT DEFAULT (datetime('now','localtime'))
             );
 
             -- Medicamentos / Vacinas aplicados
@@ -1080,6 +1105,9 @@ def _migrate(con) -> None:
     if "poligono" not in lcols:
         # Migration 0015 — perímetro do piquete, destrava services.lotacao.sobrepostos().
         con.execute("ALTER TABLE lotes ADD COLUMN poligono TEXT")
+    icols = {r["name"] for r in con.execute("PRAGMA table_info(insumos)").fetchall()}
+    if "prazo_reposicao_dias" not in icols:
+        con.execute("ALTER TABLE insumos ADD COLUMN prazo_reposicao_dias INTEGER NOT NULL DEFAULT 0")
     pcols = {r["name"] for r in con.execute("PRAGMA table_info(properties)").fetchall()}
     if "car_numero" not in pcols:
         con.execute("ALTER TABLE properties ADD COLUMN car_numero TEXT")
@@ -1748,8 +1776,8 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
 def add_new_insumo(insumo: InsumoCreate) -> None:
     with _conn() as con:
         con.execute(
-            "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit) VALUES(?,?,?,?,?,?)",
-            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit),
+            "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit,prazo_reposicao_dias) VALUES(?,?,?,?,?,?,?)",
+            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit, insumo.prazo_reposicao_dias),
         )
 
 # ─── Custos por Animal ───────────────────────────────────────────────────────
@@ -1828,8 +1856,7 @@ def add_feeding_plan(plan: FeedingPlanCreate) -> None:
 
 
 @_writes
-def nova_versao_feeding_plan(plan_id: int, *, quantity=None, unit=None,
-                             frequency=None, insumo_id=None, notes=None) -> dict:
+def nova_versao_feeding_plan(plan_id: int, updates: FeedingPlanUpdate) -> dict:
     """Altera um item de trato criando OUTRA VERSÃO — nunca sobrescrevendo.
 
     Mesmo princípio de `regras.nova_versao()`: editar no lugar reescreveria
@@ -1861,10 +1888,10 @@ def nova_versao_feeding_plan(plan_id: int, *, quantity=None, unit=None,
                 active,vigente_de,vigente_ate)
                VALUES(?,?,?,?,?,?,?,1,?,NULL)""",
             (atual["lote_id"], atual["product_name"],
-             insumo_id if insumo_id is not None else atual["insumo_id"],
-             quantity if quantity is not None else atual["quantity"],
-             unit or atual["unit"], frequency or atual["frequency"],
-             notes if notes is not None else atual["notes"],
+             updates.insumo_id if updates.insumo_id is not None else atual["insumo_id"],
+             updates.quantity if updates.quantity is not None else atual["quantity"],
+             updates.unit or atual["unit"], updates.frequency or atual["frequency"],
+             updates.notes if updates.notes is not None else atual["notes"],
              hoje.isoformat()))
     return {"ok": True}
 
@@ -1933,36 +1960,33 @@ def delete_feeding_plan(plan_id: int) -> None:
 
 
 @_writes
-def add_feeding_check(plan_id, lote_id, check_date, status,
-                      actual_quantity=None, operator="", notes="",
-                      deduct_stock=False, insumo_id=None,
-                      quantity_unit="kg") -> None:
+def add_feeding_check(data: FeedingCheckData) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO feeding_checks
                (plan_id,lote_id,check_date,status,actual_quantity,operator,notes)
                VALUES(?,?,?,?,?,?,?)""",
-            (plan_id, lote_id, check_date, status, actual_quantity, operator, notes),
+            (data.plan_id, data.lote_id, data.check_date, data.status, data.actual_quantity, data.operator, data.notes),
         )
         # Baixa opcional no estoque quando o trato é confirmado
-        if deduct_stock and insumo_id and actual_quantity and status != "nao_feito":
+        if data.deduct_stock and data.insumo_id and data.actual_quantity and data.status != "nao_feito":
             ins = con.execute(
-                "SELECT unit FROM insumos WHERE id=?", (insumo_id,)
+                "SELECT unit FROM insumos WHERE id=?", (data.insumo_id,)
             ).fetchone()
-            stock_unit = ins["unit"] if ins else quantity_unit
+            stock_unit = ins["unit"] if ins else data.quantity_unit
             # Converte a quantidade aplicada (unidade do plano) para a unidade do estoque
-            deduct = convert_quantity(actual_quantity, quantity_unit, stock_unit)
+            deduct = convert_quantity(data.actual_quantity, data.quantity_unit, stock_unit)
             if deduct is None:
-                deduct = actual_quantity   # unidades incompatíveis: baixa direta
+                deduct = data.actual_quantity   # unidades incompatíveis: baixa direta
             con.execute(
                 "UPDATE insumos SET current_stock = MAX(0, current_stock - ?) WHERE id=?",
-                (deduct, insumo_id),
+                (deduct, data.insumo_id),
             )
             con.execute(
                 """INSERT INTO insumo_transactions
                    (insumo_id,type,quantity,reason,transaction_date,operator,lote_id)
                    VALUES(?,?,?,?,?,?,?)""",
-                (insumo_id, "saida", deduct, "trato_lote", check_date, operator, lote_id),
+                (data.insumo_id, "saida", deduct, "trato_lote", data.check_date, data.operator, data.lote_id),
             )
 
 
@@ -2751,9 +2775,7 @@ def previsao_estoque() -> list[dict]:
     """Previsão de ruptura por insumo — dias restantes, data de ruptura, urgência.
 
     Liga `services/previsao_estoque.py::prever` através do adaptador da spec 0039.
-    `prazo_reposicao_dias` não existe no schema ainda (fora do escopo daquela spec)
-    — todo insumo entra com prazo 0, que `prever()` já trata como "desconhecido",
-    não como erro.
+    O `prazo_reposicao_dias` é lido do schema, passando `0` (desconhecido) como fallback.
     """
     from services.previsao_estoque import prever as previsao_estoque_prever
     from services.previsao_estoque_adaptador import (
@@ -2762,7 +2784,8 @@ def previsao_estoque() -> list[dict]:
 
     insumos = get_all_insumos()
     consumo = _consumo_diario_por_insumo()
-    montados = previsao_estoque_montar_insumos(insumos, consumo)
+    prazos_de_reposicao = {i["id"]: i.get("prazo_reposicao_dias", 0) for i in insumos}
+    montados = previsao_estoque_montar_insumos(insumos, consumo, prazos_de_reposicao)
     resultado = previsao_estoque_prever(montados, date.today().isoformat())
     for item in resultado:
         if "id" in item and "insumo_id" not in item:

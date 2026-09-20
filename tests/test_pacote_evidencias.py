@@ -14,7 +14,7 @@ from unittest.mock import patch
 import database as _database
 
 _database.configurar_sqlite(os.path.join(tempfile.gettempdir(), "agrotop-test-evidencias.db"))
-import app
+import app  # noqa: E402
 
 
 def _texto_pdf(pdf_bytes: bytes) -> str:
@@ -96,8 +96,8 @@ class TestPacoteEvidencias(unittest.TestCase):
         def carencia(animal_id):
             return date(2026, 9, 20) if animal_id == "A2" else None
 
-        with patch.object(app.db, "get_age_category", return_value="Novilho"), \
-             patch.object(app.db, "get_age_display", return_value="2 anos"), \
+        with patch("app.get_age_category", return_value="Novilho"), \
+             patch("app.get_age_display", return_value="2 anos"), \
              patch.object(app.db, "get_weighings", side_effect=pesagens), \
              patch.object(app.db, "get_medications", side_effect=medicamentos), \
              patch.object(app.db, "get_withdrawal_end", side_effect=carencia), \

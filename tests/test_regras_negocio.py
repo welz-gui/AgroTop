@@ -22,8 +22,10 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
-from repositories.animais import get_animal  # noqa: E402
+from services.zootecnia import estimate_weight_by_measurement  # noqa: E402
+from services.zootecnia import get_age_category
 from services.zootecnia import calculate_gmd_total  # noqa: E402
+from repositories.animais import get_animal  # noqa: E402
 
 HOJE = date.today()
 
@@ -212,10 +214,10 @@ class TestArrobaEIdade(BaseRegras):
         for meses, esperado in casos:
             nasc = (HOJE - timedelta(days=int(meses * 30.44) + 2)).isoformat()
             with self.subTest(meses=meses):
-                self.assertEqual(db.get_age_category(nasc), esperado)
+                self.assertEqual(get_age_category(nasc), esperado)
 
     def test_sem_data_de_nascimento(self):
-        self.assertEqual(db.get_age_category(None), "Sem idade")
+        self.assertEqual(get_age_category(None), "Sem idade")
 
     def test_idade_com_data_invalida(self):
         self.assertIsNone(db.get_age_months("invalid-date"))
@@ -605,7 +607,7 @@ class TestDietaVigencia(BaseRegras):
         db.add_feeding_plan(db.FeedingPlanCreate(lote_id=lid, product_name="Ração", quantity=10.0, unit="kg", frequency="diario"))
         antiga = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
 
-        r = db.nova_versao_feeding_plan(antiga["id"], quantity=15.0, frequency="semanal")
+        r = db.nova_versao_feeding_plan(antiga["id"], updates=db.FeedingPlanUpdate(quantity=15.0, frequency="semanal"))
         self.assertTrue(r["ok"])
 
         historico = db.get_feeding_plan_historico(lid)
@@ -626,7 +628,7 @@ class TestDietaVigencia(BaseRegras):
         db.add_feeding_plan(db.FeedingPlanCreate(lote_id=lid, product_name="Ração", quantity=10.0, unit="kg", frequency="diario", notes="obs original"))
         antiga = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
 
-        db.nova_versao_feeding_plan(antiga["id"], quantity=20.0)  # só a quantidade muda
+        db.nova_versao_feeding_plan(antiga["id"], updates=db.FeedingPlanUpdate(quantity=20.0))  # só a quantidade muda
         nova = [h for h in db.get_feeding_plan_historico(lid) if h["vigente_ate"] is None][0]
         self.assertEqual(nova["quantity"], 20.0)
         self.assertEqual(nova["frequency"], "diario")
@@ -638,7 +640,7 @@ class TestDietaVigencia(BaseRegras):
         p = db.get_feeding_plans(lote_id=lid, active_only=True)[0]
         db.encerrar_feeding_plan(p["id"])
 
-        r = db.nova_versao_feeding_plan(p["id"], quantity=99.0)
+        r = db.nova_versao_feeding_plan(p["id"], updates=db.FeedingPlanUpdate(quantity=99.0))
         self.assertFalse(r["ok"])
 
     def test_encerrar_fecha_vigencia_sem_apagar_a_linha(self):
@@ -770,17 +772,17 @@ class TestEstatisticasDoRebanho(BaseRegras):
 class TestEstimativaPesoPorMedicao(unittest.TestCase):
     def test_estimativa_peso_com_medidas_validas(self):
         # 200² * 150 / 10838 = 553.6076... -> 553.6
-        self.assertEqual(db.estimate_weight_by_measurement(200.0, 150.0), 553.6)
+        self.assertEqual(estimate_weight_by_measurement(200.0, 150.0), 553.6)
 
     def test_estimativa_peso_com_medida_zero(self):
-        self.assertEqual(db.estimate_weight_by_measurement(0.0, 150.0), 0.0)
-        self.assertEqual(db.estimate_weight_by_measurement(200.0, 0.0), 0.0)
-        self.assertEqual(db.estimate_weight_by_measurement(0.0, 0.0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(0.0, 150.0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(200.0, 0.0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(0.0, 0.0), 0.0)
 
     def test_estimativa_peso_com_medida_negativa(self):
-        self.assertEqual(db.estimate_weight_by_measurement(-10.0, 150.0), 0.0)
-        self.assertEqual(db.estimate_weight_by_measurement(200.0, -5.0), 0.0)
-        self.assertEqual(db.estimate_weight_by_measurement(-10.0, -5.0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(-10.0, 150.0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(200.0, -5.0), 0.0)
+        self.assertEqual(estimate_weight_by_measurement(-10.0, -5.0), 0.0)
 
 
 if __name__ == "__main__":
