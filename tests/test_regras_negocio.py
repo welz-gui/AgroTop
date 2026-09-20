@@ -23,6 +23,7 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from services.zootecnia import estimate_weight_by_measurement  # noqa: E402
+from services.zootecnia import get_age_category
 from services.zootecnia import calculate_gmd_total  # noqa: E402
 from repositories.animais import get_animal  # noqa: E402
 
@@ -213,10 +214,10 @@ class TestArrobaEIdade(BaseRegras):
         for meses, esperado in casos:
             nasc = (HOJE - timedelta(days=int(meses * 30.44) + 2)).isoformat()
             with self.subTest(meses=meses):
-                self.assertEqual(db.get_age_category(nasc), esperado)
+                self.assertEqual(get_age_category(nasc), esperado)
 
     def test_sem_data_de_nascimento(self):
-        self.assertEqual(db.get_age_category(None), "Sem idade")
+        self.assertEqual(get_age_category(None), "Sem idade")
 
     def test_idade_com_data_invalida(self):
         self.assertIsNone(db.get_age_months("invalid-date"))
