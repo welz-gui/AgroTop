@@ -96,7 +96,7 @@ class TestPacoteEvidencias(unittest.TestCase):
         def carencia(animal_id):
             return date(2026, 9, 20) if animal_id == "A2" else None
 
-        with patch.object(app.db, "get_age_category", return_value="Novilho"), \
+        with patch("app.get_age_category", return_value="Novilho"), \
              patch("app.get_age_display", return_value="2 anos"), \
              patch.object(app.db, "get_weighings", side_effect=pesagens), \
              patch.object(app.db, "get_medications", side_effect=medicamentos), \
