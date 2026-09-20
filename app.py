@@ -16,6 +16,7 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
 from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
@@ -55,6 +56,11 @@ from services.sincronizacao import (
 from services.estados_dispositivo import (
     ESTADOS as ESTADOS_DISPOSITIVO,
     transicao_permitida as _transicao_dispositivo,
+)
+from services.previsao_estoque import prever as previsao_estoque_prever
+from services.previsao_estoque_adaptador import (
+    consumo_diario_planejado,
+    montar_insumos as previsao_estoque_montar_insumos,
 )
 from services.arquivo_dispositivos import (
     ler as arquivo_dispositivos_ler,
@@ -1346,7 +1352,7 @@ def _tab_pesagem(animal):
         with mm2:
             comp = st.number_input("Comprimento corporal (cm)", min_value=0.0,
                 max_value=350.0, value=150.0, step=1.0, key=f"comp_{animal['id']}")
-        nw = db.estimate_weight_by_measurement(pt, comp)
+        nw = estimate_weight_by_measurement(pt, comp)
         st.success(f"⚖️ Peso estimado por medição: **{_num_br(nw, 1)} kg**")
         medida_nota = f"PT={pt:.0f}cm Comp={comp:.0f}cm"
     else:
@@ -4811,7 +4817,7 @@ def _cadastro_compra():
         with pm2:
             comp_c=st.number_input("Comprimento corporal (cm)",min_value=0.0,max_value=350.0,
                 value=150.0,step=1.0,key="cad_comp")
-        entry_weight = db.estimate_weight_by_measurement(pt_c, comp_c)
+        entry_weight = estimate_weight_by_measurement(pt_c, comp_c)
         with pm3:
             st.metric("Peso estimado", f"{_num_br(entry_weight, 1)} kg")
         medida_nota = f"PT={pt_c:.0f}cm Comp={comp_c:.0f}cm"

@@ -241,86 +241,26 @@ def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manej
     não gera um evento de mudança de piquete que não mudou nada).
     """
     movidos, ja_no_destino, erros = [], [], []
-    animal_data = {}
-    from_lotes = set()
+    animal_states = {}
     with _conn() as con:
-        # Get destination property
-        destino = con.execute("SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
-        to_property_id = destino["property_id"] if destino else None
-
         chunk_size = 900
         for i in range(0, len(animal_ids), chunk_size):
             chunk = animal_ids[i:i + chunk_size]
             placeholders = ",".join(["?"] * len(chunk))
-            rows = con.execute(f"SELECT id, uuid, lote_id FROM animals WHERE id IN ({placeholders})", chunk).fetchall()
+            rows = con.execute(f"SELECT id, lote_id FROM animals WHERE id IN ({placeholders})", chunk).fetchall()
             for row in rows:
-                animal_data[row["id"]] = {"lote_id": row["lote_id"], "uuid": row["uuid"]}
-
-        update_animals_args = []
-        insert_movements_args = []
-        insert_events_args = []
-        agora = eventos._agora()
+                animal_states[row["id"]] = row["lote_id"]
 
         for animal_id in animal_ids:
-            if animal_id not in animal_data:
+            if animal_id not in animal_states:
                 erros.append(animal_id)
                 continue
-            if animal_data[animal_id]["lote_id"] == to_lote_id:
+            if animal_states[animal_id] == to_lote_id:
                 ja_no_destino.append(animal_id)
                 continue
-
-            from_lote = animal_data[animal_id]["lote_id"]
-            uuid = animal_data[animal_id]["uuid"]
-
-            update_animals_args.append((to_lote_id, to_property_id, animal_id))
-
-            insert_movements_args.append((
-                uuid, from_lote, to_lote_id, movement_date, reason, operator, notes
-            ))
-
-            obs = f"{from_lote or '—'} → {to_lote_id} ({reason})"
-            # animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
-            # local_interno,responsavel,usuario_registro,origem_informacao,
-            # latitude,longitude,observacoes,documento,anexos,
-            # justificativa,evento_anterior_id,versao
-            insert_events_args.append((
-                uuid, "mudanca_lote", movement_date, agora, None,
-                to_lote_id, None, operator or None, "web",
-                None, None, obs, None, eventos._json(None), None, None, 1
-            ))
-
-            if from_lote:
-                from_lotes.add(from_lote)
-
+            _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason,
+                            operator, notes)
             movidos.append(animal_id)
-
-        if movidos:
-            con.executemany(
-                "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) WHERE id=?",
-                update_animals_args
-            )
-            con.executemany(
-                """INSERT INTO animal_movements
-                   (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
-                    operator,notes)
-                   VALUES(?,?,?,?,?,?,?)""",
-                insert_movements_args
-            )
-            con.executemany(
-                """INSERT INTO animal_events
-                   (animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
-                    local_interno,responsavel,usuario_registro,origem_informacao,
-                    latitude,longitude,observacoes,documento,anexos,
-                    justificativa,evento_anterior_id,versao)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                insert_events_args
-            )
-            con.execute("UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id))
-
-            if from_lotes:
-                for from_lote in from_lotes:
-                    con.execute("UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote))
-
     return {"movidos": movidos, "ja_no_destino": ja_no_destino, "erros": erros}
 
 
