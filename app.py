@@ -1259,14 +1259,18 @@ def _campo_trato():
                         key=f"bx_{p['id']}")
                 if st.form_submit_button("✅ Confirmar aplicação", type="primary",
                                          use_container_width=True):
-                    db.add_feeding_check(
-                        p["id"], lid, hoje.isoformat(), status,
+                    check_data = db.FeedingCheckData(
+                        plan_id=p["id"],
+                        lote_id=lid,
+                        check_date=hoje.isoformat(),
+                        status=status,
                         actual_quantity=qtd_real,
                         operator=st.session_state.user["name"],
                         deduct_stock=baixar,
                         insumo_id=p.get("insumo_id"),
                         quantity_unit=p["unit"],
                     )
+                    db.add_feeding_check(check_data)
                     st.success(f"✅ {p['product_name']} confirmado para {lote_nome}")
                     st.rerun()
 

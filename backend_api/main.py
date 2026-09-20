@@ -70,6 +70,7 @@ from backend_api.schemas import (
 )
 from database import (
     AGE_SOURCES,
+    FeedingCheckData,
     LoteData,
     add_feeding_check,
     add_lote,
@@ -761,7 +762,7 @@ def confirmar_trato(
             detail="Item de trato não encontrado.",
         )
 
-    add_feeding_check(
+    check_data = FeedingCheckData(
         plan_id=plano_id,
         lote_id=plan["lote_id"],
         check_date=today.isoformat(),
@@ -773,6 +774,7 @@ def confirmar_trato(
         insumo_id=plan.get("insumo_id"),
         quantity_unit=plan["unit"],
     )
+    add_feeding_check(check_data)
     return {"ok": True}
 
 
