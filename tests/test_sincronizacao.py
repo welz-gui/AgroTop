@@ -18,7 +18,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -295,7 +295,12 @@ class TestAlertaDeSaida(unittest.TestCase):
             "entre_propriedades_mesmo_titular",
             propriedade_origem_id=self.origem["id"],
             propriedade_destino_id=self.destino_id,
-            data_prevista=HOJE, gta_numero="GTA123",
+            # Data futura, não HOJE: HOJE é fixado na importação do módulo e,
+            # se a suíte cruza a meia-noite UTC (CI de domingo 20/09 ~21h BRT),
+            # pre_validar() passa a ver "data_prevista_no_passado" — alerta
+            # que também exige justificativa e mascara o que o teste prova.
+            data_prevista=(date.today() + timedelta(days=7)).isoformat(),
+            gta_numero="GTA123",
             animais=[self.animal["uuid"]], usuario="op1")
         self.assertTrue(r["ok"], r)
         return r["id"]
