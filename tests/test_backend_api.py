@@ -549,6 +549,21 @@ class TestFotosEndpoint(BackendApiTestCase):
         )
         self.assertEqual(res.status_code, 401)
 
+    def test_upload_foto_animal_inexistente_retorna_404(self):
+        """Testa se tentar fazer upload de foto de um animal inexistente retorna 404 (ValueError handling)."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        foto_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00test-image-content"
+
+        res = self.client.post(
+            "/animais/fake_id/fotos",
+            files={"arquivo": ("foto.jpg", foto_bytes, "image/jpeg")},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("não encontrado", res.json()["detail"])
+
     def test_upload_foto_valida_grava_e_retorna_bytes_iguais(self):
         """Critério 2 (Spec 0052): Upload de imagem válida grava na tabela animal_photos e
         GET /fotos/{id} devolve exatamente os mesmos bytes enviados."""
