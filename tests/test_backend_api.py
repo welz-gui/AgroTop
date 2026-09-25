@@ -881,6 +881,25 @@ class TestSanidadeEndpoint(BackendApiTestCase):
             )
         )
 
+    @patch("backend_api.main.add_medication")
+    def test_post_medicamento_error_path(self, mock_add_medication):
+        """Garante que a exceção ValueError lançada ao adicionar medicamento é tratada corretamente."""
+        mock_add_medication.side_effect = ValueError("Medication error")
+        token = self._get_access_token()
+        animal_id = get_all_animals()[0]["id"]
+        payload = {
+            "medicamento": "Medicamento Erro",
+            "dose": 2.0,
+            "unidade": "mL",
+            "via": "Oral",
+            "carencia_dias": 0,
+            "data": "2023-01-01",
+        }
+        headers = {"Authorization": f"Bearer {token}"}
+        res = self.client.post(f"/animais/{animal_id}/medicamentos", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()["detail"], "Medication error")
+
     def test_backend_api_nao_duplica_sql_de_sanidade(self):
         """Critério 8 (Spec 0050): a rota delega persistência ao repositório."""
         source = inspect.getsource(main_mod)
