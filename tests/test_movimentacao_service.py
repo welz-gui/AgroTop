@@ -1,6 +1,7 @@
 import unittest
 from datetime import date, timedelta
 from services.movimentacao import (
+    _data,
     pre_validar_saida,
     pode_liberar,
     exige_confirmacao,
@@ -143,6 +144,17 @@ class TestMovimentacaoService(unittest.TestCase):
         self.assertIn("sincronizacao_pendente", self._extract_codes(problemas))
 
     # Testes das funcoes auxiliares
+
+    def test_data_error_paths(self):
+        # ValueError
+        self.assertIsNone(_data("invalid"))
+
+        # TypeError
+        class MockTypeError:
+            def __str__(self):
+                raise TypeError("mock error")
+
+        self.assertIsNone(_data(MockTypeError()))
 
     def test_pode_liberar(self):
         # sem problemas
