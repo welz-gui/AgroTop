@@ -374,6 +374,12 @@ def _seed_animals(con, property_id: str = None):
     breeds = ["Nelore", "Angus", "Brahman", "Senepol", "Brangus", "Canchim"]
     lotes  = ["P01", "P01", "P01", "P02", "P02", "P03", "P03", "P03", "CRL"]
 
+    animals_data = []
+    weighings_data = []
+    medications_data = []
+    animal_costs_data = []
+    animal_movements_data = []
+
     for i in range(1, 15):
         aid          = f"BR{i:04d}"
         breed        = random.choice(breeds)
@@ -402,24 +408,14 @@ def _seed_animals(con, property_id: str = None):
         # B1.6 as filhas só têm `animal_uuid`, então uma linha semeada sem uuid
         # ficaria órfã sem nada de onde reconstruí-la.
         a_uuid = novo_uuid()
-        con.execute(
-            """INSERT INTO animals
-               (id,uuid,breed,sex,birth_date,birth_estimated,age_source,entry_date,
-                entry_weight,current_weight,target_weight,status,lote_id,
-                fornecedor_id,purchase_price,property_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
-             c_weight, target_w, status, lote_id, forn_id, price, property_id),
-        )
+        animals_data.append((aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
+             c_weight, target_w, status, lote_id, forn_id, price, property_id))
 
         # Pesagens: entrada, meio, recente
         for step, days_back in [(0.0, days_in), (0.5, days_in//2), (1.0, 0)]:
             w_date   = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
             w_weight = round(e_weight + (c_weight - e_weight) * step, 1)
-            con.execute(
-                "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator) VALUES(?,?,?,?,?)",
-                (a_uuid, w_weight, w_date, lote_id, "Sistema"),
-            )
+            weighings_data.append((a_uuid, w_weight, w_date, lote_id, "Sistema"))
 
         # Medicamentos (1-2 por animal)
         meds_pool = [
@@ -432,30 +428,52 @@ def _seed_animals(con, property_id: str = None):
         for _ in range(random.randint(1, 2)):
             mn, mu, dose, wd = random.choice(meds_pool)
             md = (today - timedelta(days=random.randint(0, 60))).isoformat()
-            con.execute(
-                """INSERT INTO medications
-                   (animal_uuid,medication_name,dose,unit,application_route,
-                    withdrawal_days,med_date,applied_by)
-                   VALUES(?,?,?,?,?,?,?,?)""",
-                (a_uuid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"),
-            )
+            medications_data.append((a_uuid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"))
 
         # Custo de compra
-        con.execute(
-            "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-            (a_uuid, "compra", "Valor de compra", price, entry_date),
-        )
+        animal_costs_data.append((a_uuid, "compra", "Valor de compra", price, entry_date))
         # Custo operacional
         op_cost = round(days_in * 0.85, 2)
-        con.execute(
-            "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-            (a_uuid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()),
-        )
+        animal_costs_data.append((a_uuid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()))
 
         # Movimentação inicial para o lote
-        con.execute(
+        animal_movements_data.append((a_uuid, None, lote_id, entry_date, "entrada", "Sistema"))
+
+    if animals_data:
+        con.executemany(
+            """INSERT INTO animals
+               (id,uuid,breed,sex,birth_date,birth_estimated,age_source,entry_date,
+                entry_weight,current_weight,target_weight,status,lote_id,
+                fornecedor_id,purchase_price,property_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            animals_data,
+        )
+
+    if weighings_data:
+        con.executemany(
+            "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator) VALUES(?,?,?,?,?)",
+            weighings_data,
+        )
+
+    if medications_data:
+        con.executemany(
+            """INSERT INTO medications
+               (animal_uuid,medication_name,dose,unit,application_route,
+                withdrawal_days,med_date,applied_by)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            medications_data,
+        )
+
+    if animal_costs_data:
+        con.executemany(
+            "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
+            animal_costs_data,
+        )
+
+    if animal_movements_data:
+        con.executemany(
             """INSERT INTO animal_movements
                (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator)
                VALUES(?,?,?,?,?,?)""",
-            (a_uuid, None, lote_id, entry_date, "entrada", "Sistema"),
+            animal_movements_data,
         )
