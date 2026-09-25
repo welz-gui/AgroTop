@@ -2070,6 +2070,19 @@ class TestRecomendacoesApi(BackendApiTestCase):
         self.assertIsInstance(ctx["insumos"], list)
         self.assertIsInstance(ctx["hoje"], str)
 
+    @patch('database.get_setting')
+    def test_database_contexto_preco_arroba_erro_parsing(self, mock_get_setting):
+        """Critério adicional: testa ValueError no float() do preco_arroba."""
+        # Configura o mock para devolver um valor inválido apenas para 'preco_arroba'
+        def side_effect(key, default=None):
+            if key == "preco_arroba":
+                return "abc" # Valor que causa ValueError no float()
+            return None # Outros settings default
+        mock_get_setting.side_effect = side_effect
+
+        ctx = db.contexto_recomendacoes()
+        self.assertIsNone(ctx["preco_arroba"])
+
     def test_app_py_funcoes_relocadas_removidas(self):
         """Critério 5: app.py não define mais as funções relocadas."""
         import app as app_mod
