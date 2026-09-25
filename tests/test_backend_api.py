@@ -1273,6 +1273,24 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
         with _conn() as con:
             return con.execute("SELECT COUNT(*) FROM weighings").fetchone()[0]
 
+    @patch("tempfile.SpooledTemporaryFile.read")
+    def test_post_importar_csv_erro_decodificacao(self, mock_read):
+        """Testa se a API retorna 422 ao falhar em decodificar o arquivo (nem utf-8-sig nem latin-1)."""
+        class BadBytes(bytes):
+            def decode(self, *args, **kwargs):
+                raise UnicodeDecodeError("dummy", b"", 0, 1, "dummy reason")
+
+        mock_read.return_value = BadBytes(b"dummy")
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", b"dummy", "text/csv")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(res.json()["detail"], "Não foi possível decodificar o arquivo.")
+
     def test_post_importar_csv_sem_token_retorna_401(self):
         """Critério 1: POST /pesagens/importar-csv sem Authorization devolve 401."""
         csv_content = b"animal,peso,data\nBR0001,450.0,2026-08-20\n"
