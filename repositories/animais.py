@@ -346,22 +346,21 @@ def get_last_movements_bulk(animal_ids: list[str]) -> dict[str, str]:
         return {}
 
     last_movements = {}
+    import json
     with _conn() as con:
-        # SQLite limit is typically 999 parameters. Batch by 900.
-        for i in range(0, len(animal_ids), 900):
-            batch = animal_ids[i:i+900]
-            placeholders = ",".join("?" for _ in batch)
-            sql = f"""
-                SELECT a.id as animal_id, MAX(m.movement_date) as last_movement_date
-                FROM animals a
-                LEFT JOIN animal_movements m ON a.uuid = m.animal_uuid
-                WHERE a.id IN ({placeholders})
-                GROUP BY a.id
-            """
-            rows = con.execute(sql, batch).fetchall()
-            for r in rows:
-                if r["last_movement_date"]:
-                    last_movements[r["animal_id"]] = r["last_movement_date"]
+        # Avoid python loop chunking by delegating entirely to SQLite via json_each.
+        # This operates safely within a single query regardless of parameter limits.
+        sql = """
+            SELECT a.id as animal_id, MAX(m.movement_date) as last_movement_date
+            FROM json_each(?) t
+            JOIN animals a ON a.id = t.value
+            LEFT JOIN animal_movements m ON a.uuid = m.animal_uuid
+            GROUP BY a.id
+        """
+        rows = con.execute(sql, (json.dumps(animal_ids),)).fetchall()
+        for r in rows:
+            if r["last_movement_date"]:
+                last_movements[r["animal_id"]] = r["last_movement_date"]
     return last_movements
 
 
