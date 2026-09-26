@@ -109,6 +109,7 @@ from repositories.sanidade import (
     _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
     get_protocols, add_protocol, set_protocol_active, delete_protocol,
     _protocol_pending, get_protocol_plan, apply_protocol_campaign, dose_for_animal,
+    ProtocolData,
 )
 from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,

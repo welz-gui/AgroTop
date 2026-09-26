@@ -5235,8 +5235,21 @@ def page_sanitario():
                 elif a_max < a_min:
                     st.error("Idade máxima deve ser ≥ mínima.")
                 else:
-                    db.add_protocol(nome.strip(), sexo_t, a_min, a_max, dose_v, dose_kg, dose_u,
-                        ins_link["id"] if ins_link else None, freq, carencia_p, via, notas)
+                    data = db.ProtocolData(
+                        name=nome.strip(),
+                        sex_target=sexo_t,
+                        age_min=a_min,
+                        age_max=a_max,
+                        dose_value=dose_v,
+                        dose_ref_kg=dose_kg,
+                        dose_unit=dose_u,
+                        insumo_id=ins_link["id"] if ins_link else None,
+                        frequency=freq,
+                        withdrawal_days=carencia_p,
+                        route=via,
+                        notes=notas,
+                    )
+                    db.add_protocol(data)
                     st.success(f"✅ Protocolo '{nome}' criado!")
                     st.rerun()
 
