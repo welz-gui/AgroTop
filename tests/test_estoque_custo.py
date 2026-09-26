@@ -116,5 +116,35 @@ class TestCustoMedioPonderado(unittest.TestCase):
         self.assertEqual(saldo, 500.0)
 
 
+    def test_conversao_tipos(self):
+        """Testa se valores fornecidos como string são corretamente convertidos para float."""
+        resultado = custo_medio_ponderado(
+            saldo_atual="100.0",
+            custo_atual="2.0",
+            quantidade_entrada="100.0",
+            custo_entrada="4.0",
+        )
+        self.assertEqual(resultado, 3.0)
+
+    def test_conversao_tipos_estoque_zero(self):
+        """Testa se string funciona quando cai no atalho de estoque zerado."""
+        resultado = custo_medio_ponderado(
+            saldo_atual="0.0",
+            custo_atual="2.0",
+            quantidade_entrada="100.0",
+            custo_entrada="4.0",
+        )
+        self.assertEqual(resultado, 4.0)
+
+    def test_conversao_tipos_entrada_zero(self):
+        """Testa se string funciona quando cai no atalho de entrada zero."""
+        resultado = custo_medio_ponderado(
+            saldo_atual="100.0",
+            custo_atual="2.0",
+            quantidade_entrada="0.0",
+            custo_entrada="4.0",
+        )
+        self.assertEqual(resultado, 2.0)
+
 if __name__ == "__main__":
     unittest.main()
