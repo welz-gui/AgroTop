@@ -365,6 +365,24 @@ class TestPesagensEndpoint(BackendApiTestCase):
             last_event = dict(events[-1])
             self.assertIn("465.5 kg", last_event["observacoes"])
 
+    @patch('backend_api.main.add_weighing')
+    def test_post_pesagem_add_weighing_value_error_retorna_404(self, mock_add_weighing):
+        """POST /animais/{id}/pesagens deve retornar 404 caso add_weighing suba ValueError."""
+        mock_add_weighing.side_effect = ValueError("Erro mockado na pesagem")
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # O ID em si nao importa muito já que estamos mockando o add_weighing
+        payload = {
+            "peso": 400.0,
+            "data": "2026-08-21",
+            "method": "pesado",
+            "notes": "Teste erro mockado"
+        }
+        res = self.client.post("/animais/ABC/pesagens", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("Erro mockado na pesagem", res.json()["detail"])
+
     def test_post_pesagem_animal_inexistente_retorna_404(self):
         """POST /animais/{id}/pesagens com ID inexistente retorna 404."""
         token = self._get_access_token()
