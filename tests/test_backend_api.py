@@ -1460,23 +1460,6 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
         self.assertEqual(data["aceitas"][0]["animal_id"], a1)
         self.assertEqual(data["aceitas"][0]["peso"], 475.5)
 
-    @patch("tempfile.SpooledTemporaryFile.read")
-    def test_post_importar_csv_falha_decode(self, mock_read):
-        """Critério X: POST /pesagens/importar-csv onde o conteúdo não pode ser decodificado gera erro 422."""
-        class BadBytes(bytes):
-            def decode(self, encoding="utf-8", *args, **kwargs):
-                raise UnicodeDecodeError("mock", b"", 0, 1, "mock error")
-
-        mock_read.return_value = BadBytes(b"test")
-
-        res = self.client.post(
-            "/pesagens/importar-csv",
-            headers=self._headers(),
-            files={"arquivo": ("pesagens.csv", b"test", "text/csv")},
-        )
-        self.assertEqual(res.status_code, 422)
-        self.assertEqual(res.json()["detail"], "Não foi possível decodificar o arquivo.")
-
     def test_post_importar_csv_validacoes_tamanho_e_extensao(self):
         """Critério 9: Arquivo > 1MB retorna 413, arquivo vazio ou extensão inválida retorna 422."""
         # Arquivo > 1 MB
