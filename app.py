@@ -2208,7 +2208,7 @@ def _render_tab_fin(animal):
             with cc3: cd=st.date_input("Data",value=date.today())
             desc=st.text_input("Descrição")
             if st.form_submit_button("Salvar",type="primary",use_container_width=True):
-                db.add_animal_cost(aid,ct,desc,val,cd.strftime("%Y-%m-%d"))
+                db.add_animal_cost(db.AnimalCostData(aid, ct, desc, val, cd.strftime("%Y-%m-%d")))
                 st.success("Custo registrado!"); st.rerun()
 
 
@@ -3961,9 +3961,11 @@ def _fin_rateio_de_lote(animals):
     if st.button(f"💾 Lançar custo rateado para {len(preview)} animal(is)",
                  type="primary", disabled=not desc, key="rat_salvar"):
         for item in preview:
-            db.add_animal_cost(item["animal_id"], tipo, desc, item["valor"], referencia,
-                               notes=f"Rateio do piquete {lote_sel['id']} ({criterio}), "
-                                     f"total R$ {valor_total:,.2f}")
+            db.add_animal_cost(db.AnimalCostData(
+                item["animal_id"], tipo, desc, item["valor"], referencia,
+                notes=f"Rateio do piquete {lote_sel['id']} ({criterio}), "
+                      f"total R$ {valor_total:,.2f}"
+            ))
         db.clear_cache()
         st.success(f"✅ R$ {valor_total:,.2f} rateado entre {len(preview)} animal(is).")
         st.rerun()

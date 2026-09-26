@@ -126,7 +126,7 @@ class TestRentabilidadePorRacaNaTela(unittest.TestCase):
         hoje = date.today().isoformat()
         db.add_animal(db.AnimalData("RACA2", "Angus", "F", None, entrada,
                       300.0, 450.0, 1000.0, None, None))
-        db.add_animal_cost("RACA2", "operacional", "trato caro", 5000.0, hoje)
+        db.add_animal_cost(db.AnimalCostData("RACA2", "operacional", "trato caro", 5000.0, hoje))
         db.clear_cache()
         db.register_sale(["RACA2"], hoje, "abate", "cabeca", 100.0)
         db.clear_cache()

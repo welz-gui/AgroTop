@@ -72,8 +72,8 @@ class TestCustoPorLoteDeVendaNaTela(unittest.TestCase):
                       300.0, 450.0, 1000.0, None, None))
         db.add_animal(db.AnimalData("LOTEV2", "Nelore", "M", None, entrada,
                       310.0, 460.0, 1000.0, None, None))
-        db.add_animal_cost("LOTEV1", "operacional", "trato", 200.0, hoje)
-        db.add_animal_cost("LOTEV2", "operacional", "trato", 200.0, hoje)
+        db.add_animal_cost(db.AnimalCostData("LOTEV1", "operacional", "trato", 200.0, hoje))
+        db.add_animal_cost(db.AnimalCostData("LOTEV2", "operacional", "trato", 200.0, hoje))
         db.clear_cache()
         db.register_sale(["LOTEV1", "LOTEV2"], hoje, "abate", "lote", 5000.0)
         db.clear_cache()
