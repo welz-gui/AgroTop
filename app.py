@@ -593,6 +593,77 @@ def _evidencias_nome_arquivo(vendas_do_lote: list[dict]) -> str:
     return f"agrotop_evidencias_{slug or 'lote'}.pdf"
 
 
+
+def _adicionar_capa_pacote(pdf, vendas_do_lote: list[dict], texto) -> None:
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, _pdf_safe("AgroTop — Pacote de Evidências"), ln=True, align="C")
+    pdf.ln(4)
+    compradores = sorted({str(venda.get("buyer") or "—") for venda in vendas_do_lote})
+    datas_venda = sorted({str(venda.get("sale_date") or "") for venda in vendas_do_lote if venda.get("sale_date")})
+    texto("Comprador", ", ".join(compradores) or "—")
+    texto("Data(s) da venda", ", ".join(_evidencias_data(data) for data in datas_venda) or "—")
+    texto("Quantidade de animais", str(len(vendas_do_lote)))
+    pdf.ln(7)
+    pdf.set_fill_color(255, 236, 196)
+    pdf.set_text_color(100, 55, 0)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.multi_cell(0, 8, _pdf_safe(
+        "Aviso: este pacote não é avaliação de conformidade legal nem certificação oficial."
+    ), border=1, fill=True)
+    pdf.set_text_color(20, 20, 20)
+
+
+def _adicionar_pagina_animal(pdf, venda: dict, texto, tabela) -> None:
+    animal_id = venda.get("animal_id") or venda.get("animal_id_str") or "—"
+    animal = get_animal(animal_id) or {}
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(0, 9, _pdf_safe(f"Animal {animal_id}"), ln=True)
+    pdf.ln(2)
+    texto("Raça", animal.get("breed") or venda.get("breed") or "—")
+    sexo = animal.get("sex") or venda.get("sex") or "—"
+    texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
+    texto("Categoria", get_age_category(animal.get("birth_date")))
+    texto("Idade", get_age_display(animal) if animal else "—")
+    texto("Fornecedor", animal.get("fornecedor_name") or "—")
+    texto("NF", animal.get("nf_number") or "—")
+    texto("GTA", animal.get("gta_number") or "—")
+
+    fotos = db.get_photos(animal_id) or []
+    if fotos:
+        foto = max(fotos, key=lambda item: (str(item.get("taken_date") or ""), item.get("id") or 0))
+        imagem = db.get_photo_image(foto.get("id"))
+        if imagem:
+            try:
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 7, "Foto mais recente", ln=True)
+                pdf.image(io.BytesIO(imagem[0]), w=55)
+                pdf.ln(2)
+            except Exception:
+                pass
+
+    pesagens = db.get_weighings(animal_id) or []
+    tabela("Pesagens", ["Data", "Peso (kg)", "Método", "Operador"], [
+        (_evidencias_data(item.get("weigh_date")), item.get("weight") or "—",
+         db.WEIGH_METHODS.get(item.get("method") or "pesado", item.get("method") or "—"),
+         item.get("operator") or "—") for item in pesagens
+    ])
+
+    medicamentos = db.get_medications(animal_id) or []
+    tabela("Sanidade / Medicamentos", ["Data", "Medicamento", "Dose", "Carência (dias)", "Aplicado por"], [
+        (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
+         f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
+         item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
+        for item in medicamentos
+    ])
+    fim_carencia = db.get_withdrawal_end(animal_id)
+    status_carencia = (
+        f"Em carência até {_evidencias_data(fim_carencia)}" if fim_carencia else "Livre"
+    )
+    texto("Status de carência", status_carencia)
+
+
 def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
     """Monta o PDF de evidências para um lote de venda (spec 0080).
 
@@ -633,72 +704,10 @@ def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
                     pdf.cell(largura, 5, _pdf_safe(valor)[:30], border=1)
                 pdf.ln()
 
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.cell(0, 12, _pdf_safe("AgroTop — Pacote de Evidências"), ln=True, align="C")
-        pdf.ln(4)
-        compradores = sorted({str(venda.get("buyer") or "—") for venda in vendas_do_lote})
-        datas_venda = sorted({str(venda.get("sale_date") or "") for venda in vendas_do_lote if venda.get("sale_date")})
-        texto("Comprador", ", ".join(compradores) or "—")
-        texto("Data(s) da venda", ", ".join(_evidencias_data(data) for data in datas_venda) or "—")
-        texto("Quantidade de animais", str(len(vendas_do_lote)))
-        pdf.ln(7)
-        pdf.set_fill_color(255, 236, 196)
-        pdf.set_text_color(100, 55, 0)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.multi_cell(0, 8, _pdf_safe(
-            "Aviso: este pacote não é avaliação de conformidade legal nem certificação oficial."
-        ), border=1, fill=True)
-        pdf.set_text_color(20, 20, 20)
+        _adicionar_capa_pacote(pdf, vendas_do_lote, texto)
 
         for venda in vendas_do_lote:
-            animal_id = venda.get("animal_id") or venda.get("animal_id_str") or "—"
-            animal = get_animal(animal_id) or {}
-            pdf.add_page()
-            pdf.set_font("Helvetica", "B", 15)
-            pdf.cell(0, 9, _pdf_safe(f"Animal {animal_id}"), ln=True)
-            pdf.ln(2)
-            texto("Raça", animal.get("breed") or venda.get("breed") or "—")
-            sexo = animal.get("sex") or venda.get("sex") or "—"
-            texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
-            texto("Categoria", get_age_category(animal.get("birth_date")))
-            texto("Idade", get_age_display(animal) if animal else "—")
-            texto("Fornecedor", animal.get("fornecedor_name") or "—")
-            texto("NF", animal.get("nf_number") or "—")
-            texto("GTA", animal.get("gta_number") or "—")
-
-            fotos = db.get_photos(animal_id) or []
-            if fotos:
-                foto = max(fotos, key=lambda item: (str(item.get("taken_date") or ""), item.get("id") or 0))
-                imagem = db.get_photo_image(foto.get("id"))
-                if imagem:
-                    try:
-                        pdf.set_font("Helvetica", "B", 11)
-                        pdf.cell(0, 7, "Foto mais recente", ln=True)
-                        pdf.image(io.BytesIO(imagem[0]), w=55)
-                        pdf.ln(2)
-                    except Exception:
-                        pass
-
-            pesagens = db.get_weighings(animal_id) or []
-            tabela("Pesagens", ["Data", "Peso (kg)", "Método", "Operador"], [
-                (_evidencias_data(item.get("weigh_date")), item.get("weight") or "—",
-                 db.WEIGH_METHODS.get(item.get("method") or "pesado", item.get("method") or "—"),
-                 item.get("operator") or "—") for item in pesagens
-            ])
-
-            medicamentos = db.get_medications(animal_id) or []
-            tabela("Sanidade / Medicamentos", ["Data", "Medicamento", "Dose", "Carência (dias)", "Aplicado por"], [
-                (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
-                 f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
-                 item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
-                for item in medicamentos
-            ])
-            fim_carencia = db.get_withdrawal_end(animal_id)
-            status_carencia = (
-                f"Em carência até {_evidencias_data(fim_carencia)}" if fim_carencia else "Livre"
-            )
-            texto("Status de carência", status_carencia)
+            _adicionar_pagina_animal(pdf, venda, texto, tabela)
 
         return bytes(pdf.output())
     except ImportError:
