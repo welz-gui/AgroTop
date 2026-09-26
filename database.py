@@ -2588,7 +2588,6 @@ PROTOCOL_FREQUENCIES = {
     "trimestral": "Trimestral",
     "mensal":     "Mensal",
 }
-_FREQ_DAYS = {"anual": 365, "semestral": 182, "trimestral": 91, "mensal": 30}
 SEX_TARGETS = {"ambos": "Machos e Fêmeas", "M": "Só Machos", "F": "Só Fêmeas"}
 
 
@@ -2600,16 +2599,6 @@ SEX_TARGETS = {"ambos": "Machos e Fêmeas", "M": "Só Machos", "F": "Só Fêmeas
 
 
 
-
-
-def _protocol_eligible(protocol: dict, animal: dict) -> bool:
-    stt = protocol.get("sex_target", "ambos")
-    if stt in ("M", "F") and animal["sex"] != stt:
-        return False
-    months = get_age_months(animal.get("birth_date"))
-    if months is None:
-        return False
-    return (protocol.get("age_min") or 0) <= months <= (protocol.get("age_max") or 999)
 
 
 

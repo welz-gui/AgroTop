@@ -13,6 +13,7 @@ from .animais import get_all_animals
 from .animais import uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
+from services.zootecnia import get_age_months
 
 
 @dataclass
@@ -195,6 +196,19 @@ def set_protocol_active(pid: int, active: int) -> None:
 def delete_protocol(pid: int) -> None:
     with _conn() as con:
         con.execute("DELETE FROM health_protocols WHERE id=?", (pid,))
+
+
+_FREQ_DAYS = {"anual": 365, "semestral": 182, "trimestral": 91, "mensal": 30}
+
+
+def _protocol_eligible(protocol: dict, animal: dict) -> bool:
+    stt = protocol.get("sex_target", "ambos")
+    if stt in ("M", "F") and animal["sex"] != stt:
+        return False
+    months = get_age_months(animal.get("birth_date"))
+    if months is None:
+        return False
+    return (protocol.get("age_min") or 0) <= months <= (protocol.get("age_max") or 999)
 
 
 def _protocol_pending(protocol: dict, animal: dict, ref_date: date) -> bool:
