@@ -1,0 +1,2339 @@
+2026-09-26 00:16:49.703
+'server.enableCORS=false' tells Streamlit not to limit cross-origin access.
+Streamlit sends the header 'Access-Control-Allow-Origin: *', except on the file
+upload routes, which stay pinned to the app address and still require a valid
+XSRF token.
+Streamlit also accepts a WebSocket connection from any origin.
+Streamlit does not set 'server.enableCORS' to 'true' for you.
+'server.enableXsrfProtection=true' does not stop a cross-origin WebSocket
+connection, because Streamlit does not need a valid XSRF token to open one.
+
+To limit cross-origin access, do these steps:
+  1. Set 'server.enableCORS=true'.
+  2. Put the origins that you trust in 'server.corsAllowedOrigins'.
+
+'server.allowedHosts' can also limit the hostnames that Streamlit accepts on a
+WebSocket connection.
+
+2026-09-26 00:16:49.705 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.709 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.712 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.713 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.717 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.719 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.720 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.722 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.723 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.724 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.726 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.728 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.729 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.729 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.730 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.731 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:49.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:51.038 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.297 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.302 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:51.306 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.306 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.362
+  [33m[1mWarning:[0m to view this Streamlit app on a browser, run it with the following
+  command:
+
+    streamlit run python3 -m unittest [ARGUMENTS]
+2026-09-26 00:16:51.362 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.362 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Session state does not function when running a script without `streamlit run`
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.363 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-09-26 00:16:51.364 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:51.365 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:52.336 No runtime found, using MemoryCacheStorageManager
+..2026-09-26 00:16:52.528 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 995dH3ZUQDB7g6FF
+ATENÇÃO: Senha gerada para o usuário 'op1': 83nIhZRpLrswjgG8
+2026-09-26 00:16:53.077 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.077 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.085 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.085 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.087 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.087 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.091 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.093 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': LkBHzNO7UB9L-aQj
+ATENÇÃO: Senha gerada para o usuário 'op1': iqOqfcUC2-gf3dbG
+2026-09-26 00:16:53.652 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.652 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.659 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.659 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.665 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.667 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.667 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.672 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:53.674 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': s-7Y1Mi_a9hMnaoS
+ATENÇÃO: Senha gerada para o usuário 'op1': 05POb8vSuS6-8wb-
+2026-09-26 00:16:54.231 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.231 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.239 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.239 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.247 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.247 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.247 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.251 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:54.253 No runtime found, using MemoryCacheStorageManager
+..........................................ATENÇÃO: Senha gerada para o usuário 'admin': uQ10EeDC9Mwfoddp
+ATENÇÃO: Senha gerada para o usuário 'op1': IGbs_RIjnHuXNFv5
+.....ATENÇÃO: Senha gerada para o usuário 'admin': U_YOn41uJ8Je5js1
+ATENÇÃO: Senha gerada para o usuário 'op1': JbNs71OM9VsRWo6s
+2026-09-26 00:16:57.115 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.341 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.348 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.353 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.358 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.363 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.370 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.375 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.380 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.385 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.390 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.395 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.399 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.404 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.409 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.671 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.671 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.676 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.678 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:16:57.682 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 4L2QT2Hl3L3yOyLs
+ATENÇÃO: Senha gerada para o usuário 'op1': Xt9d04_TrT9iYlFX
+2026-09-26 00:16:58.247 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 5xiMtDr0Gm8vzL1B
+ATENÇÃO: Senha gerada para o usuário 'op1': bEUIxGKtApsu-6XT
+2026-09-26 00:16:59.268 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': kWxQ5lY7oRONSCmV
+ATENÇÃO: Senha gerada para o usuário 'op1': 69hzUkvE4ngErP5E
+2026-09-26 00:17:00.041 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 5ZDt1zM84R0K4H6m
+ATENÇÃO: Senha gerada para o usuário 'op1': fZD09kOn0HdBmlIJ
+2026-09-26 00:17:01.953 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Z8D8JcJmOVfWzAka
+ATENÇÃO: Senha gerada para o usuário 'op1': qaeNWto2TZovt50h
+2026-09-26 00:17:02.970 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': d15197Y-GaDO3FeQ
+ATENÇÃO: Senha gerada para o usuário 'op1': qfzlzH8hfRPY24ui
+2026-09-26 00:17:04.103 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mFTvUzPK_G6QV6kv
+ATENÇÃO: Senha gerada para o usuário 'op1': 8_9H-pNeAnfJucMc
+2026-09-26 00:17:04.888 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:05.359 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:05.367 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': HtXZLoTnIWZeNwRj
+ATENÇÃO: Senha gerada para o usuário 'op1': IeLxKTYQKqBX4NDc
+2026-09-26 00:17:05.909 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 5q37rm0H1lv_Ltap
+ATENÇÃO: Senha gerada para o usuário 'op1': TyF04BEfSRpAVm46
+2026-09-26 00:17:06.928 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:07.397 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': i-hUMT8PQIwJJjC6
+ATENÇÃO: Senha gerada para o usuário 'op1': TwRkgjiuJzpIoDQp
+2026-09-26 00:17:07.986 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 3H4C0ppxe-1bf_W5
+ATENÇÃO: Senha gerada para o usuário 'op1': fiY-b0caaYmcLiu7
+2026-09-26 00:17:08.788 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': WEbdqdN4-H0UNa4R
+ATENÇÃO: Senha gerada para o usuário 'op1': kmMNyIN_7WZGSsKr
+2026-09-26 00:17:09.862 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:10.337 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': rSua1k8WjGQwieh-
+ATENÇÃO: Senha gerada para o usuário 'op1': Ayd1WDC9tbFq9xcj
+2026-09-26 00:17:10.914 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:11.141 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:11.141 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:11.144 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:11.146 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:11.149 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:11.154 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': uy8Wr5Uo4ltVqYaH
+ATENÇÃO: Senha gerada para o usuário 'op1': 8mWmHvX3HnpyOD1e
+2026-09-26 00:17:11.945 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jl8BgdO5wyqMWFTh
+ATENÇÃO: Senha gerada para o usuário 'op1': FMlzdU02nC5ZhnKW
+2026-09-26 00:17:12.736 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': pderkVjs6txTRBvd
+ATENÇÃO: Senha gerada para o usuário 'op1': 0D9BAsfyTJ9IwKLA
+2026-09-26 00:17:13.783 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:14.256 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:14.256 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:14.261 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:14.263 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': aV-xyDXmHPXeuXrf
+ATENÇÃO: Senha gerada para o usuário 'op1': rHiXqdyfJv1CLZtb
+2026-09-26 00:17:14.827 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:15.294 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:15.295 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:15.299 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:15.302 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': S1knztNX-mFSJ5-O
+ATENÇÃO: Senha gerada para o usuário 'op1': GRuA6UlfwBcVM05K
+2026-09-26 00:17:15.852 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:16.319 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:16.319 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:16.323 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:16.326 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': acQgLouEfwBeU4Kg
+ATENÇÃO: Senha gerada para o usuário 'op1': hYlB_oMkYIabdpYK
+2026-09-26 00:17:16.900 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:17.366 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:17.366 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:17.371 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:17.373 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mWauH_C11-IOe-uc
+ATENÇÃO: Senha gerada para o usuário 'op1': GiOqDwK-9gVsfyzv
+2026-09-26 00:17:17.945 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': G8m-8ar8kokVJTNn
+ATENÇÃO: Senha gerada para o usuário 'op1': uzTe4AtjHfJuasTj
+2026-09-26 00:17:18.976 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qkYo1xuuQna50dhY
+ATENÇÃO: Senha gerada para o usuário 'op1': 46A2EO1JKVwxnkjn
+2026-09-26 00:17:20.012 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 6ZNoMPT2xlHJf5mx
+ATENÇÃO: Senha gerada para o usuário 'op1': rsF6vPC-21WrkniM
+2026-09-26 00:17:20.820 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': xppR2cRFQgYfTkoP
+ATENÇÃO: Senha gerada para o usuário 'op1': Z_Ca_dsqcClPBXcR
+2026-09-26 00:17:22.110 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:22.597 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:22.597 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Neiv6ErUn-ms2Jk0
+ATENÇÃO: Senha gerada para o usuário 'op1': V6skhc0ciBoVtcOg
+2026-09-26 00:17:23.151 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:23.631 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': KnrGRs322mvjPLPe
+ATENÇÃO: Senha gerada para o usuário 'op1': pPhhEaRx6xqNjzJV
+2026-09-26 00:17:24.447 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:24.924 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 3Xqx_WJTGsXtavAp
+ATENÇÃO: Senha gerada para o usuário 'op1': 33YOit6cwJzPnKyU
+2026-09-26 00:17:25.491 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:25.973 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:25.973 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': cnjJZ9uzFO-aCQXq
+ATENÇÃO: Senha gerada para o usuário 'op1': cE56ru_vQwV4Ahn7
+2026-09-26 00:17:26.794 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Bsawn1yhytKGB0jp
+ATENÇÃO: Senha gerada para o usuário 'op1': zYjQLLCiVg1TomKD
+2026-09-26 00:17:27.604 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:27.832 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:27.835 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Xzqw695kAqZibTco
+ATENÇÃO: Senha gerada para o usuário 'op1': PIwXsfRoKh1Y8IH4
+2026-09-26 00:17:28.419 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:28.891 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:28.896 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': lr4d6Yyrkzxzvqp1
+ATENÇÃO: Senha gerada para o usuário 'op1': i8oUkheE1LUJF9qN
+2026-09-26 00:17:29.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:29.942 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:29.947 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': yiULHdI4SYX5D6Rb
+ATENÇÃO: Senha gerada para o usuário 'op1': 7dHH963tULxyDsDh
+2026-09-26 00:17:30.537 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:31.009 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:31.009 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:31.011 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': CZ_BTCuMEF_JhldE
+ATENÇÃO: Senha gerada para o usuário 'op1': swzxYCe5_8tnuZA0
+2026-09-26 00:17:31.609 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:32.079 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:32.084 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:32.086 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': xXM64N_UYOyjVD4M
+ATENÇÃO: Senha gerada para o usuário 'op1': 54ElysPNItEqzXIF
+2026-09-26 00:17:32.666 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 9QHbCN5FYxmrNd3l
+ATENÇÃO: Senha gerada para o usuário 'op1': oD31WPEM9wbFvfe3
+2026-09-26 00:17:33.489 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:33.953 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:33.969 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': agP1ahsj4YOgv-zP
+ATENÇÃO: Senha gerada para o usuário 'op1': cN3vI3mOp7pMlhP-
+2026-09-26 00:17:34.573 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': gxN3MXWaoUDgmPuf
+ATENÇÃO: Senha gerada para o usuário 'op1': Et3qU7vGNjkKL7o-
+2026-09-26 00:17:35.597 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:36.060 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:36.073 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': yAiBwbbxJ3xj1r7a
+ATENÇÃO: Senha gerada para o usuário 'op1': H6p0mZGN6DFNOA2l
+2026-09-26 00:17:36.624 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': rLsl5FF405pT751I
+ATENÇÃO: Senha gerada para o usuário 'op1': VPCDGqt36PBz5-Mb
+2026-09-26 00:17:37.395 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:37.858 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': uRKZxq7gNkWneoVx
+ATENÇÃO: Senha gerada para o usuário 'op1': 0j0Sj0DySwMOWYME
+2026-09-26 00:17:38.467 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:38.928 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:38.940 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': EwC8sBARuCYYzJO6
+ATENÇÃO: Senha gerada para o usuário 'op1': YJHu8FCg9-UJgmV3
+2026-09-26 00:17:39.496 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:39.954 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': nkn9SZHMaaFHuVo2
+ATENÇÃO: Senha gerada para o usuário 'op1': PJ83ITlg6H3JR2dt
+2026-09-26 00:17:40.510 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:40.969 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:40.996 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 1kDNqE2JCZd7_qf3
+ATENÇÃO: Senha gerada para o usuário 'op1': yA6EMc5P7B1d7psj
+2026-09-26 00:17:41.558 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:42.018 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:42.031 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:42.049 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': aIeFM76Qf2S7S3Em
+ATENÇÃO: Senha gerada para o usuário 'op1': 7tpvS6zw3inh5PzX
+2026-09-26 00:17:42.598 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:43.060 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:43.074 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 8vmXq-_er7n1g5UB
+ATENÇÃO: Senha gerada para o usuário 'op1': CM_7U4bNqiQbq6H5
+2026-09-26 00:17:43.630 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Y5RTEJWwE5j_PU3y
+ATENÇÃO: Senha gerada para o usuário 'op1': XOWXOXUsweDI4h0k
+2026-09-26 00:17:44.409 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:44.872 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:44.886 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:44.886 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qC2_CE4n_O4n5XiH
+ATENÇÃO: Senha gerada para o usuário 'op1': ruvOYgrVNOwUI8PK
+2026-09-26 00:17:45.447 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:45.913 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:45.916 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:45.936 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': lLQqB1ED9uCiVomC
+ATENÇÃO: Senha gerada para o usuário 'op1': 6Or2Yi4WTBq_rgXf
+2026-09-26 00:17:46.516 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:46.979 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:46.993 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': s8XQo7XSuDRmS4P1
+ATENÇÃO: Senha gerada para o usuário 'op1': rcE71pdPU0NjIdie
+2026-09-26 00:17:47.557 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': OOLv_1m6rWqT2C8-
+ATENÇÃO: Senha gerada para o usuário 'op1': hF5kN9JPBbiKaT05
+2026-09-26 00:17:48.352 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:48.577 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _hkA8tDRx8Wg28aX
+ATENÇÃO: Senha gerada para o usuário 'op1': UtggLJhw8llOboj8
+2026-09-26 00:17:49.399 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:49.625 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Oiw21-UjbnTAFwhN
+ATENÇÃO: Senha gerada para o usuário 'op1': m_PMQhbYk9ct-ZjP
+2026-09-26 00:17:50.408 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:50.632 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': dR85F_QyUHObEslf
+ATENÇÃO: Senha gerada para o usuário 'op1': 0czhUU--nEPmIP7L
+2026-09-26 00:17:51.654 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:51.877 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:52.127 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:52.131 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 0ZS-vwE6IIEntpDr
+ATENÇÃO: Senha gerada para o usuário 'op1': LwzqCHluUOv6tqod
+2026-09-26 00:17:52.669 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:52.894 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': SJLBO0CBanYiWCbA
+ATENÇÃO: Senha gerada para o usuário 'op1': EY6mNgGzZHyf7l2k
+2026-09-26 00:17:53.680 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:53.902 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:54.151 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': SaGSDT2bbOLWqcSO
+ATENÇÃO: Senha gerada para o usuário 'op1': Ao4kOHRXe0sQej52
+2026-09-26 00:17:54.694 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': yFFYUldZlgHOjn35
+ATENÇÃO: Senha gerada para o usuário 'op1': V_qki3FCK72PHEoq
+2026-09-26 00:17:55.705 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _iLbFTnily9lUW4s
+ATENÇÃO: Senha gerada para o usuário 'op1': WVfuw0z-BTM_pIgm
+2026-09-26 00:17:56.483 No runtime found, using MemoryCacheStorageManager
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/anyio/_backends/_asyncio.py:1100: StarletteDeprecationWarning: 'HTTP_413_REQUEST_ENTITY_TOO_LARGE' is deprecated. Use 'HTTP_413_CONTENT_TOO_LARGE' instead.
+  result = context.run(func, *args)
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/anyio/_backends/_asyncio.py:1100: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+  result = context.run(func, *args)
+.ATENÇÃO: Senha gerada para o usuário 'admin': bw6t6tq-irRn_UmW
+ATENÇÃO: Senha gerada para o usuário 'op1': d3shv6zduJmRs0k8
+2026-09-26 00:17:57.979 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:17:58.440 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _mN1NH4BEL6JMPgk
+ATENÇÃO: Senha gerada para o usuário 'op1': xpeNtUOUDvCaJAlD
+2026-09-26 00:17:58.975 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': hqcab63ivlSdr7nz
+ATENÇÃO: Senha gerada para o usuário 'op1': M_n3gEc2XCKULhCp
+2026-09-26 00:17:59.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:00.190 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:00.193 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:00.207 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _jan8y4yBwn0K3aB
+ATENÇÃO: Senha gerada para o usuário 'op1': SulpNBoMZlf3z5L8
+2026-09-26 00:18:00.739 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:01.196 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:01.199 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:01.211 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Pg9Dqe2-1oDcOYnm
+ATENÇÃO: Senha gerada para o usuário 'op1': n7qN54qX2u3Df4AF
+2026-09-26 00:18:01.748 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:02.205 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:02.207 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:02.223 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 4Z0E7ukKzdkr-iTa
+ATENÇÃO: Senha gerada para o usuário 'op1': xo2y3n1QBGHSzyT2
+2026-09-26 00:18:02.760 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:03.217 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:03.220 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:03.234 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Z189vuekoqT41a6E
+ATENÇÃO: Senha gerada para o usuário 'op1': 2r5DG1uWZ1moOibH
+2026-09-26 00:18:03.767 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': TV1B6iPsSmYQJtyz
+ATENÇÃO: Senha gerada para o usuário 'op1': 3UeOniVAUVMTIYpj
+2026-09-26 00:18:04.762 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:05.219 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:05.230 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:05.233 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': MIpEKIpDZZgkEs8j
+ATENÇÃO: Senha gerada para o usuário 'op1': hgKkaUHL4S4elO5z
+2026-09-26 00:18:05.769 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:06.225 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:06.234 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 0y6BWSx6Z5y56hfU
+ATENÇÃO: Senha gerada para o usuário 'op1': Ojr-_ky1d7aeVKNW
+2026-09-26 00:18:06.787 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': cB3chExPfCJyi6k7
+ATENÇÃO: Senha gerada para o usuário 'op1': x8tKc6Nu19h3el3E
+2026-09-26 00:18:07.559 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:08.015 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:08.024 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': WsBtdGoqIF5MvuvS
+ATENÇÃO: Senha gerada para o usuário 'op1': hZxCfJ9xarkouur2
+2026-09-26 00:18:08.566 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:09.024 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:09.036 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': xFXWixlLy8HAOCLn
+ATENÇÃO: Senha gerada para o usuário 'op1': JSYmIWBsBd-q7sLl
+2026-09-26 00:18:09.582 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': JeHZwotoRT8tUZU7
+ATENÇÃO: Senha gerada para o usuário 'op1': A7P_veUFWKaz7uT7
+2026-09-26 00:18:10.578 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:11.210 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _oVGsaDqSFmcHdNr
+ATENÇÃO: Senha gerada para o usuário 'op1': 65CITzcYWjprcN22
+2026-09-26 00:18:11.996 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:12.677 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 2KIgWuhwPU_Vy8Qs
+ATENÇÃO: Senha gerada para o usuário 'op1': Y3rikwJmtI5sPgQh
+2026-09-26 00:18:13.529 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:14.042 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': dhfNkdrng2TsCe11
+ATENÇÃO: Senha gerada para o usuário 'op1': 8d1U0z_OiAl0SKmd
+2026-09-26 00:18:14.590 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:15.051 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': fYZeOb9FlBzQQ-gZ
+ATENÇÃO: Senha gerada para o usuário 'op1': 5sjzzf2Xm3u2p6dM
+2026-09-26 00:18:15.603 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 2um6ydErNkpI9aHK
+ATENÇÃO: Senha gerada para o usuário 'op1': 4bRXakcUEA6kE61w
+2026-09-26 00:18:16.358 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:16.581 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:16.584 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:16.585 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:16.588 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:16.606 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:16.612 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _qchiyyXUIlphIsU
+ATENÇÃO: Senha gerada para o usuário 'op1': X0zedLpfId8tNmqD
+2026-09-26 00:18:17.147 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.619 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.624 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.624 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.624 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.626 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.628 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.630 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.631 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:17.636 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': SFrkC0ZyzJn-048S
+ATENÇÃO: Senha gerada para o usuário 'op1': hZxt3rgsZwFEYiYW
+2026-09-26 00:18:18.193 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:18.659 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:18.663 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:18.665 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:18.667 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:18.670 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:18.672 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': MTyfYbBPqWj-Bjhe
+ATENÇÃO: Senha gerada para o usuário 'op1': 8tiJYOM7YlUK7KyR
+2026-09-26 00:18:19.210 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': n-6rX2b_xySgmRtu
+ATENÇÃO: Senha gerada para o usuário 'op1': g8rSL4qQW-88CNaE
+2026-09-26 00:18:19.975 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:20.208 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:20.208 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:20.447 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:20.450 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:20.452 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ClS4D_KHWCy3Cq0m
+ATENÇÃO: Senha gerada para o usuário 'op1': p3TSlNX_OEqtVs3R
+2026-09-26 00:18:21.000 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:21.463 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:21.466 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:21.468 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': h8rigK3-mFL5FJJ2
+ATENÇÃO: Senha gerada para o usuário 'op1': 2bz_V7OtmK7ujrTE
+2026-09-26 00:18:22.019 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': koM6oGWy4E-guJ7T
+ATENÇÃO: Senha gerada para o usuário 'op1': NrriH8czPFsTTJaf
+2026-09-26 00:18:22.814 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:23.045 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:23.050 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:23.055 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:23.056 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': IWJ96LpO2YI3DY83
+ATENÇÃO: Senha gerada para o usuário 'op1': WTTLD8UUHif0vmd_
+2026-09-26 00:18:23.859 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': xqYLUS8wUbGgjQOk
+ATENÇÃO: Senha gerada para o usuário 'op1': yUrHQq9ZvhsHC1eJ
+2026-09-26 00:18:24.636 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:24.871 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Ng0H52hNp22DvV9E
+ATENÇÃO: Senha gerada para o usuário 'op1': XQI3gWAz99cN93bG
+2026-09-26 00:18:25.648 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:25.879 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': VYSCkyP2QwZfA33l
+ATENÇÃO: Senha gerada para o usuário 'op1': bWyET0oKHAklYpZU
+2026-09-26 00:18:26.682 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mq7tyToseOsDuAme
+ATENÇÃO: Senha gerada para o usuário 'op1': 9XIhgEdj7XA_-wNj
+2026-09-26 00:18:27.714 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': -vhI6HxJK5PMpakm
+ATENÇÃO: Senha gerada para o usuário 'op1': DtbUAsIEle3VnN0h
+2026-09-26 00:18:28.507 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:28.984 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': hxz3dUv2MlJwojg_
+ATENÇÃO: Senha gerada para o usuário 'op1': qeF2uBm83V3sVMhD
+2026-09-26 00:18:29.553 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ix_Hzfvt14zH7ekG
+ATENÇÃO: Senha gerada para o usuário 'op1': 2-Iyl_E96pKlVouy
+2026-09-26 00:18:30.360 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:30.584 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:30.592 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:30.592 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': WF2RiYsGS-0ZlJL-
+ATENÇÃO: Senha gerada para o usuário 'op1': bMf6TcBTrOsJmMkH
+2026-09-26 00:18:31.411 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:31.638 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': wWDR6NzTOfU7oceY
+ATENÇÃO: Senha gerada para o usuário 'op1': yMKjQazBgN_01kX4
+2026-09-26 00:18:32.429 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': I43LLsfnqMOu9R0U
+ATENÇÃO: Senha gerada para o usuário 'op1': hrvq2Fj7m9wvt-FC
+2026-09-26 00:18:33.457 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 8DeAVH3rK5h6rVqI
+ATENÇÃO: Senha gerada para o usuário 'op1': Gvs9ktfQhJE3avzO
+2026-09-26 00:18:34.471 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 1NqzZe1n9PkxBo_o
+ATENÇÃO: Senha gerada para o usuário 'op1': XhfLsVFY0v4vMu2J
+2026-09-26 00:18:35.249 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:35.473 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:35.726 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:35.726 No runtime found, using MemoryCacheStorageManager
+...ATENÇÃO: Senha gerada para o usuário 'admin': 4EZGXOdwplTd7OxI
+ATENÇÃO: Senha gerada para o usuário 'op1': rTgsKs8f_MwyGgJl
+2026-09-26 00:18:36.292 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': V2NEIVZjm5if5tES
+ATENÇÃO: Senha gerada para o usuário 'op1': tVbx2Y_cPVMh4H-_
+2026-09-26 00:18:37.072 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:37.297 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:37.304 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:37.306 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:37.313 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:37.319 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:37.319 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': roZjVpVA2PKWKYna
+ATENÇÃO: Senha gerada para o usuário 'op1': x4idUtULwVcWv_Nd
+2026-09-26 00:18:38.114 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': sJ9YL0D2sAYX_2sL
+ATENÇÃO: Senha gerada para o usuário 'op1': Npp9fujcJsuIpN2M
+2026-09-26 00:18:38.924 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:39.154 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:39.160 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:39.417 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:39.425 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': AXgaJYSaTy27oF3s
+ATENÇÃO: Senha gerada para o usuário 'op1': Y_fufpt-HZ-_E_Fr
+2026-09-26 00:18:39.970 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:40.194 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:40.201 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:40.442 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:40.450 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:40.693 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': QsJYtaYBgyQUqFzi
+ATENÇÃO: Senha gerada para o usuário 'op1': snNTHx7XY-zcKXIN
+2026-09-26 00:18:41.232 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:41.456 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:41.462 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:41.467 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:41.707 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': FyUea_RHVzZnaHIq
+ATENÇÃO: Senha gerada para o usuário 'op1': t3RhUrKLgGgjs8bX
+2026-09-26 00:18:42.259 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:42.486 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:42.492 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:42.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:42.742 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 7CRDezxtwhc3zeLJ
+ATENÇÃO: Senha gerada para o usuário 'op1': On4ZX9aWEpc_th1_
+2026-09-26 00:18:43.289 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:43.513 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:43.520 No runtime found, using MemoryCacheStorageManager
+....................ATENÇÃO: Senha gerada para o usuário 'admin': jw3RRTstv46F37QC
+ATENÇÃO: Senha gerada para o usuário 'op1': O0KGlmFBeTMwkdeX
+2026-09-26 00:18:44.328 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:44.334 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 56f22HMhKHFX_bhI
+ATENÇÃO: Senha gerada para o usuário 'op1': 2JN2y2DA4taO1VPD
+2026-09-26 00:18:44.898 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:44.904 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 47EfihToqwo-bwvg
+ATENÇÃO: Senha gerada para o usuário 'op1': RznDbNWdYUalnUdE
+2026-09-26 00:18:45.474 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:45.481 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': wQGHJHPyC3bxPj5B
+ATENÇÃO: Senha gerada para o usuário 'op1': R6_D3j2hY4zt0iIP
+2026-09-26 00:18:46.062 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:46.071 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': lSoSXgJipF-5-Yhv
+ATENÇÃO: Senha gerada para o usuário 'op1': n3mdqELz8KhDWNVt
+2026-09-26 00:18:46.650 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:46.657 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:46.661 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': U1uZ62PHm9ibsfwH
+ATENÇÃO: Senha gerada para o usuário 'op1': D963L7Qwt9Qaooqj
+2026-09-26 00:18:47.237 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:47.243 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:47.245 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:47.253 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': xcBWyZyr62o7uNnr
+ATENÇÃO: Senha gerada para o usuário 'op1': iU-fJwe1MbyGBVmR
+2026-09-26 00:18:47.824 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:47.831 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': uwkZyn-4alqOvaDf
+ATENÇÃO: Senha gerada para o usuário 'op1': m-XJHGKP7CZPWKNL
+2026-09-26 00:18:48.382 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:48.388 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:48.394 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': AVxjNGy955JCFf-g
+ATENÇÃO: Senha gerada para o usuário 'op1': vsQN3ZN3UZNff3M7
+2026-09-26 00:18:48.940 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': GD6uAsaJ4SgTOWnK
+ATENÇÃO: Senha gerada para o usuário 'op1': cn4AomE5mep_Mtem
+2026-09-26 00:18:49.484 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qrtp3j2emlHX4HDh
+ATENÇÃO: Senha gerada para o usuário 'op1': 2VqEotiyvXUDljyE
+2026-09-26 00:18:50.026 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:50.032 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _VoEpn7ChsTgC6T_
+ATENÇÃO: Senha gerada para o usuário 'op1': qnP3mxkzXWMsBBUj
+2026-09-26 00:18:50.572 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 3LgqUHpd19aJDGXv
+ATENÇÃO: Senha gerada para o usuário 'op1': wVbKOLfWV8hGFuTt
+2026-09-26 00:18:51.115 No runtime found, using MemoryCacheStorageManager
+...ATENÇÃO: Senha gerada para o usuário 'admin': 6O_QCoL-TuXAQ_DM
+ATENÇÃO: Senha gerada para o usuário 'op1': LtHQsGfrYexfX8HO
+2026-09-26 00:18:51.655 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': I2tSMn7OkgJwFzqt
+ATENÇÃO: Senha gerada para o usuário 'op1': oDEkGMEMyGtFG-LJ
+2026-09-26 00:18:52.178 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:52.180 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 2pOhF8mQhVHFxvjh
+ATENÇÃO: Senha gerada para o usuário 'op1': wx4rtzFbd8AJy0vk
+2026-09-26 00:18:52.711 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:52.718 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:52.718 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:52.720 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': x-LYP8KwgaJdCkIi
+ATENÇÃO: Senha gerada para o usuário 'op1': SW4W-V3a5w4hZaP3
+2026-09-26 00:18:53.257 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.264 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.264 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.266 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': H8YrmrpkWBsbslhQ
+ATENÇÃO: Senha gerada para o usuário 'op1': w465TMkL0CC4NLv3
+2026-09-26 00:18:53.803 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.805 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.811 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.816 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.817 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.817 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:53.817 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': OL81dO948J4Vqdsy
+ATENÇÃO: Senha gerada para o usuário 'op1': GwsTIpk8WtHaZKcW
+2026-09-26 00:18:54.350 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': gxLkB0vtbfoAu-wH
+ATENÇÃO: Senha gerada para o usuário 'op1': STuHZo9J_7AfRO0K
+2026-09-26 00:18:54.881 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:54.889 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:54.889 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:54.893 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:54.894 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:54.899 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jXY7nUHXOSx1aSAC
+ATENÇÃO: Senha gerada para o usuário 'op1': K_hnIBbC2fHWo3Ne
+2026-09-26 00:18:55.436 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': -bNtcB2YbSsfp_Xj
+ATENÇÃO: Senha gerada para o usuário 'op1': rlsDGSKtlur1oYrh
+2026-09-26 00:18:55.982 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': bxi4DjpBGCo2yeRU
+ATENÇÃO: Senha gerada para o usuário 'op1': Az5Ee9WpCum0isO9
+2026-09-26 00:18:56.531 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': UaUlzqI_uyKXYJtg
+ATENÇÃO: Senha gerada para o usuário 'op1': qzCHhUthDYOQNiWz
+2026-09-26 00:18:57.086 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': s3qHGUyCJnPyO32N
+ATENÇÃO: Senha gerada para o usuário 'op1': qC5ftVVjtXifGMxq
+2026-09-26 00:18:57.654 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 8O7BOCHLEEDN_3pU
+ATENÇÃO: Senha gerada para o usuário 'op1': f0MVxEsDTZ1AL_LK
+2026-09-26 00:18:58.228 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': YwW2kiiL8_Se0YWx
+ATENÇÃO: Senha gerada para o usuário 'op1': vdSEzCeX8rqmbTGV
+2026-09-26 00:18:58.778 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:18:58.784 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': CEE1oJfpRPan9CNz
+ATENÇÃO: Senha gerada para o usuário 'op1': xphvI_trHEw9W3Ur
+2026-09-26 00:18:59.335 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 2ACf0hM1n9zayI3k
+ATENÇÃO: Senha gerada para o usuário 'op1': 3En9iuQ81taByf5V
+2026-09-26 00:18:59.869 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mNmzMR4os4S8yP_-
+ATENÇÃO: Senha gerada para o usuário 'op1': R1kR2PeVLQso3SOP
+2026-09-26 00:19:00.406 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': tzPOFTpSHYzA0rlD
+ATENÇÃO: Senha gerada para o usuário 'op1': po3erOCUQgVbpZO4
+2026-09-26 00:19:00.936 No runtime found, using MemoryCacheStorageManager
+................................................................ssssss....................ATENÇÃO: Senha gerada para o usuário 'admin': SaOAx-8uFu8X3AAn
+ATENÇÃO: Senha gerada para o usuário 'op1': CkfwGN5zizqE-Rvk
+2026-09-26 00:19:01.607 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:01.616 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:01.616 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:01.616 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:01.617 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:01.622 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 7EpxnDYj1LHllNJT
+ATENÇÃO: Senha gerada para o usuário 'op1': LlaD7LFbEEdj33xR
+2026-09-26 00:19:02.167 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.177 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.177 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.177 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.177 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.183 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.185 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mLsLaViIXvZ2H9ko
+ATENÇÃO: Senha gerada para o usuário 'op1': CS7EXCY5fWOvPRl0
+2026-09-26 00:19:02.726 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.743 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.743 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.743 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.745 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.754 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.758 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:02.760 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': SfOLAuz117SsupuV
+ATENÇÃO: Senha gerada para o usuário 'op1': Ew7LQJ8KzPPxd78z
+2026-09-26 00:19:03.301 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.309 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.309 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.309 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.309 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.318 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.318 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.318 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.320 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.329 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.333 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': UGGmCOCGh39xbEka
+ATENÇÃO: Senha gerada para o usuário 'op1': FUy3b781wKT3cOq6
+2026-09-26 00:19:03.873 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.882 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.882 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.882 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.882 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.888 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.890 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.890 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.890 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.894 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:03.896 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 0dDcERA6ZrYOVqMa
+ATENÇÃO: Senha gerada para o usuário 'op1': 1nNK3l0tZXS9T-p5
+2026-09-26 00:19:04.441 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.450 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.450 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.450 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.450 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.458 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.458 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.458 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.461 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.469 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:04.473 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 4dfrgrFwSv2P4axN
+ATENÇÃO: Senha gerada para o usuário 'op1': WA5OwFMkLmFrr0q4
+2026-09-26 00:19:05.008 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.018 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.018 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.018 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.018 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.027 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.027 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.027 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.029 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.038 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.043 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ppEaAjH2rwauKAoP
+ATENÇÃO: Senha gerada para o usuário 'op1': GzNYsUnJnR46E9Hw
+2026-09-26 00:19:05.602 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.614 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.614 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.614 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.614 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.618 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.627 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.633 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.634 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.639 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:05.639 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': nMXPDGV2E_Vzzdtk
+ATENÇÃO: Senha gerada para o usuário 'op1': oDf9xlQuMDuFNvrd
+2026-09-26 00:19:06.186 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.195 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.195 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.195 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.196 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.198 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': iPj9yExvWEYweMYs
+ATENÇÃO: Senha gerada para o usuário 'op1': s-6x70K3KGozgOL-
+2026-09-26 00:19:06.740 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.750 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.750 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.751 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:06.751 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': XcL8Jws_Qx-4L3WZ
+ATENÇÃO: Senha gerada para o usuário 'op1': 2fzGB1fEP-Te_i6B
+2026-09-26 00:19:07.297 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.306 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.306 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.306 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.306 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 5NJLKBIzrOJUw3R3
+ATENÇÃO: Senha gerada para o usuário 'op1': r-fMEU1LrYORg_g_
+2026-09-26 00:19:07.848 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.866 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:07.866 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 5kV1tIliOlWu6iPf
+ATENÇÃO: Senha gerada para o usuário 'op1': qLAqNOCY6H-WSmPw
+2026-09-26 00:19:08.409 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.417 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.417 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.417 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.418 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.420 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': avYMVanqN3j6iy18
+ATENÇÃO: Senha gerada para o usuário 'op1': OPa2hD0e4fft5nZk
+2026-09-26 00:19:08.972 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.981 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.981 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.981 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.982 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.994 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.994 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:08.994 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.006 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.006 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.006 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.006 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': -NEYydr21MuF3p_r
+ATENÇÃO: Senha gerada para o usuário 'op1': L3K6VdMlnQ8UZN8E
+2026-09-26 00:19:09.543 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.552 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.552 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.552 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.553 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.561 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.561 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.561 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.564 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.573 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.577 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.577 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:09.577 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': TRUlZ1LWm5e_P5oG
+ATENÇÃO: Senha gerada para o usuário 'op1': XJuGph05rIZEzoCd
+2026-09-26 00:19:10.113 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.122 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.122 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.122 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.122 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.130 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.131 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.131 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.142 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.146 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.146 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.146 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _gBmHeCrk5dkwsku
+ATENÇÃO: Senha gerada para o usuário 'op1': hmrv_pmLlQOgAEXy
+2026-09-26 00:19:10.691 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.701 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.701 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.701 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.701 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.717 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.726 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:10.726 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': O9caOvx5LHlcAUL_
+ATENÇÃO: Senha gerada para o usuário 'op1': YTaC4QOye5QCga7D
+2026-09-26 00:19:11.270 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.280 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.280 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.280 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.280 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.285 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qiYsCSXKjEz_Q-lh
+ATENÇÃO: Senha gerada para o usuário 'op1': XDfe9K9IsnDV_5fL
+2026-09-26 00:19:11.828 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.837 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.837 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.837 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.837 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.851 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:11.851 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': vgSnepgz44FF1tJx
+ATENÇÃO: Senha gerada para o usuário 'op1': kCoMGasE5nTn944h
+2026-09-26 00:19:12.413 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.422 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.422 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.422 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.422 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.436 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.436 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.436 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.438 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': IGCE2yT0frX6ow_R
+ATENÇÃO: Senha gerada para o usuário 'op1': SQ1_gxkx7oW9q4nE
+2026-09-26 00:19:12.989 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.999 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.999 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.999 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:12.999 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:13.014 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:13.014 No runtime found, using MemoryCacheStorageManager
+...................................................ATENÇÃO: Senha gerada para o usuário 'admin': zltaZJYYwCYSrH1Z
+ATENÇÃO: Senha gerada para o usuário 'op1': MGVH2DKZV56264Ez
+2026-09-26 00:19:13.566 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:13.566 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:13.572 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': AkC1Yjh75xMGry7V
+ATENÇÃO: Senha gerada para o usuário 'op1': gfelzQzaE-qXObLr
+2026-09-26 00:19:14.110 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:14.110 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:14.117 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': -bIsbk_bbn7hhY5q
+ATENÇÃO: Senha gerada para o usuário 'op1': I9wVIiD9jKz_BVat
+2026-09-26 00:19:14.662 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:14.662 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:14.668 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jOMoxeVQRQGGJZOK
+ATENÇÃO: Senha gerada para o usuário 'op1': EdJSoEWpHyeoZO6p
+2026-09-26 00:19:15.203 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:15.203 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:15.210 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': z8XLrKBoY0zkF8o1
+ATENÇÃO: Senha gerada para o usuário 'op1': S9kEOPhY3UkuWThz
+2026-09-26 00:19:15.756 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:15.756 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:15.763 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': fWxfs0i4xw7wnt6J
+ATENÇÃO: Senha gerada para o usuário 'op1': rUp_2JbGKjwyEp9-
+2026-09-26 00:19:16.312 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.312 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.319 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.327 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.327 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': oyBO9URC_K6HZoaX
+ATENÇÃO: Senha gerada para o usuário 'op1': tufQVyJIGOr6Ii1X
+2026-09-26 00:19:16.884 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.884 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.891 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.899 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:16.899 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': FFG_FRoSupGSZyhb
+ATENÇÃO: Senha gerada para o usuário 'op1': dLMJzECdpfo_tPq5
+2026-09-26 00:19:17.454 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:17.454 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:17.461 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:17.463 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': yqUbsAxmq-1taLn0
+ATENÇÃO: Senha gerada para o usuário 'op1': HxGhJIXJMMn3po6y
+2026-09-26 00:19:18.005 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:18.006 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:18.013 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:18.013 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': oCWMvvfuuunu1BP5
+ATENÇÃO: Senha gerada para o usuário 'op1': bOHpVORX1k8EA6W_
+2026-09-26 00:19:18.555 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:18.555 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': waoySMRclFizaC7Q
+ATENÇÃO: Senha gerada para o usuário 'op1': eB-wVY1667_sK4W7
+2026-09-26 00:19:19.106 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:19.106 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:19.113 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Oe14USxu09q1FAn_
+ATENÇÃO: Senha gerada para o usuário 'op1': JUmSpCsSuMP3GX0N
+2026-09-26 00:19:19.658 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:19.658 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:19.665 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 4rOwBgxQsyHMouTm
+ATENÇÃO: Senha gerada para o usuário 'op1': rgtyi_IeomFsKiIE
+2026-09-26 00:19:20.204 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:20.204 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:20.208 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:20.215 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': pzMnT0MrLm4W1nL0
+ATENÇÃO: Senha gerada para o usuário 'op1': sOHpoulAEcwW2Jyq
+2026-09-26 00:19:20.759 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:20.759 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:20.767 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': nknaGp0awyrQgJvH
+ATENÇÃO: Senha gerada para o usuário 'op1': mlO7eCHbzreDW5WT
+2026-09-26 00:19:21.325 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:21.325 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:21.333 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': tb4nh7_Pwq6mWyTS
+ATENÇÃO: Senha gerada para o usuário 'op1': Yleim6Diz-t-1b64
+2026-09-26 00:19:21.882 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:21.882 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:21.892 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jkGPiGWrRhbNnZz-
+ATENÇÃO: Senha gerada para o usuário 'op1': dH5pNM2gDKuc1VJ7
+2026-09-26 00:19:22.437 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:22.437 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:22.441 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 1VDMO0bwo0VXzw5L
+ATENÇÃO: Senha gerada para o usuário 'op1': Roo1wnJ56NibdlBa
+2026-09-26 00:19:22.983 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:22.984 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:22.991 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jAngK-HLOED0ojyN
+ATENÇÃO: Senha gerada para o usuário 'op1': ikCD23OWnZMF1kiN
+2026-09-26 00:19:23.538 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:23.539 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:23.546 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': hV8PzylqJRS6cFq8
+ATENÇÃO: Senha gerada para o usuário 'op1': vpoYJTzVZrHgjjTj
+2026-09-26 00:19:24.074 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:24.074 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:24.081 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': flYFhjFUgrO9JQ7g
+ATENÇÃO: Senha gerada para o usuário 'op1': slv_rskpngeR4ruH
+2026-09-26 00:19:24.619 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:24.620 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:24.623 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': If2p0R1tYGbzUI7c
+ATENÇÃO: Senha gerada para o usuário 'op1': JOgZc_IOLE_SbM-h
+2026-09-26 00:19:25.164 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:25.164 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:25.171 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:25.176 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': CXftOCp8WTFkKlJC
+ATENÇÃO: Senha gerada para o usuário 'op1': r3X1D96dIYIfB-Ia
+2026-09-26 00:19:25.735 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:25.735 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:25.742 No runtime found, using MemoryCacheStorageManager
+..........................................................................ATENÇÃO: Senha gerada para o usuário 'admin': gDYkDd6gyuQ-EvlI
+ATENÇÃO: Senha gerada para o usuário 'op1': rQIO1JaFNU9jnRJJ
+2026-09-26 00:19:26.336 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.336 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.343 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.343 No runtime found, using MemoryCacheStorageManager
+........ATENÇÃO: Senha gerada para o usuário 'admin': AmBp3VGj7ESY1sM8
+ATENÇÃO: Senha gerada para o usuário 'op1': YRKPRiNYOgIN-NWD
+2026-09-26 00:19:26.903 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.908 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.908 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.908 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:26.911 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mm-ktgFJkN1sUtmv
+ATENÇÃO: Senha gerada para o usuário 'op1': kSvEHzoVdafMrAOT
+2026-09-26 00:19:27.465 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:27.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:27.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:27.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:27.473 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 3inafmeK7snefiT4
+ATENÇÃO: Senha gerada para o usuário 'op1': nXxJiCoSslXF-jxD
+2026-09-26 00:19:28.027 No runtime found, using MemoryCacheStorageManager
+ATENÇÃO: Senha gerada para o usuário 'admin': 0R5jjEb3pTKjSqs9
+ATENÇÃO: Senha gerada para o usuário 'op1': 6UmIK3Id5ayzsUhC
+2026-09-26 00:19:28.592 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': J02otFq5soZxYpLg
+ATENÇÃO: Senha gerada para o usuário 'op1': q_y93k9QOilbZO18
+2026-09-26 00:19:29.142 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:29.147 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:29.152 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:29.152 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:29.154 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:29.156 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Trcsk7Nfmd8vHH5E
+ATENÇÃO: Senha gerada para o usuário 'op1': b2xS2VS5mGwaTEZs
+2026-09-26 00:19:29.697 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:29.697 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': YLPBD3sLBCN21p6E
+ATENÇÃO: Senha gerada para o usuário 'op1': t06_rWo3syfVrew4
+2026-09-26 00:19:30.252 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:30.252 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:30.262 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:30.262 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:30.262 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mhY4fwy3zVAuGxUT
+ATENÇÃO: Senha gerada para o usuário 'op1': dXTwLB16Fw7pN3dZ
+2026-09-26 00:19:30.803 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': VGwTMEtJbnSYEMwP
+ATENÇÃO: Senha gerada para o usuário 'op1': uM2ZU2qRpMcMdHld
+2026-09-26 00:19:31.344 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.344 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.356 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.360 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.360 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jm4EDKCiUYShFhb_
+ATENÇÃO: Senha gerada para o usuário 'op1': Bf-wnIqngYVFjrqB
+2026-09-26 00:19:31.889 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.889 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.901 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.906 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.906 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.906 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.916 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.920 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:31.920 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': M9g1FoCh1iIamMHY
+ATENÇÃO: Senha gerada para o usuário 'op1': DQyCHvE7qImqcz98
+2026-09-26 00:19:32.452 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.452 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.454 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.467 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.471 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.473 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.483 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.487 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:32.487 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': BL4WQgqUrfFk4oqJ
+ATENÇÃO: Senha gerada para o usuário 'op1': aUqIirjpoXA3IjHd
+2026-09-26 00:19:33.022 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.022 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.025 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.038 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.042 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.042 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.042 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.042 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.044 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': DNIOh8wFDMhwYF3B
+ATENÇÃO: Senha gerada para o usuário 'op1': Uew7BxtGt1uyZhap
+2026-09-26 00:19:33.585 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:33.587 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qKHlSjXNW6J9hbCg
+ATENÇÃO: Senha gerada para o usuário 'op1': hgYHR3P7QF39acmz
+2026-09-26 00:19:34.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.146 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.151 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.151 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.161 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.166 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.166 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': EsQd5Tc1Sp-dazzZ
+ATENÇÃO: Senha gerada para o usuário 'op1': vnix8GYItHr_H7u5
+2026-09-26 00:19:34.716 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.717 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.729 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.733 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.733 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:34.733 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': KnOwjDGMdpKBv5ZT
+ATENÇÃO: Senha gerada para o usuário 'op1': BEW629aOjBe-uiFK
+2026-09-26 00:19:35.276 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.277 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.289 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.293 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.293 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.293 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.297 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.307 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.311 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.311 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': i0Q3fl2qY5ax2HqA
+ATENÇÃO: Senha gerada para o usuário 'op1': GIdp4X-_4qOMQSQX
+2026-09-26 00:19:35.842 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.843 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.854 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.859 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.859 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.859 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:35.860 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': CaJu2di2xG7L6k5-
+ATENÇÃO: Senha gerada para o usuário 'op1': olSs8O57hWgurzF7
+2026-09-26 00:19:36.391 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.392 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.403 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.408 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.408 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.408 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.409 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': u2EQaje15-Pd8Gdk
+ATENÇÃO: Senha gerada para o usuário 'op1': tjcnxkaF_tr2alYY
+2026-09-26 00:19:36.944 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.944 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.957 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.962 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.962 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.962 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.972 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.977 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:36.977 No runtime found, using MemoryCacheStorageManager
+........................................................ATENÇÃO: Senha gerada para o usuário 'admin': 8BbUKjEQTQNNzH4_
+ATENÇÃO: Senha gerada para o usuário 'op1': 7ux5IgjRwAeZ1MHF
+2026-09-26 00:19:40.562 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.562 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.569 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.569 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.569 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.581 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.581 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.593 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:40.593 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': W7gDVzaL9TJmIheV
+ATENÇÃO: Senha gerada para o usuário 'op1': CNsomIL4wpTwBSkU
+2026-09-26 00:19:41.143 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.143 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.161 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.161 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.172 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.172 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': asgAUpDLQSIwHs43
+ATENÇÃO: Senha gerada para o usuário 'op1': Z3qGEgmoiVKQ21TW
+2026-09-26 00:19:41.713 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.713 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.719 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.720 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.720 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.733 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.733 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.744 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.744 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.752 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:41.753 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': tJ51f4BkMTMwNUAe
+ATENÇÃO: Senha gerada para o usuário 'op1': xaJOAReq1EBLRtUj
+2026-09-26 00:19:42.290 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.291 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.297 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.297 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.297 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.308 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.308 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.318 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.318 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.326 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.326 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': opZ8U6iimgQv-tjg
+ATENÇÃO: Senha gerada para o usuário 'op1': N8oh-bMpiblMln_F
+2026-09-26 00:19:42.864 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.865 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.871 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.872 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.872 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.883 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.883 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.894 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.894 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.902 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:42.902 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Jo9_dhR-WSo5R3QY
+ATENÇÃO: Senha gerada para o usuário 'op1': etWwjYtJFWXCWB5n
+2026-09-26 00:19:43.456 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.456 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.462 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.462 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.462 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.473 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.473 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.484 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.484 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.493 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.493 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:43.495 No runtime found, using MemoryCacheStorageManager
+.....ATENÇÃO: Senha gerada para o usuário 'admin': UtLLh-CPyP1XNU_2
+ATENÇÃO: Senha gerada para o usuário 'op1': ti_J7gS4grg-1Z5H
+2026-09-26 00:19:44.024 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.025 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.030 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.030 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.031 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.036 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.044 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.044 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': CpTSJ0lU7J0jbzX0
+ATENÇÃO: Senha gerada para o usuário 'op1': pjVY0wd8yO8c2wi2
+2026-09-26 00:19:44.573 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.573 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.579 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.579 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.580 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.589 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.589 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.597 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:44.598 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': La2zTX4iE1EOKVek
+ATENÇÃO: Senha gerada para o usuário 'op1': VToCty-VDKDJI_7Q
+2026-09-26 00:19:45.124 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.125 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.131 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.131 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.131 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.141 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.141 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 71fWSXnR19uktT9E
+ATENÇÃO: Senha gerada para o usuário 'op1': 7dF6uiy6dyTefmbj
+2026-09-26 00:19:45.683 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.683 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.690 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.690 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.690 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.702 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:45.702 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 6bf258EUmDmOmfyX
+ATENÇÃO: Senha gerada para o usuário 'op1': rHZID5LkHFfcVxFF
+2026-09-26 00:19:46.242 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.242 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.248 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.248 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.248 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.258 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.258 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': NgQzDYVbdpGmSDck
+ATENÇÃO: Senha gerada para o usuário 'op1': PqWjesI-b2PJpKyo
+2026-09-26 00:19:46.791 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.791 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.798 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.798 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.798 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.809 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.809 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.811 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.823 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:46.823 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 2Y4msOEreAuALP0f
+ATENÇÃO: Senha gerada para o usuário 'op1': KGVEN0mQy62IGNqL
+2026-09-26 00:19:47.362 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.362 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.368 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.368 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.368 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.374 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.383 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.383 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.386 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': YVDp9LEfEh_aaS8j
+ATENÇÃO: Senha gerada para o usuário 'op1': rZOF8pf8o07TqR8x
+2026-09-26 00:19:47.925 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.925 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.931 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.932 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.932 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.938 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.946 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.946 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:47.949 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 63ayLpTlWrRyXZ43
+ATENÇÃO: Senha gerada para o usuário 'op1': 6FyfJWK8FinI_5y-
+2026-09-26 00:19:48.482 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.482 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.489 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.489 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.489 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.496 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.504 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.504 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.514 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:48.514 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': rkx23aYc005tr08B
+ATENÇÃO: Senha gerada para o usuário 'op1': YwpbXFcUFpHR_N84
+2026-09-26 00:19:49.052 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.052 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.058 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.058 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.058 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.068 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.069 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.079 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.079 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': f8ryUodsSIYTlSpn
+ATENÇÃO: Senha gerada para o usuário 'op1': DZ5jsbnXxC7Kzi0J
+2026-09-26 00:19:49.613 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.618 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.618 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.618 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.630 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:49.631 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': jTqGB9t-wTRoVnuU
+ATENÇÃO: Senha gerada para o usuário 'op1': Dz6cuKCbULmDO1Az
+2026-09-26 00:19:50.161 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.166 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.166 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.166 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.179 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.179 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': oF8F5L-sBUwnlC2Y
+ATENÇÃO: Senha gerada para o usuário 'op1': B2r1QBxFDt-3K_EB
+2026-09-26 00:19:50.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.720 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.720 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.720 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.733 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:50.733 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': NrXbBX4P6z3WpGNL
+ATENÇÃO: Senha gerada para o usuário 'op1': 41OkQylJcOdYZuA4
+2026-09-26 00:19:51.272 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.277 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.277 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.277 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.280 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': zpHZKJVIVsPDKznu
+ATENÇÃO: Senha gerada para o usuário 'op1': vbMZNhASikpu78qa
+2026-09-26 00:19:51.821 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.826 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.826 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.826 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.839 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:51.840 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': i6wo2JL496o81ZYy
+ATENÇÃO: Senha gerada para o usuário 'op1': 8nMv6GKRse30JY5j
+2026-09-26 00:19:52.387 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.393 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.393 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.393 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.407 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.407 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.414 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.414 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.414 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.428 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.428 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': xiRq61MB_I6Ed8_n
+ATENÇÃO: Senha gerada para o usuário 'op1': nV5UV-BihiNKsSh7
+2026-09-26 00:19:52.980 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.986 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.986 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:52.986 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.000 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.000 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': RmPH4LkCI0pWYuO0
+ATENÇÃO: Senha gerada para o usuário 'op1': 5857CT6er0XWmL0m
+2026-09-26 00:19:53.542 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.548 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.548 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.548 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.561 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:53.561 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': B1DBsyXWcOT0nhNz
+ATENÇÃO: Senha gerada para o usuário 'op1': kANXRhHwAkij0fos
+2026-09-26 00:19:54.104 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.110 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.110 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.110 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.113 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': VqbJxFRBG0q5temm
+ATENÇÃO: Senha gerada para o usuário 'op1': 90MYA27wJY21qdA3
+2026-09-26 00:19:54.663 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.668 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.668 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.668 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.676 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.680 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:54.680 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': t5zyJU4fkYWkszaN
+ATENÇÃO: Senha gerada para o usuário 'op1': o-56dPW79apF4BuJ
+2026-09-26 00:19:55.230 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.237 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.237 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.238 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.240 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': v1TrW-gyBVjeP5-b
+ATENÇÃO: Senha gerada para o usuário 'op1': jQneEQHmHBB_OyFU
+2026-09-26 00:19:55.795 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.801 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.801 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.801 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:55.804 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': BGZIoBihVW05n9FS
+ATENÇÃO: Senha gerada para o usuário 'op1': iB_hKIMh_Pk9F6p7
+2026-09-26 00:19:56.357 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.362 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.363 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.363 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.377 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.377 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.377 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.379 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.390 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.390 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 1vs8WNEFqcpiPTqa
+ATENÇÃO: Senha gerada para o usuário 'op1': soG6dJ4Sh9MMXveY
+2026-09-26 00:19:56.945 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.950 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.951 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:56.951 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': mxaJ8Kn0MLIibYUW
+ATENÇÃO: Senha gerada para o usuário 'op1': YJCYO56xwpqB0QqS
+2026-09-26 00:19:57.508 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.514 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.514 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.514 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.521 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.521 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.521 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.528 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:57.529 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': niSPmmON_F0RmjKg
+ATENÇÃO: Senha gerada para o usuário 'op1': P31QwXTNLHKJhnTk
+2026-09-26 00:19:58.080 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.085 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.085 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.085 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.093 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.093 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.093 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.100 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.102 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': oVrI5FbhEBdSOaWS
+ATENÇÃO: Senha gerada para o usuário 'op1': aBGSf09BHq8gpoDW
+2026-09-26 00:19:58.655 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.661 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.661 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.661 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.677 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.677 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:58.677 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Yv5jFRUhvgj7Lmd3
+ATENÇÃO: Senha gerada para o usuário 'op1': yOB7h5lXU4rQXQZ9
+2026-09-26 00:19:59.231 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.236 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.236 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.237 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.250 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.250 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.255 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.256 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.256 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.270 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:19:59.270 No runtime found, using MemoryCacheStorageManager
+...................../app/app.py:638: DeprecationWarning: The parameter "ln" is deprecated since v2.5.2. Instead of ln=True use new_x=XPos.LMARGIN, new_y=YPos.NEXT.
+  pdf.cell(0, 12, _pdf_safe("AgroTop — Pacote de Evidências"), ln=True, align="C")
+/app/app.py:613: DeprecationWarning: The parameter "ln" is deprecated since v2.5.2. Instead of ln=True use new_x=XPos.LMARGIN, new_y=YPos.NEXT.
+  pdf.cell(0, 6, _pdf_safe(value), ln=True)
+/app/app.py:659: DeprecationWarning: The parameter "ln" is deprecated since v2.5.2. Instead of ln=True use new_x=XPos.LMARGIN, new_y=YPos.NEXT.
+  pdf.cell(0, 9, _pdf_safe(f"Animal {animal_id}"), ln=True)
+/app/app.py:617: DeprecationWarning: The parameter "ln" is deprecated since v2.5.2. Instead of ln=True use new_x=XPos.LMARGIN, new_y=YPos.NEXT.
+  pdf.cell(0, 7, _pdf_safe(titulo), ln=True)
+...........ATENÇÃO: Senha gerada para o usuário 'admin': YPSUrwgjaSsImAWv
+ATENÇÃO: Senha gerada para o usuário 'op1': bxC0TkOD48s8OPCf
+2026-09-26 00:20:00.221 No runtime found, using MemoryCacheStorageManager
+ATENÇÃO: Senha gerada para o usuário 'admin': ur2mgPlIJxEAtLQp
+ATENÇÃO: Senha gerada para o usuário 'op1': IdYQ5sv7B8gS9MVP
+.ATENÇÃO: Senha gerada para o usuário 'admin': PJK5oysZhhVuVh07
+ATENÇÃO: Senha gerada para o usuário 'op1': hn0uFpMi5nBdBpkb
+2026-09-26 00:20:01.310 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': w6TQuNyXriiJwiTC
+ATENÇÃO: Senha gerada para o usuário 'op1': pbal5gI1Fa3fp2VA
+2026-09-26 00:20:01.844 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': eMAGSw-eIn6iUbaB
+ATENÇÃO: Senha gerada para o usuário 'op1': Hcsh8fMwJVd55gci
+2026-09-26 00:20:02.391 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': -EvVufEd6IwzfGoM
+ATENÇÃO: Senha gerada para o usuário 'op1': ntWWQ7PY_p_nQSmm
+2026-09-26 00:20:02.947 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': McOOT53nMBmE7sxS
+ATENÇÃO: Senha gerada para o usuário 'op1': LADk-eTc4k1odIh8
+2026-09-26 00:20:03.496 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': JtgLNVjs1oEPf3EK
+ATENÇÃO: Senha gerada para o usuário 'op1': 1ADEwfuotKdeMTqD
+2026-09-26 00:20:04.032 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': gnqlfSZmGdgxO0eN
+ATENÇÃO: Senha gerada para o usuário 'op1': ldadmkllLZcx2EpM
+2026-09-26 00:20:04.573 No runtime found, using MemoryCacheStorageManager
+ATENÇÃO: Senha gerada para o usuário 'admin': T0TTZUUzu4MlFFYg
+ATENÇÃO: Senha gerada para o usuário 'op1': AsXvFOVjduU-_22c
+.................................................ATENÇÃO: Senha gerada para o usuário 'admin': 46jTNs0PNOzhxy0m
+ATENÇÃO: Senha gerada para o usuário 'op1': cGoiKx9ZvWkSEnVu
+2026-09-26 00:20:06.422 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': HHatkCVukBBvIAnI
+ATENÇÃO: Senha gerada para o usuário 'op1': ch-7zVIIMKHqKbe2
+2026-09-26 00:20:06.967 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 3zbwK8RZpkHtAsOI
+ATENÇÃO: Senha gerada para o usuário 'op1': BW0m4w4YCAqMSMnL
+2026-09-26 00:20:07.523 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:07.523 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': lqJYbl1wx0LNm2MY
+ATENÇÃO: Senha gerada para o usuário 'op1': YZc8z_r1mZDwOFt3
+2026-09-26 00:20:08.065 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': YbCK2UqDTHVBEdTB
+ATENÇÃO: Senha gerada para o usuário 'op1': RXii-tp5RnKVfylL
+2026-09-26 00:20:08.617 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:08.618 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:08.624 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': spk-bw7XHswBLhn1
+ATENÇÃO: Senha gerada para o usuário 'op1': S5un_G5NK_-Eozoi
+2026-09-26 00:20:09.176 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.176 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.178 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': W5ZejKtzBvdrAYvf
+ATENÇÃO: Senha gerada para o usuário 'op1': 3v4mkTxx9HfqspAG
+2026-09-26 00:20:09.722 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.722 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.729 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:09.741 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': C5np8svIGsIKaewU
+ATENÇÃO: Senha gerada para o usuário 'op1': 1lI2zT335doMOanH
+2026-09-26 00:20:10.299 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': N6yr0BrqkBXjW8BA
+ATENÇÃO: Senha gerada para o usuário 'op1': 0PjjBg15928P7bJV
+2026-09-26 00:20:10.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:10.865 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 6nagoPQhhZq4tRaU
+ATENÇÃO: Senha gerada para o usuário 'op1': 1llQiIDbJQfpGrDs
+2026-09-26 00:20:11.408 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:11.413 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': XnzDayKvvyiSnrKT
+ATENÇÃO: Senha gerada para o usuário 'op1': mfUey5WCxRqgbGUa
+2026-09-26 00:20:11.958 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:11.963 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:11.965 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': GxikFEI8g5594bmR
+ATENÇÃO: Senha gerada para o usuário 'op1': X1fCvpOyIrWKSxwM
+2026-09-26 00:20:12.519 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ZwitTKmEzb9VLY3y
+ATENÇÃO: Senha gerada para o usuário 'op1': a6BlcHMeArMCiRlv
+2026-09-26 00:20:13.069 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': q-jg30juEIVx7VNb
+ATENÇÃO: Senha gerada para o usuário 'op1': b0nOLUof1As1ZiY0
+2026-09-26 00:20:13.630 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:13.635 No runtime found, using MemoryCacheStorageManager
+.................................................................2026-09-26 00:20:19.056 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.056 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.154 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.154 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.244 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.244 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.334 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.334 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.427 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.427 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.519 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.525 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.531 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.531 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.533 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.637 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.644 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.649 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.649 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.651 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.756 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.763 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.769 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.769 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.771 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:19.876 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.883 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.889 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.895 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.895 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:19.897 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.011 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.012 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.013 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.132 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.138 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.139 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.140 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.236 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.244 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.249 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.251 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.353 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.359 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.365 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.367 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.492 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.498 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.504 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.511 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.517 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.524 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.530 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.532 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.641 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.647 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.652 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.658 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.664 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.664 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.666 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.774 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.784 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.784 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.791 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.793 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.793 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:20.902 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.911 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.911 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.917 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.917 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:20.919 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.016 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.025 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.025 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.031 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.033 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.033 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.131 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.140 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.140 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.147 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.147 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.149 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.252 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.261 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.261 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.267 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.268 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.270 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.371 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.381 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.381 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.383 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.503 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.512 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.512 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.518 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.518 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.520 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.624 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.624 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.624 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.626 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.628 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.726 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.734 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.736 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.738 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:21.835 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.841 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.847 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.853 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.853 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.853 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.853 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.855 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.859 No runtime found, using MemoryCacheStorageManager
+....2026-09-26 00:20:21.959 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.963 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.964 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.970 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.976 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.976 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:21.977 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.075 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.080 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.080 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.087 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.089 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.196 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.201 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.201 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.208 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.209 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.211 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.321 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.326 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.327 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.329 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.447 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.453 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.459 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.465 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.465 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.468 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.576 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.582 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.588 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.594 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.594 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.596 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.701 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.707 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.708 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.715 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.717 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.834 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.841 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.847 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.853 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.853 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.855 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:22.963 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.970 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.976 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.982 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.988 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.988 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:22.990 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.084 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.084 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.177 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.177 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.269 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.269 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.370 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.370 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.484 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.484 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.596 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.603 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.609 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.611 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.618 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.619 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.730 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.732 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.849 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.855 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.864 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.866 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:23.981 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.989 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.991 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:23.993 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.130 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.137 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.143 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.152 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.156 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.279 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.286 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.293 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.300 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.302 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.304 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.430 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.438 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.445 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.452 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.454 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.456 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.580 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.586 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.593 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.599 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.600 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.602 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.719 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.725 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.732 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.738 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.740 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.742 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.864 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.871 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.873 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:24.875 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:24.997 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.008 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.014 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.016 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.145 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.147 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.147 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.259 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.271 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.278 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.284 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.286 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.398 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.408 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.414 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.420 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.423 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.533 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.539 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.542 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.644 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.651 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.656 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.656 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.660 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.767 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.774 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.780 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.788 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.795 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.797 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:25.914 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.921 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.928 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.937 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:25.937 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.053 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.060 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.067 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.073 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.076 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.183 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.189 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.196 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.196 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.305 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.312 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.319 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.321 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.413 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.419 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.423 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.534 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.541 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.548 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.549 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.651 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.657 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.663 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.671 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.673 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.768 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.774 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.780 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.788 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.788 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:26.892 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.898 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.904 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.911 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:26.912 No runtime found, using MemoryCacheStorageManager
+.2026-09-26 00:20:27.008 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:27.010 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:27.010 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Ha0X2Ng0ZxkNB1L9
+ATENÇÃO: Senha gerada para o usuário 'op1': mQpur7_WONJogQ5y
+2026-09-26 00:20:27.562 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:27.571 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:27.571 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:27.572 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': kFXBqqe6ZpSjIpIs
+ATENÇÃO: Senha gerada para o usuário 'op1': 3OA7xj5p7uCG1kVI
+2026-09-26 00:20:28.111 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:28.121 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:28.121 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:28.121 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:28.121 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': nmc4RvqstyMAXF4x
+ATENÇÃO: Senha gerada para o usuário 'op1': I24H6HXlR2AHxcUd
+2026-09-26 00:20:28.672 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 3PXWbeNIMciLU2bs
+ATENÇÃO: Senha gerada para o usuário 'op1': nNw4Fm39Kri3544j
+2026-09-26 00:20:29.222 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': end-zYWk3Yw12Qeb
+ATENÇÃO: Senha gerada para o usuário 'op1': 36Xujhcm5TAzlKRt
+2026-09-26 00:20:29.772 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': TZUnS-XjmZeBt7ee
+ATENÇÃO: Senha gerada para o usuário 'op1': D_sBo6UQxDqPa9Yb
+2026-09-26 00:20:30.338 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Pj-4qJb8ySG5VDie
+ATENÇÃO: Senha gerada para o usuário 'op1': FpVIh4bEefPhTymN
+2026-09-26 00:20:30.888 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:30.898 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:30.898 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:30.898 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:30.898 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': zP0wPBEEEFk8XRar
+ATENÇÃO: Senha gerada para o usuário 'op1': DS5dEm1feXBAMfqw
+2026-09-26 00:20:31.458 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:31.468 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:31.468 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:31.468 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:31.468 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 4sVHEUHv2MkdHXGJ
+ATENÇÃO: Senha gerada para o usuário 'op1': R9sc43XidC_0uEK7
+2026-09-26 00:20:32.024 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.033 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.033 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.033 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.034 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Dk0dbg4vuQD0GDBD
+ATENÇÃO: Senha gerada para o usuário 'op1': HOuM0HL17Kt8oH5R
+2026-09-26 00:20:32.572 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.581 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.581 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.581 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:32.581 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ZnGsWwmdcrFcwuXF
+ATENÇÃO: Senha gerada para o usuário 'op1': hUP8fyovGJz5KWVy
+2026-09-26 00:20:33.123 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.133 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.141 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.141 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.141 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.150 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:33.150 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Z7PMw1o5QFa8N8eX
+ATENÇÃO: Senha gerada para o usuário 'op1': HkY_C_MUy2pXSdE_
+2026-09-26 00:20:33.692 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': U55pXV5N4SBwk372
+ATENÇÃO: Senha gerada para o usuário 'op1': diVj4fkNA72aPoKa
+2026-09-26 00:20:34.237 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': B6BzmdEp9ioFgOQ4
+ATENÇÃO: Senha gerada para o usuário 'op1': 7txZ8gNThpxBZ4Pk
+2026-09-26 00:20:34.778 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:34.788 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:34.788 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:34.788 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Sfo_WMHMxsGXieDm
+ATENÇÃO: Senha gerada para o usuário 'op1': X-bxAshWeOnFtOh9
+2026-09-26 00:20:35.340 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.348 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.349 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.349 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.358 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.359 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.359 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.359 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': lCFGww6Co2tlaJLv
+ATENÇÃO: Senha gerada para o usuário 'op1': knSeo3exDsyXyGFW
+2026-09-26 00:20:35.904 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.912 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.912 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.912 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.922 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:35.922 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Gul6MbZZ7k2tzHFZ
+ATENÇÃO: Senha gerada para o usuário 'op1': BR_Vp4HRydlk-_Rg
+2026-09-26 00:20:36.482 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:36.492 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:36.492 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:36.492 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:36.492 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qsV8I7BBWSAtlHG5
+ATENÇÃO: Senha gerada para o usuário 'op1': L91prlxKT3tE5pdA
+2026-09-26 00:20:37.055 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.067 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.067 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.067 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.068 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ceKYnttC69bFuNPt
+ATENÇÃO: Senha gerada para o usuário 'op1': Nij6GspaMQYEOBSX
+2026-09-26 00:20:37.643 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.653 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.653 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.653 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:37.653 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': ynHw3CDyOezG8ZhO
+ATENÇÃO: Senha gerada para o usuário 'op1': 7Beu24lGO00g4f4N
+2026-09-26 00:20:38.206 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.215 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.215 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.216 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.216 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 4qC-F6XwNFeGh3HV
+ATENÇÃO: Senha gerada para o usuário 'op1': BBFUr1SNWQdXic-F
+2026-09-26 00:20:38.780 No runtime found, using MemoryCacheStorageManager
+................................2026-09-26 00:20:38.807 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.809 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.809 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.810 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.810 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.811 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:38.813 No runtime found, using MemoryCacheStorageManager
+ATENÇÃO: Senha gerada para o usuário 'admin': AK_BgFKP-o5po7Ha
+ATENÇÃO: Senha gerada para o usuário 'op1': r4zYsAH0h7UdZ4YR
+ATENÇÃO: Senha gerada para o usuário 'admin': mAKU2F1ZkUyGvcnu
+ATENÇÃO: Senha gerada para o usuário 'op1': rO7GvliUoBdKSdV-
+.2026-09-26 00:20:39.953 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:39.955 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:39.956 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:39.956 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:39.956 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:39.957 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:39.959 No runtime found, using MemoryCacheStorageManager
+ATENÇÃO: Senha gerada para o usuário 'admin': dlJ6QnF_iy79_aeW
+ATENÇÃO: Senha gerada para o usuário 'op1': uIzI9InZ3EfuzPVC
+..2026-09-26 00:20:40.537 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:40.538 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:40.539 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:40.539 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:40.540 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:40.541 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:40.542 No runtime found, using MemoryCacheStorageManager
+ATENÇÃO: Senha gerada para o usuário 'admin': 7577k07xcl6umjWn
+ATENÇÃO: Senha gerada para o usuário 'op1': -zkmcGIChgmel88x
+........ATENÇÃO: Senha gerada para o usuário 'admin': YeohWmQ-Ylhu1Jpm
+ATENÇÃO: Senha gerada para o usuário 'op1': _yMEF5TlV9hux_0L
+2026-09-26 00:20:43.213 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.214 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.221 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.222 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.222 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.230 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.230 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.240 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.240 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.243 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.252 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.252 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.252 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.265 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.266 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': hrjkGmpbJviwZzpA
+ATENÇÃO: Senha gerada para o usuário 'op1': V6LN7G_8owVtHxpV
+2026-09-26 00:20:43.831 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.831 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.838 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.839 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.839 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.847 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.847 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.857 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.867 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.867 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:43.867 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': bh3cCWT7uSq65cqX
+ATENÇÃO: Senha gerada para o usuário 'op1': 01kRbHwIn3rfGDrT
+2026-09-26 00:20:44.437 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:44.438 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:44.446 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:44.452 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:44.456 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:44.461 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': QMRz69HxWJqwu6AF
+ATENÇÃO: Senha gerada para o usuário 'op1': -v1b2MHMVfs3FWJy
+2026-09-26 00:20:45.032 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.032 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.040 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.046 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.051 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.057 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': WGtp2ZXcd5hBVX-C
+ATENÇÃO: Senha gerada para o usuário 'op1': zDpasxIDrV8XJwIa
+2026-09-26 00:20:45.608 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.608 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:45.616 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': _tr_b-zRyTJkLYKv
+ATENÇÃO: Senha gerada para o usuário 'op1': FAL5D7qhUKCp1iB8
+2026-09-26 00:20:46.185 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.186 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.193 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.200 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.206 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.211 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.211 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': YOa_CXITqMKYbcul
+ATENÇÃO: Senha gerada para o usuário 'op1': _9EqH83Eky9qWdaD
+2026-09-26 00:20:46.776 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.776 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.783 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.790 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:46.790 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': f95POL7CCfq54APm
+ATENÇÃO: Senha gerada para o usuário 'op1': vbGRGIzTVSa_sOtG
+2026-09-26 00:20:47.361 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.361 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.369 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.377 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': BKkEfkITBGR2xbRf
+ATENÇÃO: Senha gerada para o usuário 'op1': FvXA5ufNhQctG9ei
+2026-09-26 00:20:47.954 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.955 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.962 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.969 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:47.969 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': qebtfQlHrfcrITR3
+ATENÇÃO: Senha gerada para o usuário 'op1': wvb6zIMYEH3caK8_
+2026-09-26 00:20:48.536 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:48.537 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:48.546 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:48.553 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': vY0SCyjf_f-sq_Gc
+ATENÇÃO: Senha gerada para o usuário 'op1': tPl5Dd0yd2MT9v8e
+2026-09-26 00:20:49.118 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.118 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.125 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.132 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.138 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': bhv09lHjz3US7F_V
+ATENÇÃO: Senha gerada para o usuário 'op1': 2sgw8Npz2hjS9Q97
+2026-09-26 00:20:49.712 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.712 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.721 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.728 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:49.733 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': kPVwtHAAEO7RUNdR
+ATENÇÃO: Senha gerada para o usuário 'op1': 2JJ5620DtZV3ZkPM
+2026-09-26 00:20:50.302 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:50.302 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:50.310 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': YhvFoNTPeNX0YJDy
+ATENÇÃO: Senha gerada para o usuário 'op1': bp5cnKje6XsD6TU9
+2026-09-26 00:20:50.874 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:50.875 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:50.883 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:50.890 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:50.890 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 5r7nmnSVRbIERLrk
+ATENÇÃO: Senha gerada para o usuário 'op1': YQWgUG0yOE7eqxMH
+2026-09-26 00:20:51.455 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.455 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.462 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.469 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.473 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.478 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.483 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:51.487 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 49Wlqkrv-1o1eEBN
+ATENÇÃO: Senha gerada para o usuário 'op1': hadx_DaYdAfQON-I
+2026-09-26 00:20:52.044 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:52.044 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:52.051 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:52.058 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': V7SeXycEYA7M7ZvR
+ATENÇÃO: Senha gerada para o usuário 'op1': T1gb3LSuVF9Oe7v_
+2026-09-26 00:20:52.622 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:52.622 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:52.629 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:52.636 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': 8GhUISKWWgJKLfqX
+ATENÇÃO: Senha gerada para o usuário 'op1': wabZI_FBUJYjM9KC
+2026-09-26 00:20:53.203 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:53.203 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:53.211 No runtime found, using MemoryCacheStorageManager
+......ATENÇÃO: Senha gerada para o usuário 'admin': FAyP4eAFFNCsAF7j
+ATENÇÃO: Senha gerada para o usuário 'op1': O_EXvEL7-vXwKN-D
+2026-09-26 00:20:53.771 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:53.771 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:53.776 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': Lp6JdtIf_qtJHuFs
+ATENÇÃO: Senha gerada para o usuário 'op1': xilWlf0RpNnjhjxF
+2026-09-26 00:20:54.338 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:54.338 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:54.346 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:54.348 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': B0dilbTUAMWeHfsB
+ATENÇÃO: Senha gerada para o usuário 'op1': cAuUr5fSVtkz1CQz
+2026-09-26 00:20:54.908 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:54.908 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:54.916 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:54.922 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': U3pfDN1qK-GwGCxe
+ATENÇÃO: Senha gerada para o usuário 'op1': NU0viUCiSGouoJKI
+2026-09-26 00:20:55.489 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:55.489 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:55.496 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:55.503 No runtime found, using MemoryCacheStorageManager
+.ATENÇÃO: Senha gerada para o usuário 'admin': w_2rYCoGGT-z2PlJ
+ATENÇÃO: Senha gerada para o usuário 'op1': A2YZfFRB_SjzbZBV
+2026-09-26 00:20:56.049 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:56.049 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:56.056 No runtime found, using MemoryCacheStorageManager
+2026-09-26 00:20:56.058 No runtime found, using MemoryCacheStorageManager
+.......................................................................
+----------------------------------------------------------------------
+Ran 982 tests in 444.922s
+
+OK (skipped=6)
+CONTEXTO SINTÉTICO VERIFICADO (motor real): {"rebanho": {"total": 2, "avg_weight": 605, "avg_gmd": 0.15, "total_kg": 0.0, "males": 0, "females": 0, "total_ua": 0.0, "total_area": 0.0, "lotacao_ua_ha": 0.0, "arrobas_prod": 0.0}, "alertas_contagem": {"sumidos": 1, "carencia": 1, "prontos": 0}, "recomendacoes": [{"regra": "carencia_impede_abate", "severidade": "alta", "quantidade": 1, "motivo": "Peso-alvo atingido, mas a carência impede abate."}, {"regra": "estoque_insuficiente", "severidade": "alta", "quantidade": 1, "motivo": "Estoque abaixo do mínimo recomendado pelo motor."}, {"regra": "gmd_abaixo_da_meta", "severidade": "media", "quantidade": 2, "motivo": "GMD abaixo da meta estabelecida."}, {"regra": "margem_em_risco", "severidade": "alta", "quantidade": 1, "motivo": "Custo por arroba supera o preço de venda esperado."}, {"regra": "piquete_acima_da_capacidade", "severidade": "alta", "quantidade": 1, "motivo": "Lotação acima da capacidade do piquete."}, {"regra": "pronto_para_venda", "severidade": "media", "quantidade": 1, "motivo": "Peso-alvo atingido sem restrição de carência."}]}
+lancamento ignorado por data inválida em vencimento: invalid-date
+lancamento ignorado por data inválida em competencia: invalid-date
