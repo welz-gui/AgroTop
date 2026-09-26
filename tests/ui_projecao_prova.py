@@ -80,8 +80,8 @@ class TestProjecaoNaTela(unittest.TestCase):
         db.add_animal(db.AnimalData("PROJ1", "Nelore", "M", None, entrada,
                       300.0, 500.0, 1000.0, None, None))
         db.clear_cache()
-        db.add_weighing("PROJ1", 370.0, (date.today() - timedelta(days=11)).isoformat())
-        db.add_weighing("PROJ1", 400.0, (date.today() - timedelta(days=1)).isoformat())
+        db.add_weighing(db.WeighingCreate(animal_id="PROJ1", weight=370.0, weigh_date=(date.today() - timedelta(days=11)).isoformat()))
+        db.add_weighing(db.WeighingCreate(animal_id="PROJ1", weight=400.0, weigh_date=(date.today() - timedelta(days=1)).isoformat()))
         db.clear_cache()
 
         r = db.projecao_abate(get_animal("PROJ1"))
@@ -97,8 +97,8 @@ class TestProjecaoNaTela(unittest.TestCase):
         db.add_animal(db.AnimalData("PROJ2", "Nelore", "F", None, entrada,
                       300.0, 500.0, 1000.0, None, None))
         db.clear_cache()
-        db.add_weighing("PROJ2", 440.0, (date.today() - timedelta(days=11)).isoformat())
-        db.add_weighing("PROJ2", 420.0, (date.today() - timedelta(days=1)).isoformat())
+        db.add_weighing(db.WeighingCreate(animal_id="PROJ2", weight=440.0, weigh_date=(date.today() - timedelta(days=11)).isoformat()))
+        db.add_weighing(db.WeighingCreate(animal_id="PROJ2", weight=420.0, weigh_date=(date.today() - timedelta(days=1)).isoformat()))
         db.clear_cache()
 
         r = db.projecao_abate(get_animal("PROJ2"))

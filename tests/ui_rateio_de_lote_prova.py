@@ -81,9 +81,9 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
                       lote["id"], None))
         db.clear_cache()
         # pesos desiguais, de propósito — é o que faz "peso" divergir de "igual"
-        db.add_weighing("RAT1", 200.0, date.today().isoformat())
-        db.add_weighing("RAT2", 300.0, date.today().isoformat())
-        db.add_weighing("RAT3", 400.0, date.today().isoformat())
+        db.add_weighing(db.WeighingCreate(animal_id="RAT1", weight=200.0, weigh_date=date.today().isoformat()))
+        db.add_weighing(db.WeighingCreate(animal_id="RAT2", weight=300.0, weigh_date=date.today().isoformat()))
+        db.add_weighing(db.WeighingCreate(animal_id="RAT3", weight=400.0, weigh_date=date.today().isoformat()))
         db.clear_cache()
 
         from services.rateio import ratear
@@ -95,8 +95,10 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
 
         antes = {p["animal_id"]: db.get_total_cost(p["animal_id"]) for p in preview}
         for p in preview:
-            db.add_animal_cost(p["animal_id"], "veterinário", "prova rateio",
-                               p["valor"], date.today().isoformat())
+            db.add_animal_cost(db.AnimalCostData(
+                p["animal_id"], "veterinário", "prova rateio",
+                p["valor"], date.today().isoformat()
+            ))
         db.clear_cache()
         depois_soma = sum(db.get_total_cost(p["animal_id"]) for p in preview)
         antes_soma = sum(antes.values())
@@ -117,7 +119,7 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
                       300.0, 500.0, 0.0, origem["id"], None))
         db.clear_cache()
         data_movimento = (date.today() - timedelta(days=15)).isoformat()
-        db.move_animal("RATMOV", destino["id"], data_movimento)
+        db.move_animal("RATMOV", db.MovementParams(destino["id"], data_movimento))
         db.clear_cache()
 
         movs = db.get_movements("RATMOV", limit=1)

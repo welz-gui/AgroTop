@@ -90,9 +90,10 @@ from database import (
     previsao_estoque,
     set_lote_poligono,
 )
-from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk
+from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import (
+    WeighingCreate,
     add_weighing,
     calculate_gmd,
     calculate_gmd_bulk,
@@ -100,6 +101,7 @@ from repositories.pesagens import (
     get_weighings_batch,
 )
 from repositories.sanidade import (
+    MedicationData,
     add_medication,
     dose_for_animal,
     get_medications,
@@ -373,14 +375,14 @@ def register_pesagem(
             return cached["response_body"]
 
     try:
-        add_weighing(
+        add_weighing(WeighingCreate(
             animal_id=animal_id,
             weight=data.peso,
             weigh_date=data.data,
             operator=user.get("username", ""),
             method=data.method,
             notes=data.notes,
-        )
+        ))
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -482,14 +484,14 @@ def importar_pesagens_csv(
         operator = user.get("username", "") if user else ""
         notes = f"importado de {filename}" if filename else "importado de CSV"
         for linha in aceitas_com_alertas:
-            add_weighing(
+            add_weighing(WeighingCreate(
                 animal_id=linha["animal_id"],
                 weight=linha["peso"],
                 weigh_date=linha["data"],
                 operator=operator,
                 notes=notes,
                 method="pesado",
-            )
+            ))
             gravadas += 1
 
     return {
@@ -612,11 +614,13 @@ def movimentar_animais(
 
     resultado = move_animals_bulk(
         animal_ids=data.animal_ids,
-        to_lote_id=data.to_lote_id,
-        movement_date=data.movement_date,
-        reason=motivo,
-        operator=operador,
-        notes=observacoes,
+        params=MovementParams(
+            to_lote_id=data.to_lote_id,
+            movement_date=data.movement_date,
+            reason=motivo,
+            operator=operador,
+            notes=observacoes,
+        )
     )
     if idempotency_key:
         store_response(idempotency_key, endpoint, status.HTTP_200_OK, resultado)
@@ -862,7 +866,7 @@ def register_medicamento(
             return cached["response_body"]
 
     try:
-        add_medication(
+        add_medication(MedicationData(
             animal_id=animal_id,
             medication_name=data.medicamento,
             dose=data.dose,
@@ -874,7 +878,7 @@ def register_medicamento(
             insumo_id=None,
             notes=data.notas or "",
             protocol_id=data.protocolo_id,
-        )
+        ))
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

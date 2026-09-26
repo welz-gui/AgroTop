@@ -27,7 +27,15 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import dataclass
 from datetime import date, timedelta
+
+
+@dataclass
+class ContextoOpcionalGta:
+    animais_no_embarque_uuids: list = None
+    animais_em_carencia_uuids: list = None
+    hoje: str = None
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -92,9 +100,9 @@ class TestConferirGtaNaTela(unittest.TestCase):
                          f"app levantou exceção: {[e.value for e in at.exception]}")
         return at
 
-    def _cadeia(self, mov, dados_do_documento, animais_no_embarque_uuids=None,
-               animais_em_carencia_uuids=None, hoje=None):
+    def _cadeia(self, mov, dados_do_documento, ctx_opcional: ContextoOpcionalGta = None):
         """Reproduz exatamente o que `_mov_conferir_gta` monta."""
+        ctx = ctx_opcional or ContextoOpcionalGta()
         from services.gta_adaptador import montar_contexto
         from services.gta import validar
 
@@ -107,11 +115,11 @@ class TestConferirGtaNaTela(unittest.TestCase):
             "finalidade": mov.get("finalidade"),
             "animais_uuids": [a["animal_uuid"] for a in mov["animais"]],
         }
-        hoje = hoje or date.today().isoformat()
-        embarque = (animais_no_embarque_uuids
-                   if animais_no_embarque_uuids is not None
+        hoje = ctx.hoje or date.today().isoformat()
+        embarque = (ctx.animais_no_embarque_uuids
+                   if ctx.animais_no_embarque_uuids is not None
                    else movimentacao_ctx["animais_uuids"])
-        carencia = animais_em_carencia_uuids or []
+        carencia = ctx.animais_em_carencia_uuids or []
         gta, contexto = montar_contexto(movimentacao_ctx, dados_do_documento,
                                         embarque, carencia, hoje)
         return validar(gta, contexto)
@@ -166,8 +174,10 @@ class TestConferirGtaNaTela(unittest.TestCase):
         mid = self._rascunho(gta_numero="GTA-0005", finalidade="abate")
         mov = db.movimentacoes.get(mid)
         aid_carencia = mov["animais"][0]["brinco"]
-        db.add_medication(aid_carencia, "Ivermectina", 5.0, "ml", "Subcutânea",
-                          30, date.today().isoformat())
+        db.add_medication(db.MedicationData(
+            animal_id=aid_carencia, medication_name="Ivermectina", dose=5.0, unit="ml",
+            application_route="Subcutânea", withdrawal_days=30, med_date=date.today().isoformat()
+        ))
         db.clear_cache()
 
         wd_batch = db.get_withdrawal_end_batch(
@@ -182,7 +192,7 @@ class TestConferirGtaNaTela(unittest.TestCase):
 
         problemas = self._cadeia(
             mov, {"emissao": None, "validade": None, "quantidade_declarada": None},
-            animais_em_carencia_uuids=em_carencia_uuids)
+            ContextoOpcionalGta(animais_em_carencia_uuids=em_carencia_uuids))
         codigos = [p["codigo"] for p in problemas]
         self.assertIn("animal_em_carencia", codigos, f"{problemas}")
 

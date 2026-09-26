@@ -5,6 +5,7 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -12,6 +13,37 @@ from .animais import get_all_animals
 from .animais import uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
+
+
+@dataclass
+class MedicationData:
+    animal_id: str
+    medication_name: str
+    dose: float
+    unit: str
+    application_route: str
+    withdrawal_days: int
+    med_date: str
+    applied_by: str = ""
+    insumo_id: Optional[int] = None
+    notes: str = ""
+    protocol_id: Optional[int] = None
+
+
+@dataclass
+class ProtocolData:
+    name: str
+    sex_target: str
+    age_min: int
+    age_max: int
+    dose_value: float
+    dose_ref_kg: float
+    dose_unit: str
+    insumo_id: Optional[str]
+    frequency: str
+    withdrawal_days: int
+    route: str = "Subcutânea"
+    notes: str = ""
 
 
 @_cache
@@ -35,48 +67,46 @@ def get_medications(animal_id: str, limit: Optional[int] = None) -> list[dict]:
 
 
 @_writes
-def add_medication(animal_id, medication_name, dose, unit, application_route,
-                   withdrawal_days, med_date, applied_by="",
-                   insumo_id=None, notes="", protocol_id=None) -> None:
+def add_medication(data: MedicationData) -> None:
     with _conn() as con:
-        _uuid = uuid_de(con, animal_id)
+        _uuid = uuid_de(con, data.animal_id)
         if _uuid is None:
-            raise ValueError(f"Animal {animal_id} não encontrado.")
+            raise ValueError(f"Animal {data.animal_id} não encontrado.")
         con.execute(
             """INSERT INTO medications
                (animal_uuid,medication_name,dose,unit,application_route,
                 withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id)
                VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-            (_uuid, medication_name, dose, unit,
-             application_route,
-             withdrawal_days, med_date, applied_by, insumo_id or None, notes,
-             protocol_id or None),
+            (_uuid, data.medication_name, data.dose, data.unit,
+             data.application_route,
+             data.withdrawal_days, data.med_date, data.applied_by, data.insumo_id or None, data.notes,
+             data.protocol_id or None),
         )
         # Baixa automática no estoque
-        if insumo_id and dose > 0:
+        if data.insumo_id and data.dose > 0:
             con.execute(
                 "UPDATE insumos SET current_stock = MAX(0, current_stock - ?) WHERE id=?",
-                (dose, insumo_id),
+                (data.dose, data.insumo_id),
             )
             con.execute(
                 """INSERT INTO insumo_transactions
                    (insumo_id,type,quantity,reason,animal_uuid,transaction_date,operator)
                    VALUES(?,?,?,?,?,?,?)""",
-                (insumo_id, "saida", dose, "uso_animal", _uuid, med_date, applied_by),
+                (data.insumo_id, "saida", data.dose, "uso_animal", _uuid, data.med_date, data.applied_by),
             )
         # `vacinacao` e `tratamento` sao tipos proprios no §6.1; sem campo que
         # distinga um do outro, `manejo_sanitario` e o termo honesto.
         eventos.registrar_em(
-            con, _uuid, "manejo_sanitario", ocorrido_em=med_date,
-            usuario_registro=applied_by,
-            observacoes=f"{medication_name} {dose}{unit}"
-                        + (f", carencia {withdrawal_days}d" if withdrawal_days else ""))
+            con, _uuid, "manejo_sanitario", ocorrido_em=data.med_date,
+            usuario_registro=data.applied_by,
+            observacoes=f"{data.medication_name} {data.dose}{data.unit}"
+                        + (f", carencia {data.withdrawal_days}d" if data.withdrawal_days else ""))
 
         # Atualiza status do animal se há carência
-        if withdrawal_days and withdrawal_days > 0:
+        if data.withdrawal_days and data.withdrawal_days > 0:
             con.execute(
                 "UPDATE animals SET status='carencia' WHERE id=? AND status='ativo'",
-                (animal_id,),
+                (data.animal_id,),
             )
 
 
@@ -142,17 +172,16 @@ def get_protocols(active_only: bool = True) -> list[dict]:
 
 
 @_writes
-def add_protocol(name, sex_target, age_min, age_max, dose_value, dose_ref_kg,
-                 dose_unit, insumo_id, frequency, withdrawal_days,
-                 route="Subcutânea", notes="") -> None:
+def add_protocol(data: ProtocolData) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO health_protocols
                (name,sex_target,age_min,age_max,dose_value,dose_ref_kg,dose_unit,
                 insumo_id,frequency,withdrawal_days,route,notes)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (name, sex_target, int(age_min), int(age_max), dose_value, dose_ref_kg,
-             dose_unit, insumo_id or None, frequency, int(withdrawal_days), route, notes),
+            (data.name, data.sex_target, int(data.age_min), int(data.age_max), data.dose_value,
+             data.dose_ref_kg, data.dose_unit, data.insumo_id or None, data.frequency,
+             int(data.withdrawal_days), data.route, data.notes),
         )
 
 
@@ -228,10 +257,19 @@ def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "")
     n = 0
     for a in plan["pending"]:
         dose = dose_for_animal(prot, a)
-        add_medication(a["id"], prot["name"], dose, prot["dose_unit"],
-                       prot.get("route", "Subcutânea"), prot.get("withdrawal_days", 0),
-                       med_date, applied_by=operator, insumo_id=prot.get("insumo_id"),
-                       notes="Campanha sanitária", protocol_id=prot["id"])
+        add_medication(MedicationData(
+            animal_id=a["id"],
+            medication_name=prot["name"],
+            dose=dose,
+            unit=prot["dose_unit"],
+            application_route=prot.get("route", "Subcutânea"),
+            withdrawal_days=prot.get("withdrawal_days", 0),
+            med_date=med_date,
+            applied_by=operator,
+            insumo_id=prot.get("insumo_id"),
+            notes="Campanha sanitária",
+            protocol_id=prot["id"]
+        ))
         n += 1
     return {"n": n, "doses": plan["doses_needed"]}
 

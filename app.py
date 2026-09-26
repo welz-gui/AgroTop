@@ -593,6 +593,77 @@ def _evidencias_nome_arquivo(vendas_do_lote: list[dict]) -> str:
     return f"agrotop_evidencias_{slug or 'lote'}.pdf"
 
 
+
+def _adicionar_capa_pacote(pdf, vendas_do_lote: list[dict], texto) -> None:
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, _pdf_safe("AgroTop — Pacote de Evidências"), ln=True, align="C")
+    pdf.ln(4)
+    compradores = sorted({str(venda.get("buyer") or "—") for venda in vendas_do_lote})
+    datas_venda = sorted({str(venda.get("sale_date") or "") for venda in vendas_do_lote if venda.get("sale_date")})
+    texto("Comprador", ", ".join(compradores) or "—")
+    texto("Data(s) da venda", ", ".join(_evidencias_data(data) for data in datas_venda) or "—")
+    texto("Quantidade de animais", str(len(vendas_do_lote)))
+    pdf.ln(7)
+    pdf.set_fill_color(255, 236, 196)
+    pdf.set_text_color(100, 55, 0)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.multi_cell(0, 8, _pdf_safe(
+        "Aviso: este pacote não é avaliação de conformidade legal nem certificação oficial."
+    ), border=1, fill=True)
+    pdf.set_text_color(20, 20, 20)
+
+
+def _adicionar_pagina_animal(pdf, venda: dict, texto, tabela) -> None:
+    animal_id = venda.get("animal_id") or venda.get("animal_id_str") or "—"
+    animal = get_animal(animal_id) or {}
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(0, 9, _pdf_safe(f"Animal {animal_id}"), ln=True)
+    pdf.ln(2)
+    texto("Raça", animal.get("breed") or venda.get("breed") or "—")
+    sexo = animal.get("sex") or venda.get("sex") or "—"
+    texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
+    texto("Categoria", get_age_category(animal.get("birth_date")))
+    texto("Idade", get_age_display(animal) if animal else "—")
+    texto("Fornecedor", animal.get("fornecedor_name") or "—")
+    texto("NF", animal.get("nf_number") or "—")
+    texto("GTA", animal.get("gta_number") or "—")
+
+    fotos = db.get_photos(animal_id) or []
+    if fotos:
+        foto = max(fotos, key=lambda item: (str(item.get("taken_date") or ""), item.get("id") or 0))
+        imagem = db.get_photo_image(foto.get("id"))
+        if imagem:
+            try:
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 7, "Foto mais recente", ln=True)
+                pdf.image(io.BytesIO(imagem[0]), w=55)
+                pdf.ln(2)
+            except Exception:
+                pass
+
+    pesagens = db.get_weighings(animal_id) or []
+    tabela("Pesagens", ["Data", "Peso (kg)", "Método", "Operador"], [
+        (_evidencias_data(item.get("weigh_date")), item.get("weight") or "—",
+         db.WEIGH_METHODS.get(item.get("method") or "pesado", item.get("method") or "—"),
+         item.get("operator") or "—") for item in pesagens
+    ])
+
+    medicamentos = db.get_medications(animal_id) or []
+    tabela("Sanidade / Medicamentos", ["Data", "Medicamento", "Dose", "Carência (dias)", "Aplicado por"], [
+        (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
+         f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
+         item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
+        for item in medicamentos
+    ])
+    fim_carencia = db.get_withdrawal_end(animal_id)
+    status_carencia = (
+        f"Em carência até {_evidencias_data(fim_carencia)}" if fim_carencia else "Livre"
+    )
+    texto("Status de carência", status_carencia)
+
+
 def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
     """Monta o PDF de evidências para um lote de venda (spec 0080).
 
@@ -633,72 +704,10 @@ def _gerar_pacote_evidencias(vendas_do_lote: list[dict]) -> bytes:
                     pdf.cell(largura, 5, _pdf_safe(valor)[:30], border=1)
                 pdf.ln()
 
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.cell(0, 12, _pdf_safe("AgroTop — Pacote de Evidências"), ln=True, align="C")
-        pdf.ln(4)
-        compradores = sorted({str(venda.get("buyer") or "—") for venda in vendas_do_lote})
-        datas_venda = sorted({str(venda.get("sale_date") or "") for venda in vendas_do_lote if venda.get("sale_date")})
-        texto("Comprador", ", ".join(compradores) or "—")
-        texto("Data(s) da venda", ", ".join(_evidencias_data(data) for data in datas_venda) or "—")
-        texto("Quantidade de animais", str(len(vendas_do_lote)))
-        pdf.ln(7)
-        pdf.set_fill_color(255, 236, 196)
-        pdf.set_text_color(100, 55, 0)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.multi_cell(0, 8, _pdf_safe(
-            "Aviso: este pacote não é avaliação de conformidade legal nem certificação oficial."
-        ), border=1, fill=True)
-        pdf.set_text_color(20, 20, 20)
+        _adicionar_capa_pacote(pdf, vendas_do_lote, texto)
 
         for venda in vendas_do_lote:
-            animal_id = venda.get("animal_id") or venda.get("animal_id_str") or "—"
-            animal = get_animal(animal_id) or {}
-            pdf.add_page()
-            pdf.set_font("Helvetica", "B", 15)
-            pdf.cell(0, 9, _pdf_safe(f"Animal {animal_id}"), ln=True)
-            pdf.ln(2)
-            texto("Raça", animal.get("breed") or venda.get("breed") or "—")
-            sexo = animal.get("sex") or venda.get("sex") or "—"
-            texto("Sexo", {"M": "Macho", "F": "Fêmea"}.get(sexo, sexo))
-            texto("Categoria", get_age_category(animal.get("birth_date")))
-            texto("Idade", get_age_display(animal) if animal else "—")
-            texto("Fornecedor", animal.get("fornecedor_name") or "—")
-            texto("NF", animal.get("nf_number") or "—")
-            texto("GTA", animal.get("gta_number") or "—")
-
-            fotos = db.get_photos(animal_id) or []
-            if fotos:
-                foto = max(fotos, key=lambda item: (str(item.get("taken_date") or ""), item.get("id") or 0))
-                imagem = db.get_photo_image(foto.get("id"))
-                if imagem:
-                    try:
-                        pdf.set_font("Helvetica", "B", 11)
-                        pdf.cell(0, 7, "Foto mais recente", ln=True)
-                        pdf.image(io.BytesIO(imagem[0]), w=55)
-                        pdf.ln(2)
-                    except Exception:
-                        pass
-
-            pesagens = db.get_weighings(animal_id) or []
-            tabela("Pesagens", ["Data", "Peso (kg)", "Método", "Operador"], [
-                (_evidencias_data(item.get("weigh_date")), item.get("weight") or "—",
-                 db.WEIGH_METHODS.get(item.get("method") or "pesado", item.get("method") or "—"),
-                 item.get("operator") or "—") for item in pesagens
-            ])
-
-            medicamentos = db.get_medications(animal_id) or []
-            tabela("Sanidade / Medicamentos", ["Data", "Medicamento", "Dose", "Carência (dias)", "Aplicado por"], [
-                (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
-                 f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
-                 item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
-                for item in medicamentos
-            ])
-            fim_carencia = db.get_withdrawal_end(animal_id)
-            status_carencia = (
-                f"Em carência até {_evidencias_data(fim_carencia)}" if fim_carencia else "Livre"
-            )
-            texto("Status de carência", status_carencia)
+            _adicionar_pagina_animal(pdf, venda, texto, tabela)
 
         return bytes(pdf.output())
     except ImportError:
@@ -1367,9 +1376,10 @@ def _tab_pesagem(animal):
         _cc1, _cc2 = st.columns(2)
         if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
                        use_container_width=True):
-            db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
-                st.session_state.user["name"], _pend_alerta["notas"],
-                method=_pend_alerta["metodo"])
+            db.add_weighing(db.WeighingCreate(
+                animal_id=animal["id"], weight=_pend_alerta["peso"], weigh_date=_pend_alerta["data"],
+                operator=st.session_state.user["name"], notes=_pend_alerta["notas"],
+                method=_pend_alerta["metodo"]))
             st.session_state.pop(f"alerta_peso_{animal['id']}", None)
             st.success(f"✅ {_num_br(_pend_alerta['peso'], 1)} kg salvo."); st.rerun()
         if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
@@ -1408,8 +1418,9 @@ def _tab_pesagem(animal):
                     "metodo": metodo_peso}
                 st.rerun()
 
-            db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
-                st.session_state.user["name"], notes_p, method=metodo_peso)
+            db.add_weighing(db.WeighingCreate(
+                animal_id=animal["id"], weight=nw_final, weigh_date=wd_.strftime("%Y-%m-%d"),
+                operator=st.session_state.user["name"], notes=notes_p, method=metodo_peso))
             for _a in _alertas:
                 st.warning(f"⚠️ {_a['mensagem']}")
             msg = f"✅ {_num_br(nw_final, 1)} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
@@ -1447,9 +1458,18 @@ def _tab_medicamento(animal):
             if not med_name:
                 st.error("Informe o medicamento.")
             else:
-                db.add_medication(animal["id"],med_name,dose,unit,route,
-                    int(wd_c),md_.strftime("%Y-%m-%d"),
-                    st.session_state.user["name"],insumo_id,notes_m)
+                db.add_medication(db.MedicationData(
+                    animal_id=animal["id"],
+                    medication_name=med_name,
+                    dose=dose,
+                    unit=unit,
+                    application_route=route,
+                    withdrawal_days=int(wd_c),
+                    med_date=md_.strftime("%Y-%m-%d"),
+                    applied_by=st.session_state.user["name"],
+                    insumo_id=insumo_id,
+                    notes=notes_m
+                ))
                 st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
                 st.rerun()
 
@@ -1464,8 +1484,9 @@ def _tab_movimentacao(animal):
         notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
         if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
             if dest:
-                db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
-                    reason,st.session_state.user["name"],notes_mv)
+                db.move_animal(animal["id"], db.MovementParams(
+                    dest["id"], mv_date.strftime("%Y-%m-%d"), reason, st.session_state.user["name"], notes_mv
+                ))
                 st.success(f"✅ {animal['id']} movido para {dest['name']}")
                 st.rerun()
 
@@ -1713,9 +1734,10 @@ def _campo_importar():
     if st.button(f"💾 Gravar {len(aceitas)} pesagem(ns)", type="primary"):
         gravadas = 0
         for linha in aceitas:
-            db.add_weighing(linha["animal_id"], linha["peso"], linha["data"],
-                            operator=st.session_state.user["name"],
-                            notes=f"importado de {arquivo.name}")
+            db.add_weighing(db.WeighingCreate(
+                animal_id=linha["animal_id"], weight=linha["peso"], weigh_date=linha["data"],
+                operator=st.session_state.user["name"],
+                notes=f"importado de {arquivo.name}"))
             gravadas += 1
         st.success(f"✅ {gravadas} pesagem(ns) importada(s).")
         st.rerun()
@@ -2208,8 +2230,63 @@ def _render_tab_fin(animal):
             with cc3: cd=st.date_input("Data",value=date.today())
             desc=st.text_input("Descrição")
             if st.form_submit_button("Salvar",type="primary",use_container_width=True):
-                db.add_animal_cost(aid,ct,desc,val,cd.strftime("%Y-%m-%d"))
+                db.add_animal_cost(db.AnimalCostData(aid, ct, desc, val, cd.strftime("%Y-%m-%d")))
                 st.success("Custo registrado!"); st.rerun()
+
+
+def _render_animal_metrics(animal: dict, gmd: float | None, arrobas: float, gain: float, cat: str, target_weight: float | None):
+    m=st.columns(3)
+    m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
+    gmd_total = calculate_gmd_total(animal)
+    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
+    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
+    m[1].metric("GMD recente", gmd_txt,
+                delta=_num_br(gmd, 3) if gmd is not None else None,
+                help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
+    m[2].metric("Meta de peso", f"{_num_br(target_weight, 1)} kg"
+                if target_weight is not None and target_weight > 0
+                else "Sem meta definida")
+    st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
+               f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
+    st.caption(f"📋 Raça: **{animal['breed']}**  ·  **Categoria:** {cat}  ·  "
+               f"**Origem:** {animal.get('fornecedor_name') or 'Não informada'}  ·  "
+               f"**Ganho:** {_num_br(gain, 1, sinal=True)} kg  ·  "
+               f"**@ atuais:** {_num_br(arrobas, 2)} @")
+
+    src_label = db.AGE_SOURCES.get(animal.get("age_source","propriedade"),"—")
+    doc_parts = []
+    if animal.get("nf_number"):  doc_parts.append(f"NF: **{animal['nf_number']}**")
+    if animal.get("gta_number"): doc_parts.append(f"GTA: **{animal['gta_number']}**")
+    st.caption(f"📆 Origem da idade: **{src_label}**"
+               + (f" · nascimento: {animal['birth_date']}" if animal.get("birth_date") else "")
+               + (f"  |  📄 {' · '.join(doc_parts)}" if doc_parts else ""))
+
+
+def _render_animal_tabs(animal: dict, aid: str, ws: list, meds: list, movs: list, target_weight: float | None):
+    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id,tl_ev=st.tabs(
+        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto",
+         "🏷️ Identificadores","🕒 Linha do Tempo"])
+
+    with tl_ev:
+        _linha_do_tempo_do_animal(animal)
+
+    with tl_id:
+        _identificadores_do_animal(animal)
+
+    with tl_foto:
+        _photo_section(aid, key_prefix="ficha_")
+
+    with tl_peso:
+        _render_tab_peso(ws, target_weight)
+
+    with tl_med:
+        _render_tab_med(meds)
+
+    with tl_mov:
+        _render_tab_mov(movs)
+
+    with tl_fin:
+        _render_tab_fin(animal)
 
 
 def page_animal():
@@ -2243,31 +2320,8 @@ def page_animal():
     target_weight = animal.get("target_weight")
     if target_weight is not None:
         target_weight = float(target_weight)
-    m=st.columns(3)
-    m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
-    gmd_total = calculate_gmd_total(animal)
-    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
-    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
-    m[1].metric("GMD recente", gmd_txt,
-                delta=_num_br(gmd, 3) if gmd is not None else None,
-                help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
-    m[2].metric("Meta de peso", f"{_num_br(target_weight, 1)} kg"
-                if target_weight is not None and target_weight > 0
-                else "Sem meta definida")
-    st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
-               f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
-    st.caption(f"📋 Raça: **{animal['breed']}**  ·  **Categoria:** {cat}  ·  "
-               f"**Origem:** {animal.get('fornecedor_name') or 'Não informada'}  ·  "
-               f"**Ganho:** {_num_br(gain, 1, sinal=True)} kg  ·  "
-               f"**@ atuais:** {_num_br(arrobas, 2)} @")
 
-    src_label = db.AGE_SOURCES.get(animal.get("age_source","propriedade"),"—")
-    doc_parts = []
-    if animal.get("nf_number"):  doc_parts.append(f"NF: **{animal['nf_number']}**")
-    if animal.get("gta_number"): doc_parts.append(f"GTA: **{animal['gta_number']}**")
-    st.caption(f"📆 Origem da idade: **{src_label}**"
-               + (f" · nascimento: {animal['birth_date']}" if animal.get("birth_date") else "")
-               + (f"  |  📄 {' · '.join(doc_parts)}" if doc_parts else ""))
+    _render_animal_metrics(animal, gmd, arrobas, gain, cat, target_weight)
 
     # Editor de idade
     with st.expander("✏️ Corrigir / redefinir idade"):
@@ -2287,30 +2341,7 @@ def page_animal():
     st.markdown("---")
     _consistencia_regulatoria(animal, movs)
 
-    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id,tl_ev=st.tabs(
-        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto",
-         "🏷️ Identificadores","🕒 Linha do Tempo"])
-
-    with tl_ev:
-        _linha_do_tempo_do_animal(animal)
-
-    with tl_id:
-        _identificadores_do_animal(animal)
-
-    with tl_foto:
-        _photo_section(aid, key_prefix="ficha_")
-
-    with tl_peso:
-        _render_tab_peso(ws, target_weight)
-
-    with tl_med:
-        _render_tab_med(meds)
-
-    with tl_mov:
-        _render_tab_mov(movs)
-
-    with tl_fin:
-        _render_tab_fin(animal)
+    _render_animal_tabs(animal, aid, ws, meds, movs, target_weight)
 
     st.markdown("---")
     qa1,qa2=st.columns(2)
@@ -2388,277 +2419,315 @@ def _consultar_ndvi_cacheado(
     return ndvi_do_piquete(list(anel_tuplas), inicio, fim, nuvem_max_pct)
 
 
+def _obter_anel_lote(lote: dict) -> list | None:
+    """Extrai e valida o perímetro (anel) do lote para consulta de NDVI."""
+    poligono_raw = lote.get("poligono")
+    if not poligono_raw:
+        st.caption(
+            "📍 Demarque o perímetro do piquete primeiro na seção acima "
+            "para habilitar a consulta de imagens de satélite."
+        )
+        return None
+
+    anel = []
+    try:
+        anel = _ler_poligono(_poligono_para_texto(poligono_raw))
+    except (ValueError, TypeError):
+        pass
+
+    if not anel or geometria_validar(anel):
+        st.warning(
+            "⚠️ Perímetro cadastrado inválido. Corrija o perímetro na "
+            "seção acima antes de consultar o NDVI."
+        )
+        return None
+
+    return anel
+
+
+def _render_form_ndvi(lote_id: str) -> tuple:
+    """Renderiza os filtros para consulta de NDVI e retorna os valores."""
+    hoje = date.today()
+    c_i, c_f, c_nuv, c_btn = st.columns([2, 2, 2, 2])
+    with c_i:
+        d_inicio = st.date_input(
+            "Início",
+            value=hoje - timedelta(days=365),
+            key=f"ndvi_ini_{lote_id}",
+        )
+    with c_f:
+        d_fim = st.date_input(
+            "Fim",
+            value=hoje,
+            key=f"ndvi_fim_{lote_id}",
+        )
+    with c_nuv:
+        nuvem_max = st.number_input(
+            "Nuvem máx. (%)",
+            min_value=5,
+            max_value=80,
+            value=20,
+            step=5,
+            key=f"ndvi_nuv_{lote_id}",
+        )
+    with c_btn:
+        st.write("")
+        st.write("")
+        buscar = st.button("🛰️ Consultar NDVI", key=f"ndvi_btn_{lote_id}")
+    return d_inicio, d_fim, nuvem_max, buscar
+
+
+def _processar_busca_ndvi(
+    anel: list, d_inicio: date, d_fim: date, nuvem_max: int, estado_chave: str
+) -> None:
+    """Processa a busca de NDVI e atualiza o session_state."""
+    if d_inicio > d_fim:
+        st.error("🚫 Data de início não pode ser posterior à data de fim.")
+    else:
+        with st.spinner("Buscando cenas de satélite e calculando..."):
+            try:
+                res = _consultar_ndvi_cacheado(
+                    tuple(anel), d_inicio, d_fim, nuvem_max
+                )
+                st.session_state[estado_chave] = res
+            except NdviIndisponivelError as e:
+                st.error(
+                    "🚫 Serviço de imagens de satélite indisponível no "
+                    "momento. Tente novamente mais tarde."
+                )
+                st.caption(str(e))
+                st.session_state.pop(estado_chave, None)
+            except Exception as e:
+                st.error(f"🚫 Erro ao processar imagens: {e}")
+                st.session_state.pop(estado_chave, None)
+
+
+def _render_resultado_ndvi(lote_name: str, resultado, nuvem_max: int) -> None:
+    """Renderiza os resultados (métricas e gráfico) ou mensagem de ausência."""
+    if resultado.serie:
+        m1, m2, m3 = st.columns(3)
+        m1.metric(
+            "Última imagem utilizável",
+            _data_br(resultado.serie[-1].data),
+        )
+        m2.metric(
+            "NDVI mais recente",
+            _num_br(resultado.serie[-1].ndvi_medio, 3),
+        )
+        m3.metric(
+            "Maior vão sem imagem",
+            f"{resultado.maior_vao_dias} dias",
+        )
+
+        if resultado.maior_vao_dias > 60:
+            st.warning(
+                f"⚠️ Maior vão: {resultado.maior_vao_dias} dias. "
+                "Intervalos longos sem imagens utilizáveis são "
+                "comuns na estação chuvosa (outubro a abril) devido à "
+                "cobertura de nuvens, não constituindo falha."
+            )
+
+        df_plot = pd.DataFrame(
+            [
+                {
+                    "Data": p.data,
+                    "NDVI Médio": p.ndvi_medio,
+                    "Nuvem (%)": p.nuvem_pct_cena,
+                    "Cena": p.id_da_cena,
+                }
+                for p in resultado.serie
+            ]
+        )
+        fig_ndvi = px.line(
+            df_plot,
+            x="Data",
+            y="NDVI Médio",
+            markers=True,
+            title=f"Série Temporal de NDVI Médio — {lote_name}",
+        )
+        fig_ndvi.update_layout(
+            **PLOTLY,
+            height=300,
+            xaxis=dict(gridcolor=c["superficie"]),
+            yaxis=dict(gridcolor=c["superficie"], range=[0, 1]),
+        )
+        st.plotly_chart(fig_ndvi, use_container_width=True)
+    else:
+        st.info(
+            f"Nenhuma cena utilizável com nuvem ≤ {nuvem_max}% "
+            f"encontrada no período ({resultado.total_cenas_buscadas} "
+            f"cenas avaliadas). Maior vão: {resultado.maior_vao_dias} "
+            "dias."
+        )
+        if resultado.maior_vao_dias > 60:
+            st.warning(
+                f"⚠️ Maior vão: {resultado.maior_vao_dias} dias. "
+                "Na estação chuvosa é esperada a ausência temporária "
+                "de cenas aproveitáveis."
+            )
+
+
 def _render_secao_ndvi_lote(lote: dict) -> None:
     """Seção de consulta e série temporal de NDVI por piquete (Spec 0079)."""
     with st.expander(f"🛰️ NDVI (satélite) — {lote['name']}"):
         st.info(AVISO_NDVI_MATERIA_SECA)
-        poligono_raw = lote.get("poligono")
-        if not poligono_raw:
-            st.caption(
-                "📍 Demarque o perímetro do piquete primeiro na seção acima "
-                "para habilitar a consulta de imagens de satélite."
-            )
+
+        anel = _obter_anel_lote(lote)
+        if not anel:
             return
 
-        anel = []
-        try:
-            anel = _ler_poligono(_poligono_para_texto(poligono_raw))
-        except (ValueError, TypeError):
-            pass
-
-        if not anel or geometria_validar(anel):
-            st.warning(
-                "⚠️ Perímetro cadastrado inválido. Corrija o perímetro na "
-                "seção acima antes de consultar o NDVI."
-            )
-            return
-
-        hoje = date.today()
-        c_i, c_f, c_nuv, c_btn = st.columns([2, 2, 2, 2])
-        with c_i:
-            d_inicio = st.date_input(
-                "Início",
-                value=hoje - timedelta(days=365),
-                key=f"ndvi_ini_{lote['id']}",
-            )
-        with c_f:
-            d_fim = st.date_input(
-                "Fim",
-                value=hoje,
-                key=f"ndvi_fim_{lote['id']}",
-            )
-        with c_nuv:
-            nuvem_max = st.number_input(
-                "Nuvem máx. (%)",
-                min_value=5,
-                max_value=80,
-                value=20,
-                step=5,
-                key=f"ndvi_nuv_{lote['id']}",
-            )
-        with c_btn:
-            st.write("")
-            st.write("")
-            buscar = st.button(
-                "🛰️ Consultar NDVI", key=f"ndvi_btn_{lote['id']}"
-            )
+        d_inicio, d_fim, nuvem_max, buscar = _render_form_ndvi(str(lote["id"]))
 
         estado_chave = f"ndvi_dados_{lote['id']}"
+
         if buscar:
-            if d_inicio > d_fim:
-                st.error(
-                    "🚫 Data de início não pode ser posterior à data de fim."
-                )
-            else:
-                with st.spinner("Buscando cenas de satélite e calculando..."):
-                    try:
-                        res = _consultar_ndvi_cacheado(
-                            tuple(anel), d_inicio, d_fim, int(nuvem_max)
-                        )
-                        st.session_state[estado_chave] = res
-                    except NdviIndisponivelError as e:
-                        st.error(
-                            "🚫 Serviço de imagens de satélite indisponível no "
-                            "momento. Tente novamente mais tarde."
-                        )
-                        st.caption(str(e))
-                        st.session_state.pop(estado_chave, None)
-                    except Exception as e:
-                        st.error(f"🚫 Erro ao processar imagens: {e}")
-                        st.session_state.pop(estado_chave, None)
+            _processar_busca_ndvi(
+                anel, d_inicio, d_fim, int(nuvem_max), estado_chave
+            )
 
         resultado = st.session_state.get(estado_chave)
         if resultado is not None:
-            if resultado.serie:
-                m1, m2, m3 = st.columns(3)
-                m1.metric(
-                    "Última imagem utilizável",
-                    _data_br(resultado.serie[-1].data),
-                )
-                m2.metric(
-                    "NDVI mais recente",
-                    _num_br(resultado.serie[-1].ndvi_medio, 3),
-                )
-                m3.metric(
-                    "Maior vão sem imagem",
-                    f"{resultado.maior_vao_dias} dias",
-                )
+            _render_resultado_ndvi(lote["name"], resultado, int(nuvem_max))
 
-                if resultado.maior_vao_dias > 60:
-                    st.warning(
-                        f"⚠️ Maior vão: {resultado.maior_vao_dias} dias. "
-                        "Intervalos longos sem imagens utilizáveis são "
-                        "comuns na estação chuvosa (outubro a abril) devido à "
-                        "cobertura de nuvens, não constituindo falha."
-                    )
 
-                df_plot = pd.DataFrame([
-                    {
-                        "Data": p.data,
-                        "NDVI Médio": p.ndvi_medio,
-                        "Nuvem (%)": p.nuvem_pct_cena,
-                        "Cena": p.id_da_cena,
-                    }
-                    for p in resultado.serie
-                ])
-                fig_ndvi = px.line(
-                    df_plot,
-                    x="Data",
-                    y="NDVI Médio",
-                    markers=True,
-                    title=f"Série Temporal de NDVI Médio — {lote['name']}",
-                )
-                fig_ndvi.update_layout(
-                    **PLOTLY,
-                    height=300,
-                    xaxis=dict(gridcolor=c["superficie"]),
-                    yaxis=dict(gridcolor=c["superficie"], range=[0, 1]),
-                )
-                st.plotly_chart(fig_ndvi, use_container_width=True)
+def _render_lote_card(l):
+    ua  = l["total_ua"] or 0
+    cap = l["capacity_ua"] or 0
+    has_cap = cap > 0
+    pct = min(ua/cap*100, 100) if has_cap else 0
+    bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
+    status_badge={"ativo":'<span class="badge-green">Ativo</span>',
+        "descanso":'<span class="badge-yellow">Descanso</span>',
+        "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
+    dias_ocup=""
+    if l.get("last_entry_date") and l.get("last_exit_date"):
+        d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
+        d1=datetime.strptime(l["last_exit_date"],"%Y-%m-%d").date()
+        dias_ocup=f"Última ocupação: {abs((d1-d0).days)} dias"
+    elif l.get("last_entry_date"):
+        d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
+        dias_ocup=f"Em ocupação há {(date.today()-d0).days} dias"
+
+    # Ocupação: só mostra % quando há capacidade definida (> 0)
+    if has_cap:
+        ocup_txt = f"{_num_br(ua, 1)} / {_num_br(cap, 0)} UA ({_num_br(pct, 0)}%)"
+        cap_txt  = f"Cap. {_num_br(cap, 0)} UA"
+        barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
+                 f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
+    else:
+        ocup_txt = f"{_num_br(ua, 1)} UA · sem capacidade definida"
+        cap_txt  = "Sem capacidade de pasto (curral/manejo)"
+        barra = ""
+
+    st.markdown(f"""
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <div>
+          <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
+          <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
+            {l['area_ha']} ha · {cap_txt} · {dias_ocup}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
+          <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
+        </div>
+      </div>
+      {barra}
+    </div>""",unsafe_allow_html=True)
+
+
+def _render_lote_animais(l):
+    with st.expander(f"Ver animais do {l['name']}"):
+        anilist=db.get_all_animals(lote_id=l["id"])
+        if anilist:
+            a_ids = [a["id"] for a in anilist]
+            gmd_batch = db.calculate_gmd_bulk(a_ids)
+            rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
+                "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
+            st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
+                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                    "GMD":st.column_config.NumberColumn(format="%.3f")})
+        else:
+            st.caption("Nenhum animal neste lote.")
+
+
+def _render_lote_perimetro(l):
+    with st.expander(f"🗺️ Perímetro do {l['name']}"):
+        st.caption("Desenhe no mapa, importe um arquivo ou edite o texto — os "
+                   "três métodos alimentam o mesmo perímetro, mesma tela de "
+                   "Propriedades. A área é **calculada** do desenho, não "
+                   "digitada — salvar o perímetro atualiza o campo Área do "
+                   "piquete automaticamente.")
+        texto_l = _entrada_de_perimetro(f"lote_poligono_{l['id']}",
+                                        _poligono_para_texto(l.get("poligono")))
+
+        anel_l, erro_l, problemas_l = [], "", []
+        if texto_l.strip():
+            try:
+                anel_l = _ler_poligono(texto_l)
+            except ValueError as e:
+                erro_l = str(e)
             else:
-                st.info(
-                    f"Nenhuma cena utilizável com nuvem ≤ {nuvem_max}% "
-                    f"encontrada no período ({resultado.total_cenas_buscadas} "
-                    f"cenas avaliadas). Maior vão: {resultado.maior_vao_dias} "
-                    "dias."
-                )
-                if resultado.maior_vao_dias > 60:
-                    st.warning(
-                        f"⚠️ Maior vão: {resultado.maior_vao_dias} dias. "
-                        "Na estação chuvosa é esperada a ausência temporária "
-                        "de cenas aproveitáveis."
-                    )
+                problemas_l = geometria_validar(anel_l)
+
+        if erro_l:
+            st.error(f"🚫 {erro_l}")
+        for prob in problemas_l:
+            st.error(f"🚫 {prob}")
+
+        if anel_l and not problemas_l:
+            area_desenhada = geometria_area_ha(anel_l)
+            diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
+            gl1, gl2 = st.columns(2)
+            gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
+                       help="É o que vai gravar no campo Área ao salvar.")
+            gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
+                       delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
+                             if diverge else None))
+        elif not texto_l.strip() and l.get("poligono"):
+            st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
+                       "último valor calculado, editável à mão (Trilha 2: "
+                       "piquete sem geometria continua funcionando).")
+
+        pode_l = not erro_l and not problemas_l
+        if st.button("💾 Salvar perímetro", disabled=not pode_l,
+                     key=f"lote_poligono_salvar_{l['id']}"):
+            novo = (json.dumps({"type": "Polygon",
+                                "coordinates": [[list(v) for v in anel_l]]})
+                   if anel_l else None)
+            db.set_lote_poligono(l["id"], novo)
+            if novo:
+                st.success(f"✅ Perímetro salvo — Área atualizada para "
+                          f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
+            else:
+                st.success("✅ Perímetro removido.")
+            st.rerun()
+
+
+def _render_grafico_ua_lotes(lotes):
+    df_lot=pd.DataFrame([{"Lote":f"{l['id']}·{l['name'][:8]}",
+        "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
+    fig_l=go.Figure()
+    fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
+        marker_color=c["borda"])
+    fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
+        marker_color=c["primaria"])
+    fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
+        legend=dict(orientation="h",y=1.1),
+        xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
+    st.plotly_chart(fig_l,use_container_width=True)
 
 
 def _render_tab_visao_geral(lotes):
     for l in lotes:
-        ua  = l["total_ua"] or 0
-        cap = l["capacity_ua"] or 0
-        has_cap = cap > 0
-        pct = min(ua/cap*100, 100) if has_cap else 0
-        bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
-        status_badge={"ativo":'<span class="badge-green">Ativo</span>',
-            "descanso":'<span class="badge-yellow">Descanso</span>',
-            "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
-        dias_ocup=""
-        if l.get("last_entry_date") and l.get("last_exit_date"):
-            d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
-            d1=datetime.strptime(l["last_exit_date"],"%Y-%m-%d").date()
-            dias_ocup=f"Última ocupação: {abs((d1-d0).days)} dias"
-        elif l.get("last_entry_date"):
-            d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
-            dias_ocup=f"Em ocupação há {(date.today()-d0).days} dias"
-
-        # Ocupação: só mostra % quando há capacidade definida (> 0)
-        if has_cap:
-            ocup_txt = f"{_num_br(ua, 1)} / {_num_br(cap, 0)} UA ({_num_br(pct, 0)}%)"
-            cap_txt  = f"Cap. {_num_br(cap, 0)} UA"
-            barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
-                     f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
-        else:
-            ocup_txt = f"{_num_br(ua, 1)} UA · sem capacidade definida"
-            cap_txt  = "Sem capacidade de pasto (curral/manejo)"
-            barra = ""
-
-        st.markdown(f"""
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
-            <div>
-              <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
-              <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
-                {l['area_ha']} ha · {cap_txt} · {dias_ocup}
-              </div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
-              <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
-            </div>
-          </div>
-          {barra}
-        </div>""",unsafe_allow_html=True)
-
-        # Lista de animais do lote
-        with st.expander(f"Ver animais do {l['name']}"):
-            anilist=db.get_all_animals(lote_id=l["id"])
-            if anilist:
-                a_ids = [a["id"] for a in anilist]
-                gmd_batch = db.calculate_gmd_bulk(a_ids)
-                rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
-                    "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
-                st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
-                    column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                        "GMD":st.column_config.NumberColumn(format="%.3f")})
-            else:
-                st.caption("Nenhum animal neste lote.")
-
-        # Perímetro do piquete (migration 0015)
-        with st.expander(f"🗺️ Perímetro do {l['name']}"):
-            st.caption("Desenhe no mapa, importe um arquivo ou edite o texto — os "
-                       "três métodos alimentam o mesmo perímetro, mesma tela de "
-                       "Propriedades. A área é **calculada** do desenho, não "
-                       "digitada — salvar o perímetro atualiza o campo Área do "
-                       "piquete automaticamente.")
-            texto_l = _entrada_de_perimetro(f"lote_poligono_{l['id']}",
-                                            _poligono_para_texto(l.get("poligono")))
-
-            anel_l, erro_l, problemas_l = [], "", []
-            if texto_l.strip():
-                try:
-                    anel_l = _ler_poligono(texto_l)
-                except ValueError as e:
-                    erro_l = str(e)
-                else:
-                    problemas_l = geometria_validar(anel_l)
-
-            if erro_l:
-                st.error(f"🚫 {erro_l}")
-            for prob in problemas_l:
-                st.error(f"🚫 {prob}")
-
-            if anel_l and not problemas_l:
-                area_desenhada = geometria_area_ha(anel_l)
-                diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
-                gl1, gl2 = st.columns(2)
-                gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
-                           help="É o que vai gravar no campo Área ao salvar.")
-                gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
-                           delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
-                                 if diverge else None))
-            elif not texto_l.strip() and l.get("poligono"):
-                st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
-                           "último valor calculado, editável à mão (Trilha 2: "
-                           "piquete sem geometria continua funcionando).")
-
-            pode_l = not erro_l and not problemas_l
-            if st.button("💾 Salvar perímetro", disabled=not pode_l,
-                         key=f"lote_poligono_salvar_{l['id']}"):
-                novo = (json.dumps({"type": "Polygon",
-                                    "coordinates": [[list(v) for v in anel_l]]})
-                       if anel_l else None)
-                db.set_lote_poligono(l["id"], novo)
-                if novo:
-                    st.success(f"✅ Perímetro salvo — Área atualizada para "
-                              f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
-                else:
-                    st.success("✅ Perímetro removido.")
-                st.rerun()
-
-        # NDVI do piquete por satélite (Spec 0079)
+        _render_lote_card(l)
+        _render_lote_animais(l)
+        _render_lote_perimetro(l)
         _render_secao_ndvi_lote(l)
 
-    # Gráfico UA por Lote
     if lotes:
-        df_lot=pd.DataFrame([{"Lote":f"{l['id']}·{l['name'][:8]}",
-            "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
-        fig_l=go.Figure()
-        fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
-            marker_color=c["borda"])
-        fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
-            marker_color=c["primaria"])
-        fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
-            legend=dict(orientation="h",y=1.1),
-            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
-        st.plotly_chart(fig_l,use_container_width=True)
+        _render_grafico_ua_lotes(lotes)
 
 
 def _render_tab_novo_lote():
@@ -2728,8 +2797,9 @@ def _lotes_transferir_animais(lotes):
             if not sel_ids:
                 st.error("Selecione ao menos um animal.")
             else:
-                r = db.move_animals_bulk(sel_ids, destino["id"], mv_date.strftime("%Y-%m-%d"),
-                    reason, st.session_state.user["name"], notes_t)
+                r = db.move_animals_bulk(sel_ids, db.MovementParams(
+                    destino["id"], mv_date.strftime("%Y-%m-%d"), reason, st.session_state.user["name"], notes_t
+                ))
                 if r["movidos"]:
                     st.success(f"✅ {_plural(len(r['movidos']),'animal transferido','animais transferidos')} "
                               f"para {destino['name']}.")
@@ -2769,8 +2839,8 @@ def _fin_precos():
             st.rerun()
 
 
-def _fin_venda(animals):
-    """Registro de venda (por kg / cabeça / lote), com lucro real."""
+
+def _fin_venda_registro(animals):
     st.subheader("💵 Registrar Venda")
     if not animals:
         st.info("Não há animais ativos para vender.");
@@ -2856,10 +2926,10 @@ def _fin_venda(animals):
                                   "Contas a Receber (aba em Financeiro).")
                     st.rerun()
 
+def _fin_venda_historico(vendas):
     # Histórico de vendas
     st.markdown("---")
     st.markdown("**📜 Vendas Registradas**")
-    vendas = db.get_sales()
     if vendas:
         df_v = pd.DataFrame(vendas)[["sale_date","animal_id","breed","sale_type","pricing_mode",
                                      "weight_kg","total_value","cost_at_sale","profit","buyer"]].copy()
@@ -2874,6 +2944,8 @@ def _fin_venda(animals):
     else:
         st.info("Nenhuma venda registrada ainda.")
 
+
+def _fin_venda_custo_lote(vendas):
     # Custo por lote de venda (ROADMAP §5, Trilha 3 — último item da trilha:
     # já existia custo/kg e custo/@ por animal (aba "Custos por Animal") e
     # por piquete (Nutrição, `_nutricao_custo_por_piquete`); faltava por
@@ -2906,6 +2978,13 @@ def _fin_venda(animals):
     else:
         st.info("Nenhuma venda registrada ainda.")
 
+
+def _fin_venda(animals):
+    """Registro de venda (por kg / cabeça / lote), com lucro real."""
+    _fin_venda_registro(animals)
+    vendas = db.get_sales()
+    _fin_venda_historico(vendas)
+    _fin_venda_custo_lote(vendas)
 
 def _fin_lancamentos(start_iso=None, end_iso=None) -> list[dict]:
     """Lista única de lançamentos (spec 0034) — vendas, custos fixos, custos
@@ -3681,55 +3760,47 @@ def _fin_custos_fixos(animals, lotes):
 
 
 
-def _fin_simulador(animals):
-    ul = _unit_label()
-    arroba_mode = _use_arroba()
-    st.subheader("💵 Simulador de Venda")
-
-    precos_cat = db.get_category_prices()
-    base = st.radio("Base de preço",
-        ["categoria","manual"],
-        format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
-                              else "✏️ Preço único manual",
-        horizontal=True, key="sim_base")
-
+def _simulador_render_manual_input(arroba_mode, ul, c):
     cotacao = 0.0
     rendimento = 52
-    ajuste_pct = 0
-    if base == "manual":
-        sc1, sc2 = st.columns(2)
-        with sc1:
-            price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
-            default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
-            cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
-                value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
-            if arroba_mode:
-                rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
-        with sc2:
-            sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
-            st.markdown(
-                f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
-                f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {_num_br(cotacao, 2)}/{ul}</div>'
-                f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
-                unsafe_allow_html=True)
-    else:  # categoria
-        st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
-                   "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
-        if not precos_cat or all(v <= 0 for v in precos_cat.values()):
-            st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
-                       "e informe os valores por kg de cada categoria.")
-        ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
-            help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
-        # Mostra os preços em uso
-        linhas = []
-        for band in AGE_BANDS:
-            for sex in ("M","F"):
-                p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
-                if p > 0:
-                    linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {_num_br(p, 2)}/kg")
-        if linhas:
-            st.caption("Preços aplicados: " + "  |  ".join(linhas))
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
+        default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
+        cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
+            value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
+        if arroba_mode:
+            rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
+    with sc2:
+        sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
+        st.markdown(
+            f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
+            f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {_num_br(cotacao, 2)}/{ul}</div>'
+            f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
+            unsafe_allow_html=True)
+    return cotacao, rendimento
 
+def _simulador_render_category_input(precos_cat):
+    ajuste_pct = 0
+    st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
+               "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
+    if not precos_cat or all(v <= 0 for v in precos_cat.values()):
+        st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
+                   "e informe os valores por kg de cada categoria.")
+    ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
+        help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
+    # Mostra os preços em uso
+    linhas = []
+    for band in AGE_BANDS:
+        for sex in ("M","F"):
+            p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
+            if p > 0:
+                linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {_num_br(p, 2)}/kg")
+    if linhas:
+        st.caption("Preços aplicados: " + "  |  ".join(linhas))
+    return ajuste_pct
+
+def _simulador_get_fixed_costs_apportionment(animals):
     incluir_fixos=st.checkbox("Incluir rateio de custos fixos no cálculo",
         help="Divide os custos fixos do ano igualmente entre os animais ativos")
 
@@ -3740,7 +3811,9 @@ def _fin_simulador(animals):
         rateio_fixo = total_fix_ano / len(animals)
         st.info(f"Rateio de custos fixos: **R\\$ {rateio_fixo:,.2f}** por animal "
                 f"(total R\\$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
+    return rateio_fixo
 
+def _simulador_calculate_data(animals, base, precos_cat, ajuste_pct, cotacao, rendimento, rateio_fixo, ul):
     sim_rows=[]
     sem_preco=[]
     costs = db._costs_by_animal()
@@ -3764,16 +3837,19 @@ def _fin_simulador(animals):
             "Receita (R$)":receita,"Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
             "Margem (%)":round(lucro/receita*100,1) if receita else 0})
     df_sim=pd.DataFrame(sim_rows)
-    if base != "categoria":
+    if base != "categoria" and "Preço (R$/kg)" in df_sim.columns:
         df_sim = df_sim.drop(columns=["Preço (R$/kg)"])
+    return df_sim, sem_preco
 
+def _simulador_render_results(df_sim, sem_preco, base, arroba_mode, ul):
     if sem_preco:
         st.warning(f"⚠️ Sem preço de categoria (receita R$ 0): **{', '.join(sem_preco)}**. "
                    f"Defina os valores em **Preços/Categoria**.")
 
-    tot_rec=df_sim["Receita (R$)"].sum(); tot_luc=df_sim["Lucro (R$)"].sum()
-    tot_cost=df_sim["Custo Total (R$)"].sum()
-    margem_media=df_sim["Margem (%)"].mean()
+    tot_rec=df_sim["Receita (R$)"].sum() if not df_sim.empty else 0
+    tot_luc=df_sim["Lucro (R$)"].sum() if not df_sim.empty else 0
+    tot_cost=df_sim["Custo Total (R$)"].sum() if not df_sim.empty else 0
+    margem_media=df_sim["Margem (%)"].mean() if not df_sim.empty else 0
 
     sk=st.columns(4)
     sk[0].metric("Receita Total", f"R$ {tot_rec:,.2f}")
@@ -3796,6 +3872,34 @@ def _fin_simulador(animals):
     if base == "categoria":
         cfg["Preço (R$/kg)"]=st.column_config.NumberColumn(format="R$ %.2f")
     st.dataframe(df_sim,use_container_width=True,hide_index=True,column_config=cfg)
+
+def _fin_simulador(animals):
+    ul = _unit_label()
+    arroba_mode = _use_arroba()
+    st.subheader("💵 Simulador de Venda")
+
+    precos_cat = db.get_category_prices()
+    base = st.radio("Base de preço",
+        ["categoria","manual"],
+        format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
+                              else "✏️ Preço único manual",
+        horizontal=True, key="sim_base")
+
+    cotacao = 0.0
+    rendimento = 52
+    ajuste_pct = 0
+    if base == "manual":
+        cotacao, rendimento = _simulador_render_manual_input(arroba_mode, ul, c)
+    else:
+        ajuste_pct = _simulador_render_category_input(precos_cat)
+
+    rateio_fixo = _simulador_get_fixed_costs_apportionment(animals)
+
+    df_sim, sem_preco = _simulador_calculate_data(
+        animals, base, precos_cat, ajuste_pct, cotacao, rendimento, rateio_fixo, ul
+    )
+
+    _simulador_render_results(df_sim, sem_preco, base, arroba_mode, ul)
 
 
 
@@ -3961,9 +4065,11 @@ def _fin_rateio_de_lote(animals):
     if st.button(f"💾 Lançar custo rateado para {len(preview)} animal(is)",
                  type="primary", disabled=not desc, key="rat_salvar"):
         for item in preview:
-            db.add_animal_cost(item["animal_id"], tipo, desc, item["valor"], referencia,
-                               notes=f"Rateio do piquete {lote_sel['id']} ({criterio}), "
-                                     f"total R$ {valor_total:,.2f}")
+            db.add_animal_cost(db.AnimalCostData(
+                item["animal_id"], tipo, desc, item["valor"], referencia,
+                notes=f"Rateio do piquete {lote_sel['id']} ({criterio}), "
+                      f"total R$ {valor_total:,.2f}"
+            ))
         db.clear_cache()
         st.success(f"✅ R$ {valor_total:,.2f} rateado entre {len(preview)} animal(is).")
         st.rerun()
@@ -5221,8 +5327,21 @@ def page_sanitario():
                 elif a_max < a_min:
                     st.error("Idade máxima deve ser ≥ mínima.")
                 else:
-                    db.add_protocol(nome.strip(), sexo_t, a_min, a_max, dose_v, dose_kg, dose_u,
-                        ins_link["id"] if ins_link else None, freq, carencia_p, via, notas)
+                    data = db.ProtocolData(
+                        name=nome.strip(),
+                        sex_target=sexo_t,
+                        age_min=a_min,
+                        age_max=a_max,
+                        dose_value=dose_v,
+                        dose_ref_kg=dose_kg,
+                        dose_unit=dose_u,
+                        insumo_id=ins_link["id"] if ins_link else None,
+                        frequency=freq,
+                        withdrawal_days=carencia_p,
+                        route=via,
+                        notes=notas,
+                    )
+                    db.add_protocol(data)
                     st.success(f"✅ Protocolo '{nome}' criado!")
                     st.rerun()
 

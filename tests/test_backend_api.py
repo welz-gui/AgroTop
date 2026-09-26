@@ -35,7 +35,7 @@ from backend_api.schemas import ConfirmarTratoInput
 from repositories.animais import get_all_animals, get_all_animal_ids, get_animal
 from repositories.conexao import _conn, configurar_sqlite
 from repositories.pesagens import get_weighings
-from repositories.sanidade import add_medication, get_withdrawal_end
+from repositories.sanidade import MedicationData, add_medication, get_withdrawal_end
 from services.geometria import area_hectares, perimetro_metros, validar
 
 
@@ -815,17 +815,17 @@ class TestSanidadeEndpoint(BackendApiTestCase):
         """Critério 3 (Spec 0050): a API expõe a carência calculada pelo repositório."""
         animal_id = get_all_animals()[0]["id"]
         hoje = datetime.now().date().isoformat()
-        add_medication(
-            animal_id,
-            "Medicamento de comparação",
-            2.5,
-            "mL",
-            "Subcutânea",
-            9,
-            hoje,
+        add_medication(MedicationData(
+            animal_id=animal_id,
+            medication_name="Medicamento de comparação",
+            dose=2.5,
+            unit="mL",
+            application_route="Subcutânea",
+            withdrawal_days=9,
+            med_date=hoje,
             applied_by="preparo_teste",
             protocol_id=None,
-        )
+        ))
         esperado = get_withdrawal_end(animal_id)
         self.assertIsNotNone(esperado)
 
@@ -1638,27 +1638,27 @@ class TestAlertasEndpoint(BackendApiTestCase):
         add_animal("ALERTA_GMD", 300.0, 500.0, today - timedelta(days=20))
         add_animal("ALERTA_SEM_GMD", 300.0, 500.0, today)
 
-        add_medication(
-            "ALERTA_CARENCIA",
-            "Medicamento com carência",
-            1.0,
-            "mL",
-            "Subcutânea",
-            4,
-            today.isoformat(),
+        add_medication(MedicationData(
+            animal_id="ALERTA_CARENCIA",
+            medication_name="Medicamento com carência",
+            dose=1.0,
+            unit="mL",
+            application_route="Subcutânea",
+            withdrawal_days=4,
+            med_date=today.isoformat(),
             applied_by="teste",
-        )
-        add_medication(
-            "ALERTA_CARENCIA_VENCIDA",
-            "Medicamento vencido",
-            1.0,
-            "mL",
-            "Subcutânea",
-            2,
-            (today - timedelta(days=5)).isoformat(),
+        ))
+        add_medication(MedicationData(
+            animal_id="ALERTA_CARENCIA_VENCIDA",
+            medication_name="Medicamento vencido",
+            dose=1.0,
+            unit="mL",
+            application_route="Subcutânea",
+            withdrawal_days=2,
+            med_date=(today - timedelta(days=5)).isoformat(),
             applied_by="teste",
-        )
-        db.add_weighing("ALERTA_GMD", 308.0, today.isoformat())
+        ))
+        db.add_weighing(db.WeighingCreate(animal_id="ALERTA_GMD", weight=308.0, weigh_date=today.isoformat()))
         db.set_setting("gmd_meta", "0.5")
         with _conn() as con:
             stock_id = con.execute(
@@ -2125,8 +2125,8 @@ class TestRecomendacoesApi(BackendApiTestCase):
             )
         d1 = (date.today() - timedelta(days=100)).isoformat()
         d2 = date.today().isoformat()
-        db.add_weighing("BOV001", 300.0, d1)
-        db.add_weighing("BOV001", 310.0, d2)
+        db.add_weighing(db.WeighingCreate(animal_id="BOV001", weight=300.0, weigh_date=d1))
+        db.add_weighing(db.WeighingCreate(animal_id="BOV001", weight=310.0, weigh_date=d2))
         db.clear_cache()
 
         contexto_direto = db.contexto_recomendacoes()
@@ -2676,7 +2676,7 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
             con.execute("DELETE FROM medications WHERE animal_uuid IN (?, ?)", (u2, u3))
 
         # Adicionar medicamento com carência no BR0001
-        add_medication(
+        add_medication(MedicationData(
             animal_id="BR0001",
             medication_name="Vacina Teste Carencia",
             dose=10,
@@ -2685,7 +2685,7 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
             withdrawal_days=45,
             med_date=date.today().isoformat(),
             applied_by="Veterinario",
-        )
+        ))
 
         db.clear_cache()
 
@@ -2801,30 +2801,30 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
         d3 = (today - timedelta(days=2)).isoformat()
 
         # Adiciona pesagens com métodos diferentes
-        db.add_weighing(
+        db.add_weighing(db.WeighingCreate(
             animal_id="BR0001",
             weigh_date=d1,
             weight=410.0,
             method="pesado",
             operator="Op A",
             notes="Nota A",
-        )
-        db.add_weighing(
+        ))
+        db.add_weighing(db.WeighingCreate(
             animal_id="BR0001",
             weigh_date=d2,
             weight=420.0,
             method="estimado",
             operator="Op B",
             notes="Nota B",
-        )
-        db.add_weighing(
+        ))
+        db.add_weighing(db.WeighingCreate(
             animal_id="BR0002",
             weigh_date=d3,
             weight=390.0,
             method="fita",
             operator="Op C",
             notes="Nota C",
-        )
+        ))
         db.clear_cache()
 
         response = self.client.get("/relatorios/pesagens", headers=self._headers())

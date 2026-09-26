@@ -192,8 +192,8 @@ class TestImportacaoLigada(BaseIntegracao):
         self.assertEqual(len(r["aceitas"]), 1, r)
 
         linha = r["aceitas"][0]
-        db.add_weighing(linha["animal_id"], linha["peso"], linha["data"],
-                        operator="teste", notes="importado")
+        db.add_weighing(db.WeighingCreate(animal_id=linha["animal_id"], weight=linha["peso"], weigh_date=linha["data"],
+                        operator="teste", notes="importado"))
         db.clear_cache()
 
         pesagens = db.get_weighings(a)

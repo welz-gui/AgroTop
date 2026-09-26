@@ -96,22 +96,24 @@ from repositories import compras as compras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_all_animal_ids, count_animals, get_total_gain_kg, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
-    _seed_animals, AnimalData,
+    _seed_animals, AnimalData, MovementParams,
 )
 from repositories.pesagens import (
     calculate_gmd_bulk,  # noqa: F401
-    _weighings_by_animal, get_weighings, get_weighings_batch, add_weighing, get_all_weighings,
+    WeighingCreate, _weighings_by_animal, get_weighings, get_weighings_batch, add_weighing, get_all_weighings,
     get_average_weighings_by_date, calculate_gmd, get_last_estimate
 )
 from repositories.sanidade import (
+    MedicationData,
     get_withdrawal_end_batch,  # noqa: F401
     _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
     get_protocols, add_protocol, set_protocol_active, delete_protocol,
     _protocol_pending, get_protocol_plan, apply_protocol_campaign, dose_for_animal,
+    ProtocolData,
 )
 from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,
-    add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
+    AnimalCostData, add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
     delete_fixed_cost, get_fixed_costs_by_category, register_sale, get_sales,
     get_financial_summary, get_insumo_compras, register_death, get_deaths,
     get_mortality_stats, get_category_prices, set_category_price,
@@ -2038,18 +2040,19 @@ def get_pending_feedings(ref_date: Optional[date] = None) -> list[dict]:
     if not plans:
         return []
 
-    plan_ids = [p["id"] for p in plans]
     last_checks = {}
 
     with _conn() as con:
-        chunk_size = 900
-        for i in range(0, len(plan_ids), chunk_size):
-            chunk = plan_ids[i:i+chunk_size]
-            placeholders = ",".join("?" * len(chunk))
-            query = f"SELECT plan_id, MAX(check_date) as check_date FROM feeding_checks WHERE plan_id IN ({placeholders}) GROUP BY plan_id"
-            rows = con.execute(query, chunk).fetchall()
-            for row in rows:
-                last_checks[row["plan_id"]] = row["check_date"]
+        query = """
+            SELECT c.plan_id, MAX(c.check_date) as check_date
+            FROM feeding_checks c
+            JOIN feeding_plans p ON c.plan_id = p.id
+            WHERE p.active = 1
+            GROUP BY c.plan_id
+        """
+        rows = con.execute(query).fetchall()
+        for row in rows:
+            last_checks[row["plan_id"]] = row["check_date"]
 
         result = []
         for p in plans:

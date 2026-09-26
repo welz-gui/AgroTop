@@ -19,7 +19,7 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from repositories.animais import add_animal, get_animal  # noqa: E402
-from repositories.sanidade import add_medication  # noqa: E402
+from repositories.sanidade import MedicationData, add_medication  # noqa: E402
 
 
 class TestAlertaDeCarencia(unittest.TestCase):
@@ -41,11 +41,11 @@ class TestAlertaDeCarencia(unittest.TestCase):
 
     def test_animal_em_carencia_aparece_no_alerta(self):
         animal_id = self.animal["id"]
-        add_medication(
-            animal_id, "Ivermectina", 2.0, "ml", "Subcutânea",
+        add_medication(MedicationData(
+            animal_id=animal_id, medication_name="Ivermectina", dose=2.0, unit="ml", application_route="Subcutânea",
             withdrawal_days=21, med_date=db.date.today().isoformat(),
             applied_by="op1",
-        )
+        ))
 
         # A mudança de status é o mecanismo real que causava o bug — confirma
         # que o cenário de teste é o mesmo que acontece em produção.
@@ -65,11 +65,11 @@ class TestAlertaDeCarencia(unittest.TestCase):
         """A categoria "ativo apenas" era usada pras outras categorias também —
         confirma que somar "carencia" não filtrou incorretamente as demais."""
         animal_id = self.animal["id"]
-        add_medication(
-            animal_id, "Ivermectina", 2.0, "ml", "Subcutânea",
+        add_medication(MedicationData(
+            animal_id=animal_id, medication_name="Ivermectina", dose=2.0, unit="ml", application_route="Subcutânea",
             withdrawal_days=21, med_date=db.date.today().isoformat(),
             applied_by="op1",
-        )
+        ))
         alertas = db.get_alert_animals()
         todos_ids = (
             {a["id"] for a in alertas["sumidos"]}
@@ -79,6 +79,22 @@ class TestAlertaDeCarencia(unittest.TestCase):
         # Não precisa estar em sumidos/prontos — só confirma que a função não
         # quebrou ao processar um animal com status != "ativo".
         self.assertTrue(todos_ids)
+
+
+
+    def test_animal_em_carencia_ignora_data_invalida(self):
+        animal_id = self.animal["id"]
+        # Use a structurally valid but calendar-invalid date to trigger ValueError
+        # in datetime.strptime when parsing med_date in get_alert_animals
+        add_medication(MedicationData(
+            animal_id=animal_id, medication_name="Ivermectina", dose=2.0,
+            unit="ml", application_route="Subcutânea",
+            withdrawal_days=21, med_date="2021-02-29",
+            applied_by="op1",
+        ))
+        alertas = db.get_alert_animals()
+        self.assertIsInstance(alertas, dict)
+
 
 
 if __name__ == "__main__":
