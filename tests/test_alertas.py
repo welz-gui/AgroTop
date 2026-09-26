@@ -81,5 +81,20 @@ class TestAlertaDeCarencia(unittest.TestCase):
         self.assertTrue(todos_ids)
 
 
+
+    def test_animal_em_carencia_ignora_data_invalida(self):
+        animal_id = self.animal["id"]
+        # Use a structurally valid but calendar-invalid date to trigger ValueError
+        # in datetime.strptime when parsing med_date in get_alert_animals
+        add_medication(
+            animal_id, "Ivermectina", 2.0, "ml", "Subcutânea",
+            withdrawal_days=21, med_date="2021-02-29",
+            applied_by="op1",
+        )
+        alertas = db.get_alert_animals()
+        self.assertIsInstance(alertas, dict)
+
+
+
 if __name__ == "__main__":
     unittest.main()
