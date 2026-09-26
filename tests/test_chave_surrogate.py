@@ -287,7 +287,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
 
     def test_custo_preenche(self):
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
-        db.add_animal_cost(aid, "sanitario", "Vacina", 25.0, "2026-07-31")
+        db.add_animal_cost(db.AnimalCostData(aid, "sanitario", "Vacina", 25.0, "2026-07-31"))
         self.assertEqual(self._sem_espelho("animal_costs", aid), [])
 
     def test_movimentacao_preenche(self):
@@ -312,7 +312,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
         """Varredura final: depois de exercitar as escritas, zero pendências."""
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
         db.add_weighing(db.WeighingCreate(animal_id=aid, weight=420.0, weigh_date="2026-07-31"))
-        db.add_animal_cost(aid, "operacional", "Sal", 10.0, "2026-07-31")
+        db.add_animal_cost(db.AnimalCostData(aid, "operacional", "Sal", 10.0, "2026-07-31"))
 
         pendentes = {}
         for t in ("weighings", "medications", "animal_costs", "animal_movements",

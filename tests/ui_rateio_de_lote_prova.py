@@ -95,8 +95,10 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
 
         antes = {p["animal_id"]: db.get_total_cost(p["animal_id"]) for p in preview}
         for p in preview:
-            db.add_animal_cost(p["animal_id"], "veterinário", "prova rateio",
-                               p["valor"], date.today().isoformat())
+            db.add_animal_cost(db.AnimalCostData(
+                p["animal_id"], "veterinário", "prova rateio",
+                p["valor"], date.today().isoformat()
+            ))
         db.clear_cache()
         depois_soma = sum(db.get_total_cost(p["animal_id"]) for p in preview)
         antes_soma = sum(antes.values())

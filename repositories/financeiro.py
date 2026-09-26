@@ -6,6 +6,7 @@ Sem Streamlit no topo do módulo.
 """
 
 from datetime import date, datetime
+from dataclasses import dataclass
 from typing import Optional
 
 from . import conexao as _conexao
@@ -20,6 +21,16 @@ from services.financeiro import valor_esperado_venda
 # compra a prazo dividem o total do mesmo jeito (resto na última parcela,
 # vencimento mensal com o dia preso ao mês). Reexportar em vez de duplicar (R8).
 from services.compras import gerar_parcelas
+
+
+@dataclass
+class AnimalCostData:
+    animal_id: str
+    cost_type: str
+    description: str
+    amount: float
+    cost_date: str
+    notes: str = ""
 
 
 @_cache
@@ -70,14 +81,14 @@ def get_all_animal_costs(start_date: Optional[str] = None,
 
 
 @_writes
-def add_animal_cost(animal_id, cost_type, description, amount, cost_date, notes="") -> None:
+def add_animal_cost(data: AnimalCostData) -> None:
     with _conn() as con:
-        uuid = uuid_de(con, animal_id)
+        uuid = uuid_de(con, data.animal_id)
         if uuid is None:
-            raise ValueError(f"Animal {animal_id} não encontrado.")
+            raise ValueError(f"Animal {data.animal_id} não encontrado.")
         con.execute(
             "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date,notes) VALUES(?,?,?,?,?,?)",
-            (uuid, cost_type, description, amount, cost_date, notes),
+            (uuid, data.cost_type, data.description, data.amount, data.cost_date, data.notes),
         )
 
 
