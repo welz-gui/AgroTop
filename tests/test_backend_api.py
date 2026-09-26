@@ -78,6 +78,13 @@ class BackendApiTestCase(unittest.TestCase):
         return res.json()["access_token"]
 
 
+class TestHealthEndpoint(BackendApiTestCase):
+    def test_health_endpoint_retorna_200_e_status_ok(self):
+        res = self.client.get("/health")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"status": "ok", "app": "AgroTop Backend API"})
+
+
 class TestAuthAndTokens(BackendApiTestCase):
     def test_login_sucesso_retorna_tokens_e_usuario(self):
         """Critério 1: POST /auth/login com credenciais válidas retorna access_token (JWT, 15 min),
@@ -365,6 +372,24 @@ class TestPesagensEndpoint(BackendApiTestCase):
             last_event = dict(events[-1])
             self.assertIn("465.5 kg", last_event["observacoes"])
 
+    @patch('backend_api.main.add_weighing')
+    def test_post_pesagem_add_weighing_value_error_retorna_404(self, mock_add_weighing):
+        """POST /animais/{id}/pesagens deve retornar 404 caso add_weighing suba ValueError."""
+        mock_add_weighing.side_effect = ValueError("Erro mockado na pesagem")
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # O ID em si nao importa muito já que estamos mockando o add_weighing
+        payload = {
+            "peso": 400.0,
+            "data": "2026-08-21",
+            "method": "pesado",
+            "notes": "Teste erro mockado"
+        }
+        res = self.client.post("/animais/ABC/pesagens", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("Erro mockado na pesagem", res.json()["detail"])
+
     def test_post_pesagem_animal_inexistente_retorna_404(self):
         """POST /animais/{id}/pesagens com ID inexistente retorna 404."""
         token = self._get_access_token()
@@ -548,6 +573,21 @@ class TestFotosEndpoint(BackendApiTestCase):
             files={"arquivo": ("foto.jpg", b"fake-jpg-content", "image/jpeg")},
         )
         self.assertEqual(res.status_code, 401)
+
+    def test_upload_foto_animal_inexistente_retorna_404(self):
+        """Testa se tentar fazer upload de foto de um animal inexistente retorna 404 (ValueError handling)."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        foto_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00\xff\xdb\x00C\x00test-image-content"
+
+        res = self.client.post(
+            "/animais/fake_id/fotos",
+            files={"arquivo": ("foto.jpg", foto_bytes, "image/jpeg")},
+            headers=headers,
+        )
+        self.assertEqual(res.status_code, 404)
+        self.assertIn("não encontrado", res.json()["detail"])
 
     def test_upload_foto_valida_grava_e_retorna_bytes_iguais(self):
         """Critério 2 (Spec 0052): Upload de imagem válida grava na tabela animal_photos e
@@ -880,6 +920,25 @@ class TestSanidadeEndpoint(BackendApiTestCase):
                 for item in get_res.json()["aplicacoes"]
             )
         )
+
+    @patch("backend_api.main.add_medication")
+    def test_post_medicamento_error_path(self, mock_add_medication):
+        """Garante que a exceção ValueError lançada ao adicionar medicamento é tratada corretamente."""
+        mock_add_medication.side_effect = ValueError("Medication error")
+        token = self._get_access_token()
+        animal_id = get_all_animals()[0]["id"]
+        payload = {
+            "medicamento": "Medicamento Erro",
+            "dose": 2.0,
+            "unidade": "mL",
+            "via": "Oral",
+            "carencia_dias": 0,
+            "data": "2023-01-01",
+        }
+        headers = {"Authorization": f"Bearer {token}"}
+        res = self.client.post(f"/animais/{animal_id}/medicamentos", json=payload, headers=headers)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json()["detail"], "Medication error")
 
     def test_backend_api_nao_duplica_sql_de_sanidade(self):
         """Critério 8 (Spec 0050): a rota delega persistência ao repositório."""
@@ -1273,6 +1332,24 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
         with _conn() as con:
             return con.execute("SELECT COUNT(*) FROM weighings").fetchone()[0]
 
+    @patch("tempfile.SpooledTemporaryFile.read")
+    def test_post_importar_csv_erro_decodificacao(self, mock_read):
+        """Testa se a API retorna 422 ao falhar em decodificar o arquivo (nem utf-8-sig nem latin-1)."""
+        class BadBytes(bytes):
+            def decode(self, *args, **kwargs):
+                raise UnicodeDecodeError("dummy", b"", 0, 1, "dummy reason")
+
+        mock_read.return_value = BadBytes(b"dummy")
+
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", b"dummy", "text/csv")},
+            data={"confirmar": "false"},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(res.json()["detail"], "Não foi possível decodificar o arquivo.")
+
     def test_post_importar_csv_sem_token_retorna_401(self):
         """Critério 1: POST /pesagens/importar-csv sem Authorization devolve 401."""
         csv_content = b"animal,peso,data\nBR0001,450.0,2026-08-20\n"
@@ -1486,6 +1563,17 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
             headers=self._headers(),
         )
         self.assertEqual(res_ext.status_code, 422)
+
+    @patch("tempfile.SpooledTemporaryFile.read", side_effect=Exception("Read error"))
+    def test_post_importar_csv_arquivo_unreadable(self, mock_read):
+        """Critério: Erro de leitura no arquivo retorna 422."""
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", b"dummy content", "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(res.json()["detail"], "Não foi possível ler o arquivo.")
 
     def test_backend_api_nao_duplica_sql_pesagens_importacao(self):
         """Critério 10: backend_api não contém SQL direto de escrita em weighings ou animals."""
@@ -2069,6 +2157,19 @@ class TestRecomendacoesApi(BackendApiTestCase):
         self.assertIsInstance(ctx["lotes"], list)
         self.assertIsInstance(ctx["insumos"], list)
         self.assertIsInstance(ctx["hoje"], str)
+
+    @patch('database.get_setting')
+    def test_database_contexto_preco_arroba_erro_parsing(self, mock_get_setting):
+        """Critério adicional: testa ValueError no float() do preco_arroba."""
+        # Configura o mock para devolver um valor inválido apenas para 'preco_arroba'
+        def side_effect(key, default=None):
+            if key == "preco_arroba":
+                return "abc" # Valor que causa ValueError no float()
+            return None # Outros settings default
+        mock_get_setting.side_effect = side_effect
+
+        ctx = db.contexto_recomendacoes()
+        self.assertIsNone(ctx["preco_arroba"])
 
     def test_app_py_funcoes_relocadas_removidas(self):
         """Critério 5: app.py não define mais as funções relocadas."""

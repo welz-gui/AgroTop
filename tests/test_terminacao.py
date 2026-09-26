@@ -3,6 +3,7 @@
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import database as db  # noqa: E402
@@ -52,6 +53,20 @@ class TestSimularTerminacao(unittest.TestCase):
         self.assertEqual(len(db.TERMINACAO_DEFAULTS), 3)
         cen = db.get_terminacao_cenarios()
         self.assertTrue(all("gmd" in c and "rendimento" in c for c in cen))
+
+    @patch('database.get_setting')
+    def test_get_terminacao_cenarios_error_paths(self, mock_get_setting):
+        # ValueError: string que não é um JSON válido
+        mock_get_setting.return_value = "{invalido]"
+        self.assertEqual(db.get_terminacao_cenarios(), [dict(c) for c in db.TERMINACAO_DEFAULTS])
+
+        # TypeError: valor que não é string e json.loads não consegue ler (ex: dict)
+        mock_get_setting.return_value = {"not": "string"}
+        self.assertEqual(db.get_terminacao_cenarios(), [dict(c) for c in db.TERMINACAO_DEFAULTS])
+
+        # Formato JSON válido, mas não é uma lista (ex: dicionário)
+        mock_get_setting.return_value = '{"dict": "not_list"}'
+        self.assertEqual(db.get_terminacao_cenarios(), [dict(c) for c in db.TERMINACAO_DEFAULTS])
 
 
 if __name__ == "__main__":

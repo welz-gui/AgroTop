@@ -14,10 +14,10 @@ def custo_medio_ponderado(
 
     Arredondar para 2 casas.
     """
-    if quantidade_entrada <= 0:
+    if float(quantidade_entrada) <= 0:
         return round(float(custo_atual), 2)
 
-    if saldo_atual <= 0:
+    if float(saldo_atual) <= 0:
         return round(float(custo_entrada), 2)
 
     total_quantidade = float(saldo_atual) + float(quantidade_entrada)

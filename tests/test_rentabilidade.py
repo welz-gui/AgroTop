@@ -1,5 +1,7 @@
 import inspect
 import unittest
+from dataclasses import asdict, dataclass
+from typing import Optional
 
 from services.rentabilidade import por_lote_de_venda, ranking_por_raca
 
@@ -166,13 +168,16 @@ class TestMargemNegativa(unittest.TestCase):
         self.assertLess(r[0]["lucro_por_arroba_produzida"], 0.0)
 
 
-def _venda(id, lot_ref=None, sale_date="2026-01-10", weight_kg=300.0,
-           cost_at_sale=900.0, total_value=1500.0, profit=600.0,
-           carcass_yield=0.52):
-    return {"id": id, "lot_ref": lot_ref, "sale_date": sale_date,
-            "weight_kg": weight_kg, "cost_at_sale": cost_at_sale,
-            "total_value": total_value, "profit": profit,
-            "carcass_yield": carcass_yield}
+@dataclass
+class VendaFixture:
+    id: int
+    lot_ref: Optional[str] = None
+    sale_date: str = "2026-01-10"
+    weight_kg: float = 300.0
+    cost_at_sale: float = 900.0
+    total_value: float = 1500.0
+    profit: float = 600.0
+    carcass_yield: Optional[float] = 0.52
 
 
 class TestPorLoteDeVenda(unittest.TestCase):
@@ -186,8 +191,8 @@ class TestPorLoteDeVenda(unittest.TestCase):
 
     def test_agrupa_por_lot_ref_somando_metricas(self):
         resultado = por_lote_de_venda([
-            _venda(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0),
-            _venda(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0),
+            asdict(VendaFixture(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0)),
+            asdict(VendaFixture(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0)),
         ])
 
         self.assertEqual(len(resultado), 1, "duas vendas do mesmo lote viraram dois lotes")
@@ -202,10 +207,10 @@ class TestPorLoteDeVenda(unittest.TestCase):
     def test_custo_por_kg_e_por_arroba_batem_com_a_conta_manual(self):
         # peso 600 kg, rendimento 52% -> 312 kg de carcaça -> 20.8 @
         resultado = por_lote_de_venda([
-            _venda(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0,
-                  carcass_yield=0.52),
-            _venda(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0,
-                  carcass_yield=0.52),
+            asdict(VendaFixture(1, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0,
+                  carcass_yield=0.52)),
+            asdict(VendaFixture(2, lot_ref="L1", weight_kg=300.0, cost_at_sale=900.0,
+                  carcass_yield=0.52)),
         ])
 
         lote = resultado[0]
@@ -216,8 +221,8 @@ class TestPorLoteDeVenda(unittest.TestCase):
         """Duas vendas avulsas (lot_ref=None) não podem se misturar só por
         terem a mesma chave nula — cada uma é o seu próprio lote de 1."""
         resultado = por_lote_de_venda([
-            _venda(1, lot_ref=None, weight_kg=300.0),
-            _venda(2, lot_ref=None, weight_kg=350.0),
+            asdict(VendaFixture(1, lot_ref=None, weight_kg=300.0)),
+            asdict(VendaFixture(2, lot_ref=None, weight_kg=350.0)),
         ])
 
         self.assertEqual(len(resultado), 2)
@@ -238,7 +243,7 @@ class TestPorLoteDeVenda(unittest.TestCase):
         self.assertEqual(resultado[1]["peso_total_kg"], 200.0)
 
     def test_peso_zero_nao_divide_por_zero(self):
-        resultado = por_lote_de_venda([_venda(1, weight_kg=0.0)])
+        resultado = por_lote_de_venda([asdict(VendaFixture(1, weight_kg=0.0))])
 
         lote = resultado[0]
         self.assertIsNone(lote["custo_por_kg"])
@@ -248,7 +253,7 @@ class TestPorLoteDeVenda(unittest.TestCase):
         """`carcass_yield=None` (join vazio com `animals`) não pode quebrar —
         cai no padrão de 52% como o resto do sistema (CARCASS_YIELD)."""
         resultado = por_lote_de_venda([
-            _venda(1, weight_kg=300.0, cost_at_sale=900.0, carcass_yield=None),
+            asdict(VendaFixture(1, weight_kg=300.0, cost_at_sale=900.0, carcass_yield=None)),
         ])
 
         lote = resultado[0]
