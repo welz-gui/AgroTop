@@ -2783,8 +2783,8 @@ def _fin_precos():
             st.rerun()
 
 
-def _fin_venda(animals):
-    """Registro de venda (por kg / cabeça / lote), com lucro real."""
+
+def _fin_venda_registro(animals):
     st.subheader("💵 Registrar Venda")
     if not animals:
         st.info("Não há animais ativos para vender.");
@@ -2870,10 +2870,10 @@ def _fin_venda(animals):
                                   "Contas a Receber (aba em Financeiro).")
                     st.rerun()
 
+def _fin_venda_historico(vendas):
     # Histórico de vendas
     st.markdown("---")
     st.markdown("**📜 Vendas Registradas**")
-    vendas = db.get_sales()
     if vendas:
         df_v = pd.DataFrame(vendas)[["sale_date","animal_id","breed","sale_type","pricing_mode",
                                      "weight_kg","total_value","cost_at_sale","profit","buyer"]].copy()
@@ -2888,6 +2888,8 @@ def _fin_venda(animals):
     else:
         st.info("Nenhuma venda registrada ainda.")
 
+
+def _fin_venda_custo_lote(vendas):
     # Custo por lote de venda (ROADMAP §5, Trilha 3 — último item da trilha:
     # já existia custo/kg e custo/@ por animal (aba "Custos por Animal") e
     # por piquete (Nutrição, `_nutricao_custo_por_piquete`); faltava por
@@ -2920,6 +2922,13 @@ def _fin_venda(animals):
     else:
         st.info("Nenhuma venda registrada ainda.")
 
+
+def _fin_venda(animals):
+    """Registro de venda (por kg / cabeça / lote), com lucro real."""
+    _fin_venda_registro(animals)
+    vendas = db.get_sales()
+    _fin_venda_historico(vendas)
+    _fin_venda_custo_lote(vendas)
 
 def _fin_lancamentos(start_iso=None, end_iso=None) -> list[dict]:
     """Lista única de lançamentos (spec 0034) — vendas, custos fixos, custos
