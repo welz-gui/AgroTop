@@ -697,7 +697,7 @@ class TestTransferenciaDeAnimais(BaseRegras):
     def test_move_varios_animais_de_uma_vez(self):
         a = self.animal("T1", lote="P1")
         b = self.animal("T2", lote="P1")
-        r = db.move_animals_bulk([a, b], "P2", HOJE.isoformat())
+        r = db.move_animals_bulk([a, b], db.MovementParams("P2", HOJE.isoformat()))
         self.assertEqual(sorted(r["movidos"]), ["T1", "T2"])
         self.assertEqual(r["ja_no_destino"], [])
         self.assertEqual(r["erros"], [])
@@ -706,13 +706,13 @@ class TestTransferenciaDeAnimais(BaseRegras):
 
     def test_animal_ja_no_destino_e_pulado_sem_erro(self):
         a = self.animal("T3", lote="P2")
-        r = db.move_animals_bulk([a], "P2", HOJE.isoformat())
+        r = db.move_animals_bulk([a], db.MovementParams("P2", HOJE.isoformat()))
         self.assertEqual(r["movidos"], [])
         self.assertEqual(r["ja_no_destino"], ["T3"])
 
     def test_animal_inexistente_vira_erro_sem_derrubar_o_resto(self):
         a = self.animal("T4", lote="P1")
-        r = db.move_animals_bulk([a, "NAO_EXISTE"], "P2", HOJE.isoformat())
+        r = db.move_animals_bulk([a, "NAO_EXISTE"], db.MovementParams("P2", HOJE.isoformat()))
         self.assertEqual(r["movidos"], ["T4"])
         self.assertEqual(r["erros"], ["NAO_EXISTE"])
         self.assertEqual(get_animal(a)["lote_id"], "P2")
@@ -720,8 +720,8 @@ class TestTransferenciaDeAnimais(BaseRegras):
     def test_cada_transferencia_grava_animal_movements(self):
         a = self.animal("T5", lote="P1")
         b = self.animal("T6", lote="P1")
-        db.move_animals_bulk([a, b], "P2", HOJE.isoformat(), reason="separação",
-                             operator="op1", notes="rodízio de pasto")
+        db.move_animals_bulk([a, b], db.MovementParams("P2", HOJE.isoformat(), reason="separação",
+                             operator="op1", notes="rodízio de pasto"))
         movs_a = db.get_movements(a)
         self.assertEqual(len(movs_a), 1)
         self.assertEqual(movs_a[0]["from_lote_id"], "P1")
