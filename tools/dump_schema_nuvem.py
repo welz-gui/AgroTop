@@ -42,9 +42,19 @@ AVISO SOBRE FIDELIDADE
     Este script é o caminho alternativo para quando nenhum dos dois existe.
 """
 
+from __future__ import annotations
 import argparse
 import os
+from dataclasses import dataclass
 import sys
+
+@dataclass
+class SchemaCatalog:
+    colunas: list[dict]
+    constraints: list[dict]
+    indices: list[dict]
+    funcoes: list[dict] | None = None
+    triggers: list[dict] | None = None
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -161,14 +171,13 @@ def _redundante_com_a_pk(con: dict, definicao_pk: str | None) -> bool:
     return _colunas_da_constraint(con["definicao"]) == _colunas_da_constraint(definicao_pk)
 
 
-def escrever_baseline(colunas, constraints, indices, data,
-                      funcoes=None, triggers=None):
+def escrever_baseline(schema: SchemaCatalog, data: str):
     por_tabela = {}
-    for c in colunas:
+    for c in schema.colunas:
         por_tabela.setdefault(c["tabela"], []).append(c)
 
     cons_por_tabela = {}
-    for c in constraints:
+    for c in schema.constraints:
         cons_por_tabela.setdefault(c["tabela"], []).append(c)
 
     os.makedirs(os.path.dirname(BASELINE), exist_ok=True)
@@ -237,9 +246,9 @@ def escrever_baseline(colunas, constraints, indices, data,
                          f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
             fh.write("\n")
 
-        if indices:
+        if schema.indices:
             fh.write("-- Índices (fora das constraints)\n")
-            for i in indices:
+            for i in schema.indices:
                 definicao = i["definicao"].replace(
                     "CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", 1).replace(
                     "CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ", 1)
@@ -255,17 +264,17 @@ def escrever_baseline(colunas, constraints, indices, data,
         # baseline num schema novo criaria a função dentro de `public` — efeito
         # colateral no schema de produção — e o trigger não a encontraria no
         # schema onde está sendo criado.
-        if funcoes:
+        if schema.funcoes:
             fh.write("-- Funções\n")
-            for f in funcoes:
+            for f in schema.funcoes:
                 definicao = f["definicao"].replace("FUNCTION public.", "FUNCTION ", 1)
                 fh.write(f"{definicao};\n\n")
 
-        if triggers:
+        if schema.triggers:
             fh.write("-- Triggers\n")
             fh.write("-- Sem eles, `animal_events` e `audit_logs` deixam de ser\n")
             fh.write("-- append-only (PNIB §6.3 e §14.1).\n")
-            for t in triggers:
+            for t in schema.triggers:
                 definicao = t["definicao"].replace(" ON public.", " ON ")
                 fh.write(f"DROP TRIGGER IF EXISTS {t['nome']} ON {t['tabela']};\n")
                 fh.write(f"{definicao};\n")
@@ -306,8 +315,14 @@ def main() -> int:
     print(f"[ok] {os.path.relpath(SNAPSHOT, RAIZ)}: {n} colunas / {tabelas} tabelas")
 
     if args.baseline:
-        t = escrever_baseline(colunas, constraints, indices, hoje,
-                              funcoes, triggers)
+        schema = SchemaCatalog(
+            colunas=colunas,
+            constraints=constraints,
+            indices=indices,
+            funcoes=funcoes,
+            triggers=triggers
+        )
+        t = escrever_baseline(schema, hoje)
         print(f"[ok] {os.path.relpath(BASELINE, RAIZ)}: {t} tabelas, "
               f"{len(constraints)} constraints, {len(indices)} índices, "
               f"{len(funcoes)} funções, {len(triggers)} triggers")
