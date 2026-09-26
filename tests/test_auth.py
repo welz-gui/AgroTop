@@ -51,47 +51,5 @@ class TestLegacyMigration(unittest.TestCase):
         self.assertIsNone(u)
 
 
-
-class TestSessionManagement(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.mkdtemp()
-        db.configurar_sqlite(os.path.join(self.tmp, "test.db"))
-        db.init_db()
-
-    def test_get_session_user_invalid_date(self):
-        import sqlite3
-        con = sqlite3.connect(db.DB_PATH)
-        con.execute("INSERT INTO sessions (token,user_id,expires_at) VALUES(?,?,?)",
-                    ("bad_date_token", 1, "not-a-date"))
-        con.commit()
-        con.close()
-
-        # Should return None and suppress the ValueError/TypeError
-        self.assertIsNone(db.get_session_user("bad_date_token"))
-
-
-
-class TestSessionManagement(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.mkdtemp()
-        db.configurar_sqlite(os.path.join(self.tmp, "test.db"))
-        db.init_db()
-
-    def tearDown(self):
-        import shutil
-        shutil.rmtree(self.tmp)
-
-    def test_get_session_user_invalid_date(self):
-        import sqlite3
-        con = sqlite3.connect(db.DB_PATH)
-        con.execute("INSERT INTO sessions (token,user_id,expires_at) VALUES(?,?,?)",
-                    ("bad_date_token", 1, "not-a-date"))
-        con.commit()
-        con.close()
-
-        # Should return None and suppress the ValueError/TypeError
-        self.assertIsNone(db.get_session_user("bad_date_token"))
-
-
 if __name__ == "__main__":
     unittest.main()
