@@ -5,6 +5,7 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
+import json
 import random
 import uuid as _uuid
 from datetime import date, timedelta
@@ -248,13 +249,13 @@ def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manej
         destino = con.execute("SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
         to_property_id = destino["property_id"] if destino else None
 
-        chunk_size = 900
-        for i in range(0, len(animal_ids), chunk_size):
-            chunk = animal_ids[i:i + chunk_size]
-            placeholders = ",".join(["?"] * len(chunk))
-            rows = con.execute(f"SELECT id, uuid, lote_id FROM animals WHERE id IN ({placeholders})", chunk).fetchall()
-            for row in rows:
-                animal_data[row["id"]] = {"lote_id": row["lote_id"], "uuid": row["uuid"]}
+        ids_json = json.dumps(list(set(animal_ids)))
+        rows = con.execute(
+            "SELECT a.id, a.uuid, a.lote_id FROM animals a JOIN json_each(?) j ON a.id = j.value",
+            (ids_json,)
+        ).fetchall()
+        for row in rows:
+            animal_data[row["id"]] = {"lote_id": row["lote_id"], "uuid": row["uuid"]}
 
         update_animals_args = []
         insert_movements_args = []
