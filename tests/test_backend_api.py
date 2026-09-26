@@ -78,6 +78,13 @@ class BackendApiTestCase(unittest.TestCase):
         return res.json()["access_token"]
 
 
+class TestHealthEndpoint(BackendApiTestCase):
+    def test_health_endpoint_retorna_200_e_status_ok(self):
+        res = self.client.get("/health")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"status": "ok", "app": "AgroTop Backend API"})
+
+
 class TestAuthAndTokens(BackendApiTestCase):
     def test_login_sucesso_retorna_tokens_e_usuario(self):
         """Critério 1: POST /auth/login com credenciais válidas retorna access_token (JWT, 15 min),
