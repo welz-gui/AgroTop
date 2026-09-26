@@ -1570,7 +1570,7 @@ class TestAlertasEndpoint(BackendApiTestCase):
             (today - timedelta(days=5)).isoformat(),
             applied_by="teste",
         )
-        db.add_weighing("ALERTA_GMD", 308.0, today.isoformat())
+        db.add_weighing(db.WeighingCreate(animal_id="ALERTA_GMD", weight=308.0, weigh_date=today.isoformat()))
         db.set_setting("gmd_meta", "0.5")
         with _conn() as con:
             stock_id = con.execute(
@@ -2037,8 +2037,8 @@ class TestRecomendacoesApi(BackendApiTestCase):
             )
         d1 = (date.today() - timedelta(days=100)).isoformat()
         d2 = date.today().isoformat()
-        db.add_weighing("BOV001", 300.0, d1)
-        db.add_weighing("BOV001", 310.0, d2)
+        db.add_weighing(db.WeighingCreate(animal_id="BOV001", weight=300.0, weigh_date=d1))
+        db.add_weighing(db.WeighingCreate(animal_id="BOV001", weight=310.0, weigh_date=d2))
         db.clear_cache()
 
         contexto_direto = db.contexto_recomendacoes()
@@ -2700,30 +2700,30 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
         d3 = (today - timedelta(days=2)).isoformat()
 
         # Adiciona pesagens com métodos diferentes
-        db.add_weighing(
+        db.add_weighing(db.WeighingCreate(
             animal_id="BR0001",
             weigh_date=d1,
             weight=410.0,
             method="pesado",
             operator="Op A",
             notes="Nota A",
-        )
-        db.add_weighing(
+        ))
+        db.add_weighing(db.WeighingCreate(
             animal_id="BR0001",
             weigh_date=d2,
             weight=420.0,
             method="estimado",
             operator="Op B",
             notes="Nota B",
-        )
-        db.add_weighing(
+        ))
+        db.add_weighing(db.WeighingCreate(
             animal_id="BR0002",
             weigh_date=d3,
             weight=390.0,
             method="fita",
             operator="Op C",
             notes="Nota C",
-        )
+        ))
         db.clear_cache()
 
         response = self.client.get("/relatorios/pesagens", headers=self._headers())

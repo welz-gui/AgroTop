@@ -160,7 +160,7 @@ class TestEspelhoNasFilhas(BaseSurrogate):
         A troca é deliberada, não regressão silenciosa.
         """
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
-        db.add_weighing(aid, 400.0, "2026-07-31")
+        db.add_weighing(db.WeighingCreate(animal_id=aid, weight=400.0, weigh_date="2026-07-31"))
         pendente = self._linhas("SELECT id FROM weighings WHERE animal_uuid IS NULL")
         self.assertEqual(pendente, [], "escrita nova deixou o espelho vazio")
 
@@ -274,7 +274,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
 
     def test_pesagem_preenche(self):
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
-        db.add_weighing(aid, 411.0, "2026-07-31")
+        db.add_weighing(db.WeighingCreate(animal_id=aid, weight=411.0, weigh_date="2026-07-31"))
         self.assertEqual(self._sem_espelho("weighings", aid), [])
 
     def test_medicacao_preenche(self):
@@ -309,7 +309,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
     def test_nenhuma_tabela_fica_com_espelho_pendente(self):
         """Varredura final: depois de exercitar as escritas, zero pendências."""
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
-        db.add_weighing(aid, 420.0, "2026-07-31")
+        db.add_weighing(db.WeighingCreate(animal_id=aid, weight=420.0, weigh_date="2026-07-31"))
         db.add_animal_cost(aid, "operacional", "Sal", 10.0, "2026-07-31")
 
         pendentes = {}

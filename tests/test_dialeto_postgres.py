@@ -61,7 +61,7 @@ class TestDialetoPostgres(unittest.TestCase):
                 animal_id, "Nelore", "M", None, "2026-08-01",
                 300.0, 500.0, 0.0, None, None,
             ))
-            db.add_weighing(animal_id, 345.0, "2026-08-02", operator="CI")
+            db.add_weighing(db.WeighingCreate(animal_id=animal_id, weight=345.0, weigh_date="2026-08-02", operator="CI"))
 
             animal = get_animal(animal_id)
             assert animal is not None

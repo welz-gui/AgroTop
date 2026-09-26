@@ -8,10 +8,21 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
+from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
 from . import eventos
+
+
+@dataclass
+class WeighingCreate:
+    animal_id: str
+    weight: float
+    weigh_date: str
+    operator: str = ""
+    notes: str = ""
+    method: str = "pesado"
 from .conexao import _cache, _conn, _writes
 
 
@@ -68,24 +79,23 @@ def get_weighings_batch(animal_ids: set[str]) -> dict[str, list[dict]]:
 
 
 @_writes
-def add_weighing(animal_id, weight, weigh_date, operator="", notes="",
-                 method="pesado") -> None:
+def add_weighing(data: WeighingCreate) -> None:
     with _conn() as con:
         # Busca lote e uuid na mesma consulta (ADR 0004 etapa B1.4).
         a = con.execute(
-            "SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)
+            "SELECT lote_id, uuid FROM animals WHERE id=?", (data.animal_id,)
         ).fetchone()
         if a is None:
-            raise ValueError(f"Animal {animal_id} não encontrado.")
+            raise ValueError(f"Animal {data.animal_id} não encontrado.")
         con.execute(
             "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?)",
-            (a["uuid"], weight, weigh_date, a["lote_id"], operator, method, notes),
+            (a["uuid"], data.weight, data.weigh_date, a["lote_id"], data.operator, data.method, data.notes),
         )
-        con.execute("UPDATE animals SET current_weight=? WHERE id=?", (weight, animal_id))
+        con.execute("UPDATE animals SET current_weight=? WHERE id=?", (data.weight, data.animal_id))
         # Evento na MESMA transação da pesagem (§6): ou entram os dois, ou nenhum.
         eventos.registrar_em(
-            con, a["uuid"], "pesagem", ocorrido_em=weigh_date,
-            usuario_registro=operator, observacoes=f"{weight} kg ({method})")
+            con, a["uuid"], "pesagem", ocorrido_em=data.weigh_date,
+            usuario_registro=data.operator, observacoes=f"{data.weight} kg ({data.method})")
 
 
 def get_all_weighings() -> list[dict]:
