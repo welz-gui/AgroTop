@@ -279,8 +279,10 @@ class TestEscritaPreencheUuid(BaseSurrogate):
 
     def test_medicacao_preenche(self):
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
-        db.add_medication(aid, "Ivermectina", 5.0, "ml", "Subcutânea", 30,
-                          "2026-07-31")
+        db.add_medication(db.MedicationData(
+            animal_id=aid, medication_name="Ivermectina", dose=5.0, unit="ml",
+            application_route="Subcutânea", withdrawal_days=30, med_date="2026-07-31"
+        ))
         self.assertEqual(self._sem_espelho("medications", aid), [])
 
     def test_custo_preenche(self):

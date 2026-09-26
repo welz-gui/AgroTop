@@ -100,6 +100,7 @@ from repositories.pesagens import (
     get_weighings_batch,
 )
 from repositories.sanidade import (
+    MedicationData,
     add_medication,
     dose_for_animal,
     get_medications,
@@ -862,7 +863,7 @@ def register_medicamento(
             return cached["response_body"]
 
     try:
-        add_medication(
+        add_medication(MedicationData(
             animal_id=animal_id,
             medication_name=data.medicamento,
             dose=data.dose,
@@ -874,7 +875,7 @@ def register_medicamento(
             insumo_id=None,
             notes=data.notas or "",
             protocol_id=data.protocolo_id,
-        )
+        ))
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
