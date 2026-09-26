@@ -37,6 +37,16 @@ class AnimalData:
     property_id: str | None = None
 
 
+@dataclass
+class AnimalMovementData:
+    animal_id: str
+    to_lote_id: str
+    movement_date: str
+    reason: str = "manejo"
+    operator: str = ""
+    notes: str = ""
+
+
 def uuid_de(con, animal_id: str) -> str | None:
     """UUID interno a partir do número do brinco (ADR 0004, etapa B1.4).
 
@@ -185,48 +195,46 @@ def add_animal(data: AnimalData) -> None:
                              observacoes=f"brinco {data.animal_id}")
 
 
-def _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes) -> None:
-    """O que `move_animal` faz, mas recebendo a conexão de fora — para
-    `move_animals_bulk` mover várias cabeças na mesma transação, em vez de
-    uma conexão por animal (R8: mesma regra, um lugar só)."""
-    row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
+def _mover_animal_em(con, data: AnimalMovementData) -> None:
+    """O que `move_animal` faz, mas recebendo a conexão de fora."""
+    row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (data.animal_id,)).fetchone()
     if row is None:
-        raise ValueError(f"Animal {animal_id} não encontrado.")
+        raise ValueError(f"Animal {data.animal_id} não encontrado.")
     from_lote = row["lote_id"]
     # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
     # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
     destino = con.execute(
-        "SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
+        "SELECT property_id FROM lotes WHERE id=?", (data.to_lote_id,)).fetchone()
     con.execute(
         "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) "
         "WHERE id=?",
-        (to_lote_id, destino["property_id"] if destino else None, animal_id)
+        (data.to_lote_id, destino["property_id"] if destino else None, data.animal_id)
     )
     con.execute(
         """INSERT INTO animal_movements
            (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
             operator,notes)
            VALUES(?,?,?,?,?,?,?)""",
-        (row["uuid"], from_lote, to_lote_id,
-         movement_date, reason, operator, notes),
+        (row["uuid"], from_lote, data.to_lote_id,
+         data.movement_date, data.reason, data.operator, data.notes),
     )
     eventos.registrar_em(
-        con, row["uuid"], "mudanca_lote", ocorrido_em=movement_date,
-        usuario_registro=operator, local_interno=to_lote_id,
-        observacoes=f"{from_lote or '—'} → {to_lote_id} ({reason})")
+        con, row["uuid"], "mudanca_lote", ocorrido_em=data.movement_date,
+        usuario_registro=data.operator, local_interno=data.to_lote_id,
+        observacoes=f"{from_lote or '—'} → {data.to_lote_id} ({data.reason})")
     con.execute(
-        "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)
+        "UPDATE lotes SET last_entry_date=? WHERE id=?", (data.movement_date, data.to_lote_id)
     )
     if from_lote:
         con.execute(
-            "UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote)
+            "UPDATE lotes SET last_exit_date=? WHERE id=?", (data.movement_date, from_lote)
         )
 
 
 @_writes
-def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator="", notes="") -> None:
+def move_animal(data: AnimalMovementData) -> None:
     with _conn() as con:
-        _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes)
+        _mover_animal_em(con, data)
 
 
 @_writes

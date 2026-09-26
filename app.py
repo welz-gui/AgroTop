@@ -1464,8 +1464,9 @@ def _tab_movimentacao(animal):
         notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
         if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
             if dest:
-                db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
-                    reason,st.session_state.user["name"],notes_mv)
+                db.move_animal(db.AnimalMovementData(
+                    animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
+                    reason,st.session_state.user["name"],notes_mv))
                 st.success(f"✅ {animal['id']} movido para {dest['name']}")
                 st.rerun()
 

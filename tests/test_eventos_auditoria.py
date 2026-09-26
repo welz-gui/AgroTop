@@ -212,7 +212,7 @@ class TestOperacoesGeramEvento(BaseEventos):
         self.assertIn("manejo_sanitario", self._tipos(self.uuid))
 
     def test_movimentacao_de_lote(self):
-        db.move_animal(self.animal["id"], "P02", "2026-07-20", operator="op1")
+        db.move_animal(db.AnimalMovementData(self.animal["id"], "P02", "2026-07-20", operator="op1"))
         self.assertIn("mudanca_lote", self._tipos(self.uuid))
 
     def test_cadastro_gera_dois_eventos(self):

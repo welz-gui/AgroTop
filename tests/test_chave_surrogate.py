@@ -291,7 +291,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
     def test_movimentacao_preenche(self):
         aid = self._linhas("SELECT id FROM animals LIMIT 1")[0]["id"]
         lote = self._linhas("SELECT id FROM lotes LIMIT 1")[0]["id"]
-        db.move_animal(aid, lote, "manejo", "teste")
+        db.move_animal(db.AnimalMovementData(aid, lote, "manejo", reason="teste"))
         self.assertEqual(self._sem_espelho("animal_movements", aid), [])
 
     def test_venda_preenche(self):

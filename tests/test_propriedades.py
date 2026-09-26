@@ -138,7 +138,7 @@ class TestMovimentacaoEntrePropriedades(BaseB4):
         db.clear_cache()
 
         aid = db.get_all_animals(status="ativo")[0]["id"]
-        db.move_animal(aid, "PZ", "2026-07-20", operator="op1")
+        db.move_animal(db.AnimalMovementData(aid, "PZ", "2026-07-20", operator="op1"))
 
         a = self._linhas("SELECT property_id FROM animals WHERE id=?", (aid,))[0]
         self.assertEqual(a["property_id"], outra,
