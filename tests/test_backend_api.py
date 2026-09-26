@@ -1524,6 +1524,17 @@ class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
         )
         self.assertEqual(res_ext.status_code, 422)
 
+    @patch("tempfile.SpooledTemporaryFile.read", side_effect=Exception("Read error"))
+    def test_post_importar_csv_arquivo_unreadable(self, mock_read):
+        """Critério: Erro de leitura no arquivo retorna 422."""
+        res = self.client.post(
+            "/pesagens/importar-csv",
+            files={"arquivo": ("pesagens.csv", b"dummy content", "text/csv")},
+            headers=self._headers(),
+        )
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(res.json()["detail"], "Não foi possível ler o arquivo.")
+
     def test_backend_api_nao_duplica_sql_pesagens_importacao(self):
         """Critério 10: backend_api não contém SQL direto de escrita em weighings ou animals."""
         source = inspect.getsource(main_mod)
