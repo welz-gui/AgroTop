@@ -1367,9 +1367,10 @@ def _tab_pesagem(animal):
         _cc1, _cc2 = st.columns(2)
         if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
                        use_container_width=True):
-            db.add_weighing(animal["id"], _pend_alerta["peso"], _pend_alerta["data"],
-                st.session_state.user["name"], _pend_alerta["notas"],
-                method=_pend_alerta["metodo"])
+            db.add_weighing(db.WeighingCreate(
+                animal_id=animal["id"], weight=_pend_alerta["peso"], weigh_date=_pend_alerta["data"],
+                operator=st.session_state.user["name"], notes=_pend_alerta["notas"],
+                method=_pend_alerta["metodo"]))
             st.session_state.pop(f"alerta_peso_{animal['id']}", None)
             st.success(f"✅ {_num_br(_pend_alerta['peso'], 1)} kg salvo."); st.rerun()
         if _cc2.button("↩️ Corrigir", key=f"nopeso_{animal['id']}",
@@ -1408,8 +1409,9 @@ def _tab_pesagem(animal):
                     "metodo": metodo_peso}
                 st.rerun()
 
-            db.add_weighing(animal["id"], nw_final, wd_.strftime("%Y-%m-%d"),
-                st.session_state.user["name"], notes_p, method=metodo_peso)
+            db.add_weighing(db.WeighingCreate(
+                animal_id=animal["id"], weight=nw_final, weigh_date=wd_.strftime("%Y-%m-%d"),
+                operator=st.session_state.user["name"], notes=notes_p, method=metodo_peso))
             for _a in _alertas:
                 st.warning(f"⚠️ {_a['mensagem']}")
             msg = f"✅ {_num_br(nw_final, 1)} kg salvo ({db.WEIGH_METHODS[metodo_peso]})"
@@ -1723,9 +1725,10 @@ def _campo_importar():
     if st.button(f"💾 Gravar {len(aceitas)} pesagem(ns)", type="primary"):
         gravadas = 0
         for linha in aceitas:
-            db.add_weighing(linha["animal_id"], linha["peso"], linha["data"],
-                            operator=st.session_state.user["name"],
-                            notes=f"importado de {arquivo.name}")
+            db.add_weighing(db.WeighingCreate(
+                animal_id=linha["animal_id"], weight=linha["peso"], weigh_date=linha["data"],
+                operator=st.session_state.user["name"],
+                notes=f"importado de {arquivo.name}"))
             gravadas += 1
         st.success(f"✅ {gravadas} pesagem(ns) importada(s).")
         st.rerun()

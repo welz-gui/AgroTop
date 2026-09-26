@@ -81,9 +81,9 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
                       lote["id"], None))
         db.clear_cache()
         # pesos desiguais, de propósito — é o que faz "peso" divergir de "igual"
-        db.add_weighing("RAT1", 200.0, date.today().isoformat())
-        db.add_weighing("RAT2", 300.0, date.today().isoformat())
-        db.add_weighing("RAT3", 400.0, date.today().isoformat())
+        db.add_weighing(db.WeighingCreate(animal_id="RAT1", weight=200.0, weigh_date=date.today().isoformat()))
+        db.add_weighing(db.WeighingCreate(animal_id="RAT2", weight=300.0, weigh_date=date.today().isoformat()))
+        db.add_weighing(db.WeighingCreate(animal_id="RAT3", weight=400.0, weigh_date=date.today().isoformat()))
         db.clear_cache()
 
         from services.rateio import ratear

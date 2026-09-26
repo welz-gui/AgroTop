@@ -203,7 +203,7 @@ class TestOperacoesGeramEvento(BaseEventos):
         return [e["tipo"] for e in eventos.do_animal(uuid)]
 
     def test_pesagem(self):
-        db.add_weighing(self.animal["id"], 430.0, "2026-07-20", operator="op1")
+        db.add_weighing(db.WeighingCreate(animal_id=self.animal["id"], weight=430.0, weigh_date="2026-07-20", operator="op1"))
         self.assertIn("pesagem", self._tipos(self.uuid))
 
     def test_medicacao(self):
@@ -243,12 +243,12 @@ class TestOperacoesGeramEvento(BaseEventos):
         """
         antes = len(eventos.do_animal(self.uuid))
         with self.assertRaises(ValueError):
-            db.add_weighing("NAO_EXISTE", 400.0, "2026-07-20")
+            db.add_weighing(db.WeighingCreate(animal_id="NAO_EXISTE", weight=400.0, weigh_date="2026-07-20"))
         self.assertEqual(len(eventos.do_animal(self.uuid)), antes)
 
     def test_ocorrido_em_usa_a_data_do_fato_nao_a_de_hoje(self):
         """§6.2: pesagem lançada com atraso guarda a data em que ocorreu."""
-        db.add_weighing(self.animal["id"], 430.0, "2026-01-15", operator="op1")
+        db.add_weighing(db.WeighingCreate(animal_id=self.animal["id"], weight=430.0, weigh_date="2026-01-15", operator="op1"))
         ev = [e for e in eventos.do_animal(self.uuid) if e["tipo"] == "pesagem"][0]
         self.assertTrue(ev["ocorrido_em"].startswith("2026-01-15"),
                         f"ocorrido_em não é a data da pesagem: {ev['ocorrido_em']}")

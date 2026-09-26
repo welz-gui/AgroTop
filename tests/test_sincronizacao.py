@@ -311,7 +311,7 @@ class TestAlertaDeSaida(unittest.TestCase):
     def test_o_alerta_aparece_e_depois_some(self):
         """A prova de ponta a ponta: uma pesagem lançada passava a exigir
         justificativa em toda saída, para sempre."""
-        db.add_weighing(self.animal["id"], 430.0, HOJE, operator="op1")
+        db.add_weighing(db.WeighingCreate(animal_id=self.animal["id"], weight=430.0, weigh_date=HOJE, operator="op1"))
         db.clear_cache()
         mid = self._mov()
 
@@ -330,7 +330,7 @@ class TestAlertaDeSaida(unittest.TestCase):
                          f"ainda exige justificativa: {depois['problemas']}")
 
     def test_liberar_deixa_de_pedir_justificativa(self):
-        db.add_weighing(self.animal["id"], 430.0, HOJE, operator="op1")
+        db.add_weighing(db.WeighingCreate(animal_id=self.animal["id"], weight=430.0, weigh_date=HOJE, operator="op1"))
         db.clear_cache()
         mid = self._mov()
 

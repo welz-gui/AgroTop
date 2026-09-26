@@ -93,6 +93,7 @@ from database import (
 from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import (
+    WeighingCreate,
     add_weighing,
     calculate_gmd,
     calculate_gmd_bulk,
@@ -374,14 +375,14 @@ def register_pesagem(
             return cached["response_body"]
 
     try:
-        add_weighing(
+        add_weighing(WeighingCreate(
             animal_id=animal_id,
             weight=data.peso,
             weigh_date=data.data,
             operator=user.get("username", ""),
             method=data.method,
             notes=data.notes,
-        )
+        ))
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -483,14 +484,14 @@ def importar_pesagens_csv(
         operator = user.get("username", "") if user else ""
         notes = f"importado de {filename}" if filename else "importado de CSV"
         for linha in aceitas_com_alertas:
-            add_weighing(
+            add_weighing(WeighingCreate(
                 animal_id=linha["animal_id"],
                 weight=linha["peso"],
                 weigh_date=linha["data"],
                 operator=operator,
                 notes=notes,
                 method="pesado",
-            )
+            ))
             gravadas += 1
 
     return {
