@@ -2543,135 +2543,144 @@ def _render_secao_ndvi_lote(lote: dict) -> None:
                     )
 
 
+def _render_lote_card(l):
+    ua  = l["total_ua"] or 0
+    cap = l["capacity_ua"] or 0
+    has_cap = cap > 0
+    pct = min(ua/cap*100, 100) if has_cap else 0
+    bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
+    status_badge={"ativo":'<span class="badge-green">Ativo</span>',
+        "descanso":'<span class="badge-yellow">Descanso</span>',
+        "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
+    dias_ocup=""
+    if l.get("last_entry_date") and l.get("last_exit_date"):
+        d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
+        d1=datetime.strptime(l["last_exit_date"],"%Y-%m-%d").date()
+        dias_ocup=f"Última ocupação: {abs((d1-d0).days)} dias"
+    elif l.get("last_entry_date"):
+        d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
+        dias_ocup=f"Em ocupação há {(date.today()-d0).days} dias"
+
+    # Ocupação: só mostra % quando há capacidade definida (> 0)
+    if has_cap:
+        ocup_txt = f"{_num_br(ua, 1)} / {_num_br(cap, 0)} UA ({_num_br(pct, 0)}%)"
+        cap_txt  = f"Cap. {_num_br(cap, 0)} UA"
+        barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
+                 f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
+    else:
+        ocup_txt = f"{_num_br(ua, 1)} UA · sem capacidade definida"
+        cap_txt  = "Sem capacidade de pasto (curral/manejo)"
+        barra = ""
+
+    st.markdown(f"""
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <div>
+          <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
+          <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
+            {l['area_ha']} ha · {cap_txt} · {dias_ocup}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
+          <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
+        </div>
+      </div>
+      {barra}
+    </div>""",unsafe_allow_html=True)
+
+
+def _render_lote_animais(l):
+    with st.expander(f"Ver animais do {l['name']}"):
+        anilist=db.get_all_animals(lote_id=l["id"])
+        if anilist:
+            a_ids = [a["id"] for a in anilist]
+            gmd_batch = db.calculate_gmd_bulk(a_ids)
+            rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
+                "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
+            st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
+                column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
+                    "GMD":st.column_config.NumberColumn(format="%.3f")})
+        else:
+            st.caption("Nenhum animal neste lote.")
+
+
+def _render_lote_perimetro(l):
+    with st.expander(f"🗺️ Perímetro do {l['name']}"):
+        st.caption("Desenhe no mapa, importe um arquivo ou edite o texto — os "
+                   "três métodos alimentam o mesmo perímetro, mesma tela de "
+                   "Propriedades. A área é **calculada** do desenho, não "
+                   "digitada — salvar o perímetro atualiza o campo Área do "
+                   "piquete automaticamente.")
+        texto_l = _entrada_de_perimetro(f"lote_poligono_{l['id']}",
+                                        _poligono_para_texto(l.get("poligono")))
+
+        anel_l, erro_l, problemas_l = [], "", []
+        if texto_l.strip():
+            try:
+                anel_l = _ler_poligono(texto_l)
+            except ValueError as e:
+                erro_l = str(e)
+            else:
+                problemas_l = geometria_validar(anel_l)
+
+        if erro_l:
+            st.error(f"🚫 {erro_l}")
+        for prob in problemas_l:
+            st.error(f"🚫 {prob}")
+
+        if anel_l and not problemas_l:
+            area_desenhada = geometria_area_ha(anel_l)
+            diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
+            gl1, gl2 = st.columns(2)
+            gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
+                       help="É o que vai gravar no campo Área ao salvar.")
+            gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
+                       delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
+                             if diverge else None))
+        elif not texto_l.strip() and l.get("poligono"):
+            st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
+                       "último valor calculado, editável à mão (Trilha 2: "
+                       "piquete sem geometria continua funcionando).")
+
+        pode_l = not erro_l and not problemas_l
+        if st.button("💾 Salvar perímetro", disabled=not pode_l,
+                     key=f"lote_poligono_salvar_{l['id']}"):
+            novo = (json.dumps({"type": "Polygon",
+                                "coordinates": [[list(v) for v in anel_l]]})
+                   if anel_l else None)
+            db.set_lote_poligono(l["id"], novo)
+            if novo:
+                st.success(f"✅ Perímetro salvo — Área atualizada para "
+                          f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
+            else:
+                st.success("✅ Perímetro removido.")
+            st.rerun()
+
+
+def _render_grafico_ua_lotes(lotes):
+    df_lot=pd.DataFrame([{"Lote":f"{l['id']}·{l['name'][:8]}",
+        "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
+    fig_l=go.Figure()
+    fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
+        marker_color=c["borda"])
+    fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
+        marker_color=c["primaria"])
+    fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
+        legend=dict(orientation="h",y=1.1),
+        xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
+    st.plotly_chart(fig_l,use_container_width=True)
+
+
 def _render_tab_visao_geral(lotes):
     for l in lotes:
-        ua  = l["total_ua"] or 0
-        cap = l["capacity_ua"] or 0
-        has_cap = cap > 0
-        pct = min(ua/cap*100, 100) if has_cap else 0
-        bar_col=c["primaria"] if pct<75 else c["atencao"] if pct<95 else c["perigo"]
-        status_badge={"ativo":'<span class="badge-green">Ativo</span>',
-            "descanso":'<span class="badge-yellow">Descanso</span>',
-            "reforma":'<span class="badge-red">Reforma</span>'}.get(l["status"],'')
-        dias_ocup=""
-        if l.get("last_entry_date") and l.get("last_exit_date"):
-            d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
-            d1=datetime.strptime(l["last_exit_date"],"%Y-%m-%d").date()
-            dias_ocup=f"Última ocupação: {abs((d1-d0).days)} dias"
-        elif l.get("last_entry_date"):
-            d0=datetime.strptime(l["last_entry_date"],"%Y-%m-%d").date()
-            dias_ocup=f"Em ocupação há {(date.today()-d0).days} dias"
-
-        # Ocupação: só mostra % quando há capacidade definida (> 0)
-        if has_cap:
-            ocup_txt = f"{_num_br(ua, 1)} / {_num_br(cap, 0)} UA ({_num_br(pct, 0)}%)"
-            cap_txt  = f"Cap. {_num_br(cap, 0)} UA"
-            barra = (f'<div style="background:{c["fundo"]};border-radius:6px;height:8px;margin-top:.6rem;overflow:hidden">'
-                     f'<div style="background:{bar_col};width:{pct:.0f}%;height:100%;border-radius:6px;transition:width .4s"></div></div>')
-        else:
-            ocup_txt = f"{_num_br(ua, 1)} UA · sem capacidade definida"
-            cap_txt  = "Sem capacidade de pasto (curral/manejo)"
-            barra = ""
-
-        st.markdown(f"""
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
-            <div>
-              <b style="font-size:1.1rem;color:{c["texto"]}">{l['id']} — {l['name']}</b>&nbsp;{status_badge}
-              <div style="color:{c["texto_secundario"]};font-size:.82rem;margin-top:.2rem">
-                {l['area_ha']} ha · {cap_txt} · {dias_ocup}
-              </div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:1.5rem;font-weight:800;color:{c["primaria"]}">{_plural(l['animal_count'],'animal','animais')}</div>
-              <div style="color:{c["texto_secundario"]};font-size:.82rem">{ocup_txt}</div>
-            </div>
-          </div>
-          {barra}
-        </div>""",unsafe_allow_html=True)
-
-        # Lista de animais do lote
-        with st.expander(f"Ver animais do {l['name']}"):
-            anilist=db.get_all_animals(lote_id=l["id"])
-            if anilist:
-                a_ids = [a["id"] for a in anilist]
-                gmd_batch = db.calculate_gmd_bulk(a_ids)
-                rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
-                    "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
-                st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
-                    column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f"),
-                        "GMD":st.column_config.NumberColumn(format="%.3f")})
-            else:
-                st.caption("Nenhum animal neste lote.")
-
-        # Perímetro do piquete (migration 0015)
-        with st.expander(f"🗺️ Perímetro do {l['name']}"):
-            st.caption("Desenhe no mapa, importe um arquivo ou edite o texto — os "
-                       "três métodos alimentam o mesmo perímetro, mesma tela de "
-                       "Propriedades. A área é **calculada** do desenho, não "
-                       "digitada — salvar o perímetro atualiza o campo Área do "
-                       "piquete automaticamente.")
-            texto_l = _entrada_de_perimetro(f"lote_poligono_{l['id']}",
-                                            _poligono_para_texto(l.get("poligono")))
-
-            anel_l, erro_l, problemas_l = [], "", []
-            if texto_l.strip():
-                try:
-                    anel_l = _ler_poligono(texto_l)
-                except ValueError as e:
-                    erro_l = str(e)
-                else:
-                    problemas_l = geometria_validar(anel_l)
-
-            if erro_l:
-                st.error(f"🚫 {erro_l}")
-            for prob in problemas_l:
-                st.error(f"🚫 {prob}")
-
-            if anel_l and not problemas_l:
-                area_desenhada = geometria_area_ha(anel_l)
-                diverge = round(area_desenhada, 2) != round(l["area_ha"] or 0, 2)
-                gl1, gl2 = st.columns(2)
-                gl1.metric("Área do desenho", f"{_num_br(area_desenhada, 2)} ha",
-                           help="É o que vai gravar no campo Área ao salvar.")
-                gl2.metric("Área cadastrada hoje", f"{_num_br(l['area_ha'], 2)} ha",
-                           delta=(f"{_num_br(area_desenhada - l['area_ha'], 2)} ha ao salvar"
-                                 if diverge else None))
-            elif not texto_l.strip() and l.get("poligono"):
-                st.caption("Apagar o perímetro **não muda** a Área — ela vira o "
-                           "último valor calculado, editável à mão (Trilha 2: "
-                           "piquete sem geometria continua funcionando).")
-
-            pode_l = not erro_l and not problemas_l
-            if st.button("💾 Salvar perímetro", disabled=not pode_l,
-                         key=f"lote_poligono_salvar_{l['id']}"):
-                novo = (json.dumps({"type": "Polygon",
-                                    "coordinates": [[list(v) for v in anel_l]]})
-                       if anel_l else None)
-                db.set_lote_poligono(l["id"], novo)
-                if novo:
-                    st.success(f"✅ Perímetro salvo — Área atualizada para "
-                              f"{_num_br(geometria_area_ha(anel_l), 2)} ha.")
-                else:
-                    st.success("✅ Perímetro removido.")
-                st.rerun()
-
-        # NDVI do piquete por satélite (Spec 0079)
+        _render_lote_card(l)
+        _render_lote_animais(l)
+        _render_lote_perimetro(l)
         _render_secao_ndvi_lote(l)
 
-    # Gráfico UA por Lote
     if lotes:
-        df_lot=pd.DataFrame([{"Lote":f"{l['id']}·{l['name'][:8]}",
-            "UA Atual":l["total_ua"] or 0,"Cap. UA":l["capacity_ua"]} for l in lotes])
-        fig_l=go.Figure()
-        fig_l.add_bar(x=df_lot["Lote"],y=df_lot["Cap. UA"],name="Capacidade",
-            marker_color=c["borda"])
-        fig_l.add_bar(x=df_lot["Lote"],y=df_lot["UA Atual"],name="UA Atual",
-            marker_color=c["primaria"])
-        fig_l.update_layout(**PLOTLY,height=280,barmode="overlay",
-            legend=dict(orientation="h",y=1.1),
-            xaxis=dict(gridcolor=c["superficie"]),yaxis=dict(gridcolor=c["superficie"],title="UA"))
-        st.plotly_chart(fig_l,use_container_width=True)
+        _render_grafico_ua_lotes(lotes)
 
 
 def _render_tab_novo_lote():
