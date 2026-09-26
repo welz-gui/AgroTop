@@ -86,11 +86,12 @@ class TestAlertaDeCarencia(unittest.TestCase):
         animal_id = self.animal["id"]
         # Use a structurally valid but calendar-invalid date to trigger ValueError
         # in datetime.strptime when parsing med_date in get_alert_animals
-        add_medication(
-            animal_id, "Ivermectina", 2.0, "ml", "Subcutânea",
+        add_medication(MedicationData(
+            animal_id=animal_id, medication_name="Ivermectina", dose=2.0,
+            unit="ml", application_route="Subcutânea",
             withdrawal_days=21, med_date="2021-02-29",
             applied_by="op1",
-        )
+        ))
         alertas = db.get_alert_animals()
         self.assertIsInstance(alertas, dict)
 
