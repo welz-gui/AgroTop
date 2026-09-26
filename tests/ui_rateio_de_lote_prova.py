@@ -117,7 +117,7 @@ class TestRateioDeLoteNaTela(unittest.TestCase):
                       300.0, 500.0, 0.0, origem["id"], None))
         db.clear_cache()
         data_movimento = (date.today() - timedelta(days=15)).isoformat()
-        db.move_animal("RATMOV", destino["id"], data_movimento)
+        db.move_animal("RATMOV", db.MovementParams(destino["id"], data_movimento))
         db.clear_cache()
 
         movs = db.get_movements("RATMOV", limit=1)

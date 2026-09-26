@@ -37,6 +37,15 @@ class AnimalData:
     property_id: str | None = None
 
 
+@dataclass
+class MovementParams:
+    to_lote_id: str
+    movement_date: str
+    reason: str = "manejo"
+    operator: str = ""
+    notes: str = ""
+
+
 def uuid_de(con, animal_id: str) -> str | None:
     """UUID interno a partir do número do brinco (ADR 0004, etapa B1.4).
 
@@ -185,7 +194,7 @@ def add_animal(data: AnimalData) -> None:
                              observacoes=f"brinco {data.animal_id}")
 
 
-def _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes) -> None:
+def _mover_animal_em(con, animal_id, params: MovementParams) -> None:
     """O que `move_animal` faz, mas recebendo a conexão de fora — para
     `move_animals_bulk` mover várias cabeças na mesma transação, em vez de
     uma conexão por animal (R8: mesma regra, um lugar só)."""
@@ -196,42 +205,41 @@ def _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator
     # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
     # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
     destino = con.execute(
-        "SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
+        "SELECT property_id FROM lotes WHERE id=?", (params.to_lote_id,)).fetchone()
     con.execute(
         "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) "
         "WHERE id=?",
-        (to_lote_id, destino["property_id"] if destino else None, animal_id)
+        (params.to_lote_id, destino["property_id"] if destino else None, animal_id)
     )
     con.execute(
         """INSERT INTO animal_movements
            (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
             operator,notes)
            VALUES(?,?,?,?,?,?,?)""",
-        (row["uuid"], from_lote, to_lote_id,
-         movement_date, reason, operator, notes),
+        (row["uuid"], from_lote, params.to_lote_id,
+         params.movement_date, params.reason, params.operator, params.notes),
     )
     eventos.registrar_em(
-        con, row["uuid"], "mudanca_lote", ocorrido_em=movement_date,
-        usuario_registro=operator, local_interno=to_lote_id,
-        observacoes=f"{from_lote or '—'} → {to_lote_id} ({reason})")
+        con, row["uuid"], "mudanca_lote", ocorrido_em=params.movement_date,
+        usuario_registro=params.operator, local_interno=params.to_lote_id,
+        observacoes=f"{from_lote or '—'} → {params.to_lote_id} ({params.reason})")
     con.execute(
-        "UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id)
+        "UPDATE lotes SET last_entry_date=? WHERE id=?", (params.movement_date, params.to_lote_id)
     )
     if from_lote:
         con.execute(
-            "UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote)
+            "UPDATE lotes SET last_exit_date=? WHERE id=?", (params.movement_date, from_lote)
         )
 
 
 @_writes
-def move_animal(animal_id, to_lote_id, movement_date, reason="manejo", operator="", notes="") -> None:
+def move_animal(animal_id, params: MovementParams) -> None:
     with _conn() as con:
-        _mover_animal_em(con, animal_id, to_lote_id, movement_date, reason, operator, notes)
+        _mover_animal_em(con, animal_id, params)
 
 
 @_writes
-def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manejo",
-                      operator="", notes="") -> dict:
+def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
     """Transfere várias cabeças para o mesmo piquete de destino, na mesma
     transação — a versão em lote de `move_animal` (transferência entre
     piquetes, ROADMAP §5, Trilha 3). Sem isso, mover um piquete inteiro
@@ -245,7 +253,7 @@ def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manej
     from_lotes = set()
     with _conn() as con:
         # Get destination property
-        destino = con.execute("SELECT property_id FROM lotes WHERE id=?", (to_lote_id,)).fetchone()
+        destino = con.execute("SELECT property_id FROM lotes WHERE id=?", (params.to_lote_id,)).fetchone()
         to_property_id = destino["property_id"] if destino else None
 
         chunk_size = 900
@@ -265,27 +273,27 @@ def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manej
             if animal_id not in animal_data:
                 erros.append(animal_id)
                 continue
-            if animal_data[animal_id]["lote_id"] == to_lote_id:
+            if animal_data[animal_id]["lote_id"] == params.to_lote_id:
                 ja_no_destino.append(animal_id)
                 continue
 
             from_lote = animal_data[animal_id]["lote_id"]
             uuid = animal_data[animal_id]["uuid"]
 
-            update_animals_args.append((to_lote_id, to_property_id, animal_id))
+            update_animals_args.append((params.to_lote_id, to_property_id, animal_id))
 
             insert_movements_args.append((
-                uuid, from_lote, to_lote_id, movement_date, reason, operator, notes
+                uuid, from_lote, params.to_lote_id, params.movement_date, params.reason, params.operator, params.notes
             ))
 
-            obs = f"{from_lote or '—'} → {to_lote_id} ({reason})"
+            obs = f"{from_lote or '—'} → {params.to_lote_id} ({params.reason})"
             # animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
             # local_interno,responsavel,usuario_registro,origem_informacao,
             # latitude,longitude,observacoes,documento,anexos,
             # justificativa,evento_anterior_id,versao
             insert_events_args.append((
-                uuid, "mudanca_lote", movement_date, agora, None,
-                to_lote_id, None, operator or None, "web",
+                uuid, "mudanca_lote", params.movement_date, agora, None,
+                params.to_lote_id, None, params.operator or None, "web",
                 None, None, obs, None, eventos._json(None), None, None, 1
             ))
 
@@ -315,11 +323,11 @@ def move_animals_bulk(animal_ids: list, to_lote_id, movement_date, reason="manej
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 insert_events_args
             )
-            con.execute("UPDATE lotes SET last_entry_date=? WHERE id=?", (movement_date, to_lote_id))
+            con.execute("UPDATE lotes SET last_entry_date=? WHERE id=?", (params.movement_date, params.to_lote_id))
 
             if from_lotes:
                 for from_lote in from_lotes:
-                    con.execute("UPDATE lotes SET last_exit_date=? WHERE id=?", (movement_date, from_lote))
+                    con.execute("UPDATE lotes SET last_exit_date=? WHERE id=?", (params.movement_date, from_lote))
 
     return {"movidos": movidos, "ja_no_destino": ja_no_destino, "erros": erros}
 

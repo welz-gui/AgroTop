@@ -90,7 +90,7 @@ from database import (
     previsao_estoque,
     set_lote_poligono,
 )
-from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk
+from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import (
     add_weighing,
@@ -612,11 +612,13 @@ def movimentar_animais(
 
     resultado = move_animals_bulk(
         animal_ids=data.animal_ids,
-        to_lote_id=data.to_lote_id,
-        movement_date=data.movement_date,
-        reason=motivo,
-        operator=operador,
-        notes=observacoes,
+        params=MovementParams(
+            to_lote_id=data.to_lote_id,
+            movement_date=data.movement_date,
+            reason=motivo,
+            operator=operador,
+            notes=observacoes,
+        )
     )
     if idempotency_key:
         store_response(idempotency_key, endpoint, status.HTTP_200_OK, resultado)

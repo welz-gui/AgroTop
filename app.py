@@ -1464,8 +1464,9 @@ def _tab_movimentacao(animal):
         notes_mv=st.text_area("Obs.",height=60,placeholder="Opcional")
         if st.form_submit_button("✅ Mover Animal",type="primary",use_container_width=True):
             if dest:
-                db.move_animal(animal["id"],dest["id"],mv_date.strftime("%Y-%m-%d"),
-                    reason,st.session_state.user["name"],notes_mv)
+                db.move_animal(animal["id"], db.MovementParams(
+                    dest["id"], mv_date.strftime("%Y-%m-%d"), reason, st.session_state.user["name"], notes_mv
+                ))
                 st.success(f"✅ {animal['id']} movido para {dest['name']}")
                 st.rerun()
 
@@ -2728,8 +2729,9 @@ def _lotes_transferir_animais(lotes):
             if not sel_ids:
                 st.error("Selecione ao menos um animal.")
             else:
-                r = db.move_animals_bulk(sel_ids, destino["id"], mv_date.strftime("%Y-%m-%d"),
-                    reason, st.session_state.user["name"], notes_t)
+                r = db.move_animals_bulk(sel_ids, db.MovementParams(
+                    destino["id"], mv_date.strftime("%Y-%m-%d"), reason, st.session_state.user["name"], notes_t
+                ))
                 if r["movidos"]:
                     st.success(f"✅ {_plural(len(r['movidos']),'animal transferido','animais transferidos')} "
                               f"para {destino['name']}.")
