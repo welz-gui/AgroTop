@@ -5,6 +5,7 @@ Sem regra de negócio — cálculo e decisão ficam em `services/`.
 Sem Streamlit no topo do módulo.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -12,6 +13,22 @@ from .animais import get_all_animals
 from .animais import uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
+
+
+@dataclass
+class ProtocolData:
+    name: str
+    sex_target: str
+    age_min: int
+    age_max: int
+    dose_value: float
+    dose_ref_kg: float
+    dose_unit: str
+    insumo_id: Optional[str]
+    frequency: str
+    withdrawal_days: int
+    route: str = "Subcutânea"
+    notes: str = ""
 
 
 @_cache
@@ -142,17 +159,16 @@ def get_protocols(active_only: bool = True) -> list[dict]:
 
 
 @_writes
-def add_protocol(name, sex_target, age_min, age_max, dose_value, dose_ref_kg,
-                 dose_unit, insumo_id, frequency, withdrawal_days,
-                 route="Subcutânea", notes="") -> None:
+def add_protocol(data: ProtocolData) -> None:
     with _conn() as con:
         con.execute(
             """INSERT INTO health_protocols
                (name,sex_target,age_min,age_max,dose_value,dose_ref_kg,dose_unit,
                 insumo_id,frequency,withdrawal_days,route,notes)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (name, sex_target, int(age_min), int(age_max), dose_value, dose_ref_kg,
-             dose_unit, insumo_id or None, frequency, int(withdrawal_days), route, notes),
+            (data.name, data.sex_target, int(data.age_min), int(data.age_max), data.dose_value,
+             data.dose_ref_kg, data.dose_unit, data.insumo_id or None, data.frequency,
+             int(data.withdrawal_days), data.route, data.notes),
         )
 
 
