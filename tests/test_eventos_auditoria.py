@@ -207,8 +207,10 @@ class TestOperacoesGeramEvento(BaseEventos):
         self.assertIn("pesagem", self._tipos(self.uuid))
 
     def test_medicacao(self):
-        db.add_medication(self.animal["id"], "Ivermectina", 10, "ml",
-                          "Subcutânea", 21, "2026-07-20", "op1")
+        db.add_medication(db.MedicationData(
+            animal_id=self.animal["id"], medication_name="Ivermectina", dose=10, unit="ml",
+            application_route="Subcutânea", withdrawal_days=21, med_date="2026-07-20", applied_by="op1"
+        ))
         self.assertIn("manejo_sanitario", self._tipos(self.uuid))
 
     def test_movimentacao_de_lote(self):

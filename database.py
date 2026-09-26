@@ -104,6 +104,7 @@ from repositories.pesagens import (
     get_average_weighings_by_date, calculate_gmd, get_last_estimate
 )
 from repositories.sanidade import (
+    MedicationData,
     get_withdrawal_end_batch,  # noqa: F401
     _medications_by_animal, get_medications, add_medication, get_withdrawal_end,
     get_protocols, add_protocol, set_protocol_active, delete_protocol,

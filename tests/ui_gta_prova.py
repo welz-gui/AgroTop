@@ -166,8 +166,10 @@ class TestConferirGtaNaTela(unittest.TestCase):
         mid = self._rascunho(gta_numero="GTA-0005", finalidade="abate")
         mov = db.movimentacoes.get(mid)
         aid_carencia = mov["animais"][0]["brinco"]
-        db.add_medication(aid_carencia, "Ivermectina", 5.0, "ml", "Subcutânea",
-                          30, date.today().isoformat())
+        db.add_medication(db.MedicationData(
+            animal_id=aid_carencia, medication_name="Ivermectina", dose=5.0, unit="ml",
+            application_route="Subcutânea", withdrawal_days=30, med_date=date.today().isoformat()
+        ))
         db.clear_cache()
 
         wd_batch = db.get_withdrawal_end_batch(

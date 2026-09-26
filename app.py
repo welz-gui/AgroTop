@@ -1447,9 +1447,18 @@ def _tab_medicamento(animal):
             if not med_name:
                 st.error("Informe o medicamento.")
             else:
-                db.add_medication(animal["id"],med_name,dose,unit,route,
-                    int(wd_c),md_.strftime("%Y-%m-%d"),
-                    st.session_state.user["name"],insumo_id,notes_m)
+                db.add_medication(db.MedicationData(
+                    animal_id=animal["id"],
+                    medication_name=med_name,
+                    dose=dose,
+                    unit=unit,
+                    application_route=route,
+                    withdrawal_days=int(wd_c),
+                    med_date=md_.strftime("%Y-%m-%d"),
+                    applied_by=st.session_state.user["name"],
+                    insumo_id=insumo_id,
+                    notes=notes_m
+                ))
                 st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
                 st.rerun()
 

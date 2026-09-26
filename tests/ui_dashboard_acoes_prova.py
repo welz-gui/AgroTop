@@ -87,13 +87,15 @@ class TestFuncionalDashboardAcoes(unittest.TestCase):
                 sex="M",
             )
             # Medicamento com carência futura
-            db.add_medication(
+            db.add_medication(db.MedicationData(
                 animal_id="BR9901",
-                remedio="Ivermectina",
-                dose="5ml",
-                data_aplicacao="2026-09-01",
-                dias_carencia=60,
-            )
+                medication_name="Ivermectina",
+                dose=5.0,
+                unit="ml",
+                application_route="Subcutânea",
+                withdrawal_days=60,
+                med_date="2026-09-01",
+            ))
         except Exception:
             pass
 
