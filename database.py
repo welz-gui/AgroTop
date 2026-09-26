@@ -2042,14 +2042,14 @@ def get_pending_feedings(ref_date: Optional[date] = None) -> list[dict]:
     last_checks = {}
 
     with _conn() as con:
-        chunk_size = 900
-        for i in range(0, len(plan_ids), chunk_size):
-            chunk = plan_ids[i:i+chunk_size]
-            placeholders = ",".join("?" * len(chunk))
-            query = f"SELECT plan_id, MAX(check_date) as check_date FROM feeding_checks WHERE plan_id IN ({placeholders}) GROUP BY plan_id"
-            rows = con.execute(query, chunk).fetchall()
-            for row in rows:
-                last_checks[row["plan_id"]] = row["check_date"]
+        json_ids = json.dumps(plan_ids)
+        query = ("SELECT plan_id, MAX(check_date) as check_date "
+                 "FROM feeding_checks "
+                 "WHERE plan_id IN (SELECT value FROM json_each(?)) "
+                 "GROUP BY plan_id")
+        rows = con.execute(query, (json_ids,)).fetchall()
+        for row in rows:
+            last_checks[row["plan_id"]] = row["check_date"]
 
         result = []
         for p in plans:
