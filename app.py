@@ -3751,55 +3751,47 @@ def _fin_custos_fixos(animals, lotes):
 
 
 
-def _fin_simulador(animals):
-    ul = _unit_label()
-    arroba_mode = _use_arroba()
-    st.subheader("💵 Simulador de Venda")
-
-    precos_cat = db.get_category_prices()
-    base = st.radio("Base de preço",
-        ["categoria","manual"],
-        format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
-                              else "✏️ Preço único manual",
-        horizontal=True, key="sim_base")
-
+def _simulador_render_manual_input(arroba_mode, ul, c):
     cotacao = 0.0
     rendimento = 52
-    ajuste_pct = 0
-    if base == "manual":
-        sc1, sc2 = st.columns(2)
-        with sc1:
-            price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
-            default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
-            cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
-                value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
-            if arroba_mode:
-                rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
-        with sc2:
-            sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
-            st.markdown(
-                f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
-                f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {_num_br(cotacao, 2)}/{ul}</div>'
-                f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
-                unsafe_allow_html=True)
-    else:  # categoria
-        st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
-                   "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
-        if not precos_cat or all(v <= 0 for v in precos_cat.values()):
-            st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
-                       "e informe os valores por kg de cada categoria.")
-        ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
-            help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
-        # Mostra os preços em uso
-        linhas = []
-        for band in AGE_BANDS:
-            for sex in ("M","F"):
-                p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
-                if p > 0:
-                    linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {_num_br(p, 2)}/kg")
-        if linhas:
-            st.caption("Preços aplicados: " + "  |  ".join(linhas))
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        price_label = "Cotação por @ (R$)" if arroba_mode else "Cotação por kg de boi vivo (R$)"
+        default_price = DEFAULT_PRICE_ARROBA if arroba_mode else DEFAULT_PRICE_KG
+        cotacao=st.number_input(price_label, min_value=0.01, max_value=5000.0,
+            value=default_price, step=(5.0 if arroba_mode else 0.10), format="%.2f")
+        if arroba_mode:
+            rendimento=st.slider("Rendimento de Carcaça (%)",40,65,52)
+    with sc2:
+        sub = ("Rendimento: "+str(rendimento)+"%") if arroba_mode else "Peso vivo (sem desconto de carcaça)"
+        st.markdown(
+            f'<div class="card"><div style="color:{c["texto_secundario"]};font-size:.85rem">Cotação única</div>'
+            f'<div style="font-size:2rem;font-weight:800;color:{c["primaria"]}">R$ {_num_br(cotacao, 2)}/{ul}</div>'
+            f'<div style="color:{c["texto_secundario"]};font-size:.85rem;margin-top:.5rem">{sub}</div></div>',
+            unsafe_allow_html=True)
+    return cotacao, rendimento
 
+def _simulador_render_category_input(precos_cat):
+    ajuste_pct = 0
+    st.caption("Cada animal é avaliado pelo **R$/kg da sua categoria** (definido em "
+               "**Preços/Categoria**). Use o ajuste abaixo para simular alta/baixa de mercado.")
+    if not precos_cat or all(v <= 0 for v in precos_cat.values()):
+        st.warning("⚠️ Nenhum preço por categoria definido. Vá em **Preços/Categoria** "
+                   "e informe os valores por kg de cada categoria.")
+    ajuste_pct = st.slider("Ajuste global de preço (%)", -30, 30, 0,
+        help="Ex: mercado subiu 5% → +5. Aplica sobre todos os preços da tabela.")
+    # Mostra os preços em uso
+    linhas = []
+    for band in AGE_BANDS:
+        for sex in ("M","F"):
+            p = precos_cat.get((band,sex),0.0) * (1+ajuste_pct/100)
+            if p > 0:
+                linhas.append(f"{band} · {'♂' if sex=='M' else '♀'}: R$ {_num_br(p, 2)}/kg")
+    if linhas:
+        st.caption("Preços aplicados: " + "  |  ".join(linhas))
+    return ajuste_pct
+
+def _simulador_get_fixed_costs_apportionment(animals):
     incluir_fixos=st.checkbox("Incluir rateio de custos fixos no cálculo",
         help="Divide os custos fixos do ano igualmente entre os animais ativos")
 
@@ -3810,7 +3802,9 @@ def _fin_simulador(animals):
         rateio_fixo = total_fix_ano / len(animals)
         st.info(f"Rateio de custos fixos: **R\\$ {rateio_fixo:,.2f}** por animal "
                 f"(total R\\$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
+    return rateio_fixo
 
+def _simulador_calculate_data(animals, base, precos_cat, ajuste_pct, cotacao, rendimento, rateio_fixo, ul):
     sim_rows=[]
     sem_preco=[]
     costs = db._costs_by_animal()
@@ -3834,16 +3828,19 @@ def _fin_simulador(animals):
             "Receita (R$)":receita,"Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
             "Margem (%)":round(lucro/receita*100,1) if receita else 0})
     df_sim=pd.DataFrame(sim_rows)
-    if base != "categoria":
+    if base != "categoria" and "Preço (R$/kg)" in df_sim.columns:
         df_sim = df_sim.drop(columns=["Preço (R$/kg)"])
+    return df_sim, sem_preco
 
+def _simulador_render_results(df_sim, sem_preco, base, arroba_mode, ul):
     if sem_preco:
         st.warning(f"⚠️ Sem preço de categoria (receita R$ 0): **{', '.join(sem_preco)}**. "
                    f"Defina os valores em **Preços/Categoria**.")
 
-    tot_rec=df_sim["Receita (R$)"].sum(); tot_luc=df_sim["Lucro (R$)"].sum()
-    tot_cost=df_sim["Custo Total (R$)"].sum()
-    margem_media=df_sim["Margem (%)"].mean()
+    tot_rec=df_sim["Receita (R$)"].sum() if not df_sim.empty else 0
+    tot_luc=df_sim["Lucro (R$)"].sum() if not df_sim.empty else 0
+    tot_cost=df_sim["Custo Total (R$)"].sum() if not df_sim.empty else 0
+    margem_media=df_sim["Margem (%)"].mean() if not df_sim.empty else 0
 
     sk=st.columns(4)
     sk[0].metric("Receita Total", f"R$ {tot_rec:,.2f}")
@@ -3866,6 +3863,34 @@ def _fin_simulador(animals):
     if base == "categoria":
         cfg["Preço (R$/kg)"]=st.column_config.NumberColumn(format="R$ %.2f")
     st.dataframe(df_sim,use_container_width=True,hide_index=True,column_config=cfg)
+
+def _fin_simulador(animals):
+    ul = _unit_label()
+    arroba_mode = _use_arroba()
+    st.subheader("💵 Simulador de Venda")
+
+    precos_cat = db.get_category_prices()
+    base = st.radio("Base de preço",
+        ["categoria","manual"],
+        format_func=lambda b: "🏷️ Tabela de preços por categoria" if b=="categoria"
+                              else "✏️ Preço único manual",
+        horizontal=True, key="sim_base")
+
+    cotacao = 0.0
+    rendimento = 52
+    ajuste_pct = 0
+    if base == "manual":
+        cotacao, rendimento = _simulador_render_manual_input(arroba_mode, ul, c)
+    else:
+        ajuste_pct = _simulador_render_category_input(precos_cat)
+
+    rateio_fixo = _simulador_get_fixed_costs_apportionment(animals)
+
+    df_sim, sem_preco = _simulador_calculate_data(
+        animals, base, precos_cat, ajuste_pct, cotacao, rendimento, rateio_fixo, ul
+    )
+
+    _simulador_render_results(df_sim, sem_preco, base, arroba_mode, ul)
 
 
 
