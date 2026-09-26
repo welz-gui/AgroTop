@@ -2225,6 +2225,61 @@ def _render_tab_fin(animal):
                 st.success("Custo registrado!"); st.rerun()
 
 
+def _render_animal_metrics(animal: dict, gmd: float | None, arrobas: float, gain: float, cat: str, target_weight: float | None):
+    m=st.columns(3)
+    m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
+    gmd_total = calculate_gmd_total(animal)
+    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
+    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
+    m[1].metric("GMD recente", gmd_txt,
+                delta=_num_br(gmd, 3) if gmd is not None else None,
+                help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
+    m[2].metric("Meta de peso", f"{_num_br(target_weight, 1)} kg"
+                if target_weight is not None and target_weight > 0
+                else "Sem meta definida")
+    st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
+               f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
+    st.caption(f"📋 Raça: **{animal['breed']}**  ·  **Categoria:** {cat}  ·  "
+               f"**Origem:** {animal.get('fornecedor_name') or 'Não informada'}  ·  "
+               f"**Ganho:** {_num_br(gain, 1, sinal=True)} kg  ·  "
+               f"**@ atuais:** {_num_br(arrobas, 2)} @")
+
+    src_label = db.AGE_SOURCES.get(animal.get("age_source","propriedade"),"—")
+    doc_parts = []
+    if animal.get("nf_number"):  doc_parts.append(f"NF: **{animal['nf_number']}**")
+    if animal.get("gta_number"): doc_parts.append(f"GTA: **{animal['gta_number']}**")
+    st.caption(f"📆 Origem da idade: **{src_label}**"
+               + (f" · nascimento: {animal['birth_date']}" if animal.get("birth_date") else "")
+               + (f"  |  📄 {' · '.join(doc_parts)}" if doc_parts else ""))
+
+
+def _render_animal_tabs(animal: dict, aid: str, ws: list, meds: list, movs: list, target_weight: float | None):
+    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id,tl_ev=st.tabs(
+        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto",
+         "🏷️ Identificadores","🕒 Linha do Tempo"])
+
+    with tl_ev:
+        _linha_do_tempo_do_animal(animal)
+
+    with tl_id:
+        _identificadores_do_animal(animal)
+
+    with tl_foto:
+        _photo_section(aid, key_prefix="ficha_")
+
+    with tl_peso:
+        _render_tab_peso(ws, target_weight)
+
+    with tl_med:
+        _render_tab_med(meds)
+
+    with tl_mov:
+        _render_tab_mov(movs)
+
+    with tl_fin:
+        _render_tab_fin(animal)
+
+
 def page_animal():
     aid=st.session_state.animal_detail
     if not aid: st.warning("Nenhum animal selecionado."); return
@@ -2256,31 +2311,8 @@ def page_animal():
     target_weight = animal.get("target_weight")
     if target_weight is not None:
         target_weight = float(target_weight)
-    m=st.columns(3)
-    m[0].metric("Peso Atual", f"{_num_br(animal['current_weight'], 1)} kg")
-    gmd_total = calculate_gmd_total(animal)
-    gmd_txt = f"{_num_br(gmd, 3)} kg/dia" if gmd is not None else "Sem pesagens"
-    tot_txt = f"{_num_br(gmd_total, 3)} kg/dia" if gmd_total is not None else "Sem histórico"
-    m[1].metric("GMD recente", gmd_txt,
-                delta=_num_br(gmd, 3) if gmd is not None else None,
-                help=f"Entre as duas últimas pesagens (atual). GMD total de vida: {tot_txt}")
-    m[2].metric("Meta de peso", f"{_num_br(target_weight, 1)} kg"
-                if target_weight is not None and target_weight > 0
-                else "Sem meta definida")
-    st.caption(f"📈 **GMD recente** (entre pesagens): {gmd_txt}  ·  "
-               f"**GMD total** (de vida = peso atual − entrada ÷ dias): {tot_txt}")
-    st.caption(f"📋 Raça: **{animal['breed']}**  ·  **Categoria:** {cat}  ·  "
-               f"**Origem:** {animal.get('fornecedor_name') or 'Não informada'}  ·  "
-               f"**Ganho:** {_num_br(gain, 1, sinal=True)} kg  ·  "
-               f"**@ atuais:** {_num_br(arrobas, 2)} @")
 
-    src_label = db.AGE_SOURCES.get(animal.get("age_source","propriedade"),"—")
-    doc_parts = []
-    if animal.get("nf_number"):  doc_parts.append(f"NF: **{animal['nf_number']}**")
-    if animal.get("gta_number"): doc_parts.append(f"GTA: **{animal['gta_number']}**")
-    st.caption(f"📆 Origem da idade: **{src_label}**"
-               + (f" · nascimento: {animal['birth_date']}" if animal.get("birth_date") else "")
-               + (f"  |  📄 {' · '.join(doc_parts)}" if doc_parts else ""))
+    _render_animal_metrics(animal, gmd, arrobas, gain, cat, target_weight)
 
     # Editor de idade
     with st.expander("✏️ Corrigir / redefinir idade"):
@@ -2300,30 +2332,7 @@ def page_animal():
     st.markdown("---")
     _consistencia_regulatoria(animal, movs)
 
-    tl_peso,tl_med,tl_mov,tl_fin,tl_foto,tl_id,tl_ev=st.tabs(
-        ["📈 Curva de Peso","💉 Sanidade","🚚 Movimentações","💰 Financeiro","📷 Foto",
-         "🏷️ Identificadores","🕒 Linha do Tempo"])
-
-    with tl_ev:
-        _linha_do_tempo_do_animal(animal)
-
-    with tl_id:
-        _identificadores_do_animal(animal)
-
-    with tl_foto:
-        _photo_section(aid, key_prefix="ficha_")
-
-    with tl_peso:
-        _render_tab_peso(ws, target_weight)
-
-    with tl_med:
-        _render_tab_med(meds)
-
-    with tl_mov:
-        _render_tab_mov(movs)
-
-    with tl_fin:
-        _render_tab_fin(animal)
+    _render_animal_tabs(animal, aid, ws, meds, movs, target_weight)
 
     st.markdown("---")
     qa1,qa2=st.columns(2)
