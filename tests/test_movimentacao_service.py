@@ -4,7 +4,8 @@ from services.movimentacao import (
     pre_validar_saida,
     pode_liberar,
     exige_confirmacao,
-    resumo
+    resumo,
+    _data
 )
 
 class TestMovimentacaoService(unittest.TestCase):
@@ -45,8 +46,17 @@ class TestMovimentacaoService(unittest.TestCase):
     def _extract_codes(self, problemas):
         return [p["codigo"] for p in problemas]
 
+    def test_data(self):
+        self.assertEqual(_data("2023-01-01"), date(2023, 1, 1))
+        self.assertIsNone(_data("invalid-date"))
+        self.assertIsNone(_data(None))
+
     def test_pre_validar_saida_valida(self):
         problemas = pre_validar_saida(self.mov_valida, [self.animal_valido], self.contexto_valido)
+        self.assertEqual(problemas, [])
+
+    def test_pre_validar_saida_contexto_padrao(self):
+        problemas = pre_validar_saida(self.mov_valida, [self.animal_valido])
         self.assertEqual(problemas, [])
 
     def test_movimentacao_ja_concluida(self):
