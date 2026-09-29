@@ -51,5 +51,31 @@ class TestLegacyMigration(unittest.TestCase):
         self.assertIsNone(u)
 
 
+
+class TestSessionManagement(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        # Sem tearDown de propósito — mesmo padrão de TestLegacyMigration
+        # logo acima. Vários testes sem setUp próprio (ex.: test_terminacao.py)
+        # dependem de encontrar, em execuções completas da suíte, um SQLite
+        # já inicializado deixado por uma classe anterior; apagar o diretório
+        # aqui (ou trocar para :memory:) quebra essa suposição implícita e
+        # derruba testes mais adiante com "no such table: settings" —
+        # reproduzido isolando `test_auth.py` + `test_terminacao.py`.
+        db.configurar_sqlite(os.path.join(self.tmp, "test.db"))
+        db.init_db()
+
+    def test_get_session_user_invalid_date(self):
+        import sqlite3
+        con = sqlite3.connect(db.DB_PATH)
+        con.execute("INSERT INTO sessions (token,user_id,expires_at) VALUES(?,?,?)",
+                    ("bad_date_token", 1, "not-a-date"))
+        con.commit()
+        con.close()
+
+        # Should return None and suppress the ValueError/TypeError
+        self.assertIsNone(db.get_session_user("bad_date_token"))
+
+
 if __name__ == "__main__":
     unittest.main()
