@@ -78,6 +78,24 @@ class TestProjecaoAdaptador(unittest.TestCase):
         self.assertEqual(res[0]["chuva_mm"], 100.0)
         self.assertEqual(res[0]["gmd_medio"], 1.5)  # (1.0 + 2.0) / 2 = 1.5
 
+    def test_chuva_com_valores_invalidos_sao_ignorados(self):
+        """Valida que valores de chuva que geram ValueError ou TypeError no parse para float são ignorados."""
+        leituras_chuva = [
+            {"read_date": "2026-03-05", "rain_mm": "invalido"}, # ValueError
+            {"read_date": "2026-03-12", "rain_mm": None}, # TypeError
+            {"read_date": "2026-03-25", "rain_mm": []}, # TypeError
+            {"read_date": "2026-03-28", "rain_mm": 30.0}, # Válido
+        ]
+        pesagens = [
+            {"animal_uuid": "a1", "weigh_date": "2026-03-01", "weight": 200.0},
+            {"animal_uuid": "a1", "weigh_date": "2026-03-21", "weight": 220.0},
+        ]
+        res = series_mensais(leituras_chuva, pesagens)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["periodo"], "2026-03")
+        self.assertEqual(res[0]["chuva_mm"], 30.0)
+        self.assertEqual(res[0]["gmd_medio"], 1.0)
+
     def test_criterio_6_integra_com_correlacao_chuva_gmd(self):
         """Critério 6: Saída passada para projecao.correlacao_chuva_gmd() não levanta exceção para 0, 1, 2 e 5+ meses."""
         # 0 meses
