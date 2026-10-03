@@ -3,7 +3,7 @@ import unittest
 from pyproj import Transformer
 from shapely.geometry import Polygon
 
-from services.geometria import area_hectares, centroide, perimetro_metros, validar
+from services.geometria import _crs_utm, area_hectares, centroide, perimetro_metros, validar
 
 
 class TestGeometriaPiquete(unittest.TestCase):
@@ -106,6 +106,30 @@ class TestGeometriaPiquete(unittest.TestCase):
         problemas = validar(colinear)
 
         self.assertIn("Área do polígono é zero.", problemas)
+
+    def test_crs_utm_zona_extremo_oeste_sul(self):
+        crs = _crs_utm(-180.0, -90.0)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 1)
+        self.assertIn("south", d)
+
+    def test_crs_utm_zona_extremo_leste_norte(self):
+        crs = _crs_utm(180.0, 90.0)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 60)
+        self.assertNotIn("south", d)
+
+    def test_crs_utm_zona_meridiano_greenwich_equador(self):
+        crs = _crs_utm(0.0, 0.0)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 31)
+        self.assertNotIn("south", d)
+
+    def test_crs_utm_zona_exemplo_real(self):
+        crs = _crs_utm(-55.9, -13.3)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 21)
+        self.assertIn("south", d)
 
 
 if __name__ == "__main__":
