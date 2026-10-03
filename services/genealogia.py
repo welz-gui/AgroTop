@@ -25,6 +25,96 @@ def _calcular_idade_meses(nasc_mae: date, nasc_cria: date) -> int:
     return max(0, meses)
 
 
+def _validar_sexo_mae(mae: dict, mae_id: str, erros: list[dict]):
+    sexo_mae = str(mae.get("sexo", "")).strip().upper()
+    if sexo_mae in ("M", "MACHO", "MASCULINO") or (
+        sexo_mae and sexo_mae not in ("F", "FEMEA", "FÊMEA", "FEMININO")
+    ):
+        erros.append({
+            "codigo": "mae_macho",
+            "gravidade": "bloqueio",
+            "mensagem": f"Mãe {mae_id} informada possui sexo masculino ('{mae.get('sexo')}').",
+            "campo": "sexo",
+        })
+
+
+def _validar_nascimento_mae(mae_id: str, nasc_mae: date, nasc_cria: date, contexto: dict, erros: list[dict]):
+    if nasc_mae >= nasc_cria:
+        erros.append({
+            "codigo": "mae_mais_nova_que_cria",
+            "gravidade": "bloqueio",
+            "mensagem": (
+                f"Data de nascimento da mãe {mae_id} ({nasc_mae.strftime('%d/%m/%Y')}) "
+                f"é posterior ou igual ao nascimento da cria ({nasc_cria.strftime('%d/%m/%Y')})."
+            ),
+            "campo": "nascimento",
+        })
+    else:
+        idade_meses = _calcular_idade_meses(nasc_mae, nasc_cria)
+        idade_minima = int(contexto.get("idade_minima_parto_meses", 18) or 18)
+        if idade_meses < idade_minima:
+            erros.append({
+                "codigo": "mae_jovem_demais",
+                "gravidade": "bloqueio",
+                "mensagem": (
+                    f"Mãe {mae_id} tinha {idade_meses} meses na data do parto em {nasc_cria.strftime('%d/%m/%Y')} "
+                    f"(nascida em {nasc_mae.strftime('%d/%m/%Y')}), abaixo do mínimo de {idade_minima} meses."
+                ),
+                "campo": "nascimento",
+            })
+
+
+def _validar_morte_mae(mae_id: str, nasc_cria: date, morte_mae: date, erros: list[dict]):
+    if nasc_cria > morte_mae:
+        erros.append({
+            "codigo": "parto_apos_morte_da_mae",
+            "gravidade": "bloqueio",
+            "mensagem": (
+                f"Nascimento da cria em {nasc_cria.strftime('%d/%m/%Y')} ocorreu após "
+                f"a data de morte da mãe {mae_id} ({morte_mae.strftime('%d/%m/%Y')})."
+            ),
+            "campo": "nascimento",
+        })
+
+
+def _validar_intervalo_partos(nasc_cria: date, contexto: dict, erros: list[dict]):
+    partos_anteriores = contexto.get("partos_anteriores")
+    if isinstance(partos_anteriores, list) and partos_anteriores:
+        intervalo_minimo_dias = int(
+            contexto.get("intervalo_minimo_partos_dias", 270) or 270
+        )
+        for p_raw in partos_anteriores:
+            p_dt = _parse_date(p_raw)
+            if p_dt and p_dt <= nasc_cria:
+                dias_intervalo = (nasc_cria - p_dt).days
+                if dias_intervalo < intervalo_minimo_dias:
+                    erros.append({
+                        "codigo": "intervalo_entre_partos_curto",
+                        "gravidade": "alerta",
+                        "mensagem": (
+                            f"Intervalo de {dias_intervalo} dias entre este parto ({nasc_cria.strftime('%d/%m/%Y')}) "
+                            f"e o parto anterior ({p_dt.strftime('%d/%m/%Y')}) é menor que o mínimo de {intervalo_minimo_dias} dias."
+                        ),
+                        "campo": "nascimento",
+                    })
+                    break
+
+
+def _validar_propriedade(cria: dict, mae: dict, mae_id: str, erros: list[dict]):
+    prop_cria = cria.get("propriedade_id")
+    prop_mae = mae.get("propriedade_id")
+    if prop_cria and prop_mae and str(prop_cria) != str(prop_mae):
+        erros.append({
+            "codigo": "mae_em_outra_propriedade",
+            "gravidade": "alerta",
+            "mensagem": (
+                f"Mãe {mae_id} está cadastrada na propriedade '{prop_mae}', "
+                f"enquanto a cria nasceu na propriedade '{prop_cria}'."
+            ),
+            "campo": "propriedade_id",
+        })
+
+
 def validar_vinculo(
     cria: dict, mae: dict | None, contexto: dict | None = None
 ) -> list[dict]:
@@ -64,93 +154,22 @@ def validar_vinculo(
         return []
 
     mae_id = mae.get("id", "desconhecida")
-    sexo_mae = str(mae.get("sexo", "")).strip().upper()
-    if sexo_mae in ("M", "MACHO", "MASCULINO") or (
-        sexo_mae and sexo_mae not in ("F", "FEMEA", "FÊMEA", "FEMININO")
-    ):
-        erros.append({
-            "codigo": "mae_macho",
-            "gravidade": "bloqueio",
-            "mensagem": f"Mãe {mae_id} informada possui sexo masculino ('{mae.get('sexo')}').",
-            "campo": "sexo",
-        })
+
+    _validar_sexo_mae(mae, mae_id, erros)
 
     nasc_cria = _parse_date(cria.get("nascimento"))
     nasc_mae = _parse_date(mae.get("nascimento"))
     morte_mae = _parse_date(mae.get("morte"))
 
     if nasc_cria and nasc_mae:
-        if nasc_mae >= nasc_cria:
-            erros.append({
-                "codigo": "mae_mais_nova_que_cria",
-                "gravidade": "bloqueio",
-                "mensagem": (
-                    f"Data de nascimento da mãe {mae_id} ({nasc_mae.strftime('%d/%m/%Y')}) "
-                    f"é posterior ou igual ao nascimento da cria ({nasc_cria.strftime('%d/%m/%Y')})."
-                ),
-                "campo": "nascimento",
-            })
-        else:
-            idade_meses = _calcular_idade_meses(nasc_mae, nasc_cria)
-            idade_minima = int(
-                contexto.get("idade_minima_parto_meses", 18) or 18
-            )
-            if idade_meses < idade_minima:
-                erros.append({
-                    "codigo": "mae_jovem_demais",
-                    "gravidade": "bloqueio",
-                    "mensagem": (
-                        f"Mãe {mae_id} tinha {idade_meses} meses na data do parto em {nasc_cria.strftime('%d/%m/%Y')} "
-                        f"(nascida em {nasc_mae.strftime('%d/%m/%Y')}), abaixo do mínimo de {idade_minima} meses."
-                    ),
-                    "campo": "nascimento",
-                })
+        _validar_nascimento_mae(mae_id, nasc_mae, nasc_cria, contexto, erros)
 
     if nasc_cria and morte_mae:
-        if nasc_cria > morte_mae:
-            erros.append({
-                "codigo": "parto_apos_morte_da_mae",
-                "gravidade": "bloqueio",
-                "mensagem": (
-                    f"Nascimento da cria em {nasc_cria.strftime('%d/%m/%Y')} ocorreu após "
-                    f"a data de morte da mãe {mae_id} ({morte_mae.strftime('%d/%m/%Y')})."
-                ),
-                "campo": "nascimento",
-            })
+        _validar_morte_mae(mae_id, nasc_cria, morte_mae, erros)
 
     if nasc_cria:
-        partos_anteriores = contexto.get("partos_anteriores")
-        if isinstance(partos_anteriores, list) and partos_anteriores:
-            intervalo_minimo_dias = int(
-                contexto.get("intervalo_minimo_partos_dias", 270) or 270
-            )
-            for p_raw in partos_anteriores:
-                p_dt = _parse_date(p_raw)
-                if p_dt and p_dt <= nasc_cria:
-                    dias_intervalo = (nasc_cria - p_dt).days
-                    if dias_intervalo < intervalo_minimo_dias:
-                        erros.append({
-                            "codigo": "intervalo_entre_partos_curto",
-                            "gravidade": "alerta",
-                            "mensagem": (
-                                f"Intervalo de {dias_intervalo} dias entre este parto ({nasc_cria.strftime('%d/%m/%Y')}) "
-                                f"e o parto anterior ({p_dt.strftime('%d/%m/%Y')}) é menor que o mínimo de {intervalo_minimo_dias} dias."
-                            ),
-                            "campo": "nascimento",
-                        })
-                        break
+        _validar_intervalo_partos(nasc_cria, contexto, erros)
 
-    prop_cria = cria.get("propriedade_id")
-    prop_mae = mae.get("propriedade_id")
-    if prop_cria and prop_mae and str(prop_cria) != str(prop_mae):
-        erros.append({
-            "codigo": "mae_em_outra_propriedade",
-            "gravidade": "alerta",
-            "mensagem": (
-                f"Mãe {mae_id} está cadastrada na propriedade '{prop_mae}', "
-                f"enquanto a cria nasceu na propriedade '{prop_cria}'."
-            ),
-            "campo": "propriedade_id",
-        })
+    _validar_propriedade(cria, mae, mae_id, erros)
 
     return erros
