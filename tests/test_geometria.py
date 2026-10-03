@@ -3,8 +3,34 @@ import unittest
 from pyproj import Transformer
 from shapely.geometry import Polygon
 
-from services.geometria import area_hectares, centroide, perimetro_metros, validar
+from services.geometria import area_hectares, centroide, perimetro_metros, validar, _coordenadas
 
+
+class TestCoordenadas(unittest.TestCase):
+    def test_converte_para_float(self):
+        resultado = _coordenadas([(1, 2), (3, 4)])
+        self.assertEqual(resultado, [(1.0, 2.0), (3.0, 4.0)])
+        self.assertTrue(isinstance(resultado[0][0], float))
+
+    def test_aceita_strings_e_converte_para_float(self):
+        resultado = _coordenadas([("1.5", "-2.5"), ("3.0", "4.0")])
+        self.assertEqual(resultado, [(1.5, -2.5), (3.0, 4.0)])
+
+    def test_remove_ultimo_ponto_se_fechado(self):
+        fechado = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (1.0, 1.0)]
+        esperado = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        self.assertEqual(_coordenadas(fechado), esperado)
+
+    def test_nao_remove_ultimo_ponto_se_aberto(self):
+        aberto = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        esperado = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        self.assertEqual(_coordenadas(aberto), esperado)
+
+    def test_aceita_lista_vazia(self):
+        self.assertEqual(_coordenadas([]), [])
+
+    def test_aceita_um_ponto(self):
+        self.assertEqual(_coordenadas([(1.0, 1.0)]), [(1.0, 1.0)])
 
 class TestGeometriaPiquete(unittest.TestCase):
     @classmethod
