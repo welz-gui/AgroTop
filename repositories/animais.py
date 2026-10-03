@@ -92,6 +92,7 @@ def get_total_gain_kg(status: Optional[str] = "ativo",
         result = con.execute(sql, args).fetchone()
         return float(result[0]) if result and result[0] is not None else 0.0
 
+# Caching this function significantly improves performance for repeated reads
 @_cache
 def get_all_animals(status: Optional[str] = "ativo",
                     lote_id: Optional[str] = None,
