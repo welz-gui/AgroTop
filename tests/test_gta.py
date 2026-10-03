@@ -1,7 +1,8 @@
 import inspect
 import unittest
+from datetime import date
 
-from services.gta import validar
+from services.gta import _data_iso, validar
 
 
 class TestValidacaoGta(unittest.TestCase):
@@ -158,6 +159,24 @@ class TestValidacaoGta(unittest.TestCase):
         self.assertEqual(set(problema), {"codigo", "gravidade", "mensagem"})
         self.assertIn(problema["gravidade"], {"bloqueio", "alerta"})
         self.assertTrue(problema["mensagem"])
+
+
+class TestDataIso(unittest.TestCase):
+    def test_retorna_date_se_receber_date(self):
+        hoje = date.today()
+        self.assertEqual(_data_iso(hoje), hoje)
+
+    def test_converte_string_iso_valida(self):
+        self.assertEqual(_data_iso("2026-08-01"), date(2026, 8, 1))
+
+    def test_retorna_none_para_string_invalida(self):
+        self.assertIsNone(_data_iso("data-invalida"))
+
+    def test_retorna_none_para_tipo_incompativel(self):
+        self.assertIsNone(_data_iso(None))
+
+    def test_retorna_none_para_data_inexistente(self):
+        self.assertIsNone(_data_iso("2026-02-29"))  # 2026 não é bissexto
 
 
 if __name__ == "__main__":

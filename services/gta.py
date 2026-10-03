@@ -4,10 +4,10 @@ from datetime import date
 
 
 def _data_iso(valor) -> date | None:
-    if not isinstance(valor, str):
-        return None
+    if isinstance(valor, date):
+        return valor
     try:
-        return date.fromisoformat(valor.strip())
+        return date.fromisoformat(str(valor))
     except ValueError:
         return None
 
