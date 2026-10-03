@@ -90,6 +90,7 @@ from repositories import eventos as eventos  # noqa: F401
 from repositories import propriedades as propriedades  # noqa: F401
 from repositories import nascimentos as nascimentos  # noqa: F401
 from repositories import movimentacoes as movimentacoes  # noqa: F401
+from repositories.compras import NovaCompra as NovaCompra  # noqa: F401
 from repositories import dispositivos as dispositivos  # noqa: F401
 from repositories import regras as regras  # noqa: F401
 from repositories import compras as compras  # noqa: F401

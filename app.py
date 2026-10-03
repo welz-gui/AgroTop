@@ -4285,7 +4285,7 @@ def _estoque_compra_com_nota(insumos):
 
     if st.button("✅ Registrar Compra", type="primary", use_container_width=True,
                  key="compra_registrar_btn", disabled=not itens_atuais):
-        r = db.compras.registrar(
+        r = db.compras.registrar(db.NovaCompra(
             data_emissao=data_emissao.isoformat(),
             data_recebimento=data_recebimento.isoformat(),
             itens=[{"insumo_id": i["insumo_id"], "quantidade": i["quantidade"],
@@ -4293,7 +4293,7 @@ def _estoque_compra_com_nota(insumos):
             primeiro_vencimento=primeira_parcela.isoformat(),
             num_parcelas=int(num_parcelas),
             fornecedor_nome=fornecedor_nome, documento_numero=doc_numero,
-            documento_serie=doc_serie, operator=st.session_state.user["name"])
+            documento_serie=doc_serie, operator=st.session_state.user["name"]))
         if r["ok"]:
             st.success(f"✅ Compra registrada — R$ {r['valor_total']:,.2f} em "
                 f"{_plural(r['parcelas'],'parcela','parcelas')}. Estoque e contas a "
