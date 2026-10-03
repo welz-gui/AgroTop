@@ -14,6 +14,7 @@ parcelamento) vem de `services/compras.py` (R8 — não recalculado aqui).
 """
 
 import uuid as _uuid
+from dataclasses import dataclass
 from typing import Optional
 
 from services.compras import gerar_parcelas, total_compra
@@ -22,16 +23,27 @@ from services.estoque import custo_medio_ponderado
 from .conexao import _conn, _writes
 
 
+@dataclass
+class CompraCreate:
+    data_emissao: str
+    data_recebimento: str
+    itens: list[dict]
+    primeiro_vencimento: str
+    num_parcelas: int = 1
+    fornecedor_id: Optional[int] = None
+    fornecedor_nome: str = ""
+    documento_numero: str = ""
+    documento_serie: str = ""
+    operator: str = ""
+    notes: str = ""
+
+
 def _novo_id() -> str:
     return str(_uuid.uuid4())
 
 
 @_writes
-def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
-             primeiro_vencimento: str, num_parcelas: int = 1,
-             fornecedor_id: Optional[int] = None, fornecedor_nome: str = "",
-             documento_numero: str = "", documento_serie: str = "",
-             operator: str = "", notes: str = "") -> dict:
+def registrar(dados: CompraCreate) -> dict:
     """Registra a compra inteira: cabeçalho, itens, estoque e contas a pagar.
 
     `itens`: lista de `{"insumo_id": int, "quantidade": float, "custo_unitario": float}`.
@@ -39,16 +51,16 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
     `insumo_transactions` vinculada a esta compra. As parcelas usam
     `services.compras.gerar_parcelas` a partir do total real da nota.
     """
-    if not itens:
+    if not dados.itens:
         return {"ok": False, "erro": "compra sem nenhum item"}
-    for item in itens:
+    for item in dados.itens:
         if float(item["quantidade"]) <= 0:
             return {"ok": False, "erro": "quantidade deve ser maior que zero"}
         if float(item["custo_unitario"]) < 0:
             return {"ok": False, "erro": "custo unitário não pode ser negativo"}
 
-    valor_total = total_compra(itens)
-    parcelas = gerar_parcelas(valor_total, num_parcelas, primeiro_vencimento)
+    valor_total = total_compra(dados.itens)
+    parcelas = gerar_parcelas(valor_total, dados.num_parcelas, dados.primeiro_vencimento)
     compra_id = _novo_id()
 
     with _conn() as con:
@@ -57,12 +69,12 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
                (id, fornecedor_id, fornecedor_nome, documento_numero, documento_serie,
                 data_emissao, data_recebimento, valor_total, operator, notes)
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (compra_id, fornecedor_id, fornecedor_nome, documento_numero,
-             documento_serie, data_emissao, data_recebimento, valor_total,
-             operator, notes))
+            (compra_id, dados.fornecedor_id, dados.fornecedor_nome, dados.documento_numero,
+             dados.documento_serie, dados.data_emissao, dados.data_recebimento, valor_total,
+             dados.operator, dados.notes))
 
         insumos_db = {}
-        insumo_ids = list({item["insumo_id"] for item in itens})
+        insumo_ids = list({item["insumo_id"] for item in dados.itens})
         if insumo_ids:
             placeholders = ",".join("?" for _ in insumo_ids)
             rows = con.execute(
@@ -79,7 +91,7 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
         insumo_updates = []
         insumo_tx_params = []
 
-        for item in itens:
+        for item in dados.itens:
             insumo_id = item["insumo_id"]
             quantidade = float(item["quantidade"])
             custo_unitario = float(item["custo_unitario"])
@@ -99,8 +111,8 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
             insumo_updates.append((quantidade, novo_custo, insumo_id))
 
             insumo_tx_params.append((
-                insumo_id, "entrada", quantidade, "compra", data_recebimento,
-                operator, f"compra {compra_id}", compra_id))
+                insumo_id, "entrada", quantidade, "compra", dados.data_recebimento,
+                dados.operator, f"compra {compra_id}", compra_id))
 
         con.executemany(
             """INSERT INTO compra_itens
@@ -117,15 +129,15 @@ def registrar(*, data_emissao: str, data_recebimento: str, itens: list[dict],
                 notes, compra_id)
                VALUES (?,?,?,?,?,?,?,?)""", insumo_tx_params)
 
-        rotulo_fornecedor = fornecedor_nome or "fornecedor não informado"
-        rotulo_doc = documento_numero or compra_id[:8]
+        rotulo_fornecedor = dados.fornecedor_nome or "fornecedor não informado"
+        rotulo_doc = dados.documento_numero or compra_id[:8]
         contas_params = []
         for p in parcelas:
             contas_params.append((
-                compra_id, fornecedor_nome,
+                compra_id, dados.fornecedor_nome,
                 f"Compra {rotulo_doc} — {rotulo_fornecedor}",
                 p["valor"], p["vencimento"], p["numero"], p["total"],
-                "aberto", operator))
+                "aberto", dados.operator))
 
         con.executemany(
             """INSERT INTO contas_pagar

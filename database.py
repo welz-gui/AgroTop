@@ -93,6 +93,7 @@ from repositories import movimentacoes as movimentacoes  # noqa: F401
 from repositories import dispositivos as dispositivos  # noqa: F401
 from repositories import regras as regras  # noqa: F401
 from repositories import compras as compras  # noqa: F401
+from repositories.compras import CompraCreate  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
     get_all_animals, get_all_animal_ids, count_animals, get_total_gain_kg, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
