@@ -16,28 +16,7 @@ def _extrair_data(valor: Any) -> str | None:
     return None
 
 
-def series_mensais(
-    leituras_de_chuva: list[dict],
-    pesagens: list[dict],
-) -> list[dict]:
-    """Agrupa leituras de chuva e pesagens por mês-calendário (AAAA-MM).
-
-    Retorna uma lista de dicts:
-    [{"periodo": "AAAA-MM", "chuva_mm": float, "gmd_medio": float}, ...]
-
-    Regras:
-    - Um mês só é incluído se possuir AO MENOS UMA leitura de chuva E ao menos um par
-      consecutivo de pesagens do mesmo animal dentro do próprio mês.
-    - Pares de pesagens que cruzam a fronteira do mês (ex: 28/07 e 03/08) são descartados.
-    - `chuva_mm` é a soma total das leituras do mês.
-    - `gmd_medio` é a média simples dos GMDs dos pares calculados dentro do mês.
-    - A lista resultante é ordenada por `periodo` ("AAAA-MM").
-    """
-    if not isinstance(leituras_de_chuva, list):
-        leituras_de_chuva = []
-    if not isinstance(pesagens, list):
-        pesagens = []
-
+def _agrupar_chuva_por_mes(leituras_de_chuva: list[dict]) -> dict[str, float]:
     chuva_por_mes: dict[str, float] = {}
     for leitura in leituras_de_chuva:
         if not isinstance(leitura, dict):
@@ -62,7 +41,10 @@ def series_mensais(
             continue
 
         chuva_por_mes[mes] = chuva_por_mes.get(mes, 0.0) + rain
+    return chuva_por_mes
 
+
+def _agrupar_pesagens_por_animal(pesagens: list[dict]) -> dict[str, list[tuple[date, float]]]:
     pesagens_por_animal: dict[str, list[tuple[date, float]]] = {}
     for p in pesagens:
         if not isinstance(p, dict):
@@ -90,7 +72,10 @@ def series_mensais(
         if animal_id not in pesagens_por_animal:
             pesagens_por_animal[animal_id] = []
         pesagens_por_animal[animal_id].append((d, peso))
+    return pesagens_por_animal
 
+
+def _calcular_gmds_por_mes(pesagens_por_animal: dict[str, list[tuple[date, float]]]) -> dict[str, list[float]]:
     gmds_por_mes: dict[str, list[float]] = {}
     for animal_id, lista in pesagens_por_animal.items():
         lista_ordenada = sorted(lista, key=lambda item: item[0])
@@ -112,6 +97,34 @@ def series_mensais(
             if mes1 not in gmds_por_mes:
                 gmds_por_mes[mes1] = []
             gmds_por_mes[mes1].append(gmd)
+    return gmds_por_mes
+
+
+def series_mensais(
+    leituras_de_chuva: list[dict],
+    pesagens: list[dict],
+) -> list[dict]:
+    """Agrupa leituras de chuva e pesagens por mês-calendário (AAAA-MM).
+
+    Retorna uma lista de dicts:
+    [{"periodo": "AAAA-MM", "chuva_mm": float, "gmd_medio": float}, ...]
+
+    Regras:
+    - Um mês só é incluído se possuir AO MENOS UMA leitura de chuva E ao menos um par
+      consecutivo de pesagens do mesmo animal dentro do próprio mês.
+    - Pares de pesagens que cruzam a fronteira do mês (ex: 28/07 e 03/08) são descartados.
+    - `chuva_mm` é a soma total das leituras do mês.
+    - `gmd_medio` é a média simples dos GMDs dos pares calculados dentro do mês.
+    - A lista resultante é ordenada por `periodo` ("AAAA-MM").
+    """
+    if not isinstance(leituras_de_chuva, list):
+        leituras_de_chuva = []
+    if not isinstance(pesagens, list):
+        pesagens = []
+
+    chuva_por_mes = _agrupar_chuva_por_mes(leituras_de_chuva)
+    pesagens_por_animal = _agrupar_pesagens_por_animal(pesagens)
+    gmds_por_mes = _calcular_gmds_por_mes(pesagens_por_animal)
 
     todos_meses = sorted(set(chuva_por_mes.keys()) & set(gmds_por_mes.keys()))
     resultado = []
