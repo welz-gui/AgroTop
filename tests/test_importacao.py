@@ -135,6 +135,19 @@ class TestParsePesagens(unittest.TestCase):
         self.assertEqual(resultado["rejeitadas"][0]["conteudo"], "BR0002;abc;11/01/2026")
         self.assertEqual(resultado["total_linhas"], 3)
 
+    def test_rejeita_linha_com_erro_de_csv_field_limit(self):
+        conteudo_gigante = "A" * 131073
+        resultado = parse_pesagens(conteudo_gigante)
+
+        self.assertEqual(len(resultado["aceitas"]), 0)
+        self.assertEqual(len(resultado["rejeitadas"]), 1)
+        self.assertEqual(
+            resultado["rejeitadas"][0]["motivo"],
+            "esperado 3 colunas, encontrado 0",
+        )
+        self.assertEqual(resultado["rejeitadas"][0]["linha"], 1)
+        self.assertEqual(resultado["total_linhas"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
