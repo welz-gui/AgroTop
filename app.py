@@ -4525,142 +4525,151 @@ def _alertas_operacionais():
 # ══════════════════════════════════════════════════════════════════════════════
 # RELATÓRIOS  (CSV + PDF)
 # ══════════════════════════════════════════════════════════════════════════════
+def _download_row(title, df, key):
+    dc1, dc2, dc3 = st.columns(3)
+    with dc1:
+        st.download_button(f"⬇️ CSV", _df_to_csv(df),
+            f"agrotop_{key}.csv", "text/csv", use_container_width=True,
+            key=f"csv_{key}")
+    with dc2:
+        xlsx_bytes = _df_to_xlsx(title, df)
+        if xlsx_bytes:
+            st.download_button(f"⬇️ Excel", xlsx_bytes,
+                f"agrotop_{key}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True, key=f"xlsx_{key}")
+        else:
+            st.info("Instale `openpyxl` p/ Excel.")
+    with dc3:
+        pdf_bytes = _df_to_pdf(f"AgroTop — {title}", df)
+        if pdf_bytes:
+            st.download_button(f"⬇️ PDF", pdf_bytes,
+                f"agrotop_{key}.pdf", "application/pdf", use_container_width=True,
+                key=f"pdf_{key}")
+        else:
+            st.info("Instale `fpdf2` p/ PDF.")
+
+def _tab_relatorio_inventario(animals):
+    st.subheader("🐄 Inventário Completo do Rebanho")
+    rows_inv = []
+    a_ids = [a["id"] for a in animals]
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
+    wd_batch = db.get_withdrawal_end_batch(a_ids)
+    for a in animals:
+        gmd = gmd_batch.get(a["id"])
+        wd = wd_batch.get(a["id"])
+        rows_inv.append({"ID": a["id"], "Raça": a["breed"],
+            "Sexo": "M" if a["sex"] == "M" else "F",
+            "Categoria": get_age_category(a.get("birth_date")),
+            "Idade": get_age_display(a),
+            "Data Nascimento": a.get("birth_date") or "",
+            "Nasc. Estimado": "Sim" if a.get("birth_estimated") else "Não",
+            "Origem Idade": db.AGE_SOURCES.get(a.get("age_source", "propriedade"), ""),
+            "Data Entrada": a["entry_date"],
+            "Peso Entrada (kg)": a["entry_weight"],
+            "Peso Atual (kg)": a["current_weight"],
+            "Ganho (kg)": round(a["current_weight"] - a["entry_weight"], 1),
+            "@ Atuais": db.kg_to_arrobas(a["current_weight"]),
+            "GMD (kg/dia)": gmd or 0, "Status": a["status"],
+            "Lote": a.get("lote_id") or "",
+            "Fornecedor": a.get("fornecedor_name") or "",
+            "NF": a.get("nf_number") or "",
+            "GTA": a.get("gta_number") or "",
+            "Carência até": _data_br(wd) if wd else ""})
+    df_inv = pd.DataFrame(rows_inv)
+    st.dataframe(df_inv, use_container_width=True, hide_index=True, height=350)
+    _download_row("Inventário", df_inv, "inventario")
+
+def _tab_relatorio_pesagens():
+    st.subheader("⚖️ Histórico de Pesagens")
+    raw = db.get_all_weighings()
+    if raw:
+        df_p = pd.DataFrame(raw)[["animal_id", "weigh_date", "weight", "method", "lote_id", "operator", "notes"]].copy()
+        df_p["method"] = df_p["method"].fillna("pesado").map(lambda m: db.WEIGH_METHODS.get(m, m))
+        df_p.columns = ["Animal", "Data", "Peso (kg)", "Método", "Lote", "Operador", "Obs"]
+        st.dataframe(df_p, use_container_width=True, hide_index=True, height=350)
+        _download_row("Pesagens", df_p, "pesagens")
+
+def _tab_relatorio_financeiro(animals):
+    ul = _unit_label()
+    st.subheader("💰 Relatório Financeiro")
+    price_lbl = f"Cotação (R$/{ul}) para o relatório"
+    default_p = DEFAULT_PRICE_ARROBA if _use_arroba() else DEFAULT_PRICE_KG
+    cotacao_r = st.number_input(price_lbl, min_value=0.01, max_value=5000.0,
+        value=default_p, step=1.0)
+    rend_r = 52
+    if _use_arroba():
+        rend_r = st.slider("Rendimento de Carcaça (%)", 40, 65, 52,
+            key="rend_relatorio")
+    rows_fin = []
+    costs = db._costs_by_animal()
+    for a in animals:
+        if a["status"] not in ("ativo", "carencia"): continue
+        tc = costs.get(a["id"], 0.0)
+        prod = _live_weight(a["current_weight"], rend_r / 100)
+        be = round(tc / prod, 2) if prod else 0
+        receita = round(prod * cotacao_r, 2)
+        lucro = round(receita - tc, 2)
+        rows_fin.append({"ID": a["id"], "Raça": a["breed"],
+            "Peso Atual (kg)": a["current_weight"],
+            f"Prod. ({ul})": prod,
+            "Custo Total (R$)": tc,
+            _breakeven_label(): be,
+            f"Receita @ R${_num_br(cotacao_r, 0)}/{ul}": receita,
+            "Lucro Estimado (R$)": lucro})
+    df_fin = pd.DataFrame(rows_fin)
+    if not df_fin.empty:
+        st.dataframe(df_fin, use_container_width=True, hide_index=True)
+        _download_row("Financeiro", df_fin, "financeiro")
+
+def _tab_relatorio_evidencias():
+    st.subheader("📦 Pacote de Evidências")
+    st.caption("Agrupa um lote de venda para compartilhar registros de origem, pesagem e sanidade.")
+    vendas_evidencias = db.get_sales()
+    grupos_evidencias = _vendas_para_evidencias(vendas_evidencias)
+    if not grupos_evidencias:
+        st.info("Nenhuma venda disponível para gerar um pacote.")
+    else:
+        rotulos = []
+        for item in grupos_evidencias:
+            linhas = item["vendas"]
+            referencia = item["grupo"].get("lot_ref")
+            if referencia:
+                rotulos.append(str(referencia))
+            else:
+                venda = linhas[0]
+                rotulos.append(
+                    f"Venda avulsa — {venda.get('animal_id') or 'animal'} ({venda.get('sale_date') or '—'})"
+                )
+        indice = st.selectbox("Lote de venda", range(len(rotulos)),
+            format_func=lambda i: rotulos[i], key="evidencias_lote_idx")
+        selecao = grupos_evidencias[indice]["vendas"]
+        st.caption(f"{len(selecao)} animal(is) no lote selecionado.")
+        chave_pdf = f"evidencias_pdf_{indice}"
+        if st.button("Gerar PDF", type="primary", key="gerar_pacote_evidencias"):
+            st.session_state[chave_pdf] = _gerar_pacote_evidencias(selecao)
+        pdf_gerado = st.session_state.get(chave_pdf)
+        if pdf_gerado:
+            st.download_button(
+                "⬇️ Baixar pacote de evidências", pdf_gerado,
+                _evidencias_nome_arquivo(selecao), "application/pdf",
+                use_container_width=True, key="download_pacote_evidencias",
+            )
+
 def page_relatorios():
     st.markdown('<div class="page-title">📄 Relatórios e Exportação</div>', unsafe_allow_html=True)
-    animals=db.get_all_animals(status=None)
+    animals = db.get_all_animals(status=None)
 
-    rt1,rt2,rt3,rt4=st.tabs(["🐄 Inventário","⚖️ Pesagens","💰 Financeiro","📦 Pacote de Evidências"])
-
-    def _download_row(title, df, key):
-        dc1,dc2,dc3=st.columns(3)
-        with dc1:
-            st.download_button(f"⬇️ CSV",_df_to_csv(df),
-                f"agrotop_{key}.csv","text/csv",use_container_width=True,
-                key=f"csv_{key}")
-        with dc2:
-            xlsx_bytes=_df_to_xlsx(title,df)
-            if xlsx_bytes:
-                st.download_button(f"⬇️ Excel",xlsx_bytes,
-                    f"agrotop_{key}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,key=f"xlsx_{key}")
-            else:
-                st.info("Instale `openpyxl` p/ Excel.")
-        with dc3:
-            pdf_bytes=_df_to_pdf(f"AgroTop — {title}",df)
-            if pdf_bytes:
-                st.download_button(f"⬇️ PDF",pdf_bytes,
-                    f"agrotop_{key}.pdf","application/pdf",use_container_width=True,
-                    key=f"pdf_{key}")
-            else:
-                st.info("Instale `fpdf2` p/ PDF.")
+    rt1, rt2, rt3, rt4 = st.tabs(["🐄 Inventário", "⚖️ Pesagens", "💰 Financeiro", "📦 Pacote de Evidências"])
 
     with rt1:
-        st.subheader("🐄 Inventário Completo do Rebanho")
-        rows_inv=[]
-        a_ids = [a["id"] for a in animals]
-        gmd_batch = db.calculate_gmd_bulk(a_ids)
-        wd_batch = db.get_withdrawal_end_batch(a_ids)
-        for a in animals:
-            gmd=gmd_batch.get(a["id"])
-            wd=wd_batch.get(a["id"])
-            rows_inv.append({"ID":a["id"],"Raça":a["breed"],
-                "Sexo":"M" if a["sex"]=="M" else "F",
-                "Categoria":get_age_category(a.get("birth_date")),
-                "Idade":get_age_display(a),
-                "Data Nascimento":a.get("birth_date") or "",
-                "Nasc. Estimado":"Sim" if a.get("birth_estimated") else "Não",
-                "Origem Idade":db.AGE_SOURCES.get(a.get("age_source","propriedade"),""),
-                "Data Entrada":a["entry_date"],
-                "Peso Entrada (kg)":a["entry_weight"],
-                "Peso Atual (kg)":a["current_weight"],
-                "Ganho (kg)":round(a["current_weight"]-a["entry_weight"],1),
-                "@ Atuais":db.kg_to_arrobas(a["current_weight"]),
-                "GMD (kg/dia)":gmd or 0,"Status":a["status"],
-                "Lote":a.get("lote_id") or "",
-                "Fornecedor":a.get("fornecedor_name") or "",
-                "NF":a.get("nf_number") or "",
-                "GTA":a.get("gta_number") or "",
-                "Carência até":_data_br(wd) if wd else ""})
-        df_inv=pd.DataFrame(rows_inv)
-        st.dataframe(df_inv,use_container_width=True,hide_index=True,height=350)
-        _download_row("Inventário",df_inv,"inventario")
-
+        _tab_relatorio_inventario(animals)
     with rt2:
-        st.subheader("⚖️ Histórico de Pesagens")
-        raw=db.get_all_weighings()
-        if raw:
-            df_p=pd.DataFrame(raw)[["animal_id","weigh_date","weight","method","lote_id","operator","notes"]].copy()
-            df_p["method"]=df_p["method"].fillna("pesado").map(lambda m: db.WEIGH_METHODS.get(m,m))
-            df_p.columns=["Animal","Data","Peso (kg)","Método","Lote","Operador","Obs"]
-            st.dataframe(df_p,use_container_width=True,hide_index=True,height=350)
-            _download_row("Pesagens",df_p,"pesagens")
-
+        _tab_relatorio_pesagens()
     with rt3:
-        ul = _unit_label()
-        st.subheader("💰 Relatório Financeiro")
-        price_lbl = f"Cotação (R$/{ul}) para o relatório"
-        default_p = DEFAULT_PRICE_ARROBA if _use_arroba() else DEFAULT_PRICE_KG
-        cotacao_r = st.number_input(price_lbl, min_value=0.01, max_value=5000.0,
-            value=default_p, step=1.0)
-        rend_r = 52
-        if _use_arroba():
-            rend_r = st.slider("Rendimento de Carcaça (%)", 40, 65, 52,
-                key="rend_relatorio")
-        rows_fin=[]
-        costs = db._costs_by_animal()
-        for a in animals:
-            if a["status"] not in ("ativo","carencia"): continue
-            tc   = costs.get(a["id"], 0.0)
-            prod = _live_weight(a["current_weight"], rend_r/100)
-            be   = round(tc/prod, 2) if prod else 0
-            receita = round(prod * cotacao_r, 2)
-            lucro   = round(receita - tc, 2)
-            rows_fin.append({"ID":a["id"],"Raça":a["breed"],
-                "Peso Atual (kg)":a["current_weight"],
-                f"Prod. ({ul})":prod,
-                "Custo Total (R$)":tc,
-                _breakeven_label():be,
-                f"Receita @ R${_num_br(cotacao_r, 0)}/{ul}":receita,
-                "Lucro Estimado (R$)":lucro})
-        df_fin=pd.DataFrame(rows_fin)
-        if not df_fin.empty:
-            st.dataframe(df_fin,use_container_width=True,hide_index=True)
-            _download_row("Financeiro",df_fin,"financeiro")
-
+        _tab_relatorio_financeiro(animals)
     with rt4:
-        st.subheader("📦 Pacote de Evidências")
-        st.caption("Agrupa um lote de venda para compartilhar registros de origem, pesagem e sanidade.")
-        vendas_evidencias = db.get_sales()
-        grupos_evidencias = _vendas_para_evidencias(vendas_evidencias)
-        if not grupos_evidencias:
-            st.info("Nenhuma venda disponível para gerar um pacote.")
-        else:
-            rotulos = []
-            for item in grupos_evidencias:
-                linhas = item["vendas"]
-                referencia = item["grupo"].get("lot_ref")
-                if referencia:
-                    rotulos.append(str(referencia))
-                else:
-                    venda = linhas[0]
-                    rotulos.append(
-                        f"Venda avulsa — {venda.get('animal_id') or 'animal'} ({venda.get('sale_date') or '—'})"
-                    )
-            indice = st.selectbox("Lote de venda", range(len(rotulos)),
-                format_func=lambda i: rotulos[i], key="evidencias_lote_idx")
-            selecao = grupos_evidencias[indice]["vendas"]
-            st.caption(f"{len(selecao)} animal(is) no lote selecionado.")
-            chave_pdf = f"evidencias_pdf_{indice}"
-            if st.button("Gerar PDF", type="primary", key="gerar_pacote_evidencias"):
-                st.session_state[chave_pdf] = _gerar_pacote_evidencias(selecao)
-            pdf_gerado = st.session_state.get(chave_pdf)
-            if pdf_gerado:
-                st.download_button(
-                    "⬇️ Baixar pacote de evidências", pdf_gerado,
-                    _evidencias_nome_arquivo(selecao), "application/pdf",
-                    use_container_width=True, key="download_pacote_evidencias",
-                )
+        _tab_relatorio_evidencias()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CADASTRAR
