@@ -4734,24 +4734,7 @@ def _age_inputs(entry_date, key_prefix=""):
 _GRAVIDADE_ICONE = {"bloqueio": "🔴", "alerta": "🟡", "informativo": "🔵"}
 
 
-def _cadastro_nascimento():
-    """Registro de nascimento (PNIB §7).
-
-    A regra é `services/genealogia.py`, via `repositories/nascimentos.py`. Aqui
-    só a tela — e a decisão de interface que o §7.2 impõe: **bloqueio impede,
-    alerta pede confirmação.** O texto do §7.2 é explícito: o sistema deve
-    "emitir alerta, sem substituir a avaliação técnica". Quem avalia é o
-    técnico; o software mostra o que sabe.
-    """
-    st.caption("Nascimento na propriedade. A mãe precisa estar cadastrada e ativa — "
-               "o vínculo materno é exigência do §7 do PNIB e não pode ser preenchido depois "
-               "sem deixar rastro.")
-
-    femeas = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "F"]
-    if not femeas:
-        st.warning("Nenhuma fêmea ativa no rebanho. Cadastre a mãe antes de registrar a cria.")
-        return
-
+def _render_nasc_mae(femeas):
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         rotulos = {f"{a['id']} — {a['breed']}": a for a in femeas}
@@ -4761,12 +4744,9 @@ def _cadastro_nascimento():
                                    max_value=date.today(), key="nasc_data")
     with c3:
         hora = st.text_input("Hora", placeholder="14:30", key="nasc_hora").strip()
+    return mae, data_parto, hora
 
-    # Pai é opcional (§4.3: "quando conhecido") — sem validação biológica como a
-    # mãe (services/genealogia.py não avalia pai_uuid); é só o vínculo, quando
-    # o produtor souber. Um só seletor pro parto inteiro: gêmeos do mesmo parto
-    # quase sempre têm o mesmo pai, e o dado já é opcional — não vale complicar
-    # pedindo pai por cria individualmente.
+def _render_nasc_pai():
     machos = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "M"]
     pai = None
     if machos:
@@ -4774,7 +4754,9 @@ def _cadastro_nascimento():
         opcoes_pai = ["— Não informado —"] + list(rotulos_pai)
         sel_pai = st.selectbox("🐂 Pai (opcional)", opcoes_pai, key="nasc_pai")
         pai = rotulos_pai.get(sel_pai)
+    return pai
 
+def _render_nasc_detalhes():
     c4, c5, c6 = st.columns(3)
     with c4:
         tipo_parto = st.selectbox("Tipo de parto", ["normal", "assistido", "cesarea"],
@@ -4793,6 +4775,60 @@ def _cadastro_nascimento():
         "Data estimada (parto não acompanhado)", key="nasc_est",
         help="§7.1: marcar quando ninguém presenciou. Fica registrado como estimado "
              "e aparece nas pendências.")
+    return tipo_parto, condicao, int(n_crias), data_estimada
+
+def _render_nasc_crias(n_crias, mae, pai):
+    st.markdown("---")
+    st.markdown(f"**{'Crias' if n_crias > 1 else 'Cria'}**")
+
+    crias = []
+    for i in range(n_crias):
+        k1, k2, k3, k4 = st.columns([2, 1, 1, 1])
+        with k1:
+            brinco = st.text_input(f"🏷️ Brinco {i+1} *", key=f"nasc_id_{i}").strip().upper()
+        with k2:
+            sexo = st.selectbox("Sexo", ["M", "F"], key=f"nasc_sexo_{i}",
+                                format_func=lambda v: "♂" if v == "M" else "♀")
+        with k3:
+            raca = st.selectbox("Raça", BREEDS, key=f"nasc_raca_{i}",
+                                index=BREEDS.index(mae["breed"]) if mae["breed"] in BREEDS else 0)
+        with k4:
+            peso = st.number_input("Peso (kg)", min_value=0.0, max_value=100.0,
+                                   step=0.5, value=0.0, key=f"nasc_peso_{i}")
+        crias.append({"id": brinco, "sexo": sexo, "raca": raca,
+                      "peso": peso or None, "pai_uuid": pai["uuid"] if pai else None})
+
+    obs = st.text_area("Observações", key="nasc_obs").strip()
+    return crias, obs
+
+def _cadastro_nascimento():
+    """Registro de nascimento (PNIB §7).
+
+    A regra é `services/genealogia.py`, via `repositories/nascimentos.py`. Aqui
+    só a tela — e a decisão de interface que o §7.2 impõe: **bloqueio impede,
+    alerta pede confirmação.** O texto do §7.2 é explícito: o sistema deve
+    "emitir alerta, sem substituir a avaliação técnica". Quem avalia é o
+    técnico; o software mostra o que sabe.
+    """
+    st.caption("Nascimento na propriedade. A mãe precisa estar cadastrada e ativa — "
+               "o vínculo materno é exigência do §7 do PNIB e não pode ser preenchido depois "
+               "sem deixar rastro.")
+
+    femeas = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "F"]
+    if not femeas:
+        st.warning("Nenhuma fêmea ativa no rebanho. Cadastre a mãe antes de registrar a cria.")
+        return
+
+    mae, data_parto, hora = _render_nasc_mae(femeas)
+
+    # Pai é opcional (§4.3: "quando conhecido") — sem validação biológica como a
+    # mãe (services/genealogia.py não avalia pai_uuid); é só o vínculo, quando
+    # o produtor souber. Um só seletor pro parto inteiro: gêmeos do mesmo parto
+    # quase sempre têm o mesmo pai, e o dado já é opcional — não vale complicar
+    # pedindo pai por cria individualmente.
+    pai = _render_nasc_pai()
+
+    tipo_parto, condicao, n_crias, data_estimada = _render_nasc_detalhes()
 
     # ── Prévia da validação, ANTES de o usuário preencher as crias ───────────
     problemas = db.nascimentos.avaliar(mae["uuid"], data_parto.isoformat(),
@@ -4824,30 +4860,10 @@ def _cadastro_nascimento():
             help="§7.2: o sistema alerta, sem substituir a avaliação técnica. "
                  "A confirmação fica registrada.")
 
-    st.markdown("---")
-    st.markdown(f"**{'Crias' if n_crias > 1 else 'Cria'}**")
-
-    crias = []
-    for i in range(int(n_crias)):
-        k1, k2, k3, k4 = st.columns([2, 1, 1, 1])
-        with k1:
-            brinco = st.text_input(f"🏷️ Brinco {i+1} *", key=f"nasc_id_{i}").strip().upper()
-        with k2:
-            sexo = st.selectbox("Sexo", ["M", "F"], key=f"nasc_sexo_{i}",
-                                format_func=lambda v: "♂" if v == "M" else "♀")
-        with k3:
-            raca = st.selectbox("Raça", BREEDS, key=f"nasc_raca_{i}",
-                                index=BREEDS.index(mae["breed"]) if mae["breed"] in BREEDS else 0)
-        with k4:
-            peso = st.number_input("Peso (kg)", min_value=0.0, max_value=100.0,
-                                   step=0.5, value=0.0, key=f"nasc_peso_{i}")
-        crias.append({"id": brinco, "sexo": sexo, "raca": raca,
-                      "peso": peso or None, "pai_uuid": pai["uuid"] if pai else None})
-
-    obs = st.text_area("Observações", key="nasc_obs").strip()
+    crias, obs = _render_nasc_crias(n_crias, mae, pai)
 
     brincos = [cr["id"] for cr in crias if cr["id"]]
-    faltando = len(brincos) < int(n_crias)
+    faltando = len(brincos) < n_crias
     repetidos = len(brincos) != len(set(brincos))
     if repetidos:
         st.error("🚫 Dois brincos iguais na mesma ninhada.")
