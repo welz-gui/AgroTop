@@ -113,7 +113,8 @@ class TestImportacaoGeometria(unittest.TestCase):
         # Não JSON
         with self.assertRaises(ValueError) as ctx_json:
             ler_geojson("texto qualquer que nao e json")
-        self.assertIn("JSON", str(ctx_json.exception))
+        self.assertIn("Texto não é um JSON válido:", str(ctx_json.exception))
+        self.assertIsInstance(ctx_json.exception.__cause__, json.JSONDecodeError)
 
         # JSON vazio / tipo errado
         with self.assertRaises(ValueError):
