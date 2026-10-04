@@ -85,7 +85,6 @@ class TestDietaComVigenciaNaTela(unittest.TestCase):
 
         at = self._tela()
         self._por_chave(at.number_input, f"nv_qtd_{antiga['id']}").set_value(25.0)
-        at.run()
         botao = [b for b in at.button if b.label == "💾 Salvar nova versão"][0]
         botao.click()
         at.run()
