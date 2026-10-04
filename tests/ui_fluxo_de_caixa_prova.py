@@ -97,12 +97,12 @@ class TestFluxoDeCaixaNaTela(unittest.TestCase):
         projetado_antes = self._reais(antes["Projetado no período"])
 
         hoje = date.today()
-        r_compra = db.compras.registrar(
+        r_compra = db.compras.registrar(db.NovaCompra(
             data_emissao=hoje.isoformat(), data_recebimento=hoje.isoformat(),
             itens=[{"insumo_id": self.insumo["id"], "quantidade": 10.0,
                     "custo_unitario": 5.0}],
             primeiro_vencimento=(hoje + timedelta(days=15)).isoformat(),
-            num_parcelas=2)
+            num_parcelas=2))
         self.assertTrue(r_compra["ok"])
 
         animais = db.get_all_animals(status="ativo")
@@ -133,12 +133,12 @@ class TestFluxoDeCaixaNaTela(unittest.TestCase):
         projetado_antes = self._reais(antes["Projetado no período"])
 
         hoje = date.today()
-        r = db.compras.registrar(
+        r = db.compras.registrar(db.NovaCompra(
             data_emissao=hoje.isoformat(), data_recebimento=hoje.isoformat(),
             itens=[{"insumo_id": self.insumo["id"], "quantidade": 10.0,
                     "custo_unitario": 5.0}],
             primeiro_vencimento=(hoje + timedelta(days=15)).isoformat(),
-            num_parcelas=1)
+            num_parcelas=1))
         self.assertTrue(r["ok"])
 
         db.clear_cache()
@@ -159,11 +159,11 @@ class TestFluxoDeCaixaNaTela(unittest.TestCase):
     def test_conta_vencida_aparece_destacada_em_aberto(self):
         hoje = date.today()
         ontem = (hoje - timedelta(days=1)).isoformat()
-        r = db.compras.registrar(
+        r = db.compras.registrar(db.NovaCompra(
             data_emissao=ontem, data_recebimento=ontem,
             itens=[{"insumo_id": self.insumo["id"], "quantidade": 1.0,
                     "custo_unitario": 10.0}],
-            primeiro_vencimento=ontem, num_parcelas=1)
+            primeiro_vencimento=ontem, num_parcelas=1))
         self.assertTrue(r["ok"])
         db.clear_cache()
 
