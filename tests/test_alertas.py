@@ -80,7 +80,19 @@ class TestAlertaDeCarencia(unittest.TestCase):
         # quebrou ao processar um animal com status != "ativo".
         self.assertTrue(todos_ids)
 
+    def test_animal_com_status_carencia_explicito_aparece_no_alerta(self):
+        """Status 'carencia' definido por update_animal_status (e não só pelo
+        efeito colateral de add_medication) também entra na categoria."""
+        animal_id = self.animal["id"]
+        add_medication(MedicationData(
+            animal_id=animal_id, medication_name="Ivermectina", dose=2.0, unit="ml",
+            application_route="Subcutânea", withdrawal_days=21,
+            med_date=db.date.today().isoformat(), applied_by="op1",
+        ))
+        db.update_animal_status(animal_id, "carencia")
 
+        alertas = db.get_alert_animals()
+        self.assertIn(animal_id, {a["id"] for a in alertas["carencia"]})
 
     def test_animal_em_carencia_ignora_data_invalida(self):
         animal_id = self.animal["id"]
