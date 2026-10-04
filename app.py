@@ -4285,7 +4285,7 @@ def _estoque_compra_com_nota(insumos):
 
     if st.button("✅ Registrar Compra", type="primary", use_container_width=True,
                  key="compra_registrar_btn", disabled=not itens_atuais):
-        r = db.compras.registrar(
+        r = db.compras.registrar(db.NovaCompra(
             data_emissao=data_emissao.isoformat(),
             data_recebimento=data_recebimento.isoformat(),
             itens=[{"insumo_id": i["insumo_id"], "quantidade": i["quantidade"],
@@ -4293,7 +4293,7 @@ def _estoque_compra_com_nota(insumos):
             primeiro_vencimento=primeira_parcela.isoformat(),
             num_parcelas=int(num_parcelas),
             fornecedor_nome=fornecedor_nome, documento_numero=doc_numero,
-            documento_serie=doc_serie, operator=st.session_state.user["name"])
+            documento_serie=doc_serie, operator=st.session_state.user["name"]))
         if r["ok"]:
             st.success(f"✅ Compra registrada — R$ {r['valor_total']:,.2f} em "
                 f"{_plural(r['parcelas'],'parcela','parcelas')}. Estoque e contas a "
@@ -4387,125 +4387,113 @@ def page_alertas():
         _alertas_operacionais()
 
 
-def _alertas_operacionais():
-    foco = st.session_state.get("alertas_foco")
-    rotulos = {
-        "sumidos": "Animais Sumidos",
-        "prontos": "Prontos para Abate",
-        "carencia": "Em Período de Carência",
-    }
-    if foco in rotulos:
-        c_foco1, c_foco2 = st.columns([4, 1])
-        with c_foco1:
-            st.info(f"🔍 Filtrando alertas: **{rotulos[foco]}**")
-        with c_foco2:
-            if st.button("Ver todos os alertas", key="btn_limpar_foco_alertas", use_container_width=True):
-                st.session_state.alertas_foco = None
-                st.rerun()
+def _render_recomendacoes(foco):
+    if foco:
+        return
+    # ── Recomendações do motor de regras (services/recomendacoes.py) ──────────
+    st.subheader("🧭 Recomendações")
+    st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "
+               "motivo e os números que a dispararam.")
+    try:
+        recs = avaliar_recomendacoes(db.contexto_recomendacoes())
+    except Exception as e:   # regra nova com dado faltando não pode derrubar a página
+        recs = []
+        st.warning(f"Não foi possível avaliar as recomendações: {e}")
 
-    alerts=db.get_alert_animals()
-    low   =db.check_low_stock()
+    if recs:
+        ordem = {"alta": 0, "media": 1, "baixa": 2}
+        for r in sorted(recs, key=lambda x: ordem.get(x.get("severidade"), 9)):
+            classe = _GRAVIDADE_CARD.get(r.get("severidade"), "card-yellow")
+            acao = r.get("acao")
+            st.markdown(
+                f'<div class="{classe}"><b>{r.get("titulo","")}</b><br>'
+                f'{r.get("motivo","")}'
+                + (f'<br><i>👉 {acao}</i>' if acao else "")
+                + '</div>', unsafe_allow_html=True)
+    else:
+        st.success("✅ Nenhuma recomendação no momento.")
+
+    st.markdown("---")
+
+def _render_alertas_sumidos(foco, alerts):
+    if foco and foco != "sumidos":
+        return
+    st.subheader(f"🔴 Animais Sumidos ({len(alerts['sumidos'])})")
+    st.caption("Sem pesagem registrada há mais de 30 dias.")
+    if alerts["sumidos"]:
+        df_sum=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],"Lote":a.get("lote_id") or "—",
+            "Último Peso (kg)":a["current_weight"],
+            "Dias sem Pesagem":a["days_since_weighing"]} for a in alerts["sumidos"]])
+        st.dataframe(df_sum,use_container_width=True,hide_index=True)
+        for a in alerts["sumidos"]:
+            c1,c2=st.columns([3,1])
+            with c1:
+                st.markdown(f'<div class="card-red">🔴 <b>{a["id"]}</b> — {a["breed"]} — '
+                    f'Sem pesagem há <b>{a["days_since_weighing"]} dias</b></div>',
+                    unsafe_allow_html=True)
+            with c2:
+                if st.button("📱 Ir para Campo",key=f"alr_sum_{a['id']}",use_container_width=True):
+                    st.session_state.campo_id=a["id"]; _go("campo"); st.rerun()
+    else:
+        st.success("✅ Nenhum animal sumido.")
 
     if not foco:
-        # ── Recomendações do motor de regras (services/recomendacoes.py) ──────────
-        st.subheader("🧭 Recomendações")
-        st.caption("Regras explícitas sobre o estado atual da fazenda — cada uma diz o "
-                   "motivo e os números que a dispararam.")
-        try:
-            recs = avaliar_recomendacoes(db.contexto_recomendacoes())
-        except Exception as e:   # regra nova com dado faltando não pode derrubar a página
-            recs = []
-            st.warning(f"Não foi possível avaliar as recomendações: {e}")
-
-        if recs:
-            ordem = {"alta": 0, "media": 1, "baixa": 2}
-            for r in sorted(recs, key=lambda x: ordem.get(x.get("severidade"), 9)):
-                classe = _GRAVIDADE_CARD.get(r.get("severidade"), "card-yellow")
-                acao = r.get("acao")
-                st.markdown(
-                    f'<div class="{classe}"><b>{r.get("titulo","")}</b><br>'
-                    f'{r.get("motivo","")}'
-                    + (f'<br><i>👉 {acao}</i>' if acao else "")
-                    + '</div>', unsafe_allow_html=True)
-        else:
-            st.success("✅ Nenhuma recomendação no momento.")
-
         st.markdown("---")
 
-    # Sumidos
-    if not foco or foco == "sumidos":
-        st.subheader(f"🔴 Animais Sumidos ({len(alerts['sumidos'])})")
-        st.caption("Sem pesagem registrada há mais de 30 dias.")
-        if alerts["sumidos"]:
-            df_sum=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],"Lote":a.get("lote_id") or "—",
-                "Último Peso (kg)":a["current_weight"],
-                "Dias sem Pesagem":a["days_since_weighing"]} for a in alerts["sumidos"]])
-            st.dataframe(df_sum,use_container_width=True,hide_index=True)
-            for a in alerts["sumidos"]:
-                c1,c2=st.columns([3,1])
-                with c1:
-                    st.markdown(f'<div class="card-red">🔴 <b>{a["id"]}</b> — {a["breed"]} — '
-                        f'Sem pesagem há <b>{a["days_since_weighing"]} dias</b></div>',
-                        unsafe_allow_html=True)
-                with c2:
-                    if st.button("📱 Ir para Campo",key=f"alr_sum_{a['id']}",use_container_width=True):
-                        st.session_state.campo_id=a["id"]; _go("campo"); st.rerun()
-        else:
-            st.success("✅ Nenhum animal sumido.")
+def _render_alertas_carencia(foco, alerts):
+    if foco and foco != "carencia":
+        return
+    st.subheader(f"🟡 Em Período de Carência ({len(alerts['carencia'])})")
+    if alerts["carencia"]:
+        for a in alerts["carencia"]:
+            st.markdown(f'<div class="card-yellow">🟡 <b>{a["id"]}</b> — {a["breed"]} — '
+                f'Carência até <b>{a["withdrawal_end"]}</b> '
+                f'(<b>{a["days_remaining"]} dias restantes</b>)</div>',
+                unsafe_allow_html=True)
+    else:
+        st.success("✅ Nenhum animal em carência.")
 
-        if not foco:
-            st.markdown("---")
-
-    # Carência
-    if not foco or foco == "carencia":
-        st.subheader(f"🟡 Em Período de Carência ({len(alerts['carencia'])})")
-        if alerts["carencia"]:
-            for a in alerts["carencia"]:
-                st.markdown(f'<div class="card-yellow">🟡 <b>{a["id"]}</b> — {a["breed"]} — '
-                    f'Carência até <b>{a["withdrawal_end"]}</b> '
-                    f'(<b>{a["days_remaining"]} dias restantes</b>)</div>',
-                    unsafe_allow_html=True)
-        else:
-            st.success("✅ Nenhum animal em carência.")
-
-        if not foco:
-            st.markdown("---")
-
-    # Prontos para abate
-    if not foco or foco == "prontos":
-        st.subheader(f"🟢 Prontos para Abate ({len(alerts['prontos'])})")
-        st.caption("Atingiram o peso-alvo e estão livres de carência.")
-        if alerts["prontos"]:
-            df_pro=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],
-                "Peso Atual (kg)":a["current_weight"],"Peso-Alvo (kg)":a.get("target_weight") or 500,
-                "@ Atuais":a["arrobas"]} for a in alerts["prontos"]])
-            st.dataframe(df_pro,use_container_width=True,hide_index=True,
-                column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
-                    "@ Atuais":st.column_config.NumberColumn(format="%.2f")})
-        else:
-            st.info("Nenhum animal atingiu o peso-alvo ainda.")
-
-        if not foco:
-            st.markdown("---")
-
-    # Estoque crítico
-    if not foco:
-        st.subheader(f"📦 Estoque Abaixo do Mínimo ({len(low)})")
-        if low:
-            for i in low:
-                pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 0
-                st.markdown(f'<div class="card-yellow">⚠️ <b>{i["name"]}</b> — '
-                    f'Estoque: <b>{_num_br(i["current_stock"], 1)} {i["unit"]}</b> '
-                    f'(mínimo: {_num_br(i["min_stock"], 0)}) — <b>{_num_br(pct, 0)}% do mínimo</b></div>',
-                    unsafe_allow_html=True)
-            if st.button("📦 Ir para Estoque",type="primary"):
-                _go("estoque"); st.rerun()
-        else:
-            st.success("✅ Todos os insumos com estoque adequado.")
-
-    # Baixo desempenho (GMD abaixo da meta) — só admin gerencia a meta
     if not foco:
         st.markdown("---")
+
+def _render_alertas_prontos(foco, alerts):
+    if foco and foco != "prontos":
+        return
+    st.subheader(f"🟢 Prontos para Abate ({len(alerts['prontos'])})")
+    st.caption("Atingiram o peso-alvo e estão livres de carência.")
+    if alerts["prontos"]:
+        df_pro=pd.DataFrame([{"ID":a["id"],"Raça":a["breed"],
+            "Peso Atual (kg)":a["current_weight"],"Peso-Alvo (kg)":a.get("target_weight") or 500,
+            "@ Atuais":a["arrobas"]} for a in alerts["prontos"]])
+        st.dataframe(df_pro,use_container_width=True,hide_index=True,
+            column_config={"Peso Atual (kg)":st.column_config.NumberColumn(format="%.1f"),
+                "@ Atuais":st.column_config.NumberColumn(format="%.2f")})
+    else:
+        st.info("Nenhum animal atingiu o peso-alvo ainda.")
+
+    if not foco:
+        st.markdown("---")
+
+def _render_alertas_estoque(foco, low):
+    if foco:
+        return
+    st.subheader(f"📦 Estoque Abaixo do Mínimo ({len(low)})")
+    if low:
+        for i in low:
+            pct=i["current_stock"]/i["min_stock"]*100 if i["min_stock"] else 0
+            st.markdown(f'<div class="card-yellow">⚠️ <b>{i["name"]}</b> — '
+                f'Estoque: <b>{_num_br(i["current_stock"], 1)} {i["unit"]}</b> '
+                f'(mínimo: {_num_br(i["min_stock"], 0)}) — <b>{_num_br(pct, 0)}% do mínimo</b></div>',
+                unsafe_allow_html=True)
+        if st.button("📦 Ir para Estoque",type="primary"):
+            _go("estoque"); st.rerun()
+    else:
+        st.success("✅ Todos os insumos com estoque adequado.")
+
+    if not foco:
+        st.markdown("---")
+
+def _render_alertas_baixo_desempenho():
     meta = db.get_gmd_target()
     low_perf = db.get_low_performance(meta)
     st.subheader(f"📉 Baixo Desempenho ({len(low_perf)})")
@@ -4522,145 +4510,180 @@ def _alertas_operacionais():
     else:
         st.success("✅ Nenhum animal abaixo da meta de GMD.")
 
+def _alertas_operacionais():
+    foco = st.session_state.get("alertas_foco")
+    rotulos = {
+        "sumidos": "Animais Sumidos",
+        "prontos": "Prontos para Abate",
+        "carencia": "Em Período de Carência",
+    }
+    if foco in rotulos:
+        c_foco1, c_foco2 = st.columns([4, 1])
+        with c_foco1:
+            st.info(f"🔍 Filtrando alertas: **{rotulos[foco]}**")
+        with c_foco2:
+            if st.button("Ver todos os alertas", key="btn_limpar_foco_alertas", use_container_width=True):
+                st.session_state.alertas_foco = None
+                st.rerun()
+
+    alerts = db.get_alert_animals()
+    low = db.check_low_stock()
+
+    _render_recomendacoes(foco)
+    _render_alertas_sumidos(foco, alerts)
+    _render_alertas_carencia(foco, alerts)
+    _render_alertas_prontos(foco, alerts)
+    _render_alertas_estoque(foco, low)
+    _render_alertas_baixo_desempenho()
+
 # ══════════════════════════════════════════════════════════════════════════════
 # RELATÓRIOS  (CSV + PDF)
 # ══════════════════════════════════════════════════════════════════════════════
+def _download_row(title, df, key):
+    dc1, dc2, dc3 = st.columns(3)
+    with dc1:
+        st.download_button(f"⬇️ CSV", _df_to_csv(df),
+            f"agrotop_{key}.csv", "text/csv", use_container_width=True,
+            key=f"csv_{key}")
+    with dc2:
+        xlsx_bytes = _df_to_xlsx(title, df)
+        if xlsx_bytes:
+            st.download_button(f"⬇️ Excel", xlsx_bytes,
+                f"agrotop_{key}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True, key=f"xlsx_{key}")
+        else:
+            st.info("Instale `openpyxl` p/ Excel.")
+    with dc3:
+        pdf_bytes = _df_to_pdf(f"AgroTop — {title}", df)
+        if pdf_bytes:
+            st.download_button(f"⬇️ PDF", pdf_bytes,
+                f"agrotop_{key}.pdf", "application/pdf", use_container_width=True,
+                key=f"pdf_{key}")
+        else:
+            st.info("Instale `fpdf2` p/ PDF.")
+
+def _tab_relatorio_inventario(animals):
+    st.subheader("🐄 Inventário Completo do Rebanho")
+    rows_inv = []
+    a_ids = [a["id"] for a in animals]
+    gmd_batch = db.calculate_gmd_bulk(a_ids)
+    wd_batch = db.get_withdrawal_end_batch(a_ids)
+    for a in animals:
+        gmd = gmd_batch.get(a["id"])
+        wd = wd_batch.get(a["id"])
+        rows_inv.append({"ID": a["id"], "Raça": a["breed"],
+            "Sexo": "M" if a["sex"] == "M" else "F",
+            "Categoria": get_age_category(a.get("birth_date")),
+            "Idade": get_age_display(a),
+            "Data Nascimento": a.get("birth_date") or "",
+            "Nasc. Estimado": "Sim" if a.get("birth_estimated") else "Não",
+            "Origem Idade": db.AGE_SOURCES.get(a.get("age_source", "propriedade"), ""),
+            "Data Entrada": a["entry_date"],
+            "Peso Entrada (kg)": a["entry_weight"],
+            "Peso Atual (kg)": a["current_weight"],
+            "Ganho (kg)": round(a["current_weight"] - a["entry_weight"], 1),
+            "@ Atuais": db.kg_to_arrobas(a["current_weight"]),
+            "GMD (kg/dia)": gmd or 0, "Status": a["status"],
+            "Lote": a.get("lote_id") or "",
+            "Fornecedor": a.get("fornecedor_name") or "",
+            "NF": a.get("nf_number") or "",
+            "GTA": a.get("gta_number") or "",
+            "Carência até": _data_br(wd) if wd else ""})
+    df_inv = pd.DataFrame(rows_inv)
+    st.dataframe(df_inv, use_container_width=True, hide_index=True, height=350)
+    _download_row("Inventário", df_inv, "inventario")
+
+def _tab_relatorio_pesagens():
+    st.subheader("⚖️ Histórico de Pesagens")
+    raw = db.get_all_weighings()
+    if raw:
+        df_p = pd.DataFrame(raw)[["animal_id", "weigh_date", "weight", "method", "lote_id", "operator", "notes"]].copy()
+        df_p["method"] = df_p["method"].fillna("pesado").map(lambda m: db.WEIGH_METHODS.get(m, m))
+        df_p.columns = ["Animal", "Data", "Peso (kg)", "Método", "Lote", "Operador", "Obs"]
+        st.dataframe(df_p, use_container_width=True, hide_index=True, height=350)
+        _download_row("Pesagens", df_p, "pesagens")
+
+def _tab_relatorio_financeiro(animals):
+    ul = _unit_label()
+    st.subheader("💰 Relatório Financeiro")
+    price_lbl = f"Cotação (R$/{ul}) para o relatório"
+    default_p = DEFAULT_PRICE_ARROBA if _use_arroba() else DEFAULT_PRICE_KG
+    cotacao_r = st.number_input(price_lbl, min_value=0.01, max_value=5000.0,
+        value=default_p, step=1.0)
+    rend_r = 52
+    if _use_arroba():
+        rend_r = st.slider("Rendimento de Carcaça (%)", 40, 65, 52,
+            key="rend_relatorio")
+    rows_fin = []
+    costs = db._costs_by_animal()
+    for a in animals:
+        if a["status"] not in ("ativo", "carencia"): continue
+        tc = costs.get(a["id"], 0.0)
+        prod = _live_weight(a["current_weight"], rend_r / 100)
+        be = round(tc / prod, 2) if prod else 0
+        receita = round(prod * cotacao_r, 2)
+        lucro = round(receita - tc, 2)
+        rows_fin.append({"ID": a["id"], "Raça": a["breed"],
+            "Peso Atual (kg)": a["current_weight"],
+            f"Prod. ({ul})": prod,
+            "Custo Total (R$)": tc,
+            _breakeven_label(): be,
+            f"Receita @ R${_num_br(cotacao_r, 0)}/{ul}": receita,
+            "Lucro Estimado (R$)": lucro})
+    df_fin = pd.DataFrame(rows_fin)
+    if not df_fin.empty:
+        st.dataframe(df_fin, use_container_width=True, hide_index=True)
+        _download_row("Financeiro", df_fin, "financeiro")
+
+def _tab_relatorio_evidencias():
+    st.subheader("📦 Pacote de Evidências")
+    st.caption("Agrupa um lote de venda para compartilhar registros de origem, pesagem e sanidade.")
+    vendas_evidencias = db.get_sales()
+    grupos_evidencias = _vendas_para_evidencias(vendas_evidencias)
+    if not grupos_evidencias:
+        st.info("Nenhuma venda disponível para gerar um pacote.")
+    else:
+        rotulos = []
+        for item in grupos_evidencias:
+            linhas = item["vendas"]
+            referencia = item["grupo"].get("lot_ref")
+            if referencia:
+                rotulos.append(str(referencia))
+            else:
+                venda = linhas[0]
+                rotulos.append(
+                    f"Venda avulsa — {venda.get('animal_id') or 'animal'} ({venda.get('sale_date') or '—'})"
+                )
+        indice = st.selectbox("Lote de venda", range(len(rotulos)),
+            format_func=lambda i: rotulos[i], key="evidencias_lote_idx")
+        selecao = grupos_evidencias[indice]["vendas"]
+        st.caption(f"{len(selecao)} animal(is) no lote selecionado.")
+        chave_pdf = f"evidencias_pdf_{indice}"
+        if st.button("Gerar PDF", type="primary", key="gerar_pacote_evidencias"):
+            st.session_state[chave_pdf] = _gerar_pacote_evidencias(selecao)
+        pdf_gerado = st.session_state.get(chave_pdf)
+        if pdf_gerado:
+            st.download_button(
+                "⬇️ Baixar pacote de evidências", pdf_gerado,
+                _evidencias_nome_arquivo(selecao), "application/pdf",
+                use_container_width=True, key="download_pacote_evidencias",
+            )
+
 def page_relatorios():
     st.markdown('<div class="page-title">📄 Relatórios e Exportação</div>', unsafe_allow_html=True)
-    animals=db.get_all_animals(status=None)
+    animals = db.get_all_animals(status=None)
 
-    rt1,rt2,rt3,rt4=st.tabs(["🐄 Inventário","⚖️ Pesagens","💰 Financeiro","📦 Pacote de Evidências"])
-
-    def _download_row(title, df, key):
-        dc1,dc2,dc3=st.columns(3)
-        with dc1:
-            st.download_button(f"⬇️ CSV",_df_to_csv(df),
-                f"agrotop_{key}.csv","text/csv",use_container_width=True,
-                key=f"csv_{key}")
-        with dc2:
-            xlsx_bytes=_df_to_xlsx(title,df)
-            if xlsx_bytes:
-                st.download_button(f"⬇️ Excel",xlsx_bytes,
-                    f"agrotop_{key}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,key=f"xlsx_{key}")
-            else:
-                st.info("Instale `openpyxl` p/ Excel.")
-        with dc3:
-            pdf_bytes=_df_to_pdf(f"AgroTop — {title}",df)
-            if pdf_bytes:
-                st.download_button(f"⬇️ PDF",pdf_bytes,
-                    f"agrotop_{key}.pdf","application/pdf",use_container_width=True,
-                    key=f"pdf_{key}")
-            else:
-                st.info("Instale `fpdf2` p/ PDF.")
+    rt1, rt2, rt3, rt4 = st.tabs(["🐄 Inventário", "⚖️ Pesagens", "💰 Financeiro", "📦 Pacote de Evidências"])
 
     with rt1:
-        st.subheader("🐄 Inventário Completo do Rebanho")
-        rows_inv=[]
-        a_ids = [a["id"] for a in animals]
-        gmd_batch = db.calculate_gmd_bulk(a_ids)
-        wd_batch = db.get_withdrawal_end_batch(a_ids)
-        for a in animals:
-            gmd=gmd_batch.get(a["id"])
-            wd=wd_batch.get(a["id"])
-            rows_inv.append({"ID":a["id"],"Raça":a["breed"],
-                "Sexo":"M" if a["sex"]=="M" else "F",
-                "Categoria":get_age_category(a.get("birth_date")),
-                "Idade":get_age_display(a),
-                "Data Nascimento":a.get("birth_date") or "",
-                "Nasc. Estimado":"Sim" if a.get("birth_estimated") else "Não",
-                "Origem Idade":db.AGE_SOURCES.get(a.get("age_source","propriedade"),""),
-                "Data Entrada":a["entry_date"],
-                "Peso Entrada (kg)":a["entry_weight"],
-                "Peso Atual (kg)":a["current_weight"],
-                "Ganho (kg)":round(a["current_weight"]-a["entry_weight"],1),
-                "@ Atuais":db.kg_to_arrobas(a["current_weight"]),
-                "GMD (kg/dia)":gmd or 0,"Status":a["status"],
-                "Lote":a.get("lote_id") or "",
-                "Fornecedor":a.get("fornecedor_name") or "",
-                "NF":a.get("nf_number") or "",
-                "GTA":a.get("gta_number") or "",
-                "Carência até":_data_br(wd) if wd else ""})
-        df_inv=pd.DataFrame(rows_inv)
-        st.dataframe(df_inv,use_container_width=True,hide_index=True,height=350)
-        _download_row("Inventário",df_inv,"inventario")
-
+        _tab_relatorio_inventario(animals)
     with rt2:
-        st.subheader("⚖️ Histórico de Pesagens")
-        raw=db.get_all_weighings()
-        if raw:
-            df_p=pd.DataFrame(raw)[["animal_id","weigh_date","weight","method","lote_id","operator","notes"]].copy()
-            df_p["method"]=df_p["method"].fillna("pesado").map(lambda m: db.WEIGH_METHODS.get(m,m))
-            df_p.columns=["Animal","Data","Peso (kg)","Método","Lote","Operador","Obs"]
-            st.dataframe(df_p,use_container_width=True,hide_index=True,height=350)
-            _download_row("Pesagens",df_p,"pesagens")
-
+        _tab_relatorio_pesagens()
     with rt3:
-        ul = _unit_label()
-        st.subheader("💰 Relatório Financeiro")
-        price_lbl = f"Cotação (R$/{ul}) para o relatório"
-        default_p = DEFAULT_PRICE_ARROBA if _use_arroba() else DEFAULT_PRICE_KG
-        cotacao_r = st.number_input(price_lbl, min_value=0.01, max_value=5000.0,
-            value=default_p, step=1.0)
-        rend_r = 52
-        if _use_arroba():
-            rend_r = st.slider("Rendimento de Carcaça (%)", 40, 65, 52,
-                key="rend_relatorio")
-        rows_fin=[]
-        costs = db._costs_by_animal()
-        for a in animals:
-            if a["status"] not in ("ativo","carencia"): continue
-            tc   = costs.get(a["id"], 0.0)
-            prod = _live_weight(a["current_weight"], rend_r/100)
-            be   = round(tc/prod, 2) if prod else 0
-            receita = round(prod * cotacao_r, 2)
-            lucro   = round(receita - tc, 2)
-            rows_fin.append({"ID":a["id"],"Raça":a["breed"],
-                "Peso Atual (kg)":a["current_weight"],
-                f"Prod. ({ul})":prod,
-                "Custo Total (R$)":tc,
-                _breakeven_label():be,
-                f"Receita @ R${_num_br(cotacao_r, 0)}/{ul}":receita,
-                "Lucro Estimado (R$)":lucro})
-        df_fin=pd.DataFrame(rows_fin)
-        if not df_fin.empty:
-            st.dataframe(df_fin,use_container_width=True,hide_index=True)
-            _download_row("Financeiro",df_fin,"financeiro")
-
+        _tab_relatorio_financeiro(animals)
     with rt4:
-        st.subheader("📦 Pacote de Evidências")
-        st.caption("Agrupa um lote de venda para compartilhar registros de origem, pesagem e sanidade.")
-        vendas_evidencias = db.get_sales()
-        grupos_evidencias = _vendas_para_evidencias(vendas_evidencias)
-        if not grupos_evidencias:
-            st.info("Nenhuma venda disponível para gerar um pacote.")
-        else:
-            rotulos = []
-            for item in grupos_evidencias:
-                linhas = item["vendas"]
-                referencia = item["grupo"].get("lot_ref")
-                if referencia:
-                    rotulos.append(str(referencia))
-                else:
-                    venda = linhas[0]
-                    rotulos.append(
-                        f"Venda avulsa — {venda.get('animal_id') or 'animal'} ({venda.get('sale_date') or '—'})"
-                    )
-            indice = st.selectbox("Lote de venda", range(len(rotulos)),
-                format_func=lambda i: rotulos[i], key="evidencias_lote_idx")
-            selecao = grupos_evidencias[indice]["vendas"]
-            st.caption(f"{len(selecao)} animal(is) no lote selecionado.")
-            chave_pdf = f"evidencias_pdf_{indice}"
-            if st.button("Gerar PDF", type="primary", key="gerar_pacote_evidencias"):
-                st.session_state[chave_pdf] = _gerar_pacote_evidencias(selecao)
-            pdf_gerado = st.session_state.get(chave_pdf)
-            if pdf_gerado:
-                st.download_button(
-                    "⬇️ Baixar pacote de evidências", pdf_gerado,
-                    _evidencias_nome_arquivo(selecao), "application/pdf",
-                    use_container_width=True, key="download_pacote_evidencias",
-                )
+        _tab_relatorio_evidencias()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CADASTRAR
@@ -4734,24 +4757,7 @@ def _age_inputs(entry_date, key_prefix=""):
 _GRAVIDADE_ICONE = {"bloqueio": "🔴", "alerta": "🟡", "informativo": "🔵"}
 
 
-def _cadastro_nascimento():
-    """Registro de nascimento (PNIB §7).
-
-    A regra é `services/genealogia.py`, via `repositories/nascimentos.py`. Aqui
-    só a tela — e a decisão de interface que o §7.2 impõe: **bloqueio impede,
-    alerta pede confirmação.** O texto do §7.2 é explícito: o sistema deve
-    "emitir alerta, sem substituir a avaliação técnica". Quem avalia é o
-    técnico; o software mostra o que sabe.
-    """
-    st.caption("Nascimento na propriedade. A mãe precisa estar cadastrada e ativa — "
-               "o vínculo materno é exigência do §7 do PNIB e não pode ser preenchido depois "
-               "sem deixar rastro.")
-
-    femeas = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "F"]
-    if not femeas:
-        st.warning("Nenhuma fêmea ativa no rebanho. Cadastre a mãe antes de registrar a cria.")
-        return
-
+def _render_nasc_mae(femeas):
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         rotulos = {f"{a['id']} — {a['breed']}": a for a in femeas}
@@ -4761,12 +4767,9 @@ def _cadastro_nascimento():
                                    max_value=date.today(), key="nasc_data")
     with c3:
         hora = st.text_input("Hora", placeholder="14:30", key="nasc_hora").strip()
+    return mae, data_parto, hora
 
-    # Pai é opcional (§4.3: "quando conhecido") — sem validação biológica como a
-    # mãe (services/genealogia.py não avalia pai_uuid); é só o vínculo, quando
-    # o produtor souber. Um só seletor pro parto inteiro: gêmeos do mesmo parto
-    # quase sempre têm o mesmo pai, e o dado já é opcional — não vale complicar
-    # pedindo pai por cria individualmente.
+def _render_nasc_pai():
     machos = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "M"]
     pai = None
     if machos:
@@ -4774,7 +4777,9 @@ def _cadastro_nascimento():
         opcoes_pai = ["— Não informado —"] + list(rotulos_pai)
         sel_pai = st.selectbox("🐂 Pai (opcional)", opcoes_pai, key="nasc_pai")
         pai = rotulos_pai.get(sel_pai)
+    return pai
 
+def _render_nasc_detalhes():
     c4, c5, c6 = st.columns(3)
     with c4:
         tipo_parto = st.selectbox("Tipo de parto", ["normal", "assistido", "cesarea"],
@@ -4793,6 +4798,60 @@ def _cadastro_nascimento():
         "Data estimada (parto não acompanhado)", key="nasc_est",
         help="§7.1: marcar quando ninguém presenciou. Fica registrado como estimado "
              "e aparece nas pendências.")
+    return tipo_parto, condicao, int(n_crias), data_estimada
+
+def _render_nasc_crias(n_crias, mae, pai):
+    st.markdown("---")
+    st.markdown(f"**{'Crias' if n_crias > 1 else 'Cria'}**")
+
+    crias = []
+    for i in range(n_crias):
+        k1, k2, k3, k4 = st.columns([2, 1, 1, 1])
+        with k1:
+            brinco = st.text_input(f"🏷️ Brinco {i+1} *", key=f"nasc_id_{i}").strip().upper()
+        with k2:
+            sexo = st.selectbox("Sexo", ["M", "F"], key=f"nasc_sexo_{i}",
+                                format_func=lambda v: "♂" if v == "M" else "♀")
+        with k3:
+            raca = st.selectbox("Raça", BREEDS, key=f"nasc_raca_{i}",
+                                index=BREEDS.index(mae["breed"]) if mae["breed"] in BREEDS else 0)
+        with k4:
+            peso = st.number_input("Peso (kg)", min_value=0.0, max_value=100.0,
+                                   step=0.5, value=0.0, key=f"nasc_peso_{i}")
+        crias.append({"id": brinco, "sexo": sexo, "raca": raca,
+                      "peso": peso or None, "pai_uuid": pai["uuid"] if pai else None})
+
+    obs = st.text_area("Observações", key="nasc_obs").strip()
+    return crias, obs
+
+def _cadastro_nascimento():
+    """Registro de nascimento (PNIB §7).
+
+    A regra é `services/genealogia.py`, via `repositories/nascimentos.py`. Aqui
+    só a tela — e a decisão de interface que o §7.2 impõe: **bloqueio impede,
+    alerta pede confirmação.** O texto do §7.2 é explícito: o sistema deve
+    "emitir alerta, sem substituir a avaliação técnica". Quem avalia é o
+    técnico; o software mostra o que sabe.
+    """
+    st.caption("Nascimento na propriedade. A mãe precisa estar cadastrada e ativa — "
+               "o vínculo materno é exigência do §7 do PNIB e não pode ser preenchido depois "
+               "sem deixar rastro.")
+
+    femeas = [a for a in db.get_all_animals(status="ativo") if a.get("sex") == "F"]
+    if not femeas:
+        st.warning("Nenhuma fêmea ativa no rebanho. Cadastre a mãe antes de registrar a cria.")
+        return
+
+    mae, data_parto, hora = _render_nasc_mae(femeas)
+
+    # Pai é opcional (§4.3: "quando conhecido") — sem validação biológica como a
+    # mãe (services/genealogia.py não avalia pai_uuid); é só o vínculo, quando
+    # o produtor souber. Um só seletor pro parto inteiro: gêmeos do mesmo parto
+    # quase sempre têm o mesmo pai, e o dado já é opcional — não vale complicar
+    # pedindo pai por cria individualmente.
+    pai = _render_nasc_pai()
+
+    tipo_parto, condicao, n_crias, data_estimada = _render_nasc_detalhes()
 
     # ── Prévia da validação, ANTES de o usuário preencher as crias ───────────
     problemas = db.nascimentos.avaliar(mae["uuid"], data_parto.isoformat(),
@@ -4824,30 +4883,10 @@ def _cadastro_nascimento():
             help="§7.2: o sistema alerta, sem substituir a avaliação técnica. "
                  "A confirmação fica registrada.")
 
-    st.markdown("---")
-    st.markdown(f"**{'Crias' if n_crias > 1 else 'Cria'}**")
-
-    crias = []
-    for i in range(int(n_crias)):
-        k1, k2, k3, k4 = st.columns([2, 1, 1, 1])
-        with k1:
-            brinco = st.text_input(f"🏷️ Brinco {i+1} *", key=f"nasc_id_{i}").strip().upper()
-        with k2:
-            sexo = st.selectbox("Sexo", ["M", "F"], key=f"nasc_sexo_{i}",
-                                format_func=lambda v: "♂" if v == "M" else "♀")
-        with k3:
-            raca = st.selectbox("Raça", BREEDS, key=f"nasc_raca_{i}",
-                                index=BREEDS.index(mae["breed"]) if mae["breed"] in BREEDS else 0)
-        with k4:
-            peso = st.number_input("Peso (kg)", min_value=0.0, max_value=100.0,
-                                   step=0.5, value=0.0, key=f"nasc_peso_{i}")
-        crias.append({"id": brinco, "sexo": sexo, "raca": raca,
-                      "peso": peso or None, "pai_uuid": pai["uuid"] if pai else None})
-
-    obs = st.text_area("Observações", key="nasc_obs").strip()
+    crias, obs = _render_nasc_crias(n_crias, mae, pai)
 
     brincos = [cr["id"] for cr in crias if cr["id"]]
-    faltando = len(brincos) < int(n_crias)
+    faltando = len(brincos) < n_crias
     repetidos = len(brincos) != len(set(brincos))
     if repetidos:
         st.error("🚫 Dois brincos iguais na mesma ninhada.")
@@ -5646,6 +5685,129 @@ def page_desempenho():
         _render_tab_correlacao_chuva_gmd()
 
 
+def _nutricao_planos_ativos(lotes):
+    plans_e_encerrados = db.get_feeding_plans(active_only=False)
+    # "Planos Ativos" mostra a versão CORRENTE de cada item (vigente,
+    # ativa ou pausada) — versão encerrada (vigente_ate preenchido) só
+    # aparece na aba "🕘 Histórico da Dieta", senão as duas telas ficam
+    # mostrando a mesma coisa com nomes diferentes.
+    plans = [p for p in plans_e_encerrados if p.get("vigente_ate") is None]
+    if not plans:
+        st.info("Nenhum plano de nutrição cadastrado. Use a aba **Novo Item de Trato**.")
+    else:
+        # Agrupa por piquete
+        lotes_com_plano = sorted({p["lote_id"] for p in plans})
+        for lid in lotes_com_plano:
+            lote_nome = next((l["name"] for l in lotes if l["id"]==lid), lid)
+            itens = [p for p in plans if p["lote_id"]==lid]
+            st.markdown(f"#### 🌿 {lid} — {lote_nome}")
+            for p in itens:
+                freq = db.FEEDING_FREQUENCIES.get(p["frequency"], p["frequency"])
+                ativo = "🟢 ativo" if p["active"] else "⚪ pausado"
+                c1, c2, c3 = st.columns([5,1,1])
+                with c1:
+                    st.markdown(
+                        f'<div class="hist-item">'
+                        f'<b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
+                        f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo} '
+                        f'· desde {_data_br(p["vigente_de"])}'
+                        f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
+                        f'</div>', unsafe_allow_html=True)
+                with c2:
+                    novo = 0 if p["active"] else 1
+                    if st.button("Ativar" if not p["active"] else "Pausar",
+                                 key=f"tgl_{p['id']}", use_container_width=True,
+                                 help="Pausa/retoma esta mesma versão — não conta como mudança "
+                                      "de dieta."):
+                        db.set_feeding_plan_active(p["id"], novo); st.rerun()
+                with c3:
+                    if st.button("🔚 Encerrar", key=f"enc_{p['id']}", use_container_width=True,
+                                 help="Fecha a vigência deste item. Diferente de excluir: o "
+                                      "histórico de custo continua reconstruível."):
+                        db.encerrar_feeding_plan(p["id"]); st.rerun()
+
+                with st.expander(f"✏️ Nova versão — {p['product_name']}"):
+                    st.caption("Muda a quantidade/frequência a partir de **hoje**, sem apagar "
+                              "o que valeu até ontem — o custo já calculado com a versão "
+                              "anterior não muda retroativamente.")
+                    with st.form(f"f_versao_{p['id']}"):
+                        nv1, nv2 = st.columns(2)
+                        with nv1:
+                            nv_qtd = st.number_input("Nova quantidade", min_value=0.0,
+                                value=float(p["quantity"]), step=1.0, format="%.1f",
+                                key=f"nv_qtd_{p['id']}")
+                        with nv2:
+                            freqs = list(db.FEEDING_FREQUENCIES.keys())
+                            nv_freq = st.selectbox("Nova frequência", freqs,
+                                index=freqs.index(p["frequency"]) if p["frequency"] in freqs else 0,
+                                format_func=lambda f: db.FEEDING_FREQUENCIES[f],
+                                key=f"nv_freq_{p['id']}")
+                        if st.form_submit_button("💾 Salvar nova versão", type="primary"):
+                            if nv_qtd <= 0:
+                                st.error("A quantidade deve ser maior que zero.")
+                            else:
+                                r = db.nova_versao_feeding_plan(
+                                    p["id"], db.FeedingPlanUpdate(quantity=nv_qtd, frequency=nv_freq))
+                                if r["ok"]:
+                                    st.success("✅ Nova versão salva.")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {r['erro']}")
+
+def _nutricao_novo_item(lotes, insumos):
+    if not lotes:
+        st.warning("Cadastre piquetes primeiro (em Lotes / Pastagem).")
+    else:
+        with st.form("f_plan", clear_on_submit=True):
+            fp1, fp2 = st.columns(2)
+            with fp1:
+                lote_sel = st.selectbox("Piquete *", lotes,
+                    format_func=lambda l: f"{l['id']} — {l['name']}")
+                prod = st.text_input("Produto *", placeholder="Ex: Silagem de milho")
+                freq = st.selectbox("Frequência *", list(db.FEEDING_FREQUENCIES.keys()),
+                    format_func=lambda f: db.FEEDING_FREQUENCIES[f])
+            with fp2:
+                qtd = st.number_input("Quantidade *", min_value=0.0, step=5.0, format="%.1f")
+                unid = st.selectbox("Unidade", ["kg","ton","saco","litro","g"])
+                ins_link = st.selectbox("Vincular a insumo (opcional)",
+                    [None]+insumos,
+                    format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({_num_br(x['current_stock'], 0)} {x['unit']})",
+                    help="Se vinculado, a confirmação do operador pode baixar do estoque")
+            notes = st.text_input("Observações", placeholder="Opcional")
+            if st.form_submit_button("✅ Adicionar ao Plano", type="primary", use_container_width=True):
+                if not prod or qtd<=0:
+                    st.error("Informe o produto e a quantidade.")
+                else:
+                    plan = db.FeedingPlanCreate(
+                        lote_id=lote_sel["id"],
+                        product_name=prod.strip(),
+                        quantity=qtd,
+                        unit=unid,
+                        frequency=freq,
+                        insumo_id=ins_link["id"] if ins_link else None,
+                        notes=notes
+                    )
+                    db.add_feeding_plan(plan)
+                    st.success(f"✅ {prod} adicionado ao {lote_sel['name']} ({db.FEEDING_FREQUENCIES[freq]})")
+                    st.rerun()
+
+def _nutricao_historico_checagens():
+    st.markdown("**Checagens registradas pelos operadores**")
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        start_c = st.date_input("De", value=date.today()-timedelta(days=30), key="chk_start")
+    with cc2:
+        end_c = st.date_input("Até", value=date.today(), key="chk_end")
+    checks = db.get_feeding_checks(start_date=start_c.isoformat(), end_date=end_c.isoformat())
+    if checks:
+        df_c = pd.DataFrame(checks)[["check_date","lote_id","product_name","status","actual_quantity","operator"]].copy()
+        df_c["status"] = df_c["status"].map(lambda s: db.FEEDING_CHECK_STATUS.get(s,s))
+        df_c.columns = ["Data","Piquete","Produto","Status","Qtd Aplicada","Operador"]
+        st.dataframe(df_c, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhuma checagem registrada no período.")
+
+
 def page_nutricao():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -5662,126 +5824,13 @@ def page_nutricao():
                                        "🕘 Histórico da Dieta"])
 
     with nt1:
-        plans_e_encerrados = db.get_feeding_plans(active_only=False)
-        # "Planos Ativos" mostra a versão CORRENTE de cada item (vigente,
-        # ativa ou pausada) — versão encerrada (vigente_ate preenchido) só
-        # aparece na aba "🕘 Histórico da Dieta", senão as duas telas ficam
-        # mostrando a mesma coisa com nomes diferentes.
-        plans = [p for p in plans_e_encerrados if p.get("vigente_ate") is None]
-        if not plans:
-            st.info("Nenhum plano de nutrição cadastrado. Use a aba **Novo Item de Trato**.")
-        else:
-            # Agrupa por piquete
-            lotes_com_plano = sorted({p["lote_id"] for p in plans})
-            for lid in lotes_com_plano:
-                lote_nome = next((l["name"] for l in lotes if l["id"]==lid), lid)
-                itens = [p for p in plans if p["lote_id"]==lid]
-                st.markdown(f"#### 🌿 {lid} — {lote_nome}")
-                for p in itens:
-                    freq = db.FEEDING_FREQUENCIES.get(p["frequency"], p["frequency"])
-                    ativo = "🟢 ativo" if p["active"] else "⚪ pausado"
-                    c1, c2, c3 = st.columns([5,1,1])
-                    with c1:
-                        st.markdown(
-                            f'<div class="hist-item">'
-                            f'<b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
-                            f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo} '
-                            f'· desde {_data_br(p["vigente_de"])}'
-                            f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
-                            f'</div>', unsafe_allow_html=True)
-                    with c2:
-                        novo = 0 if p["active"] else 1
-                        if st.button("Ativar" if not p["active"] else "Pausar",
-                                     key=f"tgl_{p['id']}", use_container_width=True,
-                                     help="Pausa/retoma esta mesma versão — não conta como mudança "
-                                          "de dieta."):
-                            db.set_feeding_plan_active(p["id"], novo); st.rerun()
-                    with c3:
-                        if st.button("🔚 Encerrar", key=f"enc_{p['id']}", use_container_width=True,
-                                     help="Fecha a vigência deste item. Diferente de excluir: o "
-                                          "histórico de custo continua reconstruível."):
-                            db.encerrar_feeding_plan(p["id"]); st.rerun()
-
-                    with st.expander(f"✏️ Nova versão — {p['product_name']}"):
-                        st.caption("Muda a quantidade/frequência a partir de **hoje**, sem apagar "
-                                  "o que valeu até ontem — o custo já calculado com a versão "
-                                  "anterior não muda retroativamente.")
-                        with st.form(f"f_versao_{p['id']}"):
-                            nv1, nv2 = st.columns(2)
-                            with nv1:
-                                nv_qtd = st.number_input("Nova quantidade", min_value=0.0,
-                                    value=float(p["quantity"]), step=1.0, format="%.1f",
-                                    key=f"nv_qtd_{p['id']}")
-                            with nv2:
-                                freqs = list(db.FEEDING_FREQUENCIES.keys())
-                                nv_freq = st.selectbox("Nova frequência", freqs,
-                                    index=freqs.index(p["frequency"]) if p["frequency"] in freqs else 0,
-                                    format_func=lambda f: db.FEEDING_FREQUENCIES[f],
-                                    key=f"nv_freq_{p['id']}")
-                            if st.form_submit_button("💾 Salvar nova versão", type="primary"):
-                                if nv_qtd <= 0:
-                                    st.error("A quantidade deve ser maior que zero.")
-                                else:
-                                    r = db.nova_versao_feeding_plan(
-                                        p["id"], db.FeedingPlanUpdate(quantity=nv_qtd, frequency=nv_freq))
-                                    if r["ok"]:
-                                        st.success("✅ Nova versão salva.")
-                                        st.rerun()
-                                    else:
-                                        st.error(f"❌ {r['erro']}")
+        _nutricao_planos_ativos(lotes)
 
     with nt2:
-        if not lotes:
-            st.warning("Cadastre piquetes primeiro (em Lotes / Pastagem).")
-        else:
-            with st.form("f_plan", clear_on_submit=True):
-                fp1, fp2 = st.columns(2)
-                with fp1:
-                    lote_sel = st.selectbox("Piquete *", lotes,
-                        format_func=lambda l: f"{l['id']} — {l['name']}")
-                    prod = st.text_input("Produto *", placeholder="Ex: Silagem de milho")
-                    freq = st.selectbox("Frequência *", list(db.FEEDING_FREQUENCIES.keys()),
-                        format_func=lambda f: db.FEEDING_FREQUENCIES[f])
-                with fp2:
-                    qtd = st.number_input("Quantidade *", min_value=0.0, step=5.0, format="%.1f")
-                    unid = st.selectbox("Unidade", ["kg","ton","saco","litro","g"])
-                    ins_link = st.selectbox("Vincular a insumo (opcional)",
-                        [None]+insumos,
-                        format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({_num_br(x['current_stock'], 0)} {x['unit']})",
-                        help="Se vinculado, a confirmação do operador pode baixar do estoque")
-                notes = st.text_input("Observações", placeholder="Opcional")
-                if st.form_submit_button("✅ Adicionar ao Plano", type="primary", use_container_width=True):
-                    if not prod or qtd<=0:
-                        st.error("Informe o produto e a quantidade.")
-                    else:
-                        plan = db.FeedingPlanCreate(
-                            lote_id=lote_sel["id"],
-                            product_name=prod.strip(),
-                            quantity=qtd,
-                            unit=unid,
-                            frequency=freq,
-                            insumo_id=ins_link["id"] if ins_link else None,
-                            notes=notes
-                        )
-                        db.add_feeding_plan(plan)
-                        st.success(f"✅ {prod} adicionado ao {lote_sel['name']} ({db.FEEDING_FREQUENCIES[freq]})")
-                        st.rerun()
+        _nutricao_novo_item(lotes, insumos)
 
     with nt3:
-        st.markdown("**Checagens registradas pelos operadores**")
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            start_c = st.date_input("De", value=date.today()-timedelta(days=30), key="chk_start")
-        with cc2:
-            end_c = st.date_input("Até", value=date.today(), key="chk_end")
-        checks = db.get_feeding_checks(start_date=start_c.isoformat(), end_date=end_c.isoformat())
-        if checks:
-            df_c = pd.DataFrame(checks)[["check_date","lote_id","product_name","status","actual_quantity","operator"]].copy()
-            df_c["status"] = df_c["status"].map(lambda s: db.FEEDING_CHECK_STATUS.get(s,s))
-            df_c.columns = ["Data","Piquete","Produto","Status","Qtd Aplicada","Operador"]
-            st.dataframe(df_c, use_container_width=True, hide_index=True)
-        else:
-            st.info("Nenhuma checagem registrada no período.")
+        _nutricao_historico_checagens()
 
     with nt4:
         _nutricao_custo_por_piquete(lotes, insumos)
@@ -6740,6 +6789,11 @@ def _propriedades_editar(props):
            for p in props}
     p = rot[st.selectbox("Propriedade", list(rot), key="prop_sel")]
 
+    _propriedade_editar_form(p)
+    _propriedade_car_expander(p)
+
+
+def _propriedade_editar_form(p):
     # O titular NÃO é editável: trocá-lo é transferência de titularidade, que é
     # evento do §8, com GTA e data. Oferecer aqui como campo de cadastro faria
     # uma mudança regulatória parecer correção de digitação.
@@ -6832,6 +6886,8 @@ def _propriedades_editar(props):
         else:
             st.error("🚫 Nada foi alterado.")
 
+
+def _propriedade_car_expander(p):
     with st.expander("🌳 Situação Ambiental (CAR)", expanded=False):
         st.warning("Aviso: este registro não é avaliação de conformidade legal nem certificação oficial.")
         car_numero = st.text_input(

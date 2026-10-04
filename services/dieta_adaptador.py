@@ -6,6 +6,96 @@ por cabeça consumida por `services.dieta.custo_por_cabeca_dia()`.
 
 from typing import Callable, Optional
 
+_FATORES_FREQUENCIA = {
+    "diario": 1.0,
+    "semanal": 1.0 / 7.0,
+    "mensal": 1.0 / 30.0,
+}
+
+
+def _obter_cabecas_validas(cabecas_no_piquete: int) -> int:
+    try:
+        cabecas = int(cabecas_no_piquete)
+        return cabecas if cabecas > 0 else 0
+    except (ValueError, TypeError):
+        return 0
+
+
+def _obter_fator_frequencia(plano: dict) -> Optional[float]:
+    freq_raw = plano.get("frequency") or plano.get("frequencia")
+    if not isinstance(freq_raw, str):
+        return None
+    return _FATORES_FREQUENCIA.get(freq_raw.strip().lower())
+
+
+def _obter_quantidade(plano: dict) -> Optional[float]:
+    raw_qty = (
+        plano.get("quantity")
+        if plano.get("quantity") is not None
+        else plano.get("quantidade")
+    )
+    try:
+        qty = float(raw_qty)
+        return qty if qty > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _converter_unidade(
+    qty: float, unit_plano: str, unit_insumo: str, converter_quantidade: Optional[Callable]
+) -> Optional[float]:
+    unit_p = (unit_plano or "").strip().lower()
+    unit_i = (unit_insumo or "").strip().lower()
+
+    if unit_p and unit_i and unit_p == unit_i:
+        qty_convertida = qty
+    elif callable(converter_quantidade):
+        try:
+            qty_convertida = converter_quantidade(qty, unit_p, unit_i)
+        except Exception:
+            return None
+    elif (unit_p == "g" and unit_i == "kg") or (unit_p == "ml" and unit_i in ("l", "litro")):
+        qty_convertida = qty / 1000.0
+    elif (unit_p == "kg" and unit_i == "g") or (unit_p in ("t", "ton") and unit_i == "kg"):
+        qty_convertida = qty * 1000.0
+    else:
+        return None
+
+    if qty_convertida is None:
+        return None
+
+    try:
+        return float(qty_convertida)
+    except (ValueError, TypeError):
+        return None
+
+
+def _montar_ingrediente(item: dict) -> dict:
+    info = item["info"]
+    nome = str(info.get("name") or info.get("nome") or info.get("product_name") or "")
+
+    raw_custo = (
+        info.get("cost_per_unit")
+        if info.get("cost_per_unit") is not None
+        else info.get("custo_unitario", 0.0)
+    )
+    try:
+        custo_por_kg = float(raw_custo)
+    except (ValueError, TypeError):
+        custo_por_kg = 0.0
+
+    try:
+        materia_seca_pct = float(info.get("materia_seca_pct", 0.0))
+    except (ValueError, TypeError):
+        materia_seca_pct = 0.0
+
+    return {
+        "nome": nome,
+        "quantidade_kg_cabeca_dia": item["total_qty_cabeca_dia"],
+        "custo_por_kg": custo_por_kg,
+        "materia_seca_pct": materia_seca_pct,
+    }
+
 
 def ingredientes_por_cabeca(
     planos_do_piquete: list[dict],
@@ -30,22 +120,12 @@ def ingredientes_por_cabeca(
       resultado até que o dado seja adicionado ao schema).
     - Agrupa por `insumo_id` somando as quantidades por cabeça/dia antes de retornar.
     """
-    try:
-        cabecas = int(cabecas_no_piquete)
-    except (ValueError, TypeError):
-        return []
-
-    if cabecas <= 0:
+    cabecas = _obter_cabecas_validas(cabecas_no_piquete)
+    if cabecas == 0:
         return []
 
     if not isinstance(planos_do_piquete, list) or not isinstance(insumos_por_id, dict):
         return []
-
-    fatores_frequencia = {
-        "diario": 1.0,
-        "semanal": 1.0 / 7.0,
-        "mensal": 1.0 / 30.0,
-    }
 
     agrupado: dict[int, dict] = {}
     ordem_insumos: list[int] = []
@@ -65,56 +145,24 @@ def ingredientes_por_cabeca(
         if not isinstance(insumo_info, dict):
             continue
 
-        freq_raw = plano.get("frequency") or plano.get("frequencia")
-        if not isinstance(freq_raw, str):
+        fator_freq = _obter_fator_frequencia(plano)
+        if fator_freq is None:
             continue
 
-        freq_norm = freq_raw.strip().lower()
-        if freq_norm not in fatores_frequencia:
+        qty = _obter_quantidade(plano)
+        if qty is None:
             continue
 
-        fator_freq = fatores_frequencia[freq_norm]
-
-        raw_qty = (
-            plano.get("quantity")
-            if plano.get("quantity") is not None
-            else plano.get("quantidade")
+        qty_convertida = _converter_unidade(
+            qty,
+            plano.get("unit") or plano.get("unidade"),
+            insumo_info.get("unit") or insumo_info.get("unidade"),
+            converter_quantidade,
         )
-        try:
-            qty = float(raw_qty)
-        except (ValueError, TypeError):
-            continue
-
-        if qty <= 0:
-            continue
-
-        unit_plano = (plano.get("unit") or plano.get("unidade") or "").strip().lower()
-        unit_insumo = (insumo_info.get("unit") or insumo_info.get("unidade") or "").strip().lower()
-
-        if unit_plano and unit_insumo and unit_plano == unit_insumo:
-            qty_convertida = qty
-        elif callable(converter_quantidade):
-            try:
-                qty_convertida = converter_quantidade(qty, unit_plano, unit_insumo)
-            except Exception:
-                qty_convertida = None
-        elif (unit_plano == "g" and unit_insumo == "kg") or (unit_plano == "ml" and unit_insumo in ("l", "litro")):
-            qty_convertida = qty / 1000.0
-        elif (unit_plano == "kg" and unit_insumo == "g") or (unit_plano in ("t", "ton") and unit_insumo == "kg"):
-            qty_convertida = qty * 1000.0
-        else:
-            qty_convertida = None
-
         if qty_convertida is None:
             continue
 
-        try:
-            qty_convertida = float(qty_convertida)
-        except (ValueError, TypeError):
-            continue
-
-        qty_diaria_piquete = qty_convertida * fator_freq
-        qty_cabeca_dia = qty_diaria_piquete / cabecas
+        qty_cabeca_dia = (qty_convertida * fator_freq) / cabecas
 
         if insumo_id not in agrupado:
             agrupado[insumo_id] = {
@@ -125,31 +173,4 @@ def ingredientes_por_cabeca(
 
         agrupado[insumo_id]["total_qty_cabeca_dia"] += qty_cabeca_dia
 
-    resultado = []
-    for iid in ordem_insumos:
-        item = agrupado[iid]
-        info = item["info"]
-        nome = str(info.get("name") or info.get("nome") or info.get("product_name") or "")
-        raw_custo = (
-            info.get("cost_per_unit")
-            if info.get("cost_per_unit") is not None
-            else info.get("custo_unitario", 0.0)
-        )
-        try:
-            custo_por_kg = float(raw_custo)
-        except (ValueError, TypeError):
-            custo_por_kg = 0.0
-
-        try:
-            materia_seca_pct = float(info.get("materia_seca_pct", 0.0))
-        except (ValueError, TypeError):
-            materia_seca_pct = 0.0
-
-        resultado.append({
-            "nome": nome,
-            "quantidade_kg_cabeca_dia": item["total_qty_cabeca_dia"],
-            "custo_por_kg": custo_por_kg,
-            "materia_seca_pct": materia_seca_pct,
-        })
-
-    return resultado
+    return [_montar_ingrediente(agrupado[iid]) for iid in ordem_insumos]

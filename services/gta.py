@@ -12,17 +12,7 @@ def _data_iso(valor) -> date | None:
         return None
 
 
-def validar(gta: dict, contexto: dict | None = None) -> list[dict]:
-    """Problemas na GTA. Lista vazia = apta ao trânsito.
-
-    Valida somente os dados presentes. As verificações que dependem de uma
-    chave ausente no contexto são puladas.
-    """
-    if not isinstance(gta, dict):
-        return []
-    if not isinstance(contexto, dict):
-        contexto = {}
-
+def _validar_datas(gta: dict, contexto: dict) -> list[dict]:
     problemas: list[dict] = []
     emissao = _data_iso(gta.get("emissao"))
     validade = _data_iso(gta.get("validade"))
@@ -60,7 +50,11 @@ def validar(gta: dict, contexto: dict | None = None) -> list[dict]:
                     f"de {limite} dias."
                 ),
             })
+    return problemas
 
+
+def _validar_animais(gta: dict, contexto: dict) -> list[dict]:
+    problemas: list[dict] = []
     animais = gta.get("animais")
     quantidade = gta.get("quantidade")
     if isinstance(animais, list) and isinstance(quantidade, int):
@@ -103,7 +97,11 @@ def validar(gta: dict, contexto: dict | None = None) -> list[dict]:
                 "gravidade": "bloqueio",
                 "mensagem": f"O animal '{animal}' está em carência e não pode seguir para abate.",
             })
+    return problemas
 
+
+def _validar_origem_destino(gta: dict, contexto: dict) -> list[dict]:
+    problemas: list[dict] = []
     origem = str(gta.get("propriedade_origem", "")).strip()
     destino = str(gta.get("propriedade_destino", "")).strip()
     if origem and destino and origem == destino:
@@ -113,6 +111,7 @@ def validar(gta: dict, contexto: dict | None = None) -> list[dict]:
             "mensagem": "A propriedade de origem é igual à propriedade de destino.",
         })
 
+    finalidade = str(gta.get("finalidade", "")).strip().lower()
     uf_origem = str(gta.get("uf_origem", "")).strip().upper()
     uf_destino = str(gta.get("uf_destino", "")).strip().upper()
     if uf_origem and uf_destino and uf_origem != uf_destino and not finalidade:
@@ -123,5 +122,23 @@ def validar(gta: dict, contexto: dict | None = None) -> list[dict]:
                 f"O trânsito entre {uf_origem} e {uf_destino} está sem finalidade informada."
             ),
         })
+    return problemas
+
+
+def validar(gta: dict, contexto: dict | None = None) -> list[dict]:
+    """Problemas na GTA. Lista vazia = apta ao trânsito.
+
+    Valida somente os dados presentes. As verificações que dependem de uma
+    chave ausente no contexto são puladas.
+    """
+    if not isinstance(gta, dict):
+        return []
+    if not isinstance(contexto, dict):
+        contexto = {}
+
+    problemas: list[dict] = []
+    problemas.extend(_validar_datas(gta, contexto))
+    problemas.extend(_validar_animais(gta, contexto))
+    problemas.extend(_validar_origem_destino(gta, contexto))
 
     return problemas

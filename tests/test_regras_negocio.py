@@ -561,11 +561,11 @@ class TestEstoque(BaseRegras):
         contas_pagar/caixa)."""
         iid = self._insumo()
         db.add_insumo_entry(iid, 10.0, 2.0)  # avulsa, sem nota
-        r = db.compras.registrar(
+        r = db.compras.registrar(db.NovaCompra(
             data_emissao=HOJE.isoformat(), data_recebimento=HOJE.isoformat(),
             itens=[{"insumo_id": iid, "quantidade": 5.0, "custo_unitario": 3.0}],
             primeiro_vencimento=(HOJE + timedelta(days=10)).isoformat(),
-            num_parcelas=1)
+            num_parcelas=1))
         self.assertTrue(r["ok"])
 
         db.clear_cache()
