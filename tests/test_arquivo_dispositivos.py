@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from services.arquivo_dispositivos import conferir_pareamento, ler, _separador
+from services.arquivo_dispositivos import _eh_rodape, _separador, conferir_pareamento, ler
 
 
 class TestLerArquivoDispositivos(unittest.TestCase):
@@ -169,6 +169,36 @@ class TestSeparador(unittest.TestCase):
 
     def test_linha_sem_separador_retorna_ponto_e_virgula(self):
         self.assertEqual(_separador(["linha 1", "linha 2"]), ";")
+
+
+class TestEhRodape(unittest.TestCase):
+    def test_eh_rodape_matches_valid_footers(self):
+        valid_cases = [
+            "total:",
+            "TOTAL:",
+            "  total :",
+            "Total :",
+            "total  :",
+            "\tTotal:\n",
+        ]
+        for case in valid_cases:
+            with self.subTest(case=case):
+                self.assertTrue(_eh_rodape(case))
+
+    def test_eh_rodape_rejects_invalid_footers(self):
+        invalid_cases = [
+            "",
+            "total",
+            "subtotal:",
+            "123 total:",
+            "a total:",
+            "total 123:",
+            "tot:",
+            "total;",
+        ]
+        for case in invalid_cases:
+            with self.subTest(case=case):
+                self.assertFalse(_eh_rodape(case))
 
 
 if __name__ == "__main__":
