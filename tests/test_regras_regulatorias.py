@@ -22,7 +22,7 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from repositories import eventos, regras  # noqa: E402
-from services.regras_regulatorias import avaliar, simular, vigente_em  # noqa: E402
+from services.regras_regulatorias import _data, avaliar, simular, vigente_em  # noqa: E402
 
 
 class BaseB5(unittest.TestCase):
@@ -219,6 +219,32 @@ class TestSimulacao(BaseB5):
 
     def test_lista_vazia_nao_divide_por_zero(self):
         self.assertEqual(simular({"nome": "X"}, [])["percentual"], 0.0)
+
+
+class TestFuncaoData(unittest.TestCase):
+    def test_retorna_proprio_date_se_for_date(self):
+        hoje = date.today()
+        self.assertEqual(_data(hoje), hoje)
+
+    def test_retorna_date_para_string_valida(self):
+        self.assertEqual(_data("2024-05-10"), date(2024, 5, 10))
+
+    def test_retorna_none_para_string_invalida_ou_vazia(self):
+        self.assertIsNone(_data("2024-05-32"))
+        self.assertIsNone(_data("2021-02-29"))
+        self.assertIsNone(_data("nao-e-data"))
+        self.assertIsNone(_data(""))
+        self.assertIsNone(_data("24-05-10"))
+
+    def test_retorna_none_para_none_ou_numeros(self):
+        self.assertIsNone(_data(None))
+        self.assertIsNone(_data(12345))
+
+    def test_retorna_none_quando_str_lanca_typeerror(self):
+        class FalhaAoConverterStr:
+            def __str__(self):
+                raise TypeError("Erro proposital")
+        self.assertIsNone(_data(FalhaAoConverterStr()))
 
 
 if __name__ == "__main__":
