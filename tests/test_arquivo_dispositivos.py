@@ -112,6 +112,18 @@ class TestLerArquivoDispositivos(unittest.TestCase):
         self.assertEqual(resultado["rejeitados"], [])
         self.assertEqual(resultado["total_linhas"], 10_000)
 
+    def test_linha_malformada_retorna_csv_invalido(self):
+        resultado = ler(
+            "codigo_visual;codigo_eletronico\n"
+            '"aspas"mal"fechadas";E1\n'
+            "BR0002;E2"
+        )
+
+        self.assertEqual(resultado["total_linhas"], 2)
+        self.assertEqual(resultado["aceitos"][0]["codigo_visual"], "BR0002")
+        self.assertEqual(resultado["rejeitados"][0]["linha"], 2)
+        self.assertEqual(resultado["rejeitados"][0]["motivo"], "CSV inválido")
+
 
 class TestConferirPareamento(unittest.TestCase):
     def test_prefixo_eletronico_confere_pelos_seis_ultimos_caracteres(self):
