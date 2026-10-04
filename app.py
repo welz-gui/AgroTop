@@ -5662,6 +5662,129 @@ def page_desempenho():
         _render_tab_correlacao_chuva_gmd()
 
 
+def _nutricao_planos_ativos(lotes):
+    plans_e_encerrados = db.get_feeding_plans(active_only=False)
+    # "Planos Ativos" mostra a versão CORRENTE de cada item (vigente,
+    # ativa ou pausada) — versão encerrada (vigente_ate preenchido) só
+    # aparece na aba "🕘 Histórico da Dieta", senão as duas telas ficam
+    # mostrando a mesma coisa com nomes diferentes.
+    plans = [p for p in plans_e_encerrados if p.get("vigente_ate") is None]
+    if not plans:
+        st.info("Nenhum plano de nutrição cadastrado. Use a aba **Novo Item de Trato**.")
+    else:
+        # Agrupa por piquete
+        lotes_com_plano = sorted({p["lote_id"] for p in plans})
+        for lid in lotes_com_plano:
+            lote_nome = next((l["name"] for l in lotes if l["id"]==lid), lid)
+            itens = [p for p in plans if p["lote_id"]==lid]
+            st.markdown(f"#### 🌿 {lid} — {lote_nome}")
+            for p in itens:
+                freq = db.FEEDING_FREQUENCIES.get(p["frequency"], p["frequency"])
+                ativo = "🟢 ativo" if p["active"] else "⚪ pausado"
+                c1, c2, c3 = st.columns([5,1,1])
+                with c1:
+                    st.markdown(
+                        f'<div class="hist-item">'
+                        f'<b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
+                        f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo} '
+                        f'· desde {_data_br(p["vigente_de"])}'
+                        f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
+                        f'</div>', unsafe_allow_html=True)
+                with c2:
+                    novo = 0 if p["active"] else 1
+                    if st.button("Ativar" if not p["active"] else "Pausar",
+                                 key=f"tgl_{p['id']}", use_container_width=True,
+                                 help="Pausa/retoma esta mesma versão — não conta como mudança "
+                                      "de dieta."):
+                        db.set_feeding_plan_active(p["id"], novo); st.rerun()
+                with c3:
+                    if st.button("🔚 Encerrar", key=f"enc_{p['id']}", use_container_width=True,
+                                 help="Fecha a vigência deste item. Diferente de excluir: o "
+                                      "histórico de custo continua reconstruível."):
+                        db.encerrar_feeding_plan(p["id"]); st.rerun()
+
+                with st.expander(f"✏️ Nova versão — {p['product_name']}"):
+                    st.caption("Muda a quantidade/frequência a partir de **hoje**, sem apagar "
+                              "o que valeu até ontem — o custo já calculado com a versão "
+                              "anterior não muda retroativamente.")
+                    with st.form(f"f_versao_{p['id']}"):
+                        nv1, nv2 = st.columns(2)
+                        with nv1:
+                            nv_qtd = st.number_input("Nova quantidade", min_value=0.0,
+                                value=float(p["quantity"]), step=1.0, format="%.1f",
+                                key=f"nv_qtd_{p['id']}")
+                        with nv2:
+                            freqs = list(db.FEEDING_FREQUENCIES.keys())
+                            nv_freq = st.selectbox("Nova frequência", freqs,
+                                index=freqs.index(p["frequency"]) if p["frequency"] in freqs else 0,
+                                format_func=lambda f: db.FEEDING_FREQUENCIES[f],
+                                key=f"nv_freq_{p['id']}")
+                        if st.form_submit_button("💾 Salvar nova versão", type="primary"):
+                            if nv_qtd <= 0:
+                                st.error("A quantidade deve ser maior que zero.")
+                            else:
+                                r = db.nova_versao_feeding_plan(
+                                    p["id"], db.FeedingPlanUpdate(quantity=nv_qtd, frequency=nv_freq))
+                                if r["ok"]:
+                                    st.success("✅ Nova versão salva.")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {r['erro']}")
+
+def _nutricao_novo_item(lotes, insumos):
+    if not lotes:
+        st.warning("Cadastre piquetes primeiro (em Lotes / Pastagem).")
+    else:
+        with st.form("f_plan", clear_on_submit=True):
+            fp1, fp2 = st.columns(2)
+            with fp1:
+                lote_sel = st.selectbox("Piquete *", lotes,
+                    format_func=lambda l: f"{l['id']} — {l['name']}")
+                prod = st.text_input("Produto *", placeholder="Ex: Silagem de milho")
+                freq = st.selectbox("Frequência *", list(db.FEEDING_FREQUENCIES.keys()),
+                    format_func=lambda f: db.FEEDING_FREQUENCIES[f])
+            with fp2:
+                qtd = st.number_input("Quantidade *", min_value=0.0, step=5.0, format="%.1f")
+                unid = st.selectbox("Unidade", ["kg","ton","saco","litro","g"])
+                ins_link = st.selectbox("Vincular a insumo (opcional)",
+                    [None]+insumos,
+                    format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({_num_br(x['current_stock'], 0)} {x['unit']})",
+                    help="Se vinculado, a confirmação do operador pode baixar do estoque")
+            notes = st.text_input("Observações", placeholder="Opcional")
+            if st.form_submit_button("✅ Adicionar ao Plano", type="primary", use_container_width=True):
+                if not prod or qtd<=0:
+                    st.error("Informe o produto e a quantidade.")
+                else:
+                    plan = db.FeedingPlanCreate(
+                        lote_id=lote_sel["id"],
+                        product_name=prod.strip(),
+                        quantity=qtd,
+                        unit=unid,
+                        frequency=freq,
+                        insumo_id=ins_link["id"] if ins_link else None,
+                        notes=notes
+                    )
+                    db.add_feeding_plan(plan)
+                    st.success(f"✅ {prod} adicionado ao {lote_sel['name']} ({db.FEEDING_FREQUENCIES[freq]})")
+                    st.rerun()
+
+def _nutricao_historico_checagens():
+    st.markdown("**Checagens registradas pelos operadores**")
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        start_c = st.date_input("De", value=date.today()-timedelta(days=30), key="chk_start")
+    with cc2:
+        end_c = st.date_input("Até", value=date.today(), key="chk_end")
+    checks = db.get_feeding_checks(start_date=start_c.isoformat(), end_date=end_c.isoformat())
+    if checks:
+        df_c = pd.DataFrame(checks)[["check_date","lote_id","product_name","status","actual_quantity","operator"]].copy()
+        df_c["status"] = df_c["status"].map(lambda s: db.FEEDING_CHECK_STATUS.get(s,s))
+        df_c.columns = ["Data","Piquete","Produto","Status","Qtd Aplicada","Operador"]
+        st.dataframe(df_c, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhuma checagem registrada no período.")
+
+
 def page_nutricao():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -5678,126 +5801,13 @@ def page_nutricao():
                                        "🕘 Histórico da Dieta"])
 
     with nt1:
-        plans_e_encerrados = db.get_feeding_plans(active_only=False)
-        # "Planos Ativos" mostra a versão CORRENTE de cada item (vigente,
-        # ativa ou pausada) — versão encerrada (vigente_ate preenchido) só
-        # aparece na aba "🕘 Histórico da Dieta", senão as duas telas ficam
-        # mostrando a mesma coisa com nomes diferentes.
-        plans = [p for p in plans_e_encerrados if p.get("vigente_ate") is None]
-        if not plans:
-            st.info("Nenhum plano de nutrição cadastrado. Use a aba **Novo Item de Trato**.")
-        else:
-            # Agrupa por piquete
-            lotes_com_plano = sorted({p["lote_id"] for p in plans})
-            for lid in lotes_com_plano:
-                lote_nome = next((l["name"] for l in lotes if l["id"]==lid), lid)
-                itens = [p for p in plans if p["lote_id"]==lid]
-                st.markdown(f"#### 🌿 {lid} — {lote_nome}")
-                for p in itens:
-                    freq = db.FEEDING_FREQUENCIES.get(p["frequency"], p["frequency"])
-                    ativo = "🟢 ativo" if p["active"] else "⚪ pausado"
-                    c1, c2, c3 = st.columns([5,1,1])
-                    with c1:
-                        st.markdown(
-                            f'<div class="hist-item">'
-                            f'<b>{p["product_name"]}</b> — {_num_br(p["quantity"], 0)} {p["unit"]} '
-                            f'· <span style="color:{c["primaria"]}">{freq}</span> · {ativo} '
-                            f'· desde {_data_br(p["vigente_de"])}'
-                            f'{"  · vinc. estoque: "+p["insumo_name"] if p.get("insumo_name") else ""}'
-                            f'</div>', unsafe_allow_html=True)
-                    with c2:
-                        novo = 0 if p["active"] else 1
-                        if st.button("Ativar" if not p["active"] else "Pausar",
-                                     key=f"tgl_{p['id']}", use_container_width=True,
-                                     help="Pausa/retoma esta mesma versão — não conta como mudança "
-                                          "de dieta."):
-                            db.set_feeding_plan_active(p["id"], novo); st.rerun()
-                    with c3:
-                        if st.button("🔚 Encerrar", key=f"enc_{p['id']}", use_container_width=True,
-                                     help="Fecha a vigência deste item. Diferente de excluir: o "
-                                          "histórico de custo continua reconstruível."):
-                            db.encerrar_feeding_plan(p["id"]); st.rerun()
-
-                    with st.expander(f"✏️ Nova versão — {p['product_name']}"):
-                        st.caption("Muda a quantidade/frequência a partir de **hoje**, sem apagar "
-                                  "o que valeu até ontem — o custo já calculado com a versão "
-                                  "anterior não muda retroativamente.")
-                        with st.form(f"f_versao_{p['id']}"):
-                            nv1, nv2 = st.columns(2)
-                            with nv1:
-                                nv_qtd = st.number_input("Nova quantidade", min_value=0.0,
-                                    value=float(p["quantity"]), step=1.0, format="%.1f",
-                                    key=f"nv_qtd_{p['id']}")
-                            with nv2:
-                                freqs = list(db.FEEDING_FREQUENCIES.keys())
-                                nv_freq = st.selectbox("Nova frequência", freqs,
-                                    index=freqs.index(p["frequency"]) if p["frequency"] in freqs else 0,
-                                    format_func=lambda f: db.FEEDING_FREQUENCIES[f],
-                                    key=f"nv_freq_{p['id']}")
-                            if st.form_submit_button("💾 Salvar nova versão", type="primary"):
-                                if nv_qtd <= 0:
-                                    st.error("A quantidade deve ser maior que zero.")
-                                else:
-                                    r = db.nova_versao_feeding_plan(
-                                        p["id"], db.FeedingPlanUpdate(quantity=nv_qtd, frequency=nv_freq))
-                                    if r["ok"]:
-                                        st.success("✅ Nova versão salva.")
-                                        st.rerun()
-                                    else:
-                                        st.error(f"❌ {r['erro']}")
+        _nutricao_planos_ativos(lotes)
 
     with nt2:
-        if not lotes:
-            st.warning("Cadastre piquetes primeiro (em Lotes / Pastagem).")
-        else:
-            with st.form("f_plan", clear_on_submit=True):
-                fp1, fp2 = st.columns(2)
-                with fp1:
-                    lote_sel = st.selectbox("Piquete *", lotes,
-                        format_func=lambda l: f"{l['id']} — {l['name']}")
-                    prod = st.text_input("Produto *", placeholder="Ex: Silagem de milho")
-                    freq = st.selectbox("Frequência *", list(db.FEEDING_FREQUENCIES.keys()),
-                        format_func=lambda f: db.FEEDING_FREQUENCIES[f])
-                with fp2:
-                    qtd = st.number_input("Quantidade *", min_value=0.0, step=5.0, format="%.1f")
-                    unid = st.selectbox("Unidade", ["kg","ton","saco","litro","g"])
-                    ins_link = st.selectbox("Vincular a insumo (opcional)",
-                        [None]+insumos,
-                        format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({_num_br(x['current_stock'], 0)} {x['unit']})",
-                        help="Se vinculado, a confirmação do operador pode baixar do estoque")
-                notes = st.text_input("Observações", placeholder="Opcional")
-                if st.form_submit_button("✅ Adicionar ao Plano", type="primary", use_container_width=True):
-                    if not prod or qtd<=0:
-                        st.error("Informe o produto e a quantidade.")
-                    else:
-                        plan = db.FeedingPlanCreate(
-                            lote_id=lote_sel["id"],
-                            product_name=prod.strip(),
-                            quantity=qtd,
-                            unit=unid,
-                            frequency=freq,
-                            insumo_id=ins_link["id"] if ins_link else None,
-                            notes=notes
-                        )
-                        db.add_feeding_plan(plan)
-                        st.success(f"✅ {prod} adicionado ao {lote_sel['name']} ({db.FEEDING_FREQUENCIES[freq]})")
-                        st.rerun()
+        _nutricao_novo_item(lotes, insumos)
 
     with nt3:
-        st.markdown("**Checagens registradas pelos operadores**")
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            start_c = st.date_input("De", value=date.today()-timedelta(days=30), key="chk_start")
-        with cc2:
-            end_c = st.date_input("Até", value=date.today(), key="chk_end")
-        checks = db.get_feeding_checks(start_date=start_c.isoformat(), end_date=end_c.isoformat())
-        if checks:
-            df_c = pd.DataFrame(checks)[["check_date","lote_id","product_name","status","actual_quantity","operator"]].copy()
-            df_c["status"] = df_c["status"].map(lambda s: db.FEEDING_CHECK_STATUS.get(s,s))
-            df_c.columns = ["Data","Piquete","Produto","Status","Qtd Aplicada","Operador"]
-            st.dataframe(df_c, use_container_width=True, hide_index=True)
-        else:
-            st.info("Nenhuma checagem registrada no período.")
+        _nutricao_historico_checagens()
 
     with nt4:
         _nutricao_custo_por_piquete(lotes, insumos)
