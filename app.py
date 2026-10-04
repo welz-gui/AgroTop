@@ -4493,10 +4493,7 @@ def _render_alertas_estoque(foco, low):
     if not foco:
         st.markdown("---")
 
-def _render_alertas_baixo_desempenho(foco):
-    if foco:
-        return
-    st.markdown("---")
+def _render_alertas_baixo_desempenho():
     meta = db.get_gmd_target()
     low_perf = db.get_low_performance(meta)
     st.subheader(f"📉 Baixo Desempenho ({len(low_perf)})")
@@ -4537,7 +4534,7 @@ def _alertas_operacionais():
     _render_alertas_carencia(foco, alerts)
     _render_alertas_prontos(foco, alerts)
     _render_alertas_estoque(foco, low)
-    _render_alertas_baixo_desempenho(foco)
+    _render_alertas_baixo_desempenho()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RELATÓRIOS  (CSV + PDF)
