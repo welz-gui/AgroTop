@@ -378,7 +378,7 @@ class TestVenda(BaseRegras):
     def test_venda_por_kg(self):
         a = self.animal("V1", peso=400.0)
         self.custo(a, 1000.0)
-        r = db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0)
+        r = db.register_sale(db.SaleParams(animal_ids=[a], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0))
         self.assertEqual(r["receita"], 4000.0)      # 400 kg × R$ 10
         self.assertEqual(r["custo"], 1000.0)
         self.assertEqual(r["lucro"], 3000.0)
@@ -388,14 +388,14 @@ class TestVenda(BaseRegras):
     def test_venda_por_cabeca_ignora_o_peso(self):
         a = self.animal("V2", peso=400.0)
         b = self.animal("V3", peso=600.0)
-        r = db.register_sale([a, b], HOJE.isoformat(), "abate", "cabeca", 5000.0)
+        r = db.register_sale(db.SaleParams(animal_ids=[a, b], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="cabeca", value=5000.0))
         self.assertEqual(r["receita"], 10000.0)     # 2 × R$ 5.000
         self.assertEqual(r["n"], 2)
 
     def test_venda_de_lote_rateia_pelo_peso(self):
         a = self.animal("V4", peso=400.0)
         b = self.animal("V5", peso=600.0)           # total 1.000 kg
-        r = db.register_sale([a, b], HOJE.isoformat(), "abate", "lote", 10000.0)
+        r = db.register_sale(db.SaleParams(animal_ids=[a, b], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="lote", value=10000.0))
         self.assertEqual(r["receita"], 10000.0)
         vendas = {v["animal_id"]: v["total_value"] for v in db.get_sales()}
         self.assertEqual(vendas["V4"], 4000.0)      # 400/1000 do total
@@ -404,32 +404,30 @@ class TestVenda(BaseRegras):
     def test_lote_ref_e_criado_para_venda_multipla(self):
         a = self.animal("V6"); b = self.animal("V7")
         self.assertIsNotNone(
-            db.register_sale([a, b], HOJE.isoformat(), "abate", "kg", 10.0)["lot_ref"])
+            db.register_sale(db.SaleParams(animal_ids=[a, b], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0))["lot_ref"])
 
     def test_sem_lote_ref_para_venda_individual_por_kg(self):
         a = self.animal("V8")
         self.assertIsNone(
-            db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0)["lot_ref"])
+            db.register_sale(db.SaleParams(animal_ids=[a], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0))["lot_ref"])
 
     def test_venda_sem_animais_valido(self):
         """QUIRK: o retorno de lista vazia NÃO traz a chave 'lot_ref'."""
-        r = db.register_sale(["INEXISTENTE"], HOJE.isoformat(), "abate", "kg", 10.0)
+        r = db.register_sale(db.SaleParams(animal_ids=["INEXISTENTE"], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0))
         self.assertEqual(r, {"receita": 0, "custo": 0, "lucro": 0, "n": 0})
         self.assertNotIn("lot_ref", r)
 
     def test_venda_a_vista_nao_gera_conta_a_receber(self):
         """Padrão de sempre, preservado (ROADMAP §3): à vista não muda nada."""
         a = self.animal("V9", peso=400.0)
-        r = db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0)
+        r = db.register_sale(db.SaleParams(animal_ids=[a], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0))
         self.assertEqual(r["parcelas_a_receber"], 0)
         self.assertEqual(db.listar_contas_receber(), [])
 
     def test_venda_a_prazo_gera_parcelas_em_contas_a_receber(self):
         a = self.animal("V10", peso=400.0)
         venc = (HOJE + timedelta(days=30)).isoformat()
-        r = db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0,
-                             buyer="Frigorífico Z", a_prazo=True, num_parcelas=3,
-                             primeiro_vencimento=venc)
+        r = db.register_sale(db.SaleParams(animal_ids=[a], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0, buyer="Frigorífico Z", a_prazo=True, num_parcelas=3, primeiro_vencimento=venc))
         self.assertEqual(r["parcelas_a_receber"], 3)
         contas = db.listar_contas_receber()
         self.assertEqual(len(contas), 3)
@@ -440,7 +438,7 @@ class TestVenda(BaseRegras):
     def test_venda_a_prazo_sem_vencimento_recusa(self):
         a = self.animal("V11", peso=400.0)
         with self.assertRaises(ValueError):
-            db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0, a_prazo=True)
+            db.register_sale(db.SaleParams(animal_ids=[a], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0, a_prazo=True))
 
     def test_a_prazo_fica_marcado_na_propria_venda(self):
         """A coluna que o fluxo de caixa usa para não contar a venda duas
@@ -448,9 +446,8 @@ class TestVenda(BaseRegras):
         venc = (HOJE + timedelta(days=30)).isoformat()
         a_vista = self.animal("V13", peso=400.0)
         a_prazo = self.animal("V14", peso=400.0)
-        db.register_sale([a_vista], HOJE.isoformat(), "abate", "kg", 10.0)
-        db.register_sale([a_prazo], HOJE.isoformat(), "abate", "kg", 10.0,
-                         a_prazo=True, num_parcelas=1, primeiro_vencimento=venc)
+        db.register_sale(db.SaleParams(animal_ids=[a_vista], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0))
+        db.register_sale(db.SaleParams(animal_ids=[a_prazo], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0, a_prazo=True, num_parcelas=1, primeiro_vencimento=venc))
 
         vendas = {v["animal_id"]: v["a_prazo"] for v in db.get_sales()}
         self.assertEqual(vendas["V13"], 0)
@@ -459,8 +456,7 @@ class TestVenda(BaseRegras):
     def test_marcar_recebido_fecha_a_conta_e_preserva_as_outras(self):
         a = self.animal("V12", peso=400.0)
         venc = (HOJE + timedelta(days=30)).isoformat()
-        db.register_sale([a], HOJE.isoformat(), "abate", "kg", 10.0,
-                         a_prazo=True, num_parcelas=2, primeiro_vencimento=venc)
+        db.register_sale(db.SaleParams(animal_ids=[a], sale_date=HOJE.isoformat(), sale_type="abate", pricing_mode="kg", value=10.0, a_prazo=True, num_parcelas=2, primeiro_vencimento=venc))
         aberta1, aberta2 = db.listar_contas_receber("aberto")
         self.assertTrue(db.marcar_recebido(aberta1["id"], HOJE.isoformat(), "pix"))
         abertas = db.listar_contas_receber("aberto")

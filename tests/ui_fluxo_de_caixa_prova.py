@@ -106,11 +106,8 @@ class TestFluxoDeCaixaNaTela(unittest.TestCase):
         self.assertTrue(r_compra["ok"])
 
         animais = db.get_all_animals(status="ativo")
-        db.register_sale([animais[0]["id"]], hoje.isoformat(), "abate", "cabeca", 3000.0)
-        r_venda_prazo = db.register_sale(
-            [animais[1]["id"]], hoje.isoformat(), "abate", "cabeca", 4000.0,
-            a_prazo=True, num_parcelas=2,
-            primeiro_vencimento=(hoje + timedelta(days=20)).isoformat())
+        db.register_sale(db.SaleParams(animal_ids=[animais[0]["id"]], sale_date=hoje.isoformat(), sale_type="abate", pricing_mode="cabeca", value=3000.0))
+        r_venda_prazo = db.register_sale(db.SaleParams(animal_ids=[animais[1]["id"]], sale_date=hoje.isoformat(), sale_type="abate", pricing_mode="cabeca", value=4000.0, a_prazo=True, num_parcelas=2, primeiro_vencimento=(hoje + timedelta(days=20)).isoformat()))
         self.assertEqual(r_venda_prazo["parcelas_a_receber"], 2)
 
         db.clear_cache()

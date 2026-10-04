@@ -299,7 +299,7 @@ class TestEscritaPreencheUuid(BaseSurrogate):
     def test_venda_preenche(self):
         db.add_animal(db.AnimalData("E4V", "Nelore", "M", None, "2026-01-01",
                       300.0, 500.0, 0.0, None, None))
-        db.register_sale(["E4V"], "2026-07-31", "abate", "kg", 10.0)
+        db.register_sale(db.SaleParams(animal_ids=["E4V"], sale_date="2026-07-31", sale_type="abate", pricing_mode="kg", value=10.0))
         self.assertEqual(self._sem_espelho("sales", "E4V"), [])
 
     def test_obito_preenche(self):
