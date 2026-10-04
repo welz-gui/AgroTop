@@ -2682,16 +2682,24 @@ def _consumo_diario_por_insumo() -> dict:
 
 def _custo_medio_por_arroba() -> Optional[float]:
     """Custo médio por arroba do rebanho ativo, ou None se não der para apurar."""
-    ativos = get_all_animals(status="ativo")
-    if not ativos:
-        return None
-    custo = arrobas = 0.0
-    costs = _costs_by_animal()
-    for a in ativos:
-        custo += costs.get(a["id"], 0.0) or 0
-        arrobas += kg_to_arrobas(a["current_weight"],
-                                 a.get("carcass_yield") or 0.52) or 0
-    return round(custo / arrobas, 2) if arrobas else None
+    with _conn() as con:
+        row = con.execute(
+            """SELECT
+                   (SELECT SUM(c.amount)
+                    FROM animal_costs c
+                    JOIN animals a ON a.uuid = c.animal_uuid
+                    WHERE a.status = 'ativo') as total_cost,
+                   SUM(ROUND(a.current_weight * COALESCE(a.carcass_yield, ?) / ?, 2)) as total_arrobas
+               FROM animals a
+               WHERE a.status = 'ativo'""",
+            (CARCASS_YIELD, KG_PER_ARROBA)
+        ).fetchone()
+
+        if not row or not row['total_arrobas']:
+            return None
+
+        cost = row['total_cost'] or 0.0
+        return round(cost / row['total_arrobas'], 2)
 
 
 def contexto_recomendacoes() -> dict:
