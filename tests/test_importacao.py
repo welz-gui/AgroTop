@@ -3,7 +3,25 @@
 from datetime import date, timedelta
 import unittest
 
-from services.importacao import parse_pesagens
+from services.importacao import _eh_cabecalho, _parse_data, parse_pesagens
+
+
+class TestParseData(unittest.TestCase):
+    def test_formato_iso(self):
+        self.assertEqual(_parse_data("2026-01-15"), date(2026, 1, 15))
+
+    def test_formato_br(self):
+        self.assertEqual(_parse_data("15/01/2026"), date(2026, 1, 15))
+
+    def test_formato_invalido(self):
+        for valor in ("2026.01.15", "abc", "", "15-01-2026"):
+            with self.subTest(valor=valor):
+                self.assertIsNone(_parse_data(valor))
+
+    def test_data_inexistente(self):
+        for valor in ("32/13/2026", "2021-02-29", "29/02/2021"):
+            with self.subTest(valor=valor):
+                self.assertIsNone(_parse_data(valor))
 
 
 class TestParsePesagens(unittest.TestCase):
@@ -134,6 +152,42 @@ class TestParsePesagens(unittest.TestCase):
         self.assertEqual(resultado["rejeitadas"][0]["linha"], 4)
         self.assertEqual(resultado["rejeitadas"][0]["conteudo"], "BR0002;abc;11/01/2026")
         self.assertEqual(resultado["total_linhas"], 3)
+
+    def test_rejeita_linha_com_erro_de_csv_field_limit(self):
+        conteudo_gigante = "A" * 131073
+        resultado = parse_pesagens(conteudo_gigante)
+
+        self.assertEqual(len(resultado["aceitas"]), 0)
+        self.assertEqual(len(resultado["rejeitadas"]), 1)
+        self.assertEqual(
+            resultado["rejeitadas"][0]["motivo"],
+            "esperado 3 colunas, encontrado 0",
+        )
+        self.assertEqual(resultado["rejeitadas"][0]["linha"], 1)
+        self.assertEqual(resultado["total_linhas"], 1)
+
+
+class TestEhCabecalho(unittest.TestCase):
+    def test_valido_comum(self):
+        self.assertTrue(_eh_cabecalho(["animal_id", "peso", "data"]))
+
+    def test_valido_variacoes(self):
+        self.assertTrue(_eh_cabecalho(["id", "weight", "date"]))
+        self.assertTrue(_eh_cabecalho(["BRINCO", "PESO (KG)", "DATA"]))
+
+    def test_ignora_espacos_em_branco(self):
+        self.assertTrue(_eh_cabecalho([" animal_id ", " peso ", " data "]))
+
+    def test_invalido_tamanho_errado(self):
+        self.assertFalse(_eh_cabecalho(["animal_id", "peso"]))
+        self.assertFalse(_eh_cabecalho(["animal_id", "peso", "data", "extra"]))
+
+    def test_invalido_nome_coluna_errado(self):
+        self.assertFalse(_eh_cabecalho(["nome", "peso", "data"]))
+        self.assertFalse(_eh_cabecalho(["animal_id", "altura", "data"]))
+
+    def test_invalido_ordem_errada(self):
+        self.assertFalse(_eh_cabecalho(["peso", "animal_id", "data"]))
 
 
 if __name__ == "__main__":

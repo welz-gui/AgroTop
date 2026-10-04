@@ -3,8 +3,36 @@ import unittest
 from pyproj import Transformer
 from shapely.geometry import Polygon
 
-from services.geometria import area_hectares, centroide, perimetro_metros, validar
+from services.geometria import (
+    _coordenadas, _crs_utm, area_hectares, centroide, perimetro_metros, validar,
+)
 
+
+class TestCoordenadas(unittest.TestCase):
+    def test_converte_para_float(self):
+        resultado = _coordenadas([(1, 2), (3, 4)])
+        self.assertEqual(resultado, [(1.0, 2.0), (3.0, 4.0)])
+        self.assertTrue(isinstance(resultado[0][0], float))
+
+    def test_aceita_strings_e_converte_para_float(self):
+        resultado = _coordenadas([("1.5", "-2.5"), ("3.0", "4.0")])
+        self.assertEqual(resultado, [(1.5, -2.5), (3.0, 4.0)])
+
+    def test_remove_ultimo_ponto_se_fechado(self):
+        fechado = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0), (1.0, 1.0)]
+        esperado = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        self.assertEqual(_coordenadas(fechado), esperado)
+
+    def test_nao_remove_ultimo_ponto_se_aberto(self):
+        aberto = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        esperado = [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]
+        self.assertEqual(_coordenadas(aberto), esperado)
+
+    def test_aceita_lista_vazia(self):
+        self.assertEqual(_coordenadas([]), [])
+
+    def test_aceita_um_ponto(self):
+        self.assertEqual(_coordenadas([(1.0, 1.0)]), [(1.0, 1.0)])
 
 class TestGeometriaPiquete(unittest.TestCase):
     @classmethod
@@ -106,6 +134,30 @@ class TestGeometriaPiquete(unittest.TestCase):
         problemas = validar(colinear)
 
         self.assertIn("Área do polígono é zero.", problemas)
+
+    def test_crs_utm_zona_extremo_oeste_sul(self):
+        crs = _crs_utm(-180.0, -90.0)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 1)
+        self.assertIn("south", d)
+
+    def test_crs_utm_zona_extremo_leste_norte(self):
+        crs = _crs_utm(180.0, 90.0)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 60)
+        self.assertNotIn("south", d)
+
+    def test_crs_utm_zona_meridiano_greenwich_equador(self):
+        crs = _crs_utm(0.0, 0.0)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 31)
+        self.assertNotIn("south", d)
+
+    def test_crs_utm_zona_exemplo_real(self):
+        crs = _crs_utm(-55.9, -13.3)
+        d = crs.to_dict()
+        self.assertEqual(d["zone"], 21)
+        self.assertIn("south", d)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from services.arquivo_dispositivos import conferir_pareamento, ler
+from services.arquivo_dispositivos import _eh_rodape, _separador, conferir_pareamento, ler
 
 
 class TestLerArquivoDispositivos(unittest.TestCase):
@@ -112,6 +112,18 @@ class TestLerArquivoDispositivos(unittest.TestCase):
         self.assertEqual(resultado["rejeitados"], [])
         self.assertEqual(resultado["total_linhas"], 10_000)
 
+    def test_linha_malformada_retorna_csv_invalido(self):
+        resultado = ler(
+            "codigo_visual;codigo_eletronico\n"
+            '"aspas"mal"fechadas";E1\n'
+            "BR0002;E2"
+        )
+
+        self.assertEqual(resultado["total_linhas"], 2)
+        self.assertEqual(resultado["aceitos"][0]["codigo_visual"], "BR0002")
+        self.assertEqual(resultado["rejeitados"][0]["linha"], 2)
+        self.assertEqual(resultado["rejeitados"][0]["motivo"], "CSV inválido")
+
 
 class TestConferirPareamento(unittest.TestCase):
     def test_prefixo_eletronico_confere_pelos_seis_ultimos_caracteres(self):
@@ -161,6 +173,44 @@ class TestConferirPareamento(unittest.TestCase):
 
         conferir.assert_called_once_with("V1", "E1", digitos_comparados=4)
         self.assertEqual(resultado[0]["divergencia"], "resultado_do_servico")
+
+
+class TestSeparador(unittest.TestCase):
+    def test_lista_vazia_retorna_ponto_e_virgula(self):
+        self.assertEqual(_separador([]), ";")
+
+    def test_linha_sem_separador_retorna_ponto_e_virgula(self):
+        self.assertEqual(_separador(["linha 1", "linha 2"]), ";")
+
+
+class TestEhRodape(unittest.TestCase):
+    def test_eh_rodape_matches_valid_footers(self):
+        valid_cases = [
+            "total:",
+            "TOTAL:",
+            "  total :",
+            "Total :",
+            "total  :",
+            "\tTotal:\n",
+        ]
+        for case in valid_cases:
+            with self.subTest(case=case):
+                self.assertTrue(_eh_rodape(case))
+
+    def test_eh_rodape_rejects_invalid_footers(self):
+        invalid_cases = [
+            "",
+            "total",
+            "subtotal:",
+            "123 total:",
+            "a total:",
+            "total 123:",
+            "tot:",
+            "total;",
+        ]
+        for case in invalid_cases:
+            with self.subTest(case=case):
+                self.assertFalse(_eh_rodape(case))
 
 
 if __name__ == "__main__":
