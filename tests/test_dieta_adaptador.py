@@ -156,5 +156,28 @@ class TestDietaAdaptador(unittest.TestCase):
         self.assertEqual(len(res), 0)
 
 
+
+
+    def test_cabecas_invalido_devolve_lista_vazia(self):
+        """Testa o tratamento de erros para cabecas_no_piquete inválido (ValueError, TypeError)."""
+        planos = [
+            {
+                "insumo_id": 1,
+                "quantity": 20.0,
+                "unit": "kg",
+                "frequency": "diario",
+                "active": True,
+            }
+        ]
+        insumos = {1: {"name": "Milho", "unit": "kg", "cost_per_unit": 1.0}}
+
+        # Test ValueError (não conversível para int)
+        res_value_error = ingredientes_por_cabeca(planos, insumos, cabecas_no_piquete="invalid")
+        self.assertEqual(res_value_error, [])
+
+        # Test TypeError (tipo inválido, None)
+        res_type_error = ingredientes_por_cabeca(planos, insumos, cabecas_no_piquete=None)
+        self.assertEqual(res_type_error, [])
+
 if __name__ == "__main__":
     unittest.main()

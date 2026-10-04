@@ -101,6 +101,32 @@ class TestProjecaoAdaptador(unittest.TestCase):
         self.assertIsNotNone(res5["coeficiente"])
         self.assertEqual(res5["n"], 5)
 
+    def test_criterio_7_ignora_valores_invalidos(self):
+        """Critério 7: Leituras de chuva ou pesagens com datas/valores inválidos são ignoradas."""
+        leituras_chuva = [
+            {"read_date": "2026-03-05", "rain_mm": 40.0},
+            {"read_date": "2026-03-12", "rain_mm": "invalid"},  # ValueError float
+            {"read_date": "2026-03-15", "rain_mm": {}},         # TypeError float
+            {"read_date": "2026-02-30", "rain_mm": 10.0},       # ValueError date
+            {"read_date": "2026-03-25", "rain_mm": 30.0},
+        ]
+        pesagens = [
+            {"animal_uuid": "a1", "weigh_date": "2026-03-01", "weight": 200.0},
+            {"animal_uuid": "a1", "weigh_date": "2026-02-30", "weight": 210.0},  # ValueError date
+            {"animal_uuid": "a1", "weigh_date": "2026-03-10", "weight": "invalid"},  # ValueError float
+            {"animal_uuid": "a1", "weigh_date": "2026-03-15", "weight": {}},     # TypeError float
+            {"animal_uuid": "a1", "weigh_date": "2026-03-21", "weight": 220.0},
+        ]
+        res = series_mensais(leituras_chuva, pesagens)
+
+        # Só deve considerar a chuva de 05/03 e 25/03 (40 + 30 = 70)
+        # Só deve considerar as pesagens de 01/03 (200) e 21/03 (220) para a1
+        # GMD = (220 - 200) / 20 = 1.0 kg/dia
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["periodo"], "2026-03")
+        self.assertEqual(res[0]["chuva_mm"], 70.0)
+        self.assertEqual(res[0]["gmd_medio"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()
