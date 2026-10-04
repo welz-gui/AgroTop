@@ -38,6 +38,25 @@ class TestDispositivosEstoque(unittest.TestCase):
             expandir_faixa("BR0010", "BR0001")
         self.assertIn("menor que o início", str(ctx.exception))
 
+    def test_expandir_faixa_padding_diferentes(self):
+        # BR1 to BR10 (largura 1 and 2, max is 2)
+        res1 = expandir_faixa("BR1", "BR10")
+        self.assertEqual(len(res1), 10)
+        self.assertEqual(res1[0], "BR01")
+        self.assertEqual(res1[-1], "BR10")
+
+        # BR01 to BR10 (largura 2 and 2, max is 2)
+        res2 = expandir_faixa("BR01", "BR10")
+        self.assertEqual(len(res2), 10)
+        self.assertEqual(res2[0], "BR01")
+        self.assertEqual(res2[-1], "BR10")
+
+        # BR001 to BR10 (largura 3 and 2, max is 3)
+        res3 = expandir_faixa("BR001", "BR10")
+        self.assertEqual(len(res3), 10)
+        self.assertEqual(res3[0], "BR001")
+        self.assertEqual(res3[-1], "BR010")
+
     def test_validar_aplicacao_codigos(self):
         faixas = [
             {"inicio": "BR0001", "fim": "BR0100", "status": "disponivel"},
