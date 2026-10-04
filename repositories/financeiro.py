@@ -192,36 +192,46 @@ def get_animal_costs_by_lote(start_date: Optional[str] = None,
     return {r["lote_id"]: round(float(r["total"]), 2) for r in rows}
 
 
-@_writes
-def register_sale(animal_ids: list, sale_date: str, sale_type: str,
-                  pricing_mode: str, value: float, buyer: str = "",
-                  operator: str = "", notes: str = "",
-                  a_prazo: bool = False, num_parcelas: int = 1,
-                  primeiro_vencimento: Optional[str] = None) -> dict:
-    """Registra a venda de um ou mais animais.
-    - pricing_mode='kg':     `value` é o preço por kg (cada animal: peso × preço).
-    - pricing_mode='cabeca': `value` é o valor por cabeça (igual para cada animal).
-    - pricing_mode='lote':   `value` é o valor TOTAL do lote, rateado pelo peso.
+@dataclass
+class SaleParams:
+    animal_ids: list
+    sale_date: str
+    sale_type: str
+    pricing_mode: str
+    value: float
+    buyer: str = ""
+    operator: str = ""
+    notes: str = ""
+    a_prazo: bool = False
+    num_parcelas: int = 1
+    primeiro_vencimento: Optional[str] = None
 
-    `a_prazo=True` gera as parcelas em `contas_receber` a partir da receita
+@_writes
+def register_sale(params: SaleParams) -> dict:
+    """Registra a venda de um ou mais animais.
+    - params.pricing_mode='kg':     `params.value` é o preço por kg (cada animal: peso × preço).
+    - params.pricing_mode='cabeca': `params.value` é o valor por cabeça (igual para cada animal).
+    - params.pricing_mode='lote':   `params.value` é o valor TOTAL do lote, rateado pelo peso.
+
+    `params.a_prazo=True` gera as parcelas em `contas_receber` a partir da receita
     total (`gerar_parcelas`, mesma conta de `repositories/compras.py`) — o
     padrão continua sendo à vista (nenhuma linha em `contas_receber`), o
     comportamento de sempre, preservado (ROADMAP §3).
 
-    `sale_date` continua sendo a competência da receita (usada por
+    `params.sale_date` continua sendo a competência da receita (usada por
     `lancamentos.normalizar`/`services.caixa`); `vencimento` em
     `contas_receber` é só quando o dinheiro chega — as duas datas não se
     misturam (ROADMAP §5, Trilha 3, "cuidados que definem o sucesso").
 
     Retorna {'receita':..., 'custo':..., 'lucro':..., 'n':...}."""
-    animais = [get_animal(a) for a in animal_ids]
+    animais = [get_animal(a) for a in params.animal_ids]
     animais = [a for a in animais if a]
     if not animais:
         return {"receita": 0, "custo": 0, "lucro": 0, "n": 0}
 
     peso_total = sum(a["current_weight"] for a in animais) or 1
-    lot_ref = f"V{sale_date.replace('-','')}-{int(datetime.now().timestamp())%100000}" \
-              if (pricing_mode == "lote" or len(animais) > 1) else None
+    lot_ref = f"V{params.sale_date.replace('-','')}-{int(datetime.now().timestamp())%100000}" \
+              if (params.pricing_mode == "lote" or len(animais) > 1) else None
 
     tot_receita = tot_custo = 0.0
     sales_data = []
@@ -244,15 +254,15 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
         costs_dict = {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
 
         for a in animais:
-            if pricing_mode == "kg":
-                ppk = value
-                val = round(a["current_weight"] * value, 2)
-            elif pricing_mode == "cabeca":
+            if params.pricing_mode == "kg":
+                ppk = params.value
+                val = round(a["current_weight"] * params.value, 2)
+            elif params.pricing_mode == "cabeca":
                 ppk = None
-                val = round(value, 2)
+                val = round(params.value, 2)
             else:  # lote: rateio proporcional ao peso
                 ppk = None
-                val = round(value * a["current_weight"] / peso_total, 2)
+                val = round(params.value * a["current_weight"] / peso_total, 2)
 
             custo = costs_dict.get(a["id"], 0.0)
             lucro = round(val - custo, 2)
@@ -260,18 +270,18 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
             tot_custo += custo
 
             sales_data.append((
-                a["uuid"], sale_date, sale_type, pricing_mode,
+                a["uuid"], params.sale_date, params.sale_type, params.pricing_mode,
                 a["current_weight"], ppk,
-                val, buyer or None, lot_ref, custo, lucro, operator, notes,
-                1 if a_prazo else 0
+                val, params.buyer or None, lot_ref, custo, lucro, params.operator, params.notes,
+                1 if params.a_prazo else 0
             ))
 
             # Venda e obito mudam status por SQL direto, sem passar por
             # update_animal_status -- entao o evento precisa ser registrado aqui.
             eventos.registrar_em(
-                con, a["uuid"], "venda", ocorrido_em=sale_date,
-                usuario_registro=operator, documento=lot_ref,
-                observacoes=f"R$ {val:.2f} para {buyer or 'comprador nao informado'}")
+                con, a["uuid"], "venda", ocorrido_em=params.sale_date,
+                usuario_registro=params.operator, documento=lot_ref,
+                observacoes=f"R$ {val:.2f} para {params.buyer or 'comprador nao informado'}")
 
         con.executemany(
             """INSERT INTO sales
@@ -284,20 +294,20 @@ def register_sale(animal_ids: list, sale_date: str, sale_type: str,
         con.execute(f"UPDATE animals SET status='vendido' WHERE id IN ({qmarks})", animal_ids_tuple)
 
         n_parcelas_receber = 0
-        if a_prazo and tot_receita > 0:
-            if not primeiro_vencimento:
+        if params.a_prazo and tot_receita > 0:
+            if not params.primeiro_vencimento:
                 raise ValueError("venda a prazo exige primeiro_vencimento")
             rotulo = f"Venda {lot_ref}" if lot_ref else "Venda"
-            rotulo += f" — {buyer or 'comprador não informado'}"
-            for p in gerar_parcelas(round(tot_receita, 2), num_parcelas, primeiro_vencimento):
+            rotulo += f" — {params.buyer or 'comprador não informado'}"
+            for p in gerar_parcelas(round(tot_receita, 2), params.num_parcelas, params.primeiro_vencimento):
                 con.execute(
                     """INSERT INTO contas_receber
                        (lot_ref, comprador, descricao, valor, vencimento,
                         parcela_numero, parcela_total, status, operator)
                        VALUES (?,?,?,?,?,?,?,?,?)""",
-                    (lot_ref, buyer, rotulo, p["valor"], p["vencimento"],
-                     p["numero"], p["total"], "aberto", operator))
-            n_parcelas_receber = num_parcelas
+                    (lot_ref, params.buyer, rotulo, p["valor"], p["vencimento"],
+                     p["numero"], p["total"], "aberto", params.operator))
+            n_parcelas_receber = params.num_parcelas
     return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
             "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
             "lot_ref": lot_ref, "parcelas_a_receber": n_parcelas_receber}

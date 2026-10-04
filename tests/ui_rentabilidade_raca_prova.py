@@ -79,8 +79,7 @@ class TestRentabilidadePorRacaNaTela(unittest.TestCase):
         hoje = date.today().isoformat()
         ativos = db.get_all_animals(status="ativo")
         if ativos:
-            db.register_sale([a["id"] for a in ativos], hoje, "abate",
-                             "cabeca", 1000.0)
+            db.register_sale(db.SaleParams(animal_ids=[a["id"] for a in ativos], sale_date=hoje, sale_type="abate", pricing_mode="cabeca", value=1000.0))
             db.clear_cache()
 
         self.assertEqual(db.get_all_animals(status="ativo"), [],
@@ -98,7 +97,7 @@ class TestRentabilidadePorRacaNaTela(unittest.TestCase):
         db.add_animal(db.AnimalData("RACA3", "Brangus", "M", None, entrada,
                       320.0, 480.0, 1000.0, None, None))
         db.clear_cache()
-        db.register_sale(["RACA3"], hoje, "abate", "cabeca", 3500.0)
+        db.register_sale(db.SaleParams(animal_ids=["RACA3"], sale_date=hoje, sale_type="abate", pricing_mode="cabeca", value=3500.0))
         db.clear_cache()
 
         from services.rentabilidade_adaptador import montar_ciclos
@@ -128,7 +127,7 @@ class TestRentabilidadePorRacaNaTela(unittest.TestCase):
                       300.0, 450.0, 1000.0, None, None))
         db.add_animal_cost(db.AnimalCostData("RACA2", "operacional", "trato caro", 5000.0, hoje))
         db.clear_cache()
-        db.register_sale(["RACA2"], hoje, "abate", "cabeca", 100.0)
+        db.register_sale(db.SaleParams(animal_ids=["RACA2"], sale_date=hoje, sale_type="abate", pricing_mode="cabeca", value=100.0))
         db.clear_cache()
 
         from services.rentabilidade_adaptador import montar_ciclos

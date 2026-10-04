@@ -1559,10 +1559,8 @@ def _tab_historico(animal):
                 f'</div>',unsafe_allow_html=True)
 
 
-def _campo_animal():
-    # ── Passo 1: Localizar animal ─────────────────────────────────────────────
-    tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
 
+def _campo_animal_localizar(tab_dig, tab_cam, tab_kbd):
     with tab_dig:
         c1,c2=st.columns([3,1])
         with c1:
@@ -1607,14 +1605,7 @@ def _campo_animal():
     with tab_kbd:
         _teclado_numerico()
 
-    # ── Passo 2: Exibir animal ────────────────────────────────────────────────
-    eid=st.session_state.campo_id
-    if not eid: st.info("Selecione ou busque um animal para começar."); return
-
-    animal=get_animal(eid)
-    if not animal:
-        st.error(f"Animal **{eid}** não encontrado."); return
-
+def _campo_animal_exibir(animal, c):
     gmd=db.calculate_gmd(animal["id"])
     wd =db.get_withdrawal_end(animal["id"])
     gc =c["primaria"] if (gmd and gmd>0) else c["perigo"] if (gmd and gmd<0) else c["texto_secundario"]
@@ -1643,7 +1634,7 @@ def _campo_animal():
         f'</div></div></div>',
         unsafe_allow_html=True)
 
-    # ── Passo 3: Ação ─────────────────────────────────────────────────────────
+def _campo_animal_acoes(animal):
     t1,t2,t3,t6,t5,t4=st.tabs(["⚖️ Pesagem","💉 Medicamento","🚚 Movimentação",
                                "📷 Foto","☠️ Óbito","📜 Histórico"])
 
@@ -1664,6 +1655,24 @@ def _campo_animal():
 
     with t4:  # HISTÓRICO
         _tab_historico(animal)
+
+def _campo_animal():
+    # ── Passo 1: Localizar animal ─────────────────────────────────────────────
+    tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
+    _campo_animal_localizar(tab_dig, tab_cam, tab_kbd)
+
+    # ── Passo 2: Exibir animal ────────────────────────────────────────────────
+    eid=st.session_state.campo_id
+    if not eid: st.info("Selecione ou busque um animal para começar."); return
+
+    animal=get_animal(eid)
+    if not animal:
+        st.error(f"Animal **{eid}** não encontrado."); return
+
+    _campo_animal_exibir(animal, c)
+
+    # ── Passo 3: Ação ─────────────────────────────────────────────────────────
+    _campo_animal_acoes(animal)
 
 
 def _campo_importar():
@@ -2637,12 +2646,9 @@ def _render_lote_card(l):
     </div>""",unsafe_allow_html=True)
 
 
-def _render_lote_animais(l):
+def _render_lote_animais(l, anilist, gmd_batch):
     with st.expander(f"Ver animais do {l['name']}"):
-        anilist=db.get_all_animals(lote_id=l["id"])
         if anilist:
-            a_ids = [a["id"] for a in anilist]
-            gmd_batch = db.calculate_gmd_bulk(a_ids)
             rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
                 "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
             st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
@@ -2720,9 +2726,21 @@ def _render_grafico_ua_lotes(lotes):
 
 
 def _render_tab_visao_geral(lotes):
+    # Pre-fetch animals and GMDs to avoid N+1 queries
+    all_animals = db.get_all_animals(status="ativo")
+    animals_by_lote = {}
+    for a in all_animals:
+        animals_by_lote.setdefault(a["lote_id"], []).append(a)
+
+    all_a_ids = [a["id"] for a in all_animals]
+    all_gmds = db.calculate_gmd_bulk(all_a_ids) if all_a_ids else {}
+
     for l in lotes:
         _render_lote_card(l)
-        _render_lote_animais(l)
+
+        anilist = animals_by_lote.get(l["id"], [])
+        _render_lote_animais(l, anilist, all_gmds)
+
         _render_lote_perimetro(l)
         _render_secao_ndvi_lote(l)
 
@@ -2910,10 +2928,11 @@ def _fin_venda_registro(animals):
                 elif prazo and not primeira_parcela_v:
                     st.error("Informe o vencimento da 1ª parcela.")
                 else:
-                    r = db.register_sale(sel_ids, sale_date.strftime("%Y-%m-%d"), tipo, modo,
-                        valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
+                    r = db.register_sale(db.SaleParams(
+                        animal_ids=sel_ids, sale_date=sale_date.strftime("%Y-%m-%d"), sale_type=tipo,
+                        pricing_mode=modo, value=valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
                         a_prazo=prazo, num_parcelas=int(num_parcelas_v),
-                        primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None)
+                        primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None))
                     cor = c["primaria"] if r["lucro"] >= 0 else c["perigo"]
                     st.success(f"✅ {r['n']} animal(is) vendido(s)!")
                     st.markdown(
@@ -5258,6 +5277,124 @@ def page_clima():
             st.info("Nenhum registro de chuva no período. Registre na aba **Registrar Chuva**.")
 
 
+def _render_tab_plano_vacinacao():
+    prots = db.get_protocols(active_only=True)
+    if not prots:
+        st.info("Nenhum protocolo ativo. Cadastre em **Protocolos** (aba ao lado) "
+                "as vacinações obrigatórias da sua região.")
+    for p in prots:
+        plan = db.get_protocol_plan(p)
+        freq = db.PROTOCOL_FREQUENCIES.get(p["frequency"], p["frequency"])
+        sexo = db.SEX_TARGETS.get(p["sex_target"], p["sex_target"])
+        dose_desc = (f"{p['dose_value']:g} {p['dose_unit']} a cada {_num_br(p['dose_ref_kg'], 0)} kg"
+                     if (p.get("dose_ref_kg") or 0) > 0
+                     else f"{p['dose_value']:g} {p['dose_unit']} por animal")
+        st.markdown(f"#### 💉 {p['name']}")
+        st.caption(f"{sexo} · {p['age_min']}–{p['age_max']} meses · {freq} · dose: {dose_desc}"
+                   + (f" · insumo: {p['insumo_name']}" if p.get('insumo_name') else ""))
+        k = st.columns(5)
+        k[0].metric("Elegíveis", plan["n_eligible"])
+        k[1].metric("Pendentes", plan["n_pending"])
+        k[2].metric("Doses necessárias", f"{plan['doses_needed']:g} {p['dose_unit']}")
+        if p.get("insumo_id"):
+            k[3].metric("Estoque", f"{plan['stock']:g} {p.get('insumo_unit') or ''}")
+            if plan["shortfall"] > 0:
+                k[4].metric("Faltam comprar", f"{plan['shortfall']:g}", delta="repor",
+                            delta_color="inverse")
+            else:
+                k[4].metric("Estoque", "✅ suficiente")
+        else:
+            k[3].metric("Estoque", "— (sem insumo)")
+        if plan["idade_desconhecida"]:
+            st.caption(f"⚠️ {_plural(plan['idade_desconhecida'],'animal','animais')} do sexo-alvo "
+                       f"sem idade definida — verifique se precisam.")
+        if plan["n_pending"] > 0:
+            with st.form(f"camp_{p['id']}", clear_on_submit=True):
+                cc1, cc2 = st.columns([1,2])
+                with cc1:
+                    cd = st.date_input("Data", value=date.today(), key=f"cd_{p['id']}")
+                with cc2:
+                    if plan["shortfall"] > 0:
+                        st.warning(f"Estoque insuficiente (faltam {plan['shortfall']:g}). "
+                                   "A aplicação prossegue e o estoque vai a zero.")
+                if st.form_submit_button(
+                        f"💉 Aplicar campanha em {plan['n_pending']} animais",
+                        type="primary", use_container_width=True):
+                    r = db.apply_protocol_campaign(p["id"], cd.strftime("%Y-%m-%d"),
+                                                   st.session_state.user["name"])
+                    st.success(f"✅ Aplicado em {r['n']} animais ({r['doses']:g} {p['dose_unit']}).")
+                    st.rerun()
+        else:
+            st.success("✅ Todos os elegíveis já estão em dia com este protocolo.")
+        st.markdown("---")
+
+
+def _render_tab_gestao_protocolos(insumos):
+    st.markdown("**Protocolos cadastrados**")
+    todos = db.get_protocols(active_only=False)
+    for p in todos:
+        c1, c2, c3 = st.columns([5,1,1])
+        with c1:
+            ativo = "🟢" if p["active"] else "⚪"
+            st.markdown(f"{ativo} **{p['name']}** — {db.SEX_TARGETS.get(p['sex_target'],'')} · "
+                        f"{p['age_min']}–{p['age_max']}m · {db.PROTOCOL_FREQUENCIES.get(p['frequency'],'')}")
+        with c2:
+            if st.button("Pausar" if p["active"] else "Ativar", key=f"tgp_{p['id']}",
+                         use_container_width=True):
+                db.set_protocol_active(p["id"], 0 if p["active"] else 1); st.rerun()
+        with c3:
+            if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
+                db.delete_protocol(p["id"]); st.rerun()
+
+    st.markdown("---")
+    st.markdown("**➕ Novo Protocolo**")
+    with st.form("f_prot", clear_on_submit=True):
+        pc1, pc2, pc3 = st.columns(3)
+        with pc1:
+            nome = st.text_input("Nome *", placeholder="Ex: Brucelose B19, Aftosa")
+            sexo_t = st.selectbox("Sexo-alvo", list(db.SEX_TARGETS.keys()),
+                format_func=lambda s: db.SEX_TARGETS[s])
+            freq = st.selectbox("Frequência", list(db.PROTOCOL_FREQUENCIES.keys()),
+                format_func=lambda f: db.PROTOCOL_FREQUENCIES[f])
+        with pc2:
+            a_min = st.number_input("Idade mínima (meses)", min_value=0, max_value=999, value=0)
+            a_max = st.number_input("Idade máxima (meses)", min_value=0, max_value=999, value=999)
+            carencia_p = st.number_input("Carência (dias)", min_value=0, max_value=180, value=0)
+        with pc3:
+            dose_v = st.number_input("Dose", min_value=0.0, value=2.0, step=0.5, format="%.2f")
+            dose_kg = st.number_input("A cada X kg (0 = dose fixa)", min_value=0.0, value=0.0,
+                step=10.0, help="Ex: '1 ml a cada 50 kg' → dose=1, aqui=50. 0 = mesma dose p/ todos")
+            dose_u = st.selectbox("Unidade", ["ml","dose","mg","comprimido"])
+        ins_link = st.selectbox("Insumo do estoque (para projeção de doses)",
+            [None]+insumos,
+            format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({x['current_stock']:g} {x['unit']})")
+        via = st.selectbox("Via", ROUTES)
+        notas = st.text_input("Observações", placeholder="Opcional")
+        if st.form_submit_button("✅ Criar Protocolo", type="primary", use_container_width=True):
+            if not nome:
+                st.error("Informe o nome do protocolo.")
+            elif a_max < a_min:
+                st.error("Idade máxima deve ser ≥ mínima.")
+            else:
+                data = db.ProtocolData(
+                    name=nome.strip(),
+                    sex_target=sexo_t,
+                    age_min=a_min,
+                    age_max=a_max,
+                    dose_value=dose_v,
+                    dose_ref_kg=dose_kg,
+                    dose_unit=dose_u,
+                    insumo_id=ins_link["id"] if ins_link else None,
+                    frequency=freq,
+                    withdrawal_days=carencia_p,
+                    route=via,
+                    notes=notas,
+                )
+                db.add_protocol(data)
+                st.success(f"✅ Protocolo '{nome}' criado!")
+                st.rerun()
+
+
 def page_sanitario():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -5268,121 +5405,11 @@ def page_sanitario():
 
     # ── Plano de vacinação ────────────────────────────────────────────────────
     with tp1:
-        prots = db.get_protocols(active_only=True)
-        if not prots:
-            st.info("Nenhum protocolo ativo. Cadastre em **Protocolos** (aba ao lado) "
-                    "as vacinações obrigatórias da sua região.")
-        for p in prots:
-            plan = db.get_protocol_plan(p)
-            freq = db.PROTOCOL_FREQUENCIES.get(p["frequency"], p["frequency"])
-            sexo = db.SEX_TARGETS.get(p["sex_target"], p["sex_target"])
-            dose_desc = (f"{p['dose_value']:g} {p['dose_unit']} a cada {_num_br(p['dose_ref_kg'], 0)} kg"
-                         if (p.get("dose_ref_kg") or 0) > 0
-                         else f"{p['dose_value']:g} {p['dose_unit']} por animal")
-            st.markdown(f"#### 💉 {p['name']}")
-            st.caption(f"{sexo} · {p['age_min']}–{p['age_max']} meses · {freq} · dose: {dose_desc}"
-                       + (f" · insumo: {p['insumo_name']}" if p.get('insumo_name') else ""))
-            k = st.columns(5)
-            k[0].metric("Elegíveis", plan["n_eligible"])
-            k[1].metric("Pendentes", plan["n_pending"])
-            k[2].metric("Doses necessárias", f"{plan['doses_needed']:g} {p['dose_unit']}")
-            if p.get("insumo_id"):
-                k[3].metric("Estoque", f"{plan['stock']:g} {p.get('insumo_unit') or ''}")
-                if plan["shortfall"] > 0:
-                    k[4].metric("Faltam comprar", f"{plan['shortfall']:g}", delta="repor",
-                                delta_color="inverse")
-                else:
-                    k[4].metric("Estoque", "✅ suficiente")
-            else:
-                k[3].metric("Estoque", "— (sem insumo)")
-            if plan["idade_desconhecida"]:
-                st.caption(f"⚠️ {_plural(plan['idade_desconhecida'],'animal','animais')} do sexo-alvo "
-                           f"sem idade definida — verifique se precisam.")
-            if plan["n_pending"] > 0:
-                with st.form(f"camp_{p['id']}", clear_on_submit=True):
-                    cc1, cc2 = st.columns([1,2])
-                    with cc1:
-                        cd = st.date_input("Data", value=date.today(), key=f"cd_{p['id']}")
-                    with cc2:
-                        if plan["shortfall"] > 0:
-                            st.warning(f"Estoque insuficiente (faltam {plan['shortfall']:g}). "
-                                       "A aplicação prossegue e o estoque vai a zero.")
-                    if st.form_submit_button(
-                            f"💉 Aplicar campanha em {plan['n_pending']} animais",
-                            type="primary", use_container_width=True):
-                        r = db.apply_protocol_campaign(p["id"], cd.strftime("%Y-%m-%d"),
-                                                       st.session_state.user["name"])
-                        st.success(f"✅ Aplicado em {r['n']} animais ({r['doses']:g} {p['dose_unit']}).")
-                        st.rerun()
-            else:
-                st.success("✅ Todos os elegíveis já estão em dia com este protocolo.")
-            st.markdown("---")
+        _render_tab_plano_vacinacao()
 
     # ── Gestão de protocolos ──────────────────────────────────────────────────
     with tp2:
-        st.markdown("**Protocolos cadastrados**")
-        todos = db.get_protocols(active_only=False)
-        for p in todos:
-            c1, c2, c3 = st.columns([5,1,1])
-            with c1:
-                ativo = "🟢" if p["active"] else "⚪"
-                st.markdown(f"{ativo} **{p['name']}** — {db.SEX_TARGETS.get(p['sex_target'],'')} · "
-                            f"{p['age_min']}–{p['age_max']}m · {db.PROTOCOL_FREQUENCIES.get(p['frequency'],'')}")
-            with c2:
-                if st.button("Pausar" if p["active"] else "Ativar", key=f"tgp_{p['id']}",
-                             use_container_width=True):
-                    db.set_protocol_active(p["id"], 0 if p["active"] else 1); st.rerun()
-            with c3:
-                if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
-                    db.delete_protocol(p["id"]); st.rerun()
-
-        st.markdown("---")
-        st.markdown("**➕ Novo Protocolo**")
-        with st.form("f_prot", clear_on_submit=True):
-            pc1, pc2, pc3 = st.columns(3)
-            with pc1:
-                nome = st.text_input("Nome *", placeholder="Ex: Brucelose B19, Aftosa")
-                sexo_t = st.selectbox("Sexo-alvo", list(db.SEX_TARGETS.keys()),
-                    format_func=lambda s: db.SEX_TARGETS[s])
-                freq = st.selectbox("Frequência", list(db.PROTOCOL_FREQUENCIES.keys()),
-                    format_func=lambda f: db.PROTOCOL_FREQUENCIES[f])
-            with pc2:
-                a_min = st.number_input("Idade mínima (meses)", min_value=0, max_value=999, value=0)
-                a_max = st.number_input("Idade máxima (meses)", min_value=0, max_value=999, value=999)
-                carencia_p = st.number_input("Carência (dias)", min_value=0, max_value=180, value=0)
-            with pc3:
-                dose_v = st.number_input("Dose", min_value=0.0, value=2.0, step=0.5, format="%.2f")
-                dose_kg = st.number_input("A cada X kg (0 = dose fixa)", min_value=0.0, value=0.0,
-                    step=10.0, help="Ex: '1 ml a cada 50 kg' → dose=1, aqui=50. 0 = mesma dose p/ todos")
-                dose_u = st.selectbox("Unidade", ["ml","dose","mg","comprimido"])
-            ins_link = st.selectbox("Insumo do estoque (para projeção de doses)",
-                [None]+insumos,
-                format_func=lambda x: "— Sem vínculo —" if x is None else f"{x['name']} ({x['current_stock']:g} {x['unit']})")
-            via = st.selectbox("Via", ROUTES)
-            notas = st.text_input("Observações", placeholder="Opcional")
-            if st.form_submit_button("✅ Criar Protocolo", type="primary", use_container_width=True):
-                if not nome:
-                    st.error("Informe o nome do protocolo.")
-                elif a_max < a_min:
-                    st.error("Idade máxima deve ser ≥ mínima.")
-                else:
-                    data = db.ProtocolData(
-                        name=nome.strip(),
-                        sex_target=sexo_t,
-                        age_min=a_min,
-                        age_max=a_max,
-                        dose_value=dose_v,
-                        dose_ref_kg=dose_kg,
-                        dose_unit=dose_u,
-                        insumo_id=ins_link["id"] if ins_link else None,
-                        frequency=freq,
-                        withdrawal_days=carencia_p,
-                        route=via,
-                        notes=notas,
-                    )
-                    db.add_protocol(data)
-                    st.success(f"✅ Protocolo '{nome}' criado!")
-                    st.rerun()
+        _render_tab_gestao_protocolos(insumos)
 
 
 def _render_tab_projecao_abate(animals):

@@ -2,6 +2,7 @@ import inspect
 import unittest
 
 from services.projecao import (
+    _interpretar,
     correlacao_chuva_gmd,
     projetar_abate,
     projetar_lote,
@@ -155,6 +156,64 @@ class TestCorrelacaoChuvaGmd(unittest.TestCase):
         self.assertIn("Amostra pequena", interpretacao_tres)
         self.assertIn("Em 12 períodos", interpretacao_doze)
         self.assertNotEqual(interpretacao_tres, interpretacao_doze)
+
+
+class TestInterpretar(unittest.TestCase):
+    def test_magnitude_muito_fraca_e_positiva(self):
+        resultado = _interpretar(0.1, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é muito fraca e positiva. Correlação não demonstra causalidade."
+        )
+
+    def test_magnitude_fraca_e_negativa(self):
+        resultado = _interpretar(-0.3, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é fraca e negativa. Correlação não demonstra causalidade."
+        )
+
+    def test_magnitude_moderada_e_positiva(self):
+        resultado = _interpretar(0.5, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é moderada e positiva. Correlação não demonstra causalidade."
+        )
+
+    def test_magnitude_forte_e_negativa(self):
+        resultado = _interpretar(-0.7, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é forte e negativa. Correlação não demonstra causalidade."
+        )
+
+    def test_magnitude_muito_forte_e_positiva(self):
+        resultado = _interpretar(0.9, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é muito forte e positiva. Correlação não demonstra causalidade."
+        )
+
+    def test_sem_direcao_linear(self):
+        resultado = _interpretar(0.0, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é muito fraca, sem direção linear. Correlação não demonstra causalidade."
+        )
+
+    def test_amostra_pequena(self):
+        resultado = _interpretar(0.5, 5)
+        self.assertEqual(
+            resultado,
+            "Amostra pequena (n=5): a associação linear é moderada e positiva, mas a estimativa é instável. Correlação não demonstra causalidade."
+        )
+
+    def test_amostra_suficiente(self):
+        resultado = _interpretar(0.5, 6)
+        self.assertEqual(
+            resultado,
+            "Em 6 períodos, a associação linear é moderada e positiva. Correlação não demonstra causalidade."
+        )
 
 
 if __name__ == "__main__":

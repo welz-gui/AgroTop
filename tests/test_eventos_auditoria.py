@@ -227,8 +227,7 @@ class TestOperacoesGeramEvento(BaseEventos):
         self.assertIn("identificacao_interna", tipos)
 
     def test_venda(self):
-        db.register_sale([self.animal["id"]], "2026-07-20", "abate", "cabeca",
-                         5000.0, buyer="Frigorífico X", operator="op1")
+        db.register_sale(db.SaleParams(animal_ids=[self.animal["id"]], sale_date="2026-07-20", sale_type="abate", pricing_mode="cabeca", value=5000.0, buyer="Frigorífico X", operator="op1"))
         self.assertIn("venda", self._tipos(self.uuid))
 
     def test_obito(self):

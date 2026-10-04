@@ -74,7 +74,7 @@ class TestLancamentosFinanceirosNaTela(unittest.TestCase):
     def test_venda_do_mes_entra_como_receita(self):
         hoje = date.today().isoformat()
         aid = db.get_all_animals(status="ativo")[0]["id"]
-        db.register_sale([aid], hoje, "criacao", "cabeca", 3000.0)
+        db.register_sale(db.SaleParams(animal_ids=[aid], sale_date=hoje, sale_type="criacao", pricing_mode="cabeca", value=3000.0))
         db.clear_cache()
 
         # O helper que monta a lista única (`_fin_lancamentos`) vive em
@@ -114,7 +114,7 @@ class TestLancamentosFinanceirosNaTela(unittest.TestCase):
         banco de verdade — o mesmo caminho que a aba usa."""
         hoje = date.today().isoformat()
         aid = db.get_all_animals(status="ativo")[0]["id"]
-        db.register_sale([aid], hoje, "criacao", "cabeca", 1500.0)
+        db.register_sale(db.SaleParams(animal_ids=[aid], sale_date=hoje, sale_type="criacao", pricing_mode="cabeca", value=1500.0))
         db.add_fixed_cost("Aluguel de pastagem", "prova", 400.0, hoje)
         db.clear_cache()
 
