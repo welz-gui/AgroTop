@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from services.arquivo_dispositivos import conferir_pareamento, ler
+from services.arquivo_dispositivos import conferir_pareamento, ler, _separador
 
 
 class TestLerArquivoDispositivos(unittest.TestCase):
@@ -161,6 +161,14 @@ class TestConferirPareamento(unittest.TestCase):
 
         conferir.assert_called_once_with("V1", "E1", digitos_comparados=4)
         self.assertEqual(resultado[0]["divergencia"], "resultado_do_servico")
+
+
+class TestSeparador(unittest.TestCase):
+    def test_lista_vazia_retorna_ponto_e_virgula(self):
+        self.assertEqual(_separador([]), ";")
+
+    def test_linha_sem_separador_retorna_ponto_e_virgula(self):
+        self.assertEqual(_separador(["linha 1", "linha 2"]), ";")
 
 
 if __name__ == "__main__":
