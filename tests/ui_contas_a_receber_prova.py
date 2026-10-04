@@ -97,7 +97,6 @@ class TestContasAReceberNaTela(unittest.TestCase):
 
         self._por_label(at.number_input, "Valor por cabeça (R$)").set_value(5000.0)
         self._por_label(at.text_input, "Comprador").set_value(comprador)
-        at.run()
 
         botao = [b for b in at.button if b.label == "✅ Confirmar Venda"][0]
         botao.click()
