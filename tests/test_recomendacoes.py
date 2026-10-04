@@ -1,5 +1,6 @@
 import unittest
-from services.recomendacoes import avaliar
+from datetime import date
+from services.recomendacoes import avaliar, _parse_date
 
 
 class TestMotorRecomendacoes(unittest.TestCase):
@@ -202,6 +203,31 @@ class TestMotorRecomendacoes(unittest.TestCase):
             self.assertTrue(len(r["motivo"]) > 0)
             self.assertIsInstance(r["dados"], dict)
             self.assertTrue(len(r["dados"]) > 0)
+
+
+class TestParseDate(unittest.TestCase):
+    def test_parse_date_with_date_object(self):
+        d = date(2023, 10, 5)
+        self.assertEqual(_parse_date(d), d)
+
+    def test_parse_date_with_valid_strings(self):
+        self.assertEqual(_parse_date("2023-10-05"), date(2023, 10, 5))
+        self.assertEqual(_parse_date("05/10/2023"), date(2023, 10, 5))
+        self.assertEqual(_parse_date("  2023-10-05  "), date(2023, 10, 5))
+        self.assertEqual(_parse_date("  05/10/2023\n"), date(2023, 10, 5))
+
+    def test_parse_date_with_invalid_strings(self):
+        self.assertIsNone(_parse_date("invalid date"))
+        self.assertIsNone(_parse_date("2023/10/05"))  # Incorrect format for this func
+        self.assertIsNone(_parse_date("05-10-2023"))  # Incorrect format
+        self.assertIsNone(_parse_date(""))
+        self.assertIsNone(_parse_date("   "))
+        self.assertIsNone(_parse_date("2021-02-29"))  # 2021 is not a leap year
+
+    def test_parse_date_with_invalid_types(self):
+        self.assertIsNone(_parse_date(None))
+        self.assertIsNone(_parse_date(123))
+        self.assertIsNone(_parse_date(["2023-10-05"]))
 
 
 if __name__ == "__main__":
