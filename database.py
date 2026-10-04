@@ -2682,16 +2682,32 @@ def _consumo_diario_por_insumo() -> dict:
 
 def _custo_medio_por_arroba() -> Optional[float]:
     """Custo médio por arroba do rebanho ativo, ou None se não der para apurar."""
-    ativos = get_all_animals(status="ativo")
-    if not ativos:
-        return None
-    custo = arrobas = 0.0
-    costs = _costs_by_animal()
-    for a in ativos:
-        custo += costs.get(a["id"], 0.0) or 0
-        arrobas += kg_to_arrobas(a["current_weight"],
-                                 a.get("carcass_yield") or 0.52) or 0
-    return round(custo / arrobas, 2) if arrobas else None
+    with _conn() as con:
+        # Sums exact total carcass weight for active animals,
+        # handling python default 0.52 fallback for None or 0 accurately
+        row = con.execute("""
+            SELECT
+                COUNT(*) as qty,
+                SUM(current_weight * CASE WHEN carcass_yield IS NULL OR carcass_yield = 0 THEN 0.52 ELSE carcass_yield END) as total_peso_carcassa
+            FROM animals
+            WHERE status = 'ativo'
+        """).fetchone()
+
+        if not row or not row["qty"]:
+            return None
+
+        # Fetch active animal costs
+        costs = _costs_by_animal()
+        custo = 0.0
+
+        ids_ativos = con.execute("SELECT id FROM animals WHERE status = 'ativo'").fetchall()
+        for r in ids_ativos:
+            custo += costs.get(r["id"], 0.0) or 0
+
+        peso_carcassa = float(row["total_peso_carcassa"] or 0.0)
+        arrobas = round(peso_carcassa / KG_PER_ARROBA, 2)
+
+        return round(custo / arrobas, 2) if arrobas else None
 
 
 def contexto_recomendacoes() -> dict:
