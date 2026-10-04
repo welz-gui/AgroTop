@@ -6775,6 +6775,11 @@ def _propriedades_editar(props):
            for p in props}
     p = rot[st.selectbox("Propriedade", list(rot), key="prop_sel")]
 
+    _propriedade_editar_form(p)
+    _propriedade_car_expander(p)
+
+
+def _propriedade_editar_form(p):
     # O titular NÃO é editável: trocá-lo é transferência de titularidade, que é
     # evento do §8, com GTA e data. Oferecer aqui como campo de cadastro faria
     # uma mudança regulatória parecer correção de digitação.
@@ -6867,6 +6872,8 @@ def _propriedades_editar(props):
         else:
             st.error("🚫 Nada foi alterado.")
 
+
+def _propriedade_car_expander(p):
     with st.expander("🌳 Situação Ambiental (CAR)", expanded=False):
         st.warning("Aviso: este registro não é avaliação de conformidade legal nem certificação oficial.")
         car_numero = st.text_input(
