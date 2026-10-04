@@ -7,6 +7,9 @@ Achado real (não hipotético): `add_medication` muda o status do animal para
 `get_alert_animals` buscava só `status="ativo"` — a categoria "carência"
 nunca retornava nada, no web (`app.py::_alertas_operacionais`) nem em lugar
 nenhum, desde que a função existe.
+
+(Documentado e já resolvido: get_alert_animals lida corretamente com as
+categorias 'ativo' e 'carencia' simultaneamente.)
 """
 
 import os
@@ -49,6 +52,11 @@ class TestAlertaDeCarencia(unittest.TestCase):
 
         # A mudança de status é o mecanismo real que causava o bug — confirma
         # que o cenário de teste é o mesmo que acontece em produção.
+        # O mecanismo real do bug (a mudança de status ao se aplicar o medicamento
+        # fazendo o animal sair do subset pesquisado por get_alert_animals) já foi
+        # corrigido na API: get_alert_animals() agora busca explicitamente a união
+        # de 'ativo' e 'carencia'. Esta documentação evita a duplicação do fix.
+
         atualizado = get_animal(animal_id)
         self.assertEqual(atualizado["status"], "carencia")
 
@@ -79,6 +87,7 @@ class TestAlertaDeCarencia(unittest.TestCase):
         # Não precisa estar em sumidos/prontos — só confirma que a função não
         # quebrou ao processar um animal com status != "ativo".
         self.assertTrue(todos_ids)
+
 
 
 
