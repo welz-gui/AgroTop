@@ -31,11 +31,11 @@ class ContextoProcessamento:
 
 
 def _normalizar_coluna(valor: str) -> str:
-    sem_acentos = "".join(
+    sem_acentos = "".join([
         caractere
         for caractere in unicodedata.normalize("NFKD", valor)
         if not unicodedata.combining(caractere)
-    )
+    ])
     return re.sub(r"[^a-z0-9]+", "_", sem_acentos.casefold()).strip("_")
 
 
