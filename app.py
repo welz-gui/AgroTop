@@ -1538,10 +1538,8 @@ def _tab_historico(animal):
                 f'</div>',unsafe_allow_html=True)
 
 
-def _campo_animal():
-    # ── Passo 1: Localizar animal ─────────────────────────────────────────────
-    tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
 
+def _campo_animal_localizar(tab_dig, tab_cam, tab_kbd):
     with tab_dig:
         c1,c2=st.columns([3,1])
         with c1:
@@ -1586,14 +1584,7 @@ def _campo_animal():
     with tab_kbd:
         _teclado_numerico()
 
-    # ── Passo 2: Exibir animal ────────────────────────────────────────────────
-    eid=st.session_state.campo_id
-    if not eid: st.info("Selecione ou busque um animal para começar."); return
-
-    animal=get_animal(eid)
-    if not animal:
-        st.error(f"Animal **{eid}** não encontrado."); return
-
+def _campo_animal_exibir(animal, c):
     gmd=db.calculate_gmd(animal["id"])
     wd =db.get_withdrawal_end(animal["id"])
     gc =c["primaria"] if (gmd and gmd>0) else c["perigo"] if (gmd and gmd<0) else c["texto_secundario"]
@@ -1622,7 +1613,7 @@ def _campo_animal():
         f'</div></div></div>',
         unsafe_allow_html=True)
 
-    # ── Passo 3: Ação ─────────────────────────────────────────────────────────
+def _campo_animal_acoes(animal):
     t1,t2,t3,t6,t5,t4=st.tabs(["⚖️ Pesagem","💉 Medicamento","🚚 Movimentação",
                                "📷 Foto","☠️ Óbito","📜 Histórico"])
 
@@ -1643,6 +1634,24 @@ def _campo_animal():
 
     with t4:  # HISTÓRICO
         _tab_historico(animal)
+
+def _campo_animal():
+    # ── Passo 1: Localizar animal ─────────────────────────────────────────────
+    tab_dig, tab_cam, tab_kbd = st.tabs(["⌨️ Digitar ID","📷 Câmera (brinco)","🔢 Teclado Numérico"])
+    _campo_animal_localizar(tab_dig, tab_cam, tab_kbd)
+
+    # ── Passo 2: Exibir animal ────────────────────────────────────────────────
+    eid=st.session_state.campo_id
+    if not eid: st.info("Selecione ou busque um animal para começar."); return
+
+    animal=get_animal(eid)
+    if not animal:
+        st.error(f"Animal **{eid}** não encontrado."); return
+
+    _campo_animal_exibir(animal, c)
+
+    # ── Passo 3: Ação ─────────────────────────────────────────────────────────
+    _campo_animal_acoes(animal)
 
 
 def _campo_importar():
