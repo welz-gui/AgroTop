@@ -373,80 +373,63 @@ def get_last_movements_bulk(animal_ids: list[str]) -> dict[str, str]:
     return last_movements
 
 
-def _seed_animals(con, property_id: str = None):
-    if con.execute("SELECT COUNT(*) FROM animals").fetchone()[0]:
-        return
+def _generate_animal_seed_records(i: int, today: date, breeds: list[str], lotes: list[str], property_id: str = None) -> tuple:
+    aid          = f"BR{i:04d}"
+    breed        = random.choice(breeds)
+    sex          = random.choice(["M", "F"])
+    days_in      = random.randint(60, 220)
+    days_old     = random.randint(400, 900)
+    birth_date   = (today - timedelta(days=days_old)).isoformat()
+    entry_date   = (today - timedelta(days=days_in)).isoformat()
+    e_weight     = round(random.uniform(220, 320), 1)
+    c_weight     = round(e_weight + random.uniform(30, 110), 1)
+    target_w     = round(random.uniform(480, 520), 1)
+    lote_id      = random.choice(lotes)
+    forn_id      = random.randint(1, 4)
+    price        = round(e_weight * 0.52 / 15 * random.uniform(280, 320), 2)
+    status       = "ativo"
 
-    random.seed(7)
-    today  = date.today()
-    breeds = ["Nelore", "Angus", "Brahman", "Senepol", "Brangus", "Canchim"]
-    lotes  = ["P01", "P01", "P01", "P02", "P02", "P03", "P03", "P03", "CRL"]
+    src, est = random.choice([
+        ("propriedade", 0), ("propriedade", 0),
+        ("nf_gta", 1), ("operador", 1), ("estimado", 1),
+    ])
+    if i == 13: status = "vendido"
+    if i == 14: status = "morto"
 
-    animals_data = []
-    weighings_data = []
-    medications_data = []
-    animal_costs_data = []
-    animal_movements_data = []
+    a_uuid = novo_uuid()
+    animal_tuple = (aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
+         c_weight, target_w, status, lote_id, forn_id, price, property_id)
 
-    for i in range(1, 15):
-        aid          = f"BR{i:04d}"
-        breed        = random.choice(breeds)
-        sex          = random.choice(["M", "F"])
-        days_in      = random.randint(60, 220)
-        days_old     = random.randint(400, 900)
-        birth_date   = (today - timedelta(days=days_old)).isoformat()
-        entry_date   = (today - timedelta(days=days_in)).isoformat()
-        e_weight     = round(random.uniform(220, 320), 1)
-        c_weight     = round(e_weight + random.uniform(30, 110), 1)
-        target_w     = round(random.uniform(480, 520), 1)
-        lote_id      = random.choice(lotes)
-        forn_id      = random.randint(1, 4)
-        price        = round(e_weight * 0.52 / 15 * random.uniform(280, 320), 2)
-        status       = "ativo"
-        # Variedade de origens de idade para demonstração
-        src, est = random.choice([
-            ("propriedade", 0), ("propriedade", 0),
-            ("nf_gta", 1), ("operador", 1), ("estimado", 1),
-        ])
-        # make 1 animal vendido and 1 morto for demo
-        if i == 13: status = "vendido"
-        if i == 14: status = "morto"
+    weighings_list = []
+    for step, days_back in [(0.0, days_in), (0.5, days_in//2), (1.0, 0)]:
+        w_date   = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
+        w_weight = round(e_weight + (c_weight - e_weight) * step, 1)
+        weighings_list.append((a_uuid, w_weight, w_date, lote_id, "Sistema"))
 
-        # O uuid é gerado AQUI, e não deixado para o backfill: depois da etapa
-        # B1.6 as filhas só têm `animal_uuid`, então uma linha semeada sem uuid
-        # ficaria órfã sem nada de onde reconstruí-la.
-        a_uuid = novo_uuid()
-        animals_data.append((aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
-             c_weight, target_w, status, lote_id, forn_id, price, property_id))
+    medications_list = []
+    meds_pool = [
+        ("Ivermectina 1%",  "ml",  10, 21),
+        ("Vacina FMD",      "dose", 2,  0),
+        ("Closantel 10%",   "ml",  10, 28),
+        ("Vitamina ADE",    "ml",  10,  0),
+        ("Oxitetraciclina", "ml",  20, 14),
+    ]
+    for _ in range(random.randint(1, 2)):
+        mn, mu, dose, wd = random.choice(meds_pool)
+        md = (today - timedelta(days=random.randint(0, 60))).isoformat()
+        medications_list.append((a_uuid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"))
 
-        # Pesagens: entrada, meio, recente
-        for step, days_back in [(0.0, days_in), (0.5, days_in//2), (1.0, 0)]:
-            w_date   = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
-            w_weight = round(e_weight + (c_weight - e_weight) * step, 1)
-            weighings_data.append((a_uuid, w_weight, w_date, lote_id, "Sistema"))
+    costs_list = []
+    costs_list.append((a_uuid, "compra", "Valor de compra", price, entry_date))
+    op_cost = round(days_in * 0.85, 2)
+    costs_list.append((a_uuid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()))
 
-        # Medicamentos (1-2 por animal)
-        meds_pool = [
-            ("Ivermectina 1%",  "ml",  10, 21),
-            ("Vacina FMD",      "dose", 2,  0),
-            ("Closantel 10%",   "ml",  10, 28),
-            ("Vitamina ADE",    "ml",  10,  0),
-            ("Oxitetraciclina", "ml",  20, 14),
-        ]
-        for _ in range(random.randint(1, 2)):
-            mn, mu, dose, wd = random.choice(meds_pool)
-            md = (today - timedelta(days=random.randint(0, 60))).isoformat()
-            medications_data.append((a_uuid, mn, dose, mu, "Subcutânea", wd, md, "Sistema"))
+    movement_tuple = (a_uuid, None, lote_id, entry_date, "entrada", "Sistema")
 
-        # Custo de compra
-        animal_costs_data.append((a_uuid, "compra", "Valor de compra", price, entry_date))
-        # Custo operacional
-        op_cost = round(days_in * 0.85, 2)
-        animal_costs_data.append((a_uuid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()))
+    return animal_tuple, weighings_list, medications_list, costs_list, movement_tuple
 
-        # Movimentação inicial para o lote
-        animal_movements_data.append((a_uuid, None, lote_id, entry_date, "entrada", "Sistema"))
 
+def _insert_seed_data(con, animals_data, weighings_data, medications_data, animal_costs_data, animal_movements_data):
     if animals_data:
         con.executemany(
             """INSERT INTO animals
@@ -485,3 +468,29 @@ def _seed_animals(con, property_id: str = None):
                VALUES(?,?,?,?,?,?)""",
             animal_movements_data,
         )
+
+
+def _seed_animals(con, property_id: str = None):
+    if con.execute("SELECT COUNT(*) FROM animals").fetchone()[0]:
+        return
+
+    random.seed(7)
+    today  = date.today()
+    breeds = ["Nelore", "Angus", "Brahman", "Senepol", "Brangus", "Canchim"]
+    lotes  = ["P01", "P01", "P01", "P02", "P02", "P03", "P03", "P03", "CRL"]
+
+    animals_data = []
+    weighings_data = []
+    medications_data = []
+    animal_costs_data = []
+    animal_movements_data = []
+
+    for i in range(1, 15):
+        a_tuple, w_list, m_list, c_list, mv_tuple = _generate_animal_seed_records(i, today, breeds, lotes, property_id)
+        animals_data.append(a_tuple)
+        weighings_data.extend(w_list)
+        medications_data.extend(m_list)
+        animal_costs_data.extend(c_list)
+        animal_movements_data.append(mv_tuple)
+
+    _insert_seed_data(con, animals_data, weighings_data, medications_data, animal_costs_data, animal_movements_data)
