@@ -80,7 +80,7 @@ class TestDREGerencialNaTela(unittest.TestCase):
         self.assertGreater(custo_do_vendido, 0, "seed sem custo lançado no animal")
 
         hoje = date.today().isoformat()
-        r = db.register_sale([vendido["id"]], hoje, "abate", "cabeca", 5000.0)
+        r = db.register_sale(db.SaleParams(animal_ids=[vendido["id"]], sale_date=hoje, sale_type="abate", pricing_mode="cabeca", value=5000.0))
         db.clear_cache()
 
         fin = db.get_financial_summary(f"{date.today().year}-01-01", hoje)
@@ -97,8 +97,7 @@ class TestDREGerencialNaTela(unittest.TestCase):
 
     def test_tela_mostra_a_receita_bruta_apos_uma_venda(self):
         vendido = db.get_all_animals(status="ativo")[0]
-        db.register_sale([vendido["id"]], date.today().isoformat(), "abate",
-                         "cabeca", 5000.0)
+        db.register_sale(db.SaleParams(animal_ids=[vendido["id"]], sale_date=date.today().isoformat(), sale_type="abate", pricing_mode="cabeca", value=5000.0))
         db.clear_cache()
 
         at = self._tela()

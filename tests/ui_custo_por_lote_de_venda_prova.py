@@ -75,7 +75,7 @@ class TestCustoPorLoteDeVendaNaTela(unittest.TestCase):
         db.add_animal_cost(db.AnimalCostData("LOTEV1", "operacional", "trato", 200.0, hoje))
         db.add_animal_cost(db.AnimalCostData("LOTEV2", "operacional", "trato", 200.0, hoje))
         db.clear_cache()
-        db.register_sale(["LOTEV1", "LOTEV2"], hoje, "abate", "lote", 5000.0)
+        db.register_sale(db.SaleParams(animal_ids=["LOTEV1", "LOTEV2"], sale_date=hoje, sale_type="abate", pricing_mode="lote", value=5000.0))
         db.clear_cache()
 
         from services.rentabilidade import por_lote_de_venda
@@ -98,7 +98,7 @@ class TestCustoPorLoteDeVendaNaTela(unittest.TestCase):
         db.add_animal(db.AnimalData("LOTEV3", "Angus", "F", None, entrada,
                       280.0, 420.0, 900.0, None, None))
         db.clear_cache()
-        db.register_sale(["LOTEV3"], hoje, "abate", "cabeca", 3000.0)
+        db.register_sale(db.SaleParams(animal_ids=["LOTEV3"], sale_date=hoje, sale_type="abate", pricing_mode="cabeca", value=3000.0))
         db.clear_cache()
 
         from services.rentabilidade import por_lote_de_venda

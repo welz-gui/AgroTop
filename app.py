@@ -2928,10 +2928,11 @@ def _fin_venda_registro(animals):
                 elif prazo and not primeira_parcela_v:
                     st.error("Informe o vencimento da 1ª parcela.")
                 else:
-                    r = db.register_sale(sel_ids, sale_date.strftime("%Y-%m-%d"), tipo, modo,
-                        valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
+                    r = db.register_sale(db.SaleParams(
+                        animal_ids=sel_ids, sale_date=sale_date.strftime("%Y-%m-%d"), sale_type=tipo,
+                        pricing_mode=modo, value=valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
                         a_prazo=prazo, num_parcelas=int(num_parcelas_v),
-                        primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None)
+                        primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None))
                     cor = c["primaria"] if r["lucro"] >= 0 else c["perigo"]
                     st.success(f"✅ {r['n']} animal(is) vendido(s)!")
                     st.markdown(
