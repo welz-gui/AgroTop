@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 import unittest
 
-from services.importacao import _parse_data, parse_pesagens
+from services.importacao import _eh_cabecalho, _parse_data, parse_pesagens
 
 
 class TestParseData(unittest.TestCase):
@@ -165,6 +165,29 @@ class TestParsePesagens(unittest.TestCase):
         )
         self.assertEqual(resultado["rejeitadas"][0]["linha"], 1)
         self.assertEqual(resultado["total_linhas"], 1)
+
+
+class TestEhCabecalho(unittest.TestCase):
+    def test_valido_comum(self):
+        self.assertTrue(_eh_cabecalho(["animal_id", "peso", "data"]))
+
+    def test_valido_variacoes(self):
+        self.assertTrue(_eh_cabecalho(["id", "weight", "date"]))
+        self.assertTrue(_eh_cabecalho(["BRINCO", "PESO (KG)", "DATA"]))
+
+    def test_ignora_espacos_em_branco(self):
+        self.assertTrue(_eh_cabecalho([" animal_id ", " peso ", " data "]))
+
+    def test_invalido_tamanho_errado(self):
+        self.assertFalse(_eh_cabecalho(["animal_id", "peso"]))
+        self.assertFalse(_eh_cabecalho(["animal_id", "peso", "data", "extra"]))
+
+    def test_invalido_nome_coluna_errado(self):
+        self.assertFalse(_eh_cabecalho(["nome", "peso", "data"]))
+        self.assertFalse(_eh_cabecalho(["animal_id", "altura", "data"]))
+
+    def test_invalido_ordem_errada(self):
+        self.assertFalse(_eh_cabecalho(["peso", "animal_id", "data"]))
 
 
 if __name__ == "__main__":
