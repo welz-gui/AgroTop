@@ -91,6 +91,28 @@ class TestAlertaDeCarencia(unittest.TestCase):
 
 
 
+
+    def test_animal_com_status_carencia_explicito_mantido_no_alerta(self):
+        """Um animal que entra explicitamente em status de carência via update_animal_status
+        também deve aparecer no alerta de carência, confirmando que o get_alert_animals lida com
+        status='carencia' independentemente de como o status foi alterado."""
+        animal_id = self.animal["id"]
+
+        # Cria a carência para ter a data de fim (para aparecer em carencia_active)
+        add_medication(MedicationData(
+            animal_id=animal_id, medication_name="Ivermectina", dose=2.0, unit="ml", application_route="Subcutânea",
+            withdrawal_days=21, med_date=db.date.today().isoformat(),
+            applied_by="op1",
+        ))
+
+        # Garante o status de carência explicitamente (caso a trigger não existisse,
+        # ou se o status mudasse por outra via)
+        db.update_animal_status(animal_id, "carencia")
+
+        alertas = db.get_alert_animals()
+        ids_em_carencia = {a["id"] for a in alertas["carencia"]}
+        self.assertIn(animal_id, ids_em_carencia)
+
     def test_animal_em_carencia_ignora_data_invalida(self):
         animal_id = self.animal["id"]
         # Use a structurally valid but calendar-invalid date to trigger ValueError
