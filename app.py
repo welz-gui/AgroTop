@@ -2646,12 +2646,9 @@ def _render_lote_card(l):
     </div>""",unsafe_allow_html=True)
 
 
-def _render_lote_animais(l):
+def _render_lote_animais(l, anilist, gmd_batch):
     with st.expander(f"Ver animais do {l['name']}"):
-        anilist=db.get_all_animals(lote_id=l["id"])
         if anilist:
-            a_ids = [a["id"] for a in anilist]
-            gmd_batch = db.calculate_gmd_bulk(a_ids)
             rows_l=[{"ID":a["id"],"Raça":a["breed"],"Sexo":"♂" if a["sex"]=="M" else "♀",
                 "Peso (kg)":a["current_weight"],"GMD":gmd_batch.get(a["id"])} for a in anilist]
             st.dataframe(pd.DataFrame(rows_l),use_container_width=True,hide_index=True,
@@ -2729,9 +2726,21 @@ def _render_grafico_ua_lotes(lotes):
 
 
 def _render_tab_visao_geral(lotes):
+    # Pre-fetch animals and GMDs to avoid N+1 queries
+    all_animals = db.get_all_animals(status="ativo")
+    animals_by_lote = {}
+    for a in all_animals:
+        animals_by_lote.setdefault(a["lote_id"], []).append(a)
+
+    all_a_ids = [a["id"] for a in all_animals]
+    all_gmds = db.calculate_gmd_bulk(all_a_ids) if all_a_ids else {}
+
     for l in lotes:
         _render_lote_card(l)
-        _render_lote_animais(l)
+
+        anilist = animals_by_lote.get(l["id"], [])
+        _render_lote_animais(l, anilist, all_gmds)
+
         _render_lote_perimetro(l)
         _render_secao_ndvi_lote(l)
 
