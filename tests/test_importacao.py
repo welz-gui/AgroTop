@@ -3,7 +3,25 @@
 from datetime import date, timedelta
 import unittest
 
-from services.importacao import parse_pesagens
+from services.importacao import _parse_data, parse_pesagens
+
+
+class TestParseData(unittest.TestCase):
+    def test_formato_iso(self):
+        self.assertEqual(_parse_data("2026-01-15"), date(2026, 1, 15))
+
+    def test_formato_br(self):
+        self.assertEqual(_parse_data("15/01/2026"), date(2026, 1, 15))
+
+    def test_formato_invalido(self):
+        for valor in ("2026.01.15", "abc", "", "15-01-2026"):
+            with self.subTest(valor=valor):
+                self.assertIsNone(_parse_data(valor))
+
+    def test_data_inexistente(self):
+        for valor in ("32/13/2026", "2021-02-29", "29/02/2021"):
+            with self.subTest(valor=valor):
+                self.assertIsNone(_parse_data(valor))
 
 
 class TestParsePesagens(unittest.TestCase):
