@@ -171,6 +171,119 @@ def _redundante_com_a_pk(con: dict, definicao_pk: str | None) -> bool:
     return _colunas_da_constraint(con["definicao"]) == _colunas_da_constraint(definicao_pk)
 
 
+def _escrever_cabecalho(fh, data: str):
+    fh.write("-- Baseline do schema de produção do AgroTop\n")
+    fh.write(f"-- Gerado em {data} por tools/dump_schema_nuvem.py\n")
+    fh.write("--\n-- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.\n")
+    fh.write("-- NÃO cobre: políticas de RLS, grants, extensões.\n")
+    fh.write("-- Para um dump completo, prefira `supabase db dump` ou `pg_dump`.\n")
+    fh.write("--\n-- SEM QUALIFICAÇÃO DE SCHEMA de propósito: os nomes são resolvidos\n")
+    fh.write("-- pelo search_path, para que o mesmo arquivo sirva a qualquer tenant\n")
+    fh.write("-- (ver docs/adr/0001-multi-fazenda-schema-por-tenant.md). Aplicar com:\n")
+    fh.write("--     CREATE SCHEMA fazenda_2;  SET search_path TO fazenda_2;\n")
+    fh.write("--     \\i supabase/migrations/0000_baseline_producao.sql\n")
+    fh.write("-- Validar com: python tools/testar_baseline.py\n\n")
+
+
+def _escrever_tabelas(fh, por_tabela: dict, cons_por_tabela: dict) -> tuple[list, list]:
+    fks = []
+    unicas_redundantes = []
+    for tabela in sorted(por_tabela):
+        fh.write(f"CREATE TABLE IF NOT EXISTS {tabela} (\n")
+        partes = []
+        for c in por_tabela[tabela]:
+            tipo, padrao = c["tipo"], c["padrao"]
+            # `nextval(...)` depende de uma sequence que este arquivo não cria.
+            # Traduz para serial/bigserial, que cria a sequence junto.
+            if padrao and padrao.startswith("nextval("):
+                tipo = {"bigint": "bigserial", "integer": "serial",
+                        "smallint": "smallserial"}.get(tipo, tipo)
+                padrao = None
+            linha = f"    {c['coluna']} {tipo}"
+            if padrao:
+                linha += f" DEFAULT {padrao}"
+            # serial já implica NOT NULL
+            if c["obrigatorio"] and not tipo.endswith("serial"):
+                linha += " NOT NULL"
+            partes.append(linha)
+        # PK/UNIQUE/CHECK ficam inline; FK sai para o fim do arquivo, porque
+        # a ordem alfabética das tabelas não respeita a dependência entre elas.
+        definicao_pk = next((c["definicao"] for c in cons_por_tabela.get(tabela, [])
+                             if c["tipo"] == "p"), None)
+        for con in cons_por_tabela.get(tabela, []):
+            if con["tipo"] == "f":
+                fks.append((tabela, con))
+            elif _redundante_com_a_pk(con, definicao_pk):
+                unicas_redundantes.append((tabela, con))
+            else:
+                partes.append(f"    CONSTRAINT {con['nome']} {con['definicao']}")
+        fh.write(",\n".join(partes))
+        fh.write("\n);\n\n")
+    return fks, unicas_redundantes
+
+
+def _escrever_unicas_redundantes(fh, unicas_redundantes: list):
+    if unicas_redundantes:
+        fh.write("-- UNIQUE sobre as mesmas colunas da PRIMARY KEY. Fora do\n")
+        fh.write("-- CREATE TABLE de propósito: declarada inline, o PostgreSQL\n")
+        fh.write("-- descarta em silêncio, e o replay deixa de reproduzir a\n")
+        fh.write("-- produção (ver _redundante_com_a_pk neste arquivo).\n")
+        for tabela, con in unicas_redundantes:
+            fh.write(f"ALTER TABLE {tabela} "
+                     f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
+        fh.write("\n")
+
+
+def _escrever_fks(fh, fks: list):
+    if fks:
+        fh.write("-- Chaves estrangeiras aplicadas ao final: assim a ordem de\n")
+        fh.write("-- criação das tabelas acima não importa.\n")
+        for tabela, con in fks:
+            fh.write(f"ALTER TABLE {tabela} "
+                     f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
+        fh.write("\n")
+
+
+def _escrever_indices(fh, indices: list | None):
+    if indices:
+        fh.write("-- Índices (fora das constraints)\n")
+        for i in indices:
+            definicao = i["definicao"].replace(
+                "CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", 1).replace(
+                "CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ", 1)
+            # remove a qualificação de schema: quem resolve é o search_path
+            definicao = definicao.replace(" ON public.", " ON ")
+            fh.write(f"{definicao};\n")
+        fh.write("\n")
+
+
+def _escrever_funcoes(fh, funcoes: list | None):
+    # Funções antes dos triggers: o trigger referencia a função.
+    #
+    # A qualificação `public.` é removida das duas, pelo mesmo motivo dos
+    # índices: quem resolve o nome é o search_path. Sem isso, aplicar o
+    # baseline num schema novo criaria a função dentro de `public` — efeito
+    # colateral no schema de produção — e o trigger não a encontraria no
+    # schema onde está sendo criado.
+    if funcoes:
+        fh.write("-- Funções\n")
+        for f in funcoes:
+            definicao = f["definicao"].replace("FUNCTION public.", "FUNCTION ", 1)
+            fh.write(f"{definicao};\n\n")
+
+
+def _escrever_triggers(fh, triggers: list | None):
+    if triggers:
+        fh.write("-- Triggers\n")
+        fh.write("-- Sem eles, `animal_events` e `audit_logs` deixam de ser\n")
+        fh.write("-- append-only (PNIB §6.3 e §14.1).\n")
+        for t in triggers:
+            definicao = t["definicao"].replace(" ON public.", " ON ")
+            fh.write(f"DROP TRIGGER IF EXISTS {t['nome']} ON {t['tabela']};\n")
+            fh.write(f"{definicao};\n")
+        fh.write("\n")
+
+
 def escrever_baseline(schema: SchemaCatalog, data: str):
     por_tabela = {}
     for c in schema.colunas:
@@ -182,103 +295,14 @@ def escrever_baseline(schema: SchemaCatalog, data: str):
 
     os.makedirs(os.path.dirname(BASELINE), exist_ok=True)
     with open(BASELINE, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("-- Baseline do schema de produção do AgroTop\n")
-        fh.write(f"-- Gerado em {data} por tools/dump_schema_nuvem.py\n")
-        fh.write("--\n-- GERADO AUTOMATICAMENTE a partir do catálogo do Postgres.\n")
-        fh.write("-- NÃO cobre: políticas de RLS, grants, extensões.\n")
-        fh.write("-- Para um dump completo, prefira `supabase db dump` ou `pg_dump`.\n")
-        fh.write("--\n-- SEM QUALIFICAÇÃO DE SCHEMA de propósito: os nomes são resolvidos\n")
-        fh.write("-- pelo search_path, para que o mesmo arquivo sirva a qualquer tenant\n")
-        fh.write("-- (ver docs/adr/0001-multi-fazenda-schema-por-tenant.md). Aplicar com:\n")
-        fh.write("--     CREATE SCHEMA fazenda_2;  SET search_path TO fazenda_2;\n")
-        fh.write("--     \\i supabase/migrations/0000_baseline_producao.sql\n")
-        fh.write("-- Validar com: python tools/testar_baseline.py\n\n")
+        _escrever_cabecalho(fh, data)
+        fks, unicas_redundantes = _escrever_tabelas(fh, por_tabela, cons_por_tabela)
+        _escrever_unicas_redundantes(fh, unicas_redundantes)
+        _escrever_fks(fh, fks)
+        _escrever_indices(fh, schema.indices)
+        _escrever_funcoes(fh, schema.funcoes)
+        _escrever_triggers(fh, schema.triggers)
 
-        fks = []
-        unicas_redundantes = []
-        for tabela in sorted(por_tabela):
-            fh.write(f"CREATE TABLE IF NOT EXISTS {tabela} (\n")
-            partes = []
-            for c in por_tabela[tabela]:
-                tipo, padrao = c["tipo"], c["padrao"]
-                # `nextval(...)` depende de uma sequence que este arquivo não cria.
-                # Traduz para serial/bigserial, que cria a sequence junto.
-                if padrao and padrao.startswith("nextval("):
-                    tipo = {"bigint": "bigserial", "integer": "serial",
-                            "smallint": "smallserial"}.get(tipo, tipo)
-                    padrao = None
-                linha = f"    {c['coluna']} {tipo}"
-                if padrao:
-                    linha += f" DEFAULT {padrao}"
-                # serial já implica NOT NULL
-                if c["obrigatorio"] and not tipo.endswith("serial"):
-                    linha += " NOT NULL"
-                partes.append(linha)
-            # PK/UNIQUE/CHECK ficam inline; FK sai para o fim do arquivo, porque
-            # a ordem alfabética das tabelas não respeita a dependência entre elas.
-            definicao_pk = next((c["definicao"] for c in cons_por_tabela.get(tabela, [])
-                                 if c["tipo"] == "p"), None)
-            for con in cons_por_tabela.get(tabela, []):
-                if con["tipo"] == "f":
-                    fks.append((tabela, con))
-                elif _redundante_com_a_pk(con, definicao_pk):
-                    unicas_redundantes.append((tabela, con))
-                else:
-                    partes.append(f"    CONSTRAINT {con['nome']} {con['definicao']}")
-            fh.write(",\n".join(partes))
-            fh.write("\n);\n\n")
-
-        if unicas_redundantes:
-            fh.write("-- UNIQUE sobre as mesmas colunas da PRIMARY KEY. Fora do\n")
-            fh.write("-- CREATE TABLE de propósito: declarada inline, o PostgreSQL\n")
-            fh.write("-- descarta em silêncio, e o replay deixa de reproduzir a\n")
-            fh.write("-- produção (ver _redundante_com_a_pk neste arquivo).\n")
-            for tabela, con in unicas_redundantes:
-                fh.write(f"ALTER TABLE {tabela} "
-                         f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
-            fh.write("\n")
-
-        if fks:
-            fh.write("-- Chaves estrangeiras aplicadas ao final: assim a ordem de\n")
-            fh.write("-- criação das tabelas acima não importa.\n")
-            for tabela, con in fks:
-                fh.write(f"ALTER TABLE {tabela} "
-                         f"ADD CONSTRAINT {con['nome']} {con['definicao']};\n")
-            fh.write("\n")
-
-        if schema.indices:
-            fh.write("-- Índices (fora das constraints)\n")
-            for i in schema.indices:
-                definicao = i["definicao"].replace(
-                    "CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", 1).replace(
-                    "CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ", 1)
-                # remove a qualificação de schema: quem resolve é o search_path
-                definicao = definicao.replace(" ON public.", " ON ")
-                fh.write(f"{definicao};\n")
-            fh.write("\n")
-
-        # Funções antes dos triggers: o trigger referencia a função.
-        #
-        # A qualificação `public.` é removida das duas, pelo mesmo motivo dos
-        # índices: quem resolve o nome é o search_path. Sem isso, aplicar o
-        # baseline num schema novo criaria a função dentro de `public` — efeito
-        # colateral no schema de produção — e o trigger não a encontraria no
-        # schema onde está sendo criado.
-        if schema.funcoes:
-            fh.write("-- Funções\n")
-            for f in schema.funcoes:
-                definicao = f["definicao"].replace("FUNCTION public.", "FUNCTION ", 1)
-                fh.write(f"{definicao};\n\n")
-
-        if schema.triggers:
-            fh.write("-- Triggers\n")
-            fh.write("-- Sem eles, `animal_events` e `audit_logs` deixam de ser\n")
-            fh.write("-- append-only (PNIB §6.3 e §14.1).\n")
-            for t in schema.triggers:
-                definicao = t["definicao"].replace(" ON public.", " ON ")
-                fh.write(f"DROP TRIGGER IF EXISTS {t['nome']} ON {t['tabela']};\n")
-                fh.write(f"{definicao};\n")
-            fh.write("\n")
     return len(por_tabela)
 
 
