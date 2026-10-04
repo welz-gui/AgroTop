@@ -71,7 +71,6 @@ class TestChuvaDoDia(unittest.TestCase):
         # step=1.0 no widget: usar valor alinhado ao passo evita ambiguidade
         # de arredondamento no set_value do AppTest.
         self._por_chave(at.number_input, "campo_chuva_mm").set_value(15.0)
-        at.run()
         botao = [b for b in at.button if "Registrar chuva de hoje" in (b.label or "")][0]
         botao.click()
         at.run()
