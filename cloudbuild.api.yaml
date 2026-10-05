@@ -11,8 +11,3 @@ steps:
     args: ["build", "-f", "Dockerfile.api", "-t", "${_IMAGE}", "."]
 images:
   - "${_IMAGE}"
-options:
-  # Canal de release da VM de worker do Cloud Build (so o ambiente do host: Docker/Debian).
-  # Em 28/03/2027 o Google torna o `regular` o padrao (aviso de 05/10/2026); fixado aqui
-  # para validar a mudanca antes. Ver https://docs.cloud.google.com/build/docs/release-channels
-  workerRelease: regular
