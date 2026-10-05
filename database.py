@@ -116,6 +116,7 @@ from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,
     AnimalCostData, add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
     delete_fixed_cost, get_fixed_costs_by_category, register_sale, get_sales, SaleParams,
+    VendaBloqueadaPorCarencia,
     get_financial_summary, get_insumo_compras, register_death, get_deaths,
     get_mortality_stats, get_category_prices, set_category_price,
     get_expected_price_kg, expected_sale_value,

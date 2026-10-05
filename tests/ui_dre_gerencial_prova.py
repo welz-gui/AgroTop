@@ -42,6 +42,10 @@ class TestDREGerencialNaTela(unittest.TestCase):
         cls.dir = tempfile.mkdtemp()
         db.configurar_sqlite(os.path.join(cls.dir, "ui_dre.db"))
         db.init_db()
+        # O seed deixa animais ativos com carência vigente, e venda para abate deles é
+        # recusada. Esta prova é do financeiro: ver tests/test_venda_carencia.py.
+        with db._conn() as con:
+            con.execute("UPDATE medications SET withdrawal_days=0")
         db.clear_cache()
 
     def setUp(self):

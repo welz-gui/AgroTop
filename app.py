@@ -2928,11 +2928,18 @@ def _fin_venda_registro(animals):
                 elif prazo and not primeira_parcela_v:
                     st.error("Informe o vencimento da 1ª parcela.")
                 else:
-                    r = db.register_sale(db.SaleParams(
-                        animal_ids=sel_ids, sale_date=sale_date.strftime("%Y-%m-%d"), sale_type=tipo,
-                        pricing_mode=modo, value=valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
-                        a_prazo=prazo, num_parcelas=int(num_parcelas_v),
-                        primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None))
+                    try:
+                        r = db.register_sale(db.SaleParams(
+                            animal_ids=sel_ids, sale_date=sale_date.strftime("%Y-%m-%d"), sale_type=tipo,
+                            pricing_mode=modo, value=valor, buyer=buyer, operator=st.session_state.user["name"], notes=notes,
+                            a_prazo=prazo, num_parcelas=int(num_parcelas_v),
+                            primeiro_vencimento=primeira_parcela_v.isoformat() if primeira_parcela_v else None))
+                    except db.VendaBloqueadaPorCarencia as exc:
+                        detalhe = ", ".join(f"{aid} (até {_data_br(fim)})"
+                                            for aid, fim in sorted(exc.bloqueados.items()))
+                        st.error(f"🚫 Venda para abate bloqueada — animal em carência: {detalhe}. "
+                                 "Retire esses animais da venda ou aguarde o fim da carência.")
+                        return
                     cor = c["primaria"] if r["lucro"] >= 0 else c["perigo"]
                     st.success(f"✅ {r['n']} animal(is) vendido(s)!")
                     st.markdown(

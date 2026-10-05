@@ -21,6 +21,7 @@ from services.financeiro import valor_esperado_venda
 # compra a prazo dividem o total do mesmo jeito (resto na última parcela,
 # vencimento mensal com o dia preso ao mês). Reexportar em vez de duplicar (R8).
 from services.compras import gerar_parcelas
+from services.carencia import fim_da_carencia
 
 
 @dataclass
@@ -206,6 +207,39 @@ class SaleParams:
     num_parcelas: int = 1
     primeiro_vencimento: Optional[str] = None
 
+
+class VendaBloqueadaPorCarencia(ValueError):
+    """Venda para abate recusada: há animal ainda em carência na data da venda."""
+
+    def __init__(self, bloqueados: dict[str, str]):
+        self.bloqueados = bloqueados   # {brinco: "AAAA-MM-DD" do fim da carência}
+        detalhe = ", ".join(f"{aid} (até {fim})" for aid, fim in sorted(bloqueados.items()))
+        super().__init__(f"Venda para abate bloqueada: animal em carência — {detalhe}.")
+
+
+def _recusar_abate_em_carencia(con, animal_ids: tuple, data_venda: str) -> None:
+    """Lê as carências direto do banco, na mesma transação da venda: o cache de
+    `get_withdrawal_end` (120 s) pode estar atrasado, e a API grava medicamento
+    em outro processo. A conta é de `services/carencia.py`."""
+    referencia = date.fromisoformat(data_venda)
+    qmarks = ",".join("?" for _ in animal_ids)
+    rows = con.execute(
+        f"""SELECT a.id AS animal_id, m.med_date, m.withdrawal_days
+            FROM medications m JOIN animals a ON a.uuid = m.animal_uuid
+            WHERE m.withdrawal_days > 0 AND a.id IN ({qmarks})""", animal_ids
+    ).fetchall()
+    por_animal: dict[str, list[dict]] = {}
+    for r in rows:
+        por_animal.setdefault(r["animal_id"], []).append(dict(r))
+    bloqueados = {}
+    for aid, aplicacoes in por_animal.items():
+        fim = fim_da_carencia(aplicacoes, referencia)
+        if fim:
+            bloqueados[aid] = fim.isoformat()
+    if bloqueados:
+        raise VendaBloqueadaPorCarencia(bloqueados)
+
+
 @_writes
 def register_sale(params: SaleParams) -> dict:
     """Registra a venda de um ou mais animais.
@@ -223,6 +257,10 @@ def register_sale(params: SaleParams) -> dict:
     `contas_receber` é só quando o dinheiro chega — as duas datas não se
     misturam (ROADMAP §5, Trilha 3, "cuidados que definem o sucesso").
 
+    Venda do tipo `abate` com algum animal ainda em carência na `sale_date`
+    levanta `VendaBloqueadaPorCarencia` e não grava nada (a venda inteira é
+    recusada). Venda de criação não é afetada: a carência impede o abate.
+
     Retorna {'receita':..., 'custo':..., 'lucro':..., 'n':...}."""
     animais = [get_animal(a) for a in params.animal_ids]
     animais = [a for a in animais if a]
@@ -237,6 +275,9 @@ def register_sale(params: SaleParams) -> dict:
     sales_data = []
 
     with _conn() as con:
+        if params.sale_type == "abate":
+            _recusar_abate_em_carencia(con, tuple(a["id"] for a in animais), params.sale_date)
+
         # Optimization: batch costs by passing a list of IDs using an IN clause.
         # But we need to use _conn() inside our query to fetch costs for these specific animals.
         # To avoid the abstraction leak with events, we will keep calling eventos.registrar_em().
