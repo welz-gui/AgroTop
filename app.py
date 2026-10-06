@@ -19,6 +19,7 @@ import database as db
 from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
+from services.carencia import fim_da_carencia
 from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
@@ -2858,6 +2859,15 @@ def _fin_precos():
 
 
 
+def _animais_em_carencia(animals) -> dict:
+    """{id: fim da carência} dos animais com carência vigente hoje. Mesma regra da
+    trava de `register_sale` (`services/carencia.py`); lê as aplicações já em cache."""
+    aplicacoes = db._medications_by_animal()
+    hoje = date.today()
+    fins = {a["id"]: fim_da_carencia(aplicacoes.get(a["id"], []), hoje) for a in animals}
+    return {aid: fim for aid, fim in fins.items() if fim}
+
+
 def _fin_venda_registro(animals):
     st.subheader("💵 Registrar Venda")
     if not animals:
@@ -2882,6 +2892,14 @@ def _fin_venda_registro(animals):
                     value=date.today()+timedelta(days=30), key="venda_primeira_parcela")
 
         # Seleção de animais
+        if tipo == "abate":
+            em_carencia = _animais_em_carencia(animals)
+            if em_carencia:
+                animals = [a for a in animals if a["id"] not in em_carencia]
+                detalhe = ", ".join(f"{aid} (até {_data_br(fim)})"
+                                    for aid, fim in sorted(em_carencia.items()))
+                st.info(f"🔒 Em carência hoje, fora da lista de abate: {detalhe}. "
+                        "Carência impede o abate; a venda para criação não é afetada.")
         opts = {f"{a['id']} · {a['breed']} · {_num_br(a['current_weight'], 0)}kg · {get_age_category(a.get('birth_date'))}": a['id']
                 for a in animals}
         multi = modo in ("lote",) or True   # sempre permite múltiplos
