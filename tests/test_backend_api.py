@@ -84,6 +84,17 @@ class TestHealthEndpoint(BackendApiTestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json(), {"status": "ok", "app": "AgroTop Backend API"})
 
+    def test_health_db_consulta_o_banco_e_responde_200(self):
+        res = self.client.get("/health/db")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"status": "ok", "db": "ok"})
+
+    @patch("backend_api.main.ping_banco", side_effect=RuntimeError("banco pausado"))
+    def test_health_db_responde_503_quando_o_banco_falha(self, _ping):
+        res = self.client.get("/health/db")
+        self.assertEqual(res.status_code, 503)
+        self.assertEqual(res.json(), {"detail": "Banco indisponível."})
+
 
 class TestAuthAndTokens(BackendApiTestCase):
     def test_login_sucesso_retorna_tokens_e_usuario(self):

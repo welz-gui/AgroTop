@@ -91,6 +91,7 @@ from database import (
     set_lote_poligono,
 )
 from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams
+from repositories.conexao import ping as ping_banco
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import (
     WeighingCreate,
@@ -140,6 +141,20 @@ app.add_middleware(SlowAPIMiddleware)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "app": "AgroTop Backend API"}
+
+
+@app.get("/health/db")
+@limiter.limit("30/hour")
+def health_db(request: Request) -> dict[str, str]:
+    """Consulta real ao banco. Chamado a cada 2 dias por
+    `.github/workflows/keepalive-db.yml` para o Supabase gratuito não pausar o
+    projeto por inatividade; 503 com o banco pausado faz o workflow falhar."""
+    try:
+        ping_banco()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Banco indisponível.")
+    return {"status": "ok", "db": "ok"}
 
 
 @app.get("/dashboard/resumo", response_model=DashboardResumoOutput)
