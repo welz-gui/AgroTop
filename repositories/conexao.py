@@ -248,6 +248,17 @@ def _conn():
     finally:
         _devolver(con, quebrada)
 
+
+def ping() -> None:
+    """Uma consulta real a uma tabela do negócio, para `GET /health/db`.
+
+    O Supabase gratuito pausa o projeto após 7 dias sem atividade; relatos da
+    comunidade dizem que consulta real conta e conexão aberta sozinha pode não
+    contar, então não basta um `SELECT 1`. Levanta se o banco não responder.
+    """
+    with _conn() as con:
+        con.execute("SELECT COUNT(*) FROM animals").fetchone()
+
 # ─── Cache (reduz consultas repetidas; essencial na nuvem) ───────────────────
 # Estratégia: carregamento em lote. A 1ª chamada busca TODOS os registros de
 # uma vez; as demais são leituras em memória. clear_cache() é chamado após

@@ -1,0 +1,29 @@
+name: Keepalive do banco
+
+# O Supabase gratuito pausa o projeto após 7 dias sem atividade (decisão D3 do
+# plano de rastreabilidade, 07/10/2026: seguir no plano gratuito até o piloto).
+# Este job chama `GET /health/db`, que faz uma consulta real a uma tabela do
+# negócio, a cada 2 dias.
+#
+# Se o banco já estiver pausado (ou a API fora do ar), o endpoint responde 503 e
+# o job FALHA: o e-mail de workflow falho do GitHub é o aviso para restaurar o
+# projeto. Relatos da comunidade dizem que consulta real conta como atividade e
+# que só abrir conexão pode não contar; não é garantia documentada do Supabase.
+# Se mesmo assim pausar, o caminho é o plano Pro (backup diário e sem pausa).
+
+on:
+  schedule:
+    - cron: "17 12 */2 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consulta ao banco via API
+        run: |
+          curl --fail --silent --show-error \
+            --retry 3 --retry-delay 20 --max-time 90 \
+            https://backend-api-463zq4f3da-uc.a.run.app/health/db
