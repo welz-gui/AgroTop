@@ -17,15 +17,22 @@ abstract final class AppColors {
     'sucesso': Color(0xFF4ADE80),
     'sucesso_escuro': Color(0xFF166534),
     'sucesso_fundo': Color(0xFF14532D),
+    'sucesso_secundario': Color(0xFF34D399),
     'atencao': Color(0xFFFBBF24),
     'atencao_escuro': Color(0xFF854D0E),
     'atencao_fundo': Color(0xFF422006),
+    'atencao_fundo_alt': Color(0xFF713F12),
+    'atencao_secundario': Color(0xFFFB923C),
+    'atencao_brilhante': Color(0xFFFACC15),
     'perigo': Color(0xFFF87171),
     'perigo_escuro': Color(0xFF7F1D1D),
     'perigo_fundo': Color(0xFF450A0A),
     'info': Color(0xFF22D3EE),
+    'info_secundario': Color(0xFF3B82F6),
+    'info_texto': Color(0xFF60A5FA),
     'info_fundo': Color(0xFF1E3A5F),
     'destaque': Color(0xFFA78BFA),
+    'destaque_secundario': Color(0xFFF472B6),
   };
 
   static const light = <String, Color>{
@@ -41,15 +48,22 @@ abstract final class AppColors {
     'sucesso': Color(0xFF15803D),
     'sucesso_escuro': Color(0xFF166534),
     'sucesso_fundo': Color(0xFFDCFCE7),
+    'sucesso_secundario': Color(0xFF059669),
     'atencao': Color(0xFFB45309),
     'atencao_escuro': Color(0xFF854D0E),
     'atencao_fundo': Color(0xFFFEF3C7),
+    'atencao_fundo_alt': Color(0xFFFEF9C3),
+    'atencao_secundario': Color(0xFFEA580C),
+    'atencao_brilhante': Color(0xFFCA8A04),
     'perigo': Color(0xFFB91C1C),
     'perigo_escuro': Color(0xFF7F1D1D),
     'perigo_fundo': Color(0xFFFEE2E2),
     'info': Color(0xFF0E7490),
+    'info_secundario': Color(0xFF2563EB),
+    'info_texto': Color(0xFF1D4ED8),
     'info_fundo': Color(0xFFCFFAFE),
     'destaque': Color(0xFF6D28D9),
+    'destaque_secundario': Color(0xFFDB2777),
   };
 }
 
@@ -90,9 +104,7 @@ abstract final class AppThemes {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
