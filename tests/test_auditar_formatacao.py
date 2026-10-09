@@ -27,6 +27,10 @@ class TestHelpersFormatacao(unittest.TestCase):
         self.assertEqual(_num_br(None), "None")
         self.assertEqual(_num_br("invalido"), "invalido")
 
+    def test_num_br_error_paths(self):
+        self.assertEqual(_num_br({}), "{}")
+        self.assertEqual(_num_br("invalid"), "invalid")
+
     def test_data_br_formatos_aceitos(self):
         self.assertEqual(_data_br("2026-09-15"), "15/09/2026")
         self.assertEqual(_data_br(date(2026, 9, 15)), "15/09/2026")
