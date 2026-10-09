@@ -50,7 +50,7 @@ USE_PG = bool(DATABASE_URL)
 
 if USE_PG:
     import psycopg2
-    import psycopg2.extras
+    from psycopg2.extras import DictCursor
     IntegrityError = psycopg2.IntegrityError
 else:
     IntegrityError = sqlite3.IntegrityError
@@ -127,14 +127,14 @@ class _PGConn:
 
     def execute(self, sql, params=()):
         self._abre_transacao_se_escrita(sql)
-        cur = self.raw.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur = self.raw.cursor(cursor_factory=DictCursor)
         cur.execute(_translate(sql), params)
         return cur
 
     def executemany(self, sql, params_seq):
         # Sempre escrita (INSERT/UPDATE em lote) — nunca SELECT.
         self._abre_transacao_se_escrita(sql)
-        cur = self.raw.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur = self.raw.cursor(cursor_factory=DictCursor)
         cur.executemany(_translate(sql), params_seq)
         return cur
 
