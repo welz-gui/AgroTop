@@ -73,10 +73,13 @@ def get_all_animal_ids(status: str = "ativo") -> set[str]:
     with _conn() as con:
         return {r["id"] for r in con.execute(sql, (status,)).fetchall()}
 
+
 @_cache
-def get_total_gain_kg(status: Optional[str] = "ativo",
-                      lote_id: Optional[str] = None,
-                      breed: Optional[str] = None) -> float:
+def get_total_gain_kg(
+    status: Optional[str] = "ativo",
+    lote_id: Optional[str] = None,
+    breed: Optional[str] = None,
+) -> float:
     sql = "SELECT SUM(current_weight - entry_weight) FROM animals WHERE 1=1"
     args = []
     if status:
@@ -92,37 +95,49 @@ def get_total_gain_kg(status: Optional[str] = "ativo",
         result = con.execute(sql, args).fetchone()
         return float(result[0]) if result and result[0] is not None else 0.0
 
+
 @_cache
-def get_all_animals(status: Optional[str] = "ativo",
-                    lote_id: Optional[str] = None,
-                    breed: Optional[str] = None,
-                    id_contains: Optional[str] = None) -> list[dict]:
-    sql  = "SELECT a.*, f.name as fornecedor_name FROM animals a LEFT JOIN fornecedores f ON f.id=a.fornecedor_id WHERE 1=1"
+def get_all_animals(
+    status: Optional[str] = "ativo",
+    lote_id: Optional[str] = None,
+    breed: Optional[str] = None,
+    id_contains: Optional[str] = None,
+) -> list[dict]:
+    sql = "SELECT a.*, f.name as fornecedor_name FROM animals a LEFT JOIN fornecedores f ON f.id=a.fornecedor_id WHERE 1=1"
     args: list = []
     if status:
-        sql += " AND a.status=?"; args.append(status)
+        sql += " AND a.status=?"
+        args.append(status)
     if lote_id:
-        sql += " AND a.lote_id=?"; args.append(lote_id)
+        sql += " AND a.lote_id=?"
+        args.append(lote_id)
     if breed:
-        sql += " AND a.breed=?"; args.append(breed)
+        sql += " AND a.breed=?"
+        args.append(breed)
     if id_contains:
-        sql += " AND LOWER(a.id) LIKE LOWER(?)"; args.append(f"%{id_contains}%")
+        sql += " AND LOWER(a.id) LIKE LOWER(?)"
+        args.append(f"%{id_contains}%")
     sql += " ORDER BY a.id"
     with _conn() as con:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
-def count_animals(status: Optional[str] = "ativo",
-                  lote_id: Optional[str] = None,
-                  breed: Optional[str] = None) -> int:
-    sql  = "SELECT COUNT(*) FROM animals a WHERE 1=1"
+def count_animals(
+    status: Optional[str] = "ativo",
+    lote_id: Optional[str] = None,
+    breed: Optional[str] = None,
+) -> int:
+    sql = "SELECT COUNT(*) FROM animals a WHERE 1=1"
     args: list = []
     if status:
-        sql += " AND a.status=?"; args.append(status)
+        sql += " AND a.status=?"
+        args.append(status)
     if lote_id:
-        sql += " AND a.lote_id=?"; args.append(lote_id)
+        sql += " AND a.lote_id=?"
+        args.append(lote_id)
     if breed:
-        sql += " AND a.breed=?"; args.append(breed)
+        sql += " AND a.breed=?"
+        args.append(breed)
     with _conn() as con:
         return con.execute(sql, args).fetchone()[0]
 
@@ -149,11 +164,13 @@ def add_animal(data: AnimalData) -> None:
         # É o que permite a B4.3 exigir a coluna depois.
         if data.property_id is None and data.lote_id:
             r = con.execute(
-                "SELECT property_id FROM lotes WHERE id=?", (data.lote_id,)).fetchone()
+                "SELECT property_id FROM lotes WHERE id=?", (data.lote_id,)
+            ).fetchone()
             data.property_id = r["property_id"] if r else None
         if data.property_id is None:
             r = con.execute(
-                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
+                "SELECT id FROM properties ORDER BY created_at LIMIT 1"
+            ).fetchone()
             data.property_id = r["id"] if r else None
 
         con.execute(
@@ -162,73 +179,135 @@ def add_animal(data: AnimalData) -> None:
                 gta_number,entry_date,entry_weight,current_weight,target_weight,
                 purchase_price,purchase_mode,lote_id,property_id,fornecedor_id,notes)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (data.animal_id, _uuid_novo, data.breed, data.sex, data.birth_date or None,
-             int(data.birth_estimated), data.age_source,
-             data.nf_number or None, data.gta_number or None, data.entry_date,
-             data.entry_weight, data.entry_weight, data.target_weight, data.purchase_price,
-             data.purchase_mode, data.lote_id or None, data.property_id,
-             data.fornecedor_id or None, data.notes),
+            (
+                data.animal_id,
+                _uuid_novo,
+                data.breed,
+                data.sex,
+                data.birth_date or None,
+                int(data.birth_estimated),
+                data.age_source,
+                data.nf_number or None,
+                data.gta_number or None,
+                data.entry_date,
+                data.entry_weight,
+                data.entry_weight,
+                data.target_weight,
+                data.purchase_price,
+                data.purchase_mode,
+                data.lote_id or None,
+                data.property_id,
+                data.fornecedor_id or None,
+                data.notes,
+            ),
         )
         con.execute(
             "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method) VALUES(?,?,?,?,?,?)",
-            (_uuid_novo, data.entry_weight, data.entry_date, data.lote_id or None,
-             "Cadastro", data.weight_method),
+            (
+                _uuid_novo,
+                data.entry_weight,
+                data.entry_date,
+                data.lote_id or None,
+                "Cadastro",
+                data.weight_method,
+            ),
         )
         # Registra custo de compra apenas para animais adquiridos
-        if data.age_source != "propriedade" and data.purchase_price and data.purchase_price > 0:
+        if (
+            data.age_source != "propriedade"
+            and data.purchase_price
+            and data.purchase_price > 0
+        ):
             con.execute(
                 "INSERT INTO animal_costs (animal_uuid,cost_type,description,amount,cost_date) VALUES(?,?,?,?,?)",
-                (_uuid_novo, "compra", "Valor de compra", data.purchase_price,
-                 data.entry_date),
+                (
+                    _uuid_novo,
+                    "compra",
+                    "Valor de compra",
+                    data.purchase_price,
+                    data.entry_date,
+                ),
             )
         if data.lote_id:
             con.execute(
                 "INSERT INTO animal_movements (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,operator) VALUES(?,?,?,?,?,?)",
-                (_uuid_novo, None, data.lote_id, data.entry_date, "entrada", "Cadastro"),
+                (
+                    _uuid_novo,
+                    None,
+                    data.lote_id,
+                    data.entry_date,
+                    "entrada",
+                    "Cadastro",
+                ),
             )
-        eventos.registrar_em(con, _uuid_novo, "cadastro_inicial",
-                             ocorrido_em=data.entry_date,
-                             observacoes=f"{data.breed}, {data.entry_weight} kg")
-        eventos.registrar_em(con, _uuid_novo, "identificacao_interna",
-                             ocorrido_em=data.entry_date,
-                             observacoes=f"brinco {data.animal_id}")
+        eventos.registrar_em(
+            con,
+            _uuid_novo,
+            "cadastro_inicial",
+            ocorrido_em=data.entry_date,
+            observacoes=f"{data.breed}, {data.entry_weight} kg",
+        )
+        eventos.registrar_em(
+            con,
+            _uuid_novo,
+            "identificacao_interna",
+            ocorrido_em=data.entry_date,
+            observacoes=f"brinco {data.animal_id}",
+        )
 
 
 def _mover_animal_em(con, animal_id, params: MovementParams) -> None:
     """O que `move_animal` faz, mas recebendo a conexão de fora — para
     `move_animals_bulk` mover várias cabeças na mesma transação, em vez de
     uma conexão por animal (R8: mesma regra, um lugar só)."""
-    row = con.execute("SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)).fetchone()
+    row = con.execute(
+        "SELECT lote_id, uuid FROM animals WHERE id=?", (animal_id,)
+    ).fetchone()
     if row is None:
         raise ValueError(f"Animal {animal_id} não encontrado.")
     from_lote = row["lote_id"]
     # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
     # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
     destino = con.execute(
-        "SELECT property_id FROM lotes WHERE id=?", (params.to_lote_id,)).fetchone()
+        "SELECT property_id FROM lotes WHERE id=?", (params.to_lote_id,)
+    ).fetchone()
     con.execute(
         "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) "
         "WHERE id=?",
-        (params.to_lote_id, destino["property_id"] if destino else None, animal_id)
+        (params.to_lote_id, destino["property_id"] if destino else None, animal_id),
     )
     con.execute(
         """INSERT INTO animal_movements
            (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
             operator,notes)
            VALUES(?,?,?,?,?,?,?)""",
-        (row["uuid"], from_lote, params.to_lote_id,
-         params.movement_date, params.reason, params.operator, params.notes),
+        (
+            row["uuid"],
+            from_lote,
+            params.to_lote_id,
+            params.movement_date,
+            params.reason,
+            params.operator,
+            params.notes,
+        ),
     )
     eventos.registrar_em(
-        con, row["uuid"], "mudanca_lote", ocorrido_em=params.movement_date,
-        usuario_registro=params.operator, local_interno=params.to_lote_id,
-        observacoes=f"{from_lote or '—'} → {params.to_lote_id} ({params.reason})")
+        con,
+        row["uuid"],
+        "mudanca_lote",
+        ocorrido_em=params.movement_date,
+        usuario_registro=params.operator,
+        local_interno=params.to_lote_id,
+        observacoes=f"{from_lote or '—'} → {params.to_lote_id} ({params.reason})",
+    )
     con.execute(
-        "UPDATE lotes SET last_entry_date=? WHERE id=?", (params.movement_date, params.to_lote_id)
+        "UPDATE lotes SET last_entry_date=? WHERE id=?",
+        (params.movement_date, params.to_lote_id),
     )
     if from_lote:
         con.execute(
-            "UPDATE lotes SET last_exit_date=? WHERE id=?", (params.movement_date, from_lote)
+            "UPDATE lotes SET last_exit_date=? WHERE id=?",
+            (params.movement_date, from_lote),
         )
 
 
@@ -253,16 +332,24 @@ def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
     from_lotes = set()
     with _conn() as con:
         # Get destination property
-        destino = con.execute("SELECT property_id FROM lotes WHERE id=?", (params.to_lote_id,)).fetchone()
+        destino = con.execute(
+            "SELECT property_id FROM lotes WHERE id=?", (params.to_lote_id,)
+        ).fetchone()
         to_property_id = destino["property_id"] if destino else None
 
         chunk_size = 900
         for i in range(0, len(animal_ids), chunk_size):
-            chunk = animal_ids[i:i + chunk_size]
+            chunk = animal_ids[i : i + chunk_size]
             placeholders = ",".join(["?"] * len(chunk))
-            rows = con.execute(f"SELECT id, uuid, lote_id FROM animals WHERE id IN ({placeholders})", chunk).fetchall()
+            rows = con.execute(
+                f"SELECT id, uuid, lote_id FROM animals WHERE id IN ({placeholders})",
+                chunk,
+            ).fetchall()
             for row in rows:
-                animal_data[row["id"]] = {"lote_id": row["lote_id"], "uuid": row["uuid"]}
+                animal_data[row["id"]] = {
+                    "lote_id": row["lote_id"],
+                    "uuid": row["uuid"],
+                }
 
         update_animals_args = []
         insert_movements_args = []
@@ -282,20 +369,44 @@ def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
 
             update_animals_args.append((params.to_lote_id, to_property_id, animal_id))
 
-            insert_movements_args.append((
-                uuid, from_lote, params.to_lote_id, params.movement_date, params.reason, params.operator, params.notes
-            ))
+            insert_movements_args.append(
+                (
+                    uuid,
+                    from_lote,
+                    params.to_lote_id,
+                    params.movement_date,
+                    params.reason,
+                    params.operator,
+                    params.notes,
+                )
+            )
 
             obs = f"{from_lote or '—'} → {params.to_lote_id} ({params.reason})"
             # animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
             # local_interno,responsavel,usuario_registro,origem_informacao,
             # latitude,longitude,observacoes,documento,anexos,
             # justificativa,evento_anterior_id,versao
-            insert_events_args.append((
-                uuid, "mudanca_lote", params.movement_date, agora, None,
-                params.to_lote_id, None, params.operator or None, "web",
-                None, None, obs, None, eventos._json(None), None, None, 1
-            ))
+            insert_events_args.append(
+                (
+                    uuid,
+                    "mudanca_lote",
+                    params.movement_date,
+                    agora,
+                    None,
+                    params.to_lote_id,
+                    None,
+                    params.operator or None,
+                    "web",
+                    None,
+                    None,
+                    obs,
+                    None,
+                    eventos._json(None),
+                    None,
+                    None,
+                    1,
+                )
+            )
 
             if from_lote:
                 from_lotes.add(from_lote)
@@ -305,14 +416,14 @@ def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
         if movidos:
             con.executemany(
                 "UPDATE animals SET lote_id=?, property_id=COALESCE(?, property_id) WHERE id=?",
-                update_animals_args
+                update_animals_args,
             )
             con.executemany(
                 """INSERT INTO animal_movements
                    (animal_uuid,from_lote_id,to_lote_id,movement_date,reason,
                     operator,notes)
                    VALUES(?,?,?,?,?,?,?)""",
-                insert_movements_args
+                insert_movements_args,
             )
             con.executemany(
                 """INSERT INTO animal_events
@@ -321,13 +432,18 @@ def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
                     latitude,longitude,observacoes,documento,anexos,
                     justificativa,evento_anterior_id,versao)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                insert_events_args
+                insert_events_args,
             )
-            con.execute("UPDATE lotes SET last_entry_date=? WHERE id=?", (params.movement_date, params.to_lote_id))
+            con.execute(
+                "UPDATE lotes SET last_entry_date=? WHERE id=?",
+                (params.movement_date, params.to_lote_id),
+            )
 
             if from_lotes:
-                for from_lote in from_lotes:
-                    con.execute("UPDATE lotes SET last_exit_date=? WHERE id=?", (params.movement_date, from_lote))
+                con.executemany(
+                    "UPDATE lotes SET last_exit_date=? WHERE id=?",
+                    [(params.movement_date, from_lote) for from_lote in from_lotes],
+                )
 
     return {"movidos": movidos, "ja_no_destino": ja_no_destino, "erros": erros}
 
@@ -357,7 +473,7 @@ def get_last_movements_bulk(animal_ids: list[str]) -> dict[str, str]:
     with _conn() as con:
         # SQLite limit is typically 999 parameters. Batch by 900.
         for i in range(0, len(animal_ids), 900):
-            batch = animal_ids[i:i+900]
+            batch = animal_ids[i : i + 900]
             placeholders = ",".join("?" for _ in batch)
             sql = f"""
                 SELECT a.id as animal_id, MAX(m.movement_date) as last_movement_date
@@ -373,46 +489,71 @@ def get_last_movements_bulk(animal_ids: list[str]) -> dict[str, str]:
     return last_movements
 
 
-def _generate_animal_seed_records(i: int, today: date, breeds: list[str], lotes: list[str], property_id: str = None) -> tuple:
-    aid          = f"BR{i:04d}"
-    breed        = random.choice(breeds)
-    sex          = random.choice(["M", "F"])
-    days_in      = random.randint(60, 220)
-    days_old     = random.randint(400, 900)
-    birth_date   = (today - timedelta(days=days_old)).isoformat()
-    entry_date   = (today - timedelta(days=days_in)).isoformat()
-    e_weight     = round(random.uniform(220, 320), 1)
-    c_weight     = round(e_weight + random.uniform(30, 110), 1)
-    target_w     = round(random.uniform(480, 520), 1)
-    lote_id      = random.choice(lotes)
-    forn_id      = random.randint(1, 4)
-    price        = round(e_weight * 0.52 / 15 * random.uniform(280, 320), 2)
-    status       = "ativo"
+def _generate_animal_seed_records(
+    i: int, today: date, breeds: list[str], lotes: list[str], property_id: str = None
+) -> tuple:
+    aid = f"BR{i:04d}"
+    breed = random.choice(breeds)
+    sex = random.choice(["M", "F"])
+    days_in = random.randint(60, 220)
+    days_old = random.randint(400, 900)
+    birth_date = (today - timedelta(days=days_old)).isoformat()
+    entry_date = (today - timedelta(days=days_in)).isoformat()
+    e_weight = round(random.uniform(220, 320), 1)
+    c_weight = round(e_weight + random.uniform(30, 110), 1)
+    target_w = round(random.uniform(480, 520), 1)
+    lote_id = random.choice(lotes)
+    forn_id = random.randint(1, 4)
+    price = round(e_weight * 0.52 / 15 * random.uniform(280, 320), 2)
+    status = "ativo"
 
-    src, est = random.choice([
-        ("propriedade", 0), ("propriedade", 0),
-        ("nf_gta", 1), ("operador", 1), ("estimado", 1),
-    ])
-    if i == 13: status = "vendido"
-    if i == 14: status = "morto"
+    src, est = random.choice(
+        [
+            ("propriedade", 0),
+            ("propriedade", 0),
+            ("nf_gta", 1),
+            ("operador", 1),
+            ("estimado", 1),
+        ]
+    )
+    if i == 13:
+        status = "vendido"
+    if i == 14:
+        status = "morto"
 
     a_uuid = novo_uuid()
-    animal_tuple = (aid, a_uuid, breed, sex, birth_date, est, src, entry_date, e_weight,
-         c_weight, target_w, status, lote_id, forn_id, price, property_id)
+    animal_tuple = (
+        aid,
+        a_uuid,
+        breed,
+        sex,
+        birth_date,
+        est,
+        src,
+        entry_date,
+        e_weight,
+        c_weight,
+        target_w,
+        status,
+        lote_id,
+        forn_id,
+        price,
+        property_id,
+    )
 
     weighings_list = []
-    for step, days_back in [(0.0, days_in), (0.5, days_in//2), (1.0, 0)]:
-        w_date   = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
+    for step, days_back in [(0.0, days_in), (0.5, days_in // 2), (1.0, 0)]:
+        w_date = (today - timedelta(days=int(days_in * (1 - step)))).isoformat()
         w_weight = round(e_weight + (c_weight - e_weight) * step, 1)
         weighings_list.append((a_uuid, w_weight, w_date, lote_id, "Sistema"))
 
     medications_list = []
     meds_pool = [
-        ("Ivermectina 1%",  "ml",  10, 21),
-        ("Vacina FMD",      "dose", 2,  0),
-        ("Closantel 10%",   "ml",  10, 28),
-        ("Vitamina ADE",    "ml",  10,  0),
-        ("Oxitetraciclina", "ml",  20, 14),
+        ("Ivermectina 1%", "ml", 10, 21),
+        ("Vacina FMD", "dose", 2, 0),
+        ("Closantel 10%", "ml", 10, 28),
+        ("Vitamina ADE", "ml", 10, 0),
+        ("Oxitetraciclina", "ml", 20, 14),
     ]
     for _ in range(random.randint(1, 2)):
         mn, mu, dose, wd = random.choice(meds_pool)
@@ -422,14 +563,29 @@ def _generate_animal_seed_records(i: int, today: date, breeds: list[str], lotes:
     costs_list = []
     costs_list.append((a_uuid, "compra", "Valor de compra", price, entry_date))
     op_cost = round(days_in * 0.85, 2)
-    costs_list.append((a_uuid, "operacional", "Custeio diário (pasto/água/mão de obra)", op_cost, today.isoformat()))
+    costs_list.append(
+        (
+            a_uuid,
+            "operacional",
+            "Custeio diário (pasto/água/mão de obra)",
+            op_cost,
+            today.isoformat(),
+        )
+    )
 
     movement_tuple = (a_uuid, None, lote_id, entry_date, "entrada", "Sistema")
 
     return animal_tuple, weighings_list, medications_list, costs_list, movement_tuple
 
 
-def _insert_seed_data(con, animals_data, weighings_data, medications_data, animal_costs_data, animal_movements_data):
+def _insert_seed_data(
+    con,
+    animals_data,
+    weighings_data,
+    medications_data,
+    animal_costs_data,
+    animal_movements_data,
+):
     if animals_data:
         con.executemany(
             """INSERT INTO animals
@@ -475,9 +631,9 @@ def _seed_animals(con, property_id: str = None):
         return
 
     random.seed(7)
-    today  = date.today()
+    today = date.today()
     breeds = ["Nelore", "Angus", "Brahman", "Senepol", "Brangus", "Canchim"]
-    lotes  = ["P01", "P01", "P01", "P02", "P02", "P03", "P03", "P03", "CRL"]
+    lotes = ["P01", "P01", "P01", "P02", "P02", "P03", "P03", "P03", "CRL"]
 
     animals_data = []
     weighings_data = []
@@ -486,11 +642,20 @@ def _seed_animals(con, property_id: str = None):
     animal_movements_data = []
 
     for i in range(1, 15):
-        a_tuple, w_list, m_list, c_list, mv_tuple = _generate_animal_seed_records(i, today, breeds, lotes, property_id)
+        a_tuple, w_list, m_list, c_list, mv_tuple = _generate_animal_seed_records(
+            i, today, breeds, lotes, property_id
+        )
         animals_data.append(a_tuple)
         weighings_data.extend(w_list)
         medications_data.extend(m_list)
         animal_costs_data.extend(c_list)
         animal_movements_data.append(mv_tuple)
 
-    _insert_seed_data(con, animals_data, weighings_data, medications_data, animal_costs_data, animal_movements_data)
+    _insert_seed_data(
+        con,
+        animals_data,
+        weighings_data,
+        medications_data,
+        animal_costs_data,
+        animal_movements_data,
+    )
