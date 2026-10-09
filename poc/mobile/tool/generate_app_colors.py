@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -12,12 +12,10 @@ TARGET = Path(__file__).resolve().parents[1] / "lib" / "app_colors.dart"
 
 
 def _load_theme_module():
-    spec = importlib.util.spec_from_file_location("agrotop_tema", SOURCE)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Não foi possível carregar {SOURCE}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    sys.path.insert(0, str(ROOT))
+    import ui.tema as theme
+
+    return theme
 
 
 def _dart_color(value: str) -> str:
