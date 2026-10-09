@@ -13,7 +13,6 @@ Quem executa isto é `tests/test_ui.py`, num subprocesso.
 """
 
 import os
-import sqlite3
 import sys
 import tempfile
 import unittest
