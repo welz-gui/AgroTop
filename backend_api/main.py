@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date
+import hashlib
 import json
 from typing import Annotated, Any, Optional
 
@@ -27,7 +28,7 @@ from backend_api.auth import (
     verify_refresh_token,
 )
 from backend_api.config import ACCESS_TOKEN_EXPIRE_SECONDS
-from backend_api.idempotency import get_cached_response, store_response
+from backend_api.idempotency import executar_idempotente
 from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
@@ -382,39 +383,34 @@ def register_pesagem(
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> Any:
     """Registra uma nova pesagem para o animal autenticado pelo operador."""
-    endpoint = f"/animais/{animal_id}/pesagens"
-    if idempotency_key:
-        cached = get_cached_response(idempotency_key)
-        if cached is not None:
-            response.status_code = cached["status_code"]
-            return cached["response_body"]
+    def executar() -> dict[str, Any]:
+        try:
+            add_weighing(WeighingCreate(
+                animal_id=animal_id,
+                weight=data.peso,
+                weigh_date=data.data,
+                operator=user.get("username", ""),
+                method=data.method,
+                notes=data.notes,
+            ))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            )
 
-    try:
-        add_weighing(WeighingCreate(
-            animal_id=animal_id,
-            weight=data.peso,
-            weigh_date=data.data,
-            operator=user.get("username", ""),
-            method=data.method,
-            notes=data.notes,
-        ))
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        )
+        return {
+            "status": "success",
+            "message": "Pesagem registrada com sucesso.",
+            "animal_id": animal_id,
+            "peso": data.peso,
+            "data": data.data,
+        }
 
-    out = {
-        "status": "success",
-        "message": "Pesagem registrada com sucesso.",
-        "animal_id": animal_id,
-        "peso": data.peso,
-        "data": data.data,
-    }
-    if idempotency_key:
-        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
-
-    return out
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/pesagens", data.model_dump(),
+        response, status.HTTP_201_CREATED, executar,
+    )
 
 
 @app.post("/pesagens/importar-csv", response_model=ImportarPesagensOutput)
@@ -616,30 +612,26 @@ def movimentar_animais(
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, list[str]]:
     """Transfere um ou mais animais para outro piquete (em lote)."""
-    endpoint = "/animais/movimentar"
-    if idempotency_key:
-        cached = get_cached_response(idempotency_key)
-        if cached is not None:
-            response.status_code = cached["status_code"]
-            return cached["response_body"]
-
     motivo = data.reason or "manejo"
     observacoes = data.notes or ""
     operador = user.get("username", "")
 
-    resultado = move_animals_bulk(
-        animal_ids=data.animal_ids,
-        params=MovementParams(
-            to_lote_id=data.to_lote_id,
-            movement_date=data.movement_date,
-            reason=motivo,
-            operator=operador,
-            notes=observacoes,
+    def executar() -> dict[str, list[str]]:
+        return move_animals_bulk(
+            animal_ids=data.animal_ids,
+            params=MovementParams(
+                to_lote_id=data.to_lote_id,
+                movement_date=data.movement_date,
+                reason=motivo,
+                operator=operador,
+                notes=observacoes,
+            )
         )
+
+    return executar_idempotente(
+        idempotency_key, "/animais/movimentar", data.model_dump(),
+        response, status.HTTP_200_OK, executar,
     )
-    if idempotency_key:
-        store_response(idempotency_key, endpoint, status.HTTP_200_OK, resultado)
-    return resultado
 
 
 @app.post("/animais/{animal_id}/fotos", response_model=PhotoUploadOutput, status_code=status.HTTP_201_CREATED)
@@ -651,13 +643,6 @@ def upload_animal_photo(
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, int]:
     """Envia uma foto do animal (JPEG ou PNG, até 5 MB)."""
-    endpoint = f"/animais/{animal_id}/fotos"
-    if idempotency_key:
-        cached = get_cached_response(idempotency_key)
-        if cached is not None:
-            response.status_code = cached["status_code"]
-            return cached["response_body"]
-
     content_type = (data.arquivo.content_type or "").lower().strip()
     if content_type not in ALLOWED_PHOTO_MIMES:
         raise HTTPException(
@@ -675,29 +660,32 @@ def upload_animal_photo(
     mime = "image/jpeg" if content_type in ("image/jpeg", "image/jpg") else "image/png"
     operator = user.get("username", "") if user else ""
 
-    try:
-        add_photo(
-            animal_id=animal_id,
-            image_bytes=content,
-            mime=mime,
-            taken_date=data.taken_date,
-            operator=operator,
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        )
+    def executar() -> dict[str, int]:
+        try:
+            add_photo(
+                animal_id=animal_id,
+                image_bytes=content,
+                mime=mime,
+                taken_date=data.taken_date,
+                operator=operator,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            )
 
-    photos = get_photos(animal_id)
-    if not photos:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao recuperar foto salva.")
+        photos = get_photos(animal_id)
+        if not photos:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao recuperar foto salva.")
 
-    out = {"id": photos[0]["id"]}
-    if idempotency_key:
-        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
+        return {"id": photos[0]["id"]}
 
-    return out
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/fotos",
+        {"sha256": hashlib.sha256(content).hexdigest(), "mime": mime, "taken_date": data.taken_date},
+        response, status.HTTP_201_CREATED, executar,
+    )
 
 
 @app.get("/animais/{animal_id}/fotos", response_model=list[PhotoSummary])
@@ -873,38 +861,34 @@ def register_medicamento(
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> dict[str, Optional[str]]:
     """Registra uma aplicação individual sem movimentar estoque."""
-    endpoint = f"/animais/{animal_id}/medicamentos"
-    if idempotency_key:
-        cached = get_cached_response(idempotency_key)
-        if cached is not None:
-            response.status_code = cached["status_code"]
-            return cached["response_body"]
+    def executar() -> dict[str, Optional[str]]:
+        try:
+            add_medication(MedicationData(
+                animal_id=animal_id,
+                medication_name=data.medicamento,
+                dose=data.dose,
+                unit=data.unidade,
+                application_route=data.via,
+                withdrawal_days=data.carencia_dias,
+                med_date=data.data,
+                applied_by=user.get("username", ""),
+                insumo_id=None,
+                notes=data.notas or "",
+                protocol_id=data.protocolo_id,
+            ))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            )
 
-    try:
-        add_medication(MedicationData(
-            animal_id=animal_id,
-            medication_name=data.medicamento,
-            dose=data.dose,
-            unit=data.unidade,
-            application_route=data.via,
-            withdrawal_days=data.carencia_dias,
-            med_date=data.data,
-            applied_by=user.get("username", ""),
-            insumo_id=None,
-            notes=data.notas or "",
-            protocol_id=data.protocolo_id,
-        ))
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        )
+        carencia_ate = get_withdrawal_end(animal_id)
+        return {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
 
-    carencia_ate = get_withdrawal_end(animal_id)
-    out = {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None}
-    if idempotency_key:
-        store_response(idempotency_key, endpoint, status.HTTP_201_CREATED, out)
-    return out
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/medicamentos", data.model_dump(),
+        response, status.HTTP_201_CREATED, executar,
+    )
 
 
 @app.get("/dispositivos/{codigo_visual}", response_model=DispositivoOutput)

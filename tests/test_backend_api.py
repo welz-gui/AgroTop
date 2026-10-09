@@ -11,6 +11,7 @@ import os
 from services.zootecnia import get_age_display, get_age_category  # noqa: E402
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -29,7 +30,16 @@ from backend_api.config import (
     TOKEN_ISSUER,
     get_secret_key,
 )
-from backend_api.idempotency import get_cached_response, store_response
+from backend_api.idempotency import (
+    PRAZO_RESERVA,
+    ChaveReutilizada,
+    RequisicaoEmAndamento,
+    concluir,
+    get_cached_response,
+    hash_requisicao,
+    reservar,
+    store_response,
+)
 from backend_api.main import app, limiter
 from backend_api.schemas import ConfirmarTratoInput
 from repositories.animais import get_all_animals, get_all_animal_ids, get_animal
@@ -1333,6 +1343,154 @@ class TestIdempotency(BackendApiTestCase):
         cached = get_cached_response("fail-then-retry-key")
         self.assertIsNotNone(cached)
         self.assertEqual(cached["status_code"], 201)
+
+    # --- D2 / lacuna 1: reserva atômica + hash do payload -------------------
+
+    def _pesagens_com_nota(self, nota):
+        with _conn() as con:
+            return len(con.execute("SELECT 1 FROM weighings WHERE notes = ?", (nota,)).fetchall())
+
+    def test_mesma_chave_com_conteudo_diferente_devolve_422_e_nao_grava(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-reusada"}
+        animal_id = get_all_animals()[0]["id"]
+        url = f"/animais/{animal_id}/pesagens"
+        original = {"peso": 400.0, "data": "2026-08-25", "method": "manual", "notes": "hash original"}
+        outro = {"peso": 999.0, "data": "2026-08-25", "method": "manual", "notes": "hash outro"}
+
+        res1 = self.client.post(url, json=original, headers=headers)
+        self.assertEqual(res1.status_code, 201)
+
+        res2 = self.client.post(url, json=outro, headers=headers)
+        self.assertEqual(res2.status_code, 422)
+        self.assertIn("Idempotency-Key", res2.json()["detail"])
+        self.assertEqual(self._pesagens_com_nota("hash outro"), 0)
+
+        # A resposta original continua intacta para quem repete o mesmo pedido.
+        res3 = self.client.post(url, json=original, headers=headers)
+        self.assertEqual(res3.status_code, 201)
+        self.assertEqual(res3.json(), res1.json())
+        self.assertEqual(self._pesagens_com_nota("hash original"), 1)
+
+    def test_mesma_chave_em_outro_animal_devolve_422(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-outro-animal"}
+        animais = get_all_animals()
+        payload = {"peso": 410.0, "data": "2026-08-25", "method": "manual", "notes": "mesmo corpo"}
+
+        res1 = self.client.post(f"/animais/{animais[0]['id']}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res1.status_code, 201)
+        res2 = self.client.post(f"/animais/{animais[1]['id']}/pesagens", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 422)
+        self.assertEqual(self._pesagens_com_nota("mesmo corpo"), 1)
+
+    def test_foto_com_bytes_diferentes_na_mesma_chave_devolve_422(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "foto-chave-reusada"}
+        animal_id = get_all_animals()[0]["id"]
+        jpeg = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xff\xdb\x00C\x00"
+
+        res1 = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("a.jpg", jpeg, "image/jpeg")}, data={"taken_date": "2026-08-25"},
+            headers=headers,
+        )
+        self.assertEqual(res1.status_code, 201)
+        res2 = self.client.post(
+            f"/animais/{animal_id}/fotos",
+            files={"arquivo": ("b.jpg", jpeg + b"\x01", "image/jpeg")}, data={"taken_date": "2026-08-25"},
+            headers=headers,
+        )
+        self.assertEqual(res2.status_code, 422)
+
+    def test_reserva_em_andamento_devolve_409_e_nao_executa_a_escrita(self):
+        """Segunda requisição com a chave reservada e ainda sem resposta não escreve."""
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-em-andamento"}
+        animal_id = get_all_animals()[0]["id"]
+        url = f"/animais/{animal_id}/pesagens"
+        payload = {"peso": 420.0, "data": "2026-08-25", "method": "manual", "notes": "em andamento"}
+
+        reservar("chave-em-andamento", url, hash_requisicao(url, payload))
+
+        res = self.client.post(url, json=payload, headers=headers)
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(self._pesagens_com_nota("em andamento"), 0)
+        # Reserva sem resposta não pode ser lida como resposta guardada.
+        self.assertIsNone(get_cached_response("chave-em-andamento"))
+
+    def test_reservar_so_entrega_a_chave_a_um_chamador(self):
+        h = hash_requisicao("/x", {"a": 1})
+        self.assertIsNone(reservar("chave-unica", "/x", h))
+        with self.assertRaises(RequisicaoEmAndamento):
+            reservar("chave-unica", "/x", h)
+        with self.assertRaises(ChaveReutilizada):
+            reservar("chave-unica", "/x", hash_requisicao("/x", {"a": 2}))
+
+        concluir("chave-unica", 201, {"ok": True})
+        self.assertEqual(
+            reservar("chave-unica", "/x", h),
+            {"status_code": 201, "response_body": {"ok": True}},
+        )
+
+    def test_reserva_abandonada_e_retomada_apos_o_prazo(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-abandonada"}
+        animal_id = get_all_animals()[0]["id"]
+        url = f"/animais/{animal_id}/pesagens"
+        payload = {"peso": 430.0, "data": "2026-08-25", "method": "manual", "notes": "retomada"}
+
+        reservar("chave-abandonada", url, hash_requisicao(url, payload))
+        velha = (datetime.now(timezone.utc) - PRAZO_RESERVA - timedelta(seconds=1)).isoformat()
+        with _conn() as con:
+            con.execute(
+                "UPDATE api_idempotency_keys SET reservada_em = ? WHERE idempotency_key = ?",
+                (velha, "chave-abandonada"),
+            )
+
+        res = self.client.post(url, json=payload, headers=headers)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(self._pesagens_com_nota("retomada"), 1)
+
+    def test_chave_legada_sem_hash_continua_respondendo_do_cache(self):
+        """Linhas gravadas antes da migração não têm hash: respondem sem checar o corpo."""
+        token = self._get_access_token()
+        animal_id = get_all_animals()[0]["id"]
+        url = f"/animais/{animal_id}/pesagens"
+        legado = {"status": "success", "message": "Pesagem registrada com sucesso.", "animal_id": str(animal_id), "peso": 1.0, "data": "2026-01-01"}
+        store_response("chave-legada", url, 201, legado)
+
+        res = self.client.post(
+            url,
+            json={"peso": 440.0, "data": "2026-08-25", "method": "manual", "notes": "legada"},
+            headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-legada"},
+        )
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.json(), legado)
+        self.assertEqual(self._pesagens_com_nota("legada"), 0)
+
+    def test_hash_nao_depende_da_ordem_das_chaves(self):
+        self.assertEqual(
+            hash_requisicao("/x", {"a": 1, "b": [1, 2]}),
+            hash_requisicao("/x", {"b": [1, 2], "a": 1}),
+        )
+        self.assertNotEqual(hash_requisicao("/x", {"a": 1}), hash_requisicao("/y", {"a": 1}))
+
+    def test_requisicoes_simultaneas_com_a_mesma_chave_gravam_uma_vez(self):
+        token = self._get_access_token()
+        headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-simultanea"}
+        animal_id = get_all_animals()[0]["id"]
+        url = f"/animais/{animal_id}/pesagens"
+        payload = {"peso": 450.0, "data": "2026-08-25", "method": "manual", "notes": "simultanea"}
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            codigos = list(pool.map(
+                lambda _: self.client.post(url, json=payload, headers=headers).status_code,
+                range(6),
+            ))
+
+        self.assertEqual(self._pesagens_com_nota("simultanea"), 1)
+        self.assertTrue(set(codigos) <= {201, 409}, codigos)
 
 
 class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
