@@ -151,7 +151,7 @@ class TestContextoAssistente(unittest.TestCase):
 
 class TestPerguntar(unittest.TestCase):
     def setUp(self):
-        self.post = patch.object(ia.requests, "post").start()
+        self.post = patch.object(ia._session, "post").start()
         self.addCleanup(patch.stopall)
         self.resposta = Mock(status_code=200)
         self.resposta.json.return_value = {

@@ -9,6 +9,8 @@ import requests
 import database as db
 from services.recomendacoes import avaliar
 
+_session = requests.Session()
+
 # Catálogo e endpoint público confirmados em 2026-09-09. Pode ser substituído
 # por OPENROUTER_MODEL na UI, sem alterar este módulo.
 MODELO_PADRAO = "google/gemma-4-31b-it:free"
@@ -120,7 +122,7 @@ def perguntar(
     # e escolher endpoint compatível. Sem troca automática nesta v1.
     # https://openrouter.ai/docs/guides/features/zdr (2026-09-09).
     try:
-        resposta = requests.post(
+        resposta = _session.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}"},
             json=payload,
