@@ -12,6 +12,7 @@ uma vez. **Não adicione regra de negócio nova aqui**: ela vai para `services/`
 
 import os
 import json
+from collections import defaultdict
 from datetime import datetime, date, timedelta
 from typing import Optional
 from dataclasses import dataclass
@@ -2161,43 +2162,51 @@ def admin_apply_changes(table: str, updates: list[dict],
         qt = _quote_ident(table)
         qpk = _quote_ident(pk)
         # Exclusões
-        for pkv in delete_pks:
+        if delete_pks:
             # Seguro: qt e qpk são validados via ADMIN_TABLES e PRAGMA e scappados via _quote_ident.
-            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))  # nosec B608
-            n_del += 1
+            con.executemany(f"DELETE FROM {qt} WHERE {qpk}=?", [(pkv,) for pkv in delete_pks])  # nosec B608
+            n_del += len(delete_pks)
+
         # Atualizações
+        update_groups = defaultdict(list)
         for row in updates:
             pkv = row.get(pk)
             fields = {k: v for k, v in row.items() if k in valid and k != pk}
             if not fields:
                 continue
-            sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
+            update_groups[tuple(fields.keys())].append(tuple(fields.values()) + (pkv,))
+            n_upd += 1
+
+        for keys, vals in update_groups.items():
+            sets = ", ".join(f"{_quote_ident(k)}=?" for k in keys)
             # Seguro: B608 falso positivo. O nome da tabela (qt)
             # whitelist (ADMIN_TABLES) antes desta função. As colunas (sets)
             # e pk vêm diretamente do esquema do banco (PRAGMA table_info/),
             # todas filtradas pelo set 'valid' e seguramente escapadas com
             # _quote_ident. Os dados manipulados são estritamente binds SQL
             # passados como parâmetros, neutralizando qualquer injeção.
-            con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
-                        (*fields.values(), pkv))
-            n_upd += 1
+            con.executemany(f"UPDATE {qt} SET {sets} WHERE {qpk}=?", vals)  # nosec B608
+
         # Inserções
+        insert_groups = defaultdict(list)
         for row in inserts:
             fields = {k: v for k, v in row.items()
                       if k in valid and v is not None and str(v) != ""}
             if not fields:
                 continue
-            placeholders = ", ".join("?" for _ in fields)
-            cols_str = ", ".join(_quote_ident(k) for k in fields)
+            insert_groups[tuple(fields.keys())].append(tuple(fields.values()))
+            n_ins += 1
+
+        for keys, vals in insert_groups.items():
+            placeholders = ", ".join("?" for _ in keys)
+            cols_str = ", ".join(_quote_ident(k) for k in keys)
             # Seguro: B608 falso positivo. O nome da tabela e as colunas
             # inseridas obedecem estritamente à whitelist de ADMIN_TABLES
             # e ao esquema da tabela retornado pela query protegida do
             # banco, escapadas adequadamente com _quote_ident. Valores
             # injetados são puramente binds SQL (?/%s).
-            con.execute(
-                f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
-                tuple(fields.values()))
-            n_ins += 1
+            con.executemany(
+                f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})", vals)  # nosec B608
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
 
 
