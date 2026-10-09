@@ -153,10 +153,10 @@ def criar(tipo: str, *, propriedade_origem_id: Optional[str] = None,
              titular_origem_id, titular_destino_id, finalidade or None,
              data_prevista or None, transportador or None, veiculo or None,
              gta_numero or None, documento_comercial or None))
-        for u in (animais or []):
-            con.execute(
+        if animais:
+            con.executemany(
                 "INSERT INTO movimentacao_animais (movimentacao_id,animal_uuid) "
-                "VALUES(?,?)", (mid, u))
+                "VALUES(?,?)", [(mid, u) for u in animais])
 
     eventos.auditar("criacao_de_movimentacao", usuario=usuario,
                     entidade="movimentacoes", entidade_id=mid,
