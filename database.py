@@ -2161,10 +2161,10 @@ def admin_apply_changes(table: str, updates: list[dict],
         qt = _quote_ident(table)
         qpk = _quote_ident(pk)
         # Exclusões
-        for pkv in delete_pks:
+        if delete_pks:
             # Seguro: qt e qpk são validados via ADMIN_TABLES e PRAGMA e scappados via _quote_ident.
-            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))  # nosec B608
-            n_del += 1
+            con.executemany(f"DELETE FROM {qt} WHERE {qpk}=?", [(pkv,) for pkv in delete_pks])  # nosec B608
+            n_del += len(delete_pks)
         # Atualizações
         for row in updates:
             pkv = row.get(pk)
