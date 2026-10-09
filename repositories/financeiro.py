@@ -34,6 +34,17 @@ class AnimalCostData:
     notes: str = ""
 
 
+@dataclass
+class FixedCostData:
+    category: str
+    description: str
+    amount: float
+    cost_date: str
+    recurring: int = 0
+    notes: str = ""
+    lote_id: Optional[str] = None
+
+
 @_cache
 def _costs_by_animal() -> dict:
     """Soma de custos por animal. 1 consulta."""
@@ -94,8 +105,7 @@ def add_animal_cost(data: AnimalCostData) -> None:
 
 
 @_writes
-def add_fixed_cost(category, description, amount, cost_date, recurring=0, notes="",
-                   lote_id=None) -> None:
+def add_fixed_cost(data: FixedCostData) -> None:
     """`lote_id` é o centro de custo (o piquete a que este custo fixo pertence).
     `None` é um valor válido — "geral da fazenda", não alocado a um piquete
     específico (salário do gerente, contabilidade) — não "esqueceram de
@@ -105,7 +115,7 @@ def add_fixed_cost(category, description, amount, cost_date, recurring=0, notes=
             """INSERT INTO fixed_costs
                (category,description,amount,cost_date,recurring,notes,lote_id)
                VALUES(?,?,?,?,?,?,?)""",
-            (category, description, amount, cost_date, int(recurring), notes, lote_id),
+            (data.category, data.description, data.amount, data.cost_date, int(data.recurring), data.notes, data.lote_id),
         )
 
 

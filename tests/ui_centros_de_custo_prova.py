@@ -86,9 +86,13 @@ class TestCentrosDeCustoNaTela(unittest.TestCase):
 
     def test_lancar_custo_geral_e_custo_de_piquete_aparecem_separados(self):
         hoje = date.today().isoformat()
-        db.add_fixed_cost("Salários", "Gerente", 5000.0, hoje, 1, "")  # geral
-        db.add_fixed_cost("Aluguel de pastagem", "Piquete X", 1000.0, hoje, 0, "",
-                          lote_id=self.lote["id"])
+        db.add_fixed_cost(db.FixedCostData(
+            category="Salários", description="Gerente", amount=5000.0, cost_date=hoje, recurring=1, notes=""
+        ))  # geral
+        db.add_fixed_cost(db.FixedCostData(
+            category="Aluguel de pastagem", description="Piquete X", amount=1000.0, cost_date=hoje, recurring=0, notes="",
+            lote_id=self.lote["id"]
+        ))
         db.clear_cache()
 
         fixos = db.get_fixed_costs_by_lote(f"{date.today().year}-01-01", hoje)
@@ -101,7 +105,9 @@ class TestCentrosDeCustoNaTela(unittest.TestCase):
         self.assertEqual(self._reais(m["Total no período"]) >= 6000.0, True)
 
     def test_geral_da_fazenda_aparece_na_tabela_quando_ha_custo_sem_lote(self):
-        db.add_fixed_cost("Impostos", "IPTU", 300.0, date.today().isoformat(), 0, "")
+        db.add_fixed_cost(db.FixedCostData(
+            category="Impostos", description="IPTU", amount=300.0, cost_date=date.today().isoformat(), recurring=0, notes=""
+        ))
         db.clear_cache()
 
         at = self._tela()

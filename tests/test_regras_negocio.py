@@ -269,9 +269,13 @@ class TestCustos(BaseRegras):
         finally:
             con.close()
 
-        db.add_fixed_cost("Salários", "Gerente", 5000.0, HOJE.isoformat())
-        db.add_fixed_cost("Aluguel de pastagem", "Piquete 1", 1000.0,
-                          HOJE.isoformat(), lote_id="P1")
+        db.add_fixed_cost(db.FixedCostData(
+            category="Salários", description="Gerente", amount=5000.0, cost_date=HOJE.isoformat()
+        ))
+        db.add_fixed_cost(db.FixedCostData(
+            category="Aluguel de pastagem", description="Piquete 1", amount=1000.0,
+            cost_date=HOJE.isoformat(), lote_id="P1"
+        ))
 
         por_lote = db.get_fixed_costs_by_lote()
         self.assertEqual(por_lote[None], 5000.0)
