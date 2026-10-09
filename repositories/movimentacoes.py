@@ -255,16 +255,14 @@ def confirmar_chegada(movimentacao_id: str, *, data: str, usuario: str,
         if destino and chegaram:
             con.executemany("UPDATE animals SET property_id=? WHERE uuid=?",
                             [(destino, u) for u in chegaram])
-        for u in chegaram:
-            eventos.registrar_em(
-                con, u, "chegada_confirmada", ocorrido_em=data,
-                usuario_registro=usuario, propriedade_id=destino,
-                observacoes=f"movimentação {movimentacao_id[:8]}")
-        for u in faltantes:
-            eventos.registrar_em(
-                con, u, "recusa_recepcao", ocorrido_em=data,
-                usuario_registro=usuario,
-                observacoes="declarado na movimentação e não recebido")
+        eventos.registrar_lote_em(
+            con, chegaram, "chegada_confirmada", ocorrido_em=data,
+            usuario_registro=usuario, propriedade_id=destino,
+            observacoes=f"movimentação {movimentacao_id[:8]}")
+        eventos.registrar_lote_em(
+            con, faltantes, "recusa_recepcao", ocorrido_em=data,
+            usuario_registro=usuario,
+            observacoes="declarado na movimentação e não recebido")
 
     eventos.auditar("confirmacao_de_chegada", usuario=usuario,
                     entidade="movimentacoes", entidade_id=movimentacao_id,

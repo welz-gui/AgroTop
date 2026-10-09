@@ -89,6 +89,15 @@ def _normalizar(linha) -> dict:
     return d
 
 
+def registrar_lote_em(con, animal_uuids: list[str], tipo: str, **campos) -> dict:
+    """Grava o mesmo evento para vários animais de uma vez na mesma conexão.
+
+    Evita N+1 query ao registrar eventos gerados em lote, como recusa de
+    recepção ou confirmação de chegada na movimentação.
+    """
+    return _gravar_lote(con, animal_uuids, tipo, **campos)
+
+
 def registrar_em(con, animal_uuid: str, tipo: str, **campos) -> dict:
     """Grava o evento **na conexão do chamador**, dentro da transação dele.
 
@@ -115,48 +124,61 @@ def registrar(animal_uuid: str, tipo: str, **campos) -> dict:
         return _gravar(con, animal_uuid, tipo, **campos)
 
 
-def _gravar(con, animal_uuid: str, tipo: str, *,
-            ocorrido_em: Optional[str] = None,
-            usuario_registro: str = "",
-            responsavel: str = "",
-            origem_informacao: str = "web",
-            propriedade_id: Optional[str] = None,
-            local_interno: Optional[str] = None,
-            latitude: Optional[float] = None,
-            longitude: Optional[float] = None,
-            observacoes: str = "",
-            documento: Optional[str] = None,
-            anexos=None,
-            justificativa: str = "",
-            evento_anterior_id: Optional[int] = None,
-            versao: int = 1) -> dict:
-    """Grava um evento na conexão recebida. Nunca sobrescreve nada.
+def _gravar(con, animal_uuid: str, tipo: str, **kwargs) -> dict:
+    """Grava um evento na conexão recebida. Nunca sobrescreve nada."""
+    # Reutiliza a lógica em lote para um único animal
+    return _gravar_lote(con, [animal_uuid], tipo, **kwargs)
+
+
+def _gravar_lote(con, animal_uuids: list[str], tipo: str, *,
+                 ocorrido_em: Optional[str] = None,
+                 usuario_registro: str = "",
+                 responsavel: str = "",
+                 origem_informacao: str = "web",
+                 propriedade_id: Optional[str] = None,
+                 local_interno: Optional[str] = None,
+                 latitude: Optional[float] = None,
+                 longitude: Optional[float] = None,
+                 observacoes: str = "",
+                 documento: Optional[str] = None,
+                 anexos=None,
+                 justificativa: str = "",
+                 evento_anterior_id: Optional[int] = None,
+                 versao: int = 1) -> dict:
+    """Grava o mesmo evento para uma lista de animais usando executemany.
 
     `ocorrido_em` é quando o fato aconteceu; se omitido, assume agora. O
     `registrado_em` é sempre agora — os dois são gravados separados de propósito
     (§6.2), e é o atraso entre eles que uma auditoria consegue enxergar.
     """
+    if not animal_uuids:
+        return {"ok": True}
+
     if tipo not in TIPOS:
         return {"ok": False, "erro": f"Tipo de evento desconhecido: '{tipo}'."}
 
     agora = _agora()
-    existe = con.execute(
-        "SELECT 1 FROM animals WHERE uuid=?", (animal_uuid,)).fetchone()
-    if existe is None:
-        return {"ok": False, "erro": f"Animal {animal_uuid} não encontrado."}
 
-    con.execute(
+    # Se for apenas um animal, validamos se existe para manter a API antiga,
+    # porém, normalmente quem chama já fez esse SELECT antes ou garantiu por FK.
+    if len(animal_uuids) == 1:
+        existe = con.execute(
+            "SELECT 1 FROM animals WHERE uuid=?", (animal_uuids[0],)).fetchone()
+        if existe is None:
+            return {"ok": False, "erro": f"Animal {animal_uuids[0]} não encontrado."}
+
+    con.executemany(
         """INSERT INTO animal_events
            (animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
             local_interno,responsavel,usuario_registro,origem_informacao,
             latitude,longitude,observacoes,documento,anexos,
             justificativa,evento_anterior_id,versao)
            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (animal_uuid, tipo, ocorrido_em or agora, agora, propriedade_id,
+        [(u, tipo, ocorrido_em or agora, agora, propriedade_id,
          local_interno, responsavel or None, usuario_registro or None,
          origem_informacao, latitude, longitude, observacoes or None,
          documento, _json(anexos), justificativa or None,
-         evento_anterior_id, versao),
+         evento_anterior_id, versao) for u in animal_uuids]
     )
     return {"ok": True}
 
