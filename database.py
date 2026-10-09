@@ -132,7 +132,7 @@ from repositories.conexao import (  # noqa: F401
 )
 import repositories.conexao as _conexao
 from repositories.conexao import _quote_ident
-
+from collections import defaultdict
 
 
 
@@ -2182,22 +2182,28 @@ def admin_apply_changes(table: str, updates: list[dict],
                         (*fields.values(), pkv))
             n_upd += 1
         # Inserções
+        groups = defaultdict(list)
         for row in inserts:
             fields = {k: v for k, v in row.items()
                       if k in valid and v is not None and str(v) != ""}
             if not fields:
                 continue
-            placeholders = ", ".join("?" for _ in fields)
-            cols_str = ", ".join(_quote_ident(k) for k in fields)
+            keys = tuple(sorted(fields.keys()))
+            groups[keys].append(tuple(fields[k] for k in keys))
+
+        for keys, rows in groups.items():
+            placeholders = ", ".join("?" for _ in keys)
+            cols_str = ", ".join(_quote_ident(k) for k in keys)
             # Seguro: B608 falso positivo. O nome da tabela e as colunas
             # inseridas obedecem estritamente à whitelist de ADMIN_TABLES
             # e ao esquema da tabela retornado pela query protegida do
             # banco, escapadas adequadamente com _quote_ident. Valores
             # injetados são puramente binds SQL (?/%s).
-            con.execute(
+            con.executemany(
                 f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
-                tuple(fields.values()))
-            n_ins += 1
+                rows
+            )
+            n_ins += len(rows)
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
 
 
