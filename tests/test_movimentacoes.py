@@ -13,7 +13,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
