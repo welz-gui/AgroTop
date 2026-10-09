@@ -59,6 +59,7 @@ PROVAS = [
     "tests.ui_tema_nativo_prova", # CSS e Plotly recebem o tema nativo (Spec 0102)
     "tests.ui_sidebar_grupos_prova", # sidebar por tarefa preserva as rotas (Spec 0103)
     "tests.ui_dashboard_acoes_prova", # dashboard com prioridades e alertas acionáveis (Spec 0105)
+    "tests.ui_sanitario_prova", # acesso à tela de calendário sanitário
 ]
 
 
