@@ -3,7 +3,7 @@ import unittest
 from datetime import date, datetime
 from pathlib import Path
 
-from app import _data_br, _num_br
+from app import _data_br, _fmt_dose, _num_br
 from tools.auditar_formatacao import (
     classificar_data,
     classificar_decimal,
@@ -36,6 +36,20 @@ class TestHelpersFormatacao(unittest.TestCase):
         self.assertEqual(_data_br(None), "—")
         self.assertEqual(_data_br(""), "—")
         self.assertEqual(_data_br("data-invalida"), "data-invalida")
+
+    def test_fmt_dose_normal(self):
+        self.assertEqual(_fmt_dose("10", "ml"), "10,0 ml")
+        self.assertEqual(_fmt_dose("10.5", "ml"), "10,5 ml")
+        self.assertEqual(_fmt_dose(2.0, "dose"), "2,0 doses")
+        self.assertEqual(_fmt_dose("1", "comprimido"), "1,0 comprimido")
+        self.assertEqual(_fmt_dose("2", "comprimido"), "2,0 comprimidos")
+
+    def test_fmt_dose_error_paths(self):
+        # ValueError
+        self.assertEqual(_fmt_dose("invalid", "ml"), "invalid ml")
+        # TypeError
+        self.assertEqual(_fmt_dose({}, "ml"), "{} ml")
+        self.assertEqual(_fmt_dose(None, "dose"), "None dose")
 
 
 class TestClassificacaoAuditoria(unittest.TestCase):
