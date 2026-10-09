@@ -5,7 +5,9 @@ em EPSG:4326 consumidas por `services.geometria`.
 """
 
 import json
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
+import defusedxml.common
+import xml.etree.ElementTree as native_ET
 
 
 def ler_geojson(conteudo: str) -> list[tuple[float, float]]:
@@ -93,11 +95,11 @@ def ler_geojson(conteudo: str) -> list[tuple[float, float]]:
     return vertices
 
 
-def _tag_local(elem: ET.Element) -> str:
+def _tag_local(elem: native_ET.Element) -> str:
     return elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
 
 
-def _buscar_primeiro_por_tag(root: ET.Element, nome_tag: str) -> ET.Element | None:
+def _buscar_primeiro_por_tag(root: native_ET.Element, nome_tag: str) -> native_ET.Element | None:
     for elem in root.iter():
         if _tag_local(elem) == nome_tag:
             return elem
@@ -120,7 +122,7 @@ def ler_kml(conteudo: str) -> list[tuple[float, float]]:
 
     try:
         root = ET.fromstring(conteudo.strip())
-    except ET.ParseError as e:
+    except (ET.ParseError, defusedxml.common.DefusedXmlException) as e:
         raise ValueError(f"XML KML inválido ou corrompido: {e}") from e
 
     poligono = _buscar_primeiro_por_tag(root, "Polygon")
