@@ -3,6 +3,7 @@ AgroTop — Sistema de Gestão de Gado de Corte
 PWA responsivo: Streamlit + SQLite + Plotly
 """
 
+from dataclasses import dataclass
 import io
 import html
 import os
@@ -3857,31 +3858,42 @@ def _simulador_get_fixed_costs_apportionment(animals):
                 f"(total R\\$ {total_fix_ano:,.2f} ÷ {len(animals)} animais ativos).")
     return rateio_fixo
 
-def _simulador_calculate_data(animals, base, precos_cat, ajuste_pct, cotacao, rendimento, rateio_fixo, ul):
+@dataclass
+class SimuladorParams:
+    animals: list
+    base: str
+    precos_cat: dict
+    ajuste_pct: float
+    cotacao: float
+    rendimento: float
+    rateio_fixo: float
+    ul: str
+
+def _simulador_calculate_data(params: SimuladorParams):
     sim_rows=[]
     sem_preco=[]
     costs = db._costs_by_animal()
-    for a in animals:
-        tc  = costs.get(a["id"], 0.0) + rateio_fixo
+    for a in params.animals:
+        tc  = costs.get(a["id"], 0.0) + params.rateio_fixo
         band = get_age_category(a.get("birth_date"))
-        if base == "categoria":
-            price_kg = precos_cat.get((band, a["sex"]), 0.0) * (1+ajuste_pct/100)
+        if params.base == "categoria":
+            price_kg = params.precos_cat.get((band, a["sex"]), 0.0) * (1+params.ajuste_pct/100)
             receita  = round(a["current_weight"] * price_kg, 2)
             preco_aplicado = round(price_kg, 2)
             if price_kg <= 0: sem_preco.append(a["id"])
         else:
-            prod    = _live_weight(a["current_weight"], rendimento/100)
-            receita = round(prod * cotacao, 2)
-            preco_aplicado = round(cotacao, 2)
-        prod_disp = _live_weight(a["current_weight"], rendimento/100)
+            prod    = _live_weight(a["current_weight"], params.rendimento/100)
+            receita = round(prod * params.cotacao, 2)
+            preco_aplicado = round(params.cotacao, 2)
+        prod_disp = _live_weight(a["current_weight"], params.rendimento/100)
         lucro = round(receita - tc, 2)
         sim_rows.append({"ID":a["id"],"Categoria":band,
-            "Peso (kg)":a["current_weight"], f"Venda ({ul})":prod_disp,
-            "Preço (R$/kg)":preco_aplicado if base=="categoria" else None,
+            "Peso (kg)":a["current_weight"], f"Venda ({params.ul})":prod_disp,
+            "Preço (R$/kg)":preco_aplicado if params.base=="categoria" else None,
             "Receita (R$)":receita,"Custo Total (R$)":round(tc,2),"Lucro (R$)":lucro,
             "Margem (%)":round(lucro/receita*100,1) if receita else 0})
     df_sim=pd.DataFrame(sim_rows)
-    if base != "categoria" and "Preço (R$/kg)" in df_sim.columns:
+    if params.base != "categoria" and "Preço (R$/kg)" in df_sim.columns:
         df_sim = df_sim.drop(columns=["Preço (R$/kg)"])
     return df_sim, sem_preco
 
@@ -3939,9 +3951,17 @@ def _fin_simulador(animals):
 
     rateio_fixo = _simulador_get_fixed_costs_apportionment(animals)
 
-    df_sim, sem_preco = _simulador_calculate_data(
-        animals, base, precos_cat, ajuste_pct, cotacao, rendimento, rateio_fixo, ul
+    params = SimuladorParams(
+        animals=animals,
+        base=base,
+        precos_cat=precos_cat,
+        ajuste_pct=ajuste_pct,
+        cotacao=cotacao,
+        rendimento=rendimento,
+        rateio_fixo=rateio_fixo,
+        ul=ul,
     )
+    df_sim, sem_preco = _simulador_calculate_data(params)
 
     _simulador_render_results(df_sim, sem_preco, base, arroba_mode, ul)
 
