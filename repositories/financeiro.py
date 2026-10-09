@@ -240,6 +240,76 @@ def _recusar_abate_em_carencia(con, animal_ids: tuple, data_venda: str) -> None:
         raise VendaBloqueadaPorCarencia(bloqueados)
 
 
+def _fetch_animal_costs(con, animais: list[dict]) -> dict[str, float]:
+    """Busca o custo de múltiplos animais em lote."""
+    qmarks = ",".join("?" for _ in animais)
+    animal_ids_tuple = tuple(a["id"] for a in animais)
+    rows = con.execute(
+        f"""SELECT a.id AS animal_id, COALESCE(SUM(c.amount),0) AS total
+           FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
+           WHERE a.id IN ({qmarks})
+           GROUP BY a.id""", animal_ids_tuple
+    ).fetchall()
+    return {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
+
+
+def _process_sale_items(con, animais: list[dict], params: SaleParams, costs_dict: dict[str, float], peso_total: float, lot_ref: Optional[str]) -> tuple[list[tuple], float, float]:
+    """Processa o valor, lucro e os eventos para os itens vendidos."""
+    tot_receita = tot_custo = 0.0
+    sales_data = []
+
+    for a in animais:
+        if params.pricing_mode == "kg":
+            ppk = params.value
+            val = round(a["current_weight"] * params.value, 2)
+        elif params.pricing_mode == "cabeca":
+            ppk = None
+            val = round(params.value, 2)
+        else:  # lote: rateio proporcional ao peso
+            ppk = None
+            val = round(params.value * a["current_weight"] / peso_total, 2)
+
+        custo = costs_dict.get(a["id"], 0.0)
+        lucro = round(val - custo, 2)
+        tot_receita += val
+        tot_custo += custo
+
+        sales_data.append((
+            a["uuid"], params.sale_date, params.sale_type, params.pricing_mode,
+            a["current_weight"], ppk,
+            val, params.buyer or None, lot_ref, custo, lucro, params.operator, params.notes,
+            1 if params.a_prazo else 0
+        ))
+
+        eventos.registrar_em(
+            con, a["uuid"], "venda", ocorrido_em=params.sale_date,
+            usuario_registro=params.operator, documento=lot_ref,
+            observacoes=f"R$ {val:.2f} para {params.buyer or 'comprador nao informado'}")
+
+    return sales_data, tot_receita, tot_custo
+
+
+def _gerar_contas_receber_venda(con, params: SaleParams, tot_receita: float, lot_ref: Optional[str]) -> int:
+    """Gera as parcelas em contas_receber para uma venda a prazo."""
+    if not params.a_prazo or tot_receita <= 0:
+        return 0
+    if not params.primeiro_vencimento:
+        raise ValueError("venda a prazo exige primeiro_vencimento")
+
+    rotulo = f"Venda {lot_ref}" if lot_ref else "Venda"
+    rotulo += f" — {params.buyer or 'comprador não informado'}"
+
+    for p in gerar_parcelas(round(tot_receita, 2), params.num_parcelas, params.primeiro_vencimento):
+        con.execute(
+            """INSERT INTO contas_receber
+               (lot_ref, comprador, descricao, valor, vencimento,
+                parcela_numero, parcela_total, status, operator)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (lot_ref, params.buyer, rotulo, p["valor"], p["vencimento"],
+             p["numero"], p["total"], "aberto", params.operator))
+    return params.num_parcelas
+
+
 @_writes
 def register_sale(params: SaleParams) -> dict:
     """Registra a venda de um ou mais animais.
@@ -271,58 +341,14 @@ def register_sale(params: SaleParams) -> dict:
     lot_ref = f"V{params.sale_date.replace('-','')}-{int(datetime.now().timestamp())%100000}" \
               if (params.pricing_mode == "lote" or len(animais) > 1) else None
 
-    tot_receita = tot_custo = 0.0
-    sales_data = []
-
     with _conn() as con:
         if params.sale_type == "abate":
             _recusar_abate_em_carencia(con, tuple(a["id"] for a in animais), params.sale_date)
 
-        # Optimization: batch costs by passing a list of IDs using an IN clause.
-        # But we need to use _conn() inside our query to fetch costs for these specific animals.
-        # To avoid the abstraction leak with events, we will keep calling eventos.registrar_em().
-        # We can still batch the sales insert and the animal updates.
-
-        # Batch fetching costs
-        qmarks = ",".join("?" for _ in animais)
-        animal_ids_tuple = tuple(a["id"] for a in animais)
-        rows = con.execute(
-            f"""SELECT a.id AS animal_id, COALESCE(SUM(c.amount),0) AS total
-               FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
-               WHERE a.id IN ({qmarks})
-               GROUP BY a.id""", animal_ids_tuple
-        ).fetchall()
-        costs_dict = {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
-
-        for a in animais:
-            if params.pricing_mode == "kg":
-                ppk = params.value
-                val = round(a["current_weight"] * params.value, 2)
-            elif params.pricing_mode == "cabeca":
-                ppk = None
-                val = round(params.value, 2)
-            else:  # lote: rateio proporcional ao peso
-                ppk = None
-                val = round(params.value * a["current_weight"] / peso_total, 2)
-
-            custo = costs_dict.get(a["id"], 0.0)
-            lucro = round(val - custo, 2)
-            tot_receita += val
-            tot_custo += custo
-
-            sales_data.append((
-                a["uuid"], params.sale_date, params.sale_type, params.pricing_mode,
-                a["current_weight"], ppk,
-                val, params.buyer or None, lot_ref, custo, lucro, params.operator, params.notes,
-                1 if params.a_prazo else 0
-            ))
-
-            # Venda e obito mudam status por SQL direto, sem passar por
-            # update_animal_status -- entao o evento precisa ser registrado aqui.
-            eventos.registrar_em(
-                con, a["uuid"], "venda", ocorrido_em=params.sale_date,
-                usuario_registro=params.operator, documento=lot_ref,
-                observacoes=f"R$ {val:.2f} para {params.buyer or 'comprador nao informado'}")
+        costs_dict = _fetch_animal_costs(con, animais)
+        sales_data, tot_receita, tot_custo = _process_sale_items(
+            con, animais, params, costs_dict, peso_total, lot_ref
+        )
 
         con.executemany(
             """INSERT INTO sales
@@ -332,23 +358,13 @@ def register_sale(params: SaleParams) -> dict:
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             sales_data,
         )
+
+        qmarks = ",".join("?" for _ in animais)
+        animal_ids_tuple = tuple(a["id"] for a in animais)
         con.execute(f"UPDATE animals SET status='vendido' WHERE id IN ({qmarks})", animal_ids_tuple)
 
-        n_parcelas_receber = 0
-        if params.a_prazo and tot_receita > 0:
-            if not params.primeiro_vencimento:
-                raise ValueError("venda a prazo exige primeiro_vencimento")
-            rotulo = f"Venda {lot_ref}" if lot_ref else "Venda"
-            rotulo += f" — {params.buyer or 'comprador não informado'}"
-            for p in gerar_parcelas(round(tot_receita, 2), params.num_parcelas, params.primeiro_vencimento):
-                con.execute(
-                    """INSERT INTO contas_receber
-                       (lot_ref, comprador, descricao, valor, vencimento,
-                        parcela_numero, parcela_total, status, operator)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
-                    (lot_ref, params.buyer, rotulo, p["valor"], p["vencimento"],
-                     p["numero"], p["total"], "aberto", params.operator))
-            n_parcelas_receber = params.num_parcelas
+        n_parcelas_receber = _gerar_contas_receber_venda(con, params, tot_receita, lot_ref)
+
     return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
             "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
             "lot_ref": lot_ref, "parcelas_a_receber": n_parcelas_receber}
