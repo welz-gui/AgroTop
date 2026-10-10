@@ -769,6 +769,30 @@ class MockApiServer {
         final body = await _body(request);
         lastMovementBody = body;
         final destination = body['to_lote_id'] as String;
+        final esperado = body['lote_origem_esperado'] as String?;
+        if (esperado != null) {
+          // Mesma regra do servidor: divergente = fora do esperado e do destino.
+          final divergentes = {
+            for (final id in List<String>.from(
+              body['animal_ids'] as List<dynamic>,
+            ))
+              if (_animalLotes[id] != null &&
+                  _animalLotes[id] != esperado &&
+                  _animalLotes[id] != destination)
+                id: _animalLotes[id],
+          };
+          if (divergentes.isNotEmpty) {
+            await _json(request, 409, {
+              'detail': {
+                'mensagem':
+                    '${divergentes.length} animal(is) não estão mais no piquete $esperado',
+                'lote_origem_esperado': esperado,
+                'divergentes': divergentes,
+              },
+            });
+            return;
+          }
+        }
         final movidos = <String>[];
         final jaNoDestino = <String>[];
         final erros = <String>[];
