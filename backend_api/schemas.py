@@ -132,6 +132,13 @@ class MovimentarInput(BaseModel):
     movement_date: str = Field(..., description="Data da movimentação no formato AAAA-MM-DD")
     reason: Optional[str] = Field(default="manejo", description="Motivo da movimentação (default: manejo)")
     notes: Optional[str] = Field(default="", description="Observações opcionais")
+    lote_origem_esperado: Optional[str] = Field(
+        default=None,
+        description=(
+            "Piquete em que o operador viu os animais. Se algum já estiver em outro (e não no destino), "
+            "nada é movido e a API responde 409 com a divergência. Omitido = não confere."
+        ),
+    )
 
 
 class MovimentarOutput(BaseModel):

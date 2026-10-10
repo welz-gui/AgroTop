@@ -44,6 +44,42 @@ class MovementParams:
     reason: str = "manejo"
     operator: str = ""
     notes: str = ""
+    # Piquete em que quem registrou viu os animais (mobile offline, ADR 0006 / D2).
+    # None = não confere (comportamento de sempre: a origem é o que o servidor tem).
+    from_lote_esperado: str | None = None
+
+
+class OrigemDivergente(ValueError):
+    """Animal não está mais no piquete em que o operador o viu.
+
+    `.divergentes` mapeia animal → piquete atual (None = sem piquete). Nada é
+    gravado: quem decide o que fazer é o operador (ADR 0006, zero merge automático).
+    """
+
+    def __init__(self, esperado: str, divergentes: dict):
+        self.esperado = esperado
+        self.divergentes = divergentes
+        super().__init__(
+            f"{len(divergentes)} animal(is) não estão mais no piquete {esperado}: "
+            + ", ".join(f"{a} (agora em {l or 'sem piquete'})" for a, l in divergentes.items())
+        )
+
+
+def _confere_origem(params: MovementParams, atuais: dict) -> None:
+    """Levanta `OrigemDivergente` se algum animal saiu do piquete esperado.
+
+    Animal que já está no destino não é divergência: a movimentação pedida já
+    aconteceu (é o `ja_no_destino`), e recusar impediria repetir um pedido
+    cuja resposta se perdeu.
+    """
+    if params.from_lote_esperado is None:
+        return
+    divergentes = {
+        a: lote for a, lote in atuais.items()
+        if lote != params.from_lote_esperado and lote != params.to_lote_id
+    }
+    if divergentes:
+        raise OrigemDivergente(params.from_lote_esperado, divergentes)
 
 
 def uuid_de(con, animal_id: str) -> str | None:
@@ -202,6 +238,7 @@ def _mover_animal_em(con, animal_id, params: MovementParams) -> None:
     if row is None:
         raise ValueError(f"Animal {animal_id} não encontrado.")
     from_lote = row["lote_id"]
+    _confere_origem(params, {animal_id: from_lote})
     # Mudar de piquete pode mudar de propriedade — a B6 vai tratar isso como
     # evento regulatório de trânsito. Por ora o animal acompanha o piquete.
     destino = con.execute(
@@ -263,6 +300,9 @@ def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
             rows = con.execute(f"SELECT id, uuid, lote_id FROM animals WHERE id IN ({placeholders})", chunk).fetchall()
             for row in rows:
                 animal_data[row["id"]] = {"lote_id": row["lote_id"], "uuid": row["uuid"]}
+
+        # Antes de qualquer escrita: com origem divergente o lote inteiro é recusado.
+        _confere_origem(params, {a: d["lote_id"] for a, d in animal_data.items()})
 
         update_animals_args = []
         insert_movements_args = []

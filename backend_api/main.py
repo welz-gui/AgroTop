@@ -91,7 +91,9 @@ from database import (
     previsao_estoque,
     set_lote_poligono,
 )
-from repositories.animais import get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams
+from repositories.animais import (
+    get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams, OrigemDivergente,
+)
 from repositories.conexao import ping as ping_banco
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import (
@@ -622,16 +624,27 @@ def movimentar_animais(
     operador = user.get("username", "")
 
     def executar() -> dict[str, list[str]]:
-        return move_animals_bulk(
-            animal_ids=data.animal_ids,
-            params=MovementParams(
-                to_lote_id=data.to_lote_id,
-                movement_date=data.movement_date,
-                reason=motivo,
-                operator=operador,
-                notes=observacoes,
+        try:
+            return move_animals_bulk(
+                animal_ids=data.animal_ids,
+                params=MovementParams(
+                    to_lote_id=data.to_lote_id,
+                    movement_date=data.movement_date,
+                    reason=motivo,
+                    operator=operador,
+                    notes=observacoes,
+                    from_lote_esperado=data.lote_origem_esperado,
+                )
             )
-        )
+        except OrigemDivergente as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "mensagem": str(exc),
+                    "lote_origem_esperado": exc.esperado,
+                    "divergentes": exc.divergentes,
+                },
+            )
 
     return executar_idempotente(
         idempotency_key, "/animais/movimentar", data.model_dump(),

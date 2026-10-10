@@ -1520,6 +1520,61 @@ class TestPesagemRetroativaApi(BackendApiTestCase):
         self.assertEqual(len(rows), 2)
 
 
+class TestMovimentarOrigemEsperadaApi(BackendApiTestCase):
+    """D2 / ADR 0006: movimentação offline confere o piquete em que o operador viu os animais."""
+
+    def _setup(self):
+        animais = get_all_animals()
+        lotes = db.get_all_lotes()
+        a1, a2 = animais[0]["id"], animais[1]["id"]
+        origem, outro, destino = (str(lotes[0]["id"]), str(lotes[1]["id"]), str(lotes[2]["id"]))
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id = ?", (origem, a1))
+            con.execute("UPDATE animals SET lote_id = ? WHERE id = ?", (outro, a2))
+        return a1, a2, origem, outro, destino
+
+    def _lote_de(self, animal_id):
+        db.clear_cache()
+        return str(get_animal(animal_id)["lote_id"])
+
+    def test_origem_divergente_devolve_409_com_a_diferenca_e_nao_move_ninguem(self):
+        a1, a2, origem, outro, destino = self._setup()
+        headers = {"Authorization": f"Bearer {self._get_access_token()}", "Idempotency-Key": "mov-origem-1"}
+        payload = {"animal_ids": [a1, a2], "to_lote_id": destino, "movement_date": "2026-08-25",
+                   "lote_origem_esperado": origem}
+
+        res = self.client.post("/animais/movimentar", json=payload, headers=headers)
+
+        self.assertEqual(res.status_code, 409)
+        detalhe = res.json()["detail"]
+        self.assertEqual(detalhe["lote_origem_esperado"], origem)
+        self.assertEqual(detalhe["divergentes"], {a2: outro})
+        self.assertEqual(self._lote_de(a1), origem)
+        self.assertEqual(self._lote_de(a2), outro)
+
+        # O erro não é cacheado: depois que o operador resolve, a mesma chave e o mesmo pedido passam.
+        with _conn() as con:
+            con.execute("UPDATE animals SET lote_id = ? WHERE id = ?", (origem, a2))
+        res2 = self.client.post("/animais/movimentar", json=payload, headers=headers)
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(sorted(res2.json()["movidos"]), sorted([a1, a2]))
+
+    def test_origem_confere_e_sem_o_campo_o_comportamento_e_o_de_sempre(self):
+        a1, a2, origem, outro, destino = self._setup()
+        headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+
+        res = self.client.post("/animais/movimentar", headers=headers, json={
+            "animal_ids": [a1], "to_lote_id": destino, "movement_date": "2026-08-25",
+            "lote_origem_esperado": origem})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["movidos"], [a1])
+
+        res2 = self.client.post("/animais/movimentar", headers=headers, json={
+            "animal_ids": [a2], "to_lote_id": destino, "movement_date": "2026-08-25"})
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(res2.json()["movidos"], [a2])
+
+
 class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
     def _headers(self):
         return {"Authorization": f"Bearer {self._get_access_token()}"}
