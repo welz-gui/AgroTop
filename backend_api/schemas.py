@@ -88,6 +88,9 @@ class PesagemOutput(BaseModel):
     animal_id: Union[str, int]
     peso: float
     data: str
+    # False quando a pesagem é mais antiga que a última (fila offline): entra no
+    # histórico, mas não vira o peso atual. Default True p/ respostas guardadas antes do campo.
+    peso_atual_atualizado: bool = True
 
 
 class LoteSummary(BaseModel):

@@ -360,7 +360,8 @@ class TestPesagensEndpoint(BackendApiTestCase):
         animais = get_all_animals()
         animal_id = animais[0]["id"]
         novo_peso = 465.5
-        data_pesagem = "2026-08-21"
+        # Hoje: a pesagem só vira peso atual se não houver nenhuma mais recente.
+        data_pesagem = date.today().isoformat()
 
         payload = {
             "peso": novo_peso,
@@ -1466,7 +1467,7 @@ class TestIdempotency(BackendApiTestCase):
             headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "chave-legada"},
         )
         self.assertEqual(res.status_code, 201)
-        self.assertEqual(res.json(), legado)
+        self.assertEqual(res.json(), {**legado, "peso_atual_atualizado": True})
         self.assertEqual(self._pesagens_com_nota("legada"), 0)
 
     def test_hash_nao_depende_da_ordem_das_chaves(self):
@@ -1491,6 +1492,32 @@ class TestIdempotency(BackendApiTestCase):
 
         self.assertEqual(self._pesagens_com_nota("simultanea"), 1)
         self.assertTrue(set(codigos) <= {201, 409}, codigos)
+
+
+class TestPesagemRetroativaApi(BackendApiTestCase):
+    """D2 / ADR 0006: pesagem atrasada da fila offline não sobrescreve o peso atual."""
+
+    def test_pesagem_antiga_entra_no_historico_e_avisa_que_manteve_o_peso_atual(self):
+        headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+        animal_id = get_all_animals()[0]["id"]
+        url = f"/animais/{animal_id}/pesagens"
+
+        nova = self.client.post(url, headers=headers, json={
+            "peso": 512.0, "data": date.today().isoformat(), "method": "manual", "notes": "retro nova"})
+        self.assertEqual(nova.status_code, 201)
+        self.assertTrue(nova.json()["peso_atual_atualizado"])
+
+        antiga = self.client.post(url, headers=headers, json={
+            "peso": 333.0, "data": "2020-01-01", "method": "manual", "notes": "retro antiga"})
+        self.assertEqual(antiga.status_code, 201)
+        self.assertFalse(antiga.json()["peso_atual_atualizado"])
+        self.assertIn("peso atual", antiga.json()["message"])
+
+        db.clear_cache()
+        self.assertEqual(get_animal(animal_id)["current_weight"], 512.0)
+        with _conn() as con:
+            rows = con.execute("SELECT 1 FROM weighings WHERE notes IN ('retro nova', 'retro antiga')").fetchall()
+        self.assertEqual(len(rows), 2)
 
 
 class TestImportarPesagensCsvEndpoint(BackendApiTestCase):

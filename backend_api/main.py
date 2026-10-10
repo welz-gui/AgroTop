@@ -385,7 +385,7 @@ def register_pesagem(
     """Registra uma nova pesagem para o animal autenticado pelo operador."""
     def executar() -> dict[str, Any]:
         try:
-            add_weighing(WeighingCreate(
+            virou_peso_atual = add_weighing(WeighingCreate(
                 animal_id=animal_id,
                 weight=data.peso,
                 weigh_date=data.data,
@@ -401,10 +401,15 @@ def register_pesagem(
 
         return {
             "status": "success",
-            "message": "Pesagem registrada com sucesso.",
+            "message": (
+                "Pesagem registrada com sucesso."
+                if virou_peso_atual
+                else "Pesagem registrada no histórico; o peso atual do animal foi mantido (há pesagem mais recente)."
+            ),
             "animal_id": animal_id,
             "peso": data.peso,
             "data": data.data,
+            "peso_atual_atualizado": virou_peso_atual,
         }
 
     return executar_idempotente(
