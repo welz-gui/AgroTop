@@ -1009,7 +1009,10 @@ _SCHEMA_SQL = """
                 endpoint        TEXT NOT NULL,
                 status_code     INTEGER NOT NULL,
                 response_body   TEXT NOT NULL,
-                created_at      TEXT DEFAULT (datetime('now','localtime'))
+                created_at      TEXT DEFAULT (datetime('now','localtime')),
+                request_hash    TEXT,
+                estado          TEXT NOT NULL DEFAULT 'concluida',
+                reservada_em    TEXT
             );
 """
 
@@ -1091,6 +1094,14 @@ def _migrate(con) -> None:
         con.execute("ALTER TABLE animals ADD COLUMN purchase_mode TEXT DEFAULT 'cabeca'")
     if "purchase_lot_ref" not in cols:
         con.execute("ALTER TABLE animals ADD COLUMN purchase_lot_ref TEXT")
+    # Spec 0059 / ADR 0006: reserva atômica da chave + hash do payload.
+    icols = {r["name"] for r in con.execute("PRAGMA table_info(api_idempotency_keys)").fetchall()}
+    if "request_hash" not in icols:
+        con.execute("ALTER TABLE api_idempotency_keys ADD COLUMN request_hash TEXT")
+    if "estado" not in icols:
+        con.execute("ALTER TABLE api_idempotency_keys ADD COLUMN estado TEXT NOT NULL DEFAULT 'concluida'")
+    if "reservada_em" not in icols:
+        con.execute("ALTER TABLE api_idempotency_keys ADD COLUMN reservada_em TEXT")
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")

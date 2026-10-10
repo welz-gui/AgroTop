@@ -79,23 +79,37 @@ def get_weighings_batch(animal_ids: set[str]) -> dict[str, list[dict]]:
 
 
 @_writes
-def add_weighing(data: WeighingCreate) -> None:
+def add_weighing(data: WeighingCreate) -> bool:
+    """Registra a pesagem. Devolve True se ela passou a ser o peso atual do animal.
+
+    Pesagem mais antiga que a última já registrada (ou que a entrada do animal)
+    entra no histórico, mas não sobrescreve `current_weight`: a fila offline do
+    mobile pode entregar uma pesagem de dias atrás depois de uma mais nova
+    (ADR 0006, D2). Mesma data conta como mais nova, como sempre foi.
+    """
     with _conn() as con:
         # Busca lote e uuid na mesma consulta (ADR 0004 etapa B1.4).
         a = con.execute(
-            "SELECT lote_id, uuid FROM animals WHERE id=?", (data.animal_id,)
+            "SELECT lote_id, uuid, entry_date FROM animals WHERE id=?", (data.animal_id,)
         ).fetchone()
         if a is None:
             raise ValueError(f"Animal {data.animal_id} não encontrado.")
+        ultima = con.execute(
+            "SELECT MAX(weigh_date) AS d FROM weighings WHERE animal_uuid=?", (a["uuid"],)
+        ).fetchone()["d"]
+        referencia = max((str(d)[:10] for d in (ultima, a["entry_date"]) if d), default="")
         con.execute(
             "INSERT INTO weighings (animal_uuid,weight,weigh_date,lote_id,operator,method,notes) VALUES(?,?,?,?,?,?,?)",
             (a["uuid"], data.weight, data.weigh_date, a["lote_id"], data.operator, data.method, data.notes),
         )
-        con.execute("UPDATE animals SET current_weight=? WHERE id=?", (data.weight, data.animal_id))
+        eh_a_mais_recente = str(data.weigh_date)[:10] >= referencia
+        if eh_a_mais_recente:
+            con.execute("UPDATE animals SET current_weight=? WHERE id=?", (data.weight, data.animal_id))
         # Evento na MESMA transação da pesagem (§6): ou entram os dois, ou nenhum.
         eventos.registrar_em(
             con, a["uuid"], "pesagem", ocorrido_em=data.weigh_date,
             usuario_registro=data.operator, observacoes=f"{data.weight} kg ({data.method})")
+    return eh_a_mais_recente
 
 
 def get_all_weighings() -> list[dict]:
