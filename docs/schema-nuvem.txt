@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-08-19 por tools/dump_schema_nuvem.py
+# Extraído em 2026-10-10 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -62,16 +62,6 @@ animal_photos.taken_date
 animal_photos.operator
 animal_photos.created_at
 animal_photos.animal_uuid
-api_idempotency_keys.idempotency_key
-api_idempotency_keys.endpoint
-api_idempotency_keys.status_code
-api_idempotency_keys.response_body
-api_idempotency_keys.created_at
-api_refresh_tokens.token
-api_refresh_tokens.user_id
-api_refresh_tokens.expires_at
-api_refresh_tokens.revoked
-api_refresh_tokens.created_at
 animals.id
 animals.breed
 animals.sex
@@ -101,6 +91,19 @@ animals.pai_uuid
 animals.parto_id
 animals.peso_nascimento
 animals.origem
+api_idempotency_keys.idempotency_key
+api_idempotency_keys.endpoint
+api_idempotency_keys.status_code
+api_idempotency_keys.response_body
+api_idempotency_keys.created_at
+api_idempotency_keys.request_hash
+api_idempotency_keys.estado
+api_idempotency_keys.reservada_em
+api_refresh_tokens.token
+api_refresh_tokens.user_id
+api_refresh_tokens.expires_at
+api_refresh_tokens.revoked
+api_refresh_tokens.created_at
 audit_logs.id
 audit_logs.usuario
 audit_logs.ocorrido_em
@@ -281,10 +284,10 @@ insumos.unit
 insumos.current_stock
 insumos.min_stock
 insumos.cost_per_unit
-insumos.prazo_reposicao_dias
 insumos.supplier
 insumos.notes
 insumos.created_at
+insumos.prazo_reposicao_dias
 lotes.id
 lotes.name
 lotes.area_ha
@@ -377,14 +380,14 @@ properties.endereco
 properties.latitude
 properties.longitude
 properties.poligono
-properties.car_numero
-properties.poligono_car
-properties.car_area_ha
 properties.atividade
 properties.situacao
 properties.inicio
 properties.encerramento
 properties.created_at
+properties.car_numero
+properties.poligono_car
+properties.car_area_ha
 regras_regulatorias.id
 regras_regulatorias.nome
 regras_regulatorias.descricao
