@@ -86,6 +86,7 @@ class FakeApiClient extends ApiClient {
     String? reason = 'manejo',
     String? notes,
     String? idempotencyKey,
+    String? loteOrigemEsperado,
   }) async {
     movementsReceived.add({
       'animal_ids': animalIds,
@@ -94,6 +95,7 @@ class FakeApiClient extends ApiClient {
       'reason': reason,
       'notes': notes,
       'idempotency_key': idempotencyKey,
+      'lote_origem_esperado': loteOrigemEsperado,
     });
     return MovementResult(
       movidos: animalIds,
@@ -213,6 +215,28 @@ void main() {
       expect(fakeApi.weighingsReceived[0]['idempotency_key'], equals(u1));
       expect(fakeApi.movementsReceived.length, equals(1));
       expect(fakeApi.movementsReceived[0]['idempotency_key'], equals(u2));
+    });
+
+    test('movimentação enfileirada reenvia o piquete de origem esperado', () async {
+      final fakeApi = FakeApiClient();
+      await queue.enqueueMovement(
+        animalIds: ['BR0001'],
+        toLoteId: 'P02',
+        movementDate: '2026-08-27',
+        loteOrigemEsperado: 'P01',
+      );
+      // Item de versão anterior do app: sem o campo, o servidor não confere.
+      await queue.enqueueMovement(
+        animalIds: ['BR0002'],
+        toLoteId: 'P02',
+        movementDate: '2026-08-27',
+      );
+
+      final report = await queue.sync(fakeApi);
+
+      expect(report.sincronizados.length, equals(2));
+      expect(fakeApi.movementsReceived[0]['lote_origem_esperado'], equals('P01'));
+      expect(fakeApi.movementsReceived[1]['lote_origem_esperado'], isNull);
     });
 
     test('item rejeitado pelo servidor (ApiException) sai da fila e vai para rejeitados', () async {

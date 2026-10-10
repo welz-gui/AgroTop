@@ -223,6 +223,47 @@ void main() {
       await api.logout();
     }, PassthroughHttpOverrides());
   });
+
+  test('movimentação com origem divergente recebe 409 e não move ninguém', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      // BR0001 está em P01; o operador acreditava que estava em P02.
+      await expectLater(
+        api.moveAnimals(
+          animalIds: ['BR0001'],
+          toLoteId: 'P03',
+          movementDate: '2026-08-22',
+          loteOrigemEsperado: 'P02',
+        ),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.message, 'message', contains('P02')),
+        ),
+      );
+      expect((await api.getAnimal('BR0001')).loteId, 'P01');
+
+      final ok = await api.moveAnimals(
+        animalIds: ['BR0001'],
+        toLoteId: 'P03',
+        movementDate: '2026-08-22',
+        loteOrigemEsperado: 'P01',
+      );
+      expect(ok.movidos, ['BR0001']);
+      expect(server.lastMovementBody?['lote_origem_esperado'], 'P01');
+    }, PassthroughHttpOverrides());
+  });
 }
 
 Uint8List _testPhoto() {
