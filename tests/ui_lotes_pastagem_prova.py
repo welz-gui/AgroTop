@@ -1,11 +1,10 @@
-"""Testes funcionais e estruturais para a página de lotes.
+"""Testes funcionais para a página de lotes.
 
 Critérios de aceite:
 1. page_lotes mostra as três abas de navegação (Visão Geral, Novo Lote, Transferir).
 2. O alerta de sobreposição aparece quando há lotes com polígonos sobrepostos.
 """
 
-import ast
 import json
 import os
 import sys
@@ -21,22 +20,6 @@ try:
     from streamlit.testing.v1 import AppTest
 except ImportError:
     AppTest = None
-
-
-class TestEstruturalPageLotes(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        with open(os.path.join(RAIZ, "app.py"), encoding="utf-8") as f:
-            cls.codigo = f.read()
-
-    def test_page_lotes_possui_elementos_basicos(self):
-        self.assertIn("def page_lotes():", self.codigo)
-        self.assertIn("lotes=db.get_all_lotes()", self.codigo)
-        self.assertIn("sobrepostos = _sobreposicoes_dos_lotes(lotes)", self.codigo)
-        self.assertIn('st.tabs(["📋 Visão Geral","➕ Novo Lote","🔀 Transferir Animais"])', self.codigo)
-        self.assertIn("_render_tab_visao_geral(lotes)", self.codigo)
-        self.assertIn("_render_tab_novo_lote()", self.codigo)
-        self.assertIn("_lotes_transferir_animais(lotes)", self.codigo)
 
 
 @unittest.skipIf(AppTest is None, "streamlit.testing indisponível")

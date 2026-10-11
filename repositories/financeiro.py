@@ -291,6 +291,8 @@ def _process_sale_items(con, animais: list[dict], params: SaleParams, costs_dict
             1 if params.a_prazo else 0
         ))
 
+        # Venda e obito mudam status por SQL direto, sem passar por
+        # update_animal_status -- entao o evento precisa ser registrado aqui.
         eventos.registrar_em(
             con, a["uuid"], "venda", ocorrido_em=params.sale_date,
             usuario_registro=params.operator, documento=lot_ref,
