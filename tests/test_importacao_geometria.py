@@ -158,6 +158,25 @@ class TestImportacaoGeometria(unittest.TestCase):
         self.assertGreater(area_g, 0.0)
         self.assertAlmostEqual(area_g, area_k, places=2)
 
+    def test_criterio_8_xxe_vulnerability(self):
+        """Critério 8: Documentos com entidades externas maliciosas (XXE) levantam ValueError."""
+        kml_xxe = """<?xml version="1.0"?>
+<!DOCTYPE kml [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<kml>
+  <Polygon>
+    <outerBoundaryIs>
+      <LinearRing>
+        <coordinates>&xxe;</coordinates>
+      </LinearRing>
+    </outerBoundaryIs>
+  </Polygon>
+</kml>"""
+        with self.assertRaises(ValueError) as ctx:
+            ler_kml(kml_xxe)
+        self.assertIn("KML", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
