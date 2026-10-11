@@ -62,6 +62,7 @@ PROVAS = [
     "tests.ui_dashboard_acoes_prova", # dashboard com prioridades e alertas acionáveis (Spec 0105)
     "tests.ui_sanitario_prova", # acesso à tela de calendário sanitário
     "tests.ui_animal_prova", # ficha do animal, estado quando nao encontrado, voltar, metricas
+    "tests.ui_lotes_pastagem_prova", # testes funcionais e estruturais para a página de lotes
 ]
 
 
