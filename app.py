@@ -2104,12 +2104,12 @@ def _cartao_de_evento(e: dict, correcoes: list[dict]):
             f'<b>{rotulo}</b> {"🔺 corrigido depois" if correcoes else ""}<br>'
             f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
             f'ocorreu: {ocorrido} · registrado: {registrado}{atraso}'
-            f'{"  ·  por: " + e["usuario_registro"] if e.get("usuario_registro") else ""}'
+            f'{"  ·  por: " + html.escape(e["usuario_registro"]) if e.get("usuario_registro") else ""}'
             f'</span>'
-            + (f'<br><span style="font-size:.85rem">{e["observacoes"]}</span>'
+            + (f'<br><span style="font-size:.85rem">{html.escape(e["observacoes"])}</span>'
                if e.get("observacoes") else "")
             + (f'<br><span style="color:{c["atencao"]};font-size:.82rem">'
-               f'justificativa: {e["justificativa"]}</span>'
+               f'justificativa: {html.escape(e["justificativa"])}</span>'
                if e.get("justificativa") else "")
             + '</div>', unsafe_allow_html=True)
 
