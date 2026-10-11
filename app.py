@@ -3763,9 +3763,15 @@ def _fin_custos_fixos(animals, lotes):
                 if fx_amount<=0:
                     st.error("O valor deve ser maior que zero.")
                 else:
-                    db.add_fixed_cost(fx_cat, fx_desc, fx_amount,
-                                      fx_date.strftime("%Y-%m-%d"), fx_recur, "",
-                                      lote_id=fx_cc)
+                    db.add_fixed_cost(db.FixedCostData(
+                        category=fx_cat,
+                        description=fx_desc,
+                        amount=fx_amount,
+                        cost_date=fx_date.strftime("%Y-%m-%d"),
+                        recurring=fx_recur,
+                        notes="",
+                        lote_id=fx_cc
+                    ))
                     st.success(f"✅ {fx_cat}: R$ {fx_amount:,.2f} lançado!")
                     st.rerun()
 

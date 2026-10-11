@@ -115,7 +115,9 @@ class TestLancamentosFinanceirosNaTela(unittest.TestCase):
         hoje = date.today().isoformat()
         aid = db.get_all_animals(status="ativo")[0]["id"]
         db.register_sale(db.SaleParams(animal_ids=[aid], sale_date=hoje, sale_type="criacao", pricing_mode="cabeca", value=1500.0))
-        db.add_fixed_cost("Aluguel de pastagem", "prova", 400.0, hoje)
+        db.add_fixed_cost(db.FixedCostData(
+            category="Aluguel de pastagem", description="prova", amount=400.0, cost_date=hoje
+        ))
         db.clear_cache()
 
         from services.lancamentos import normalizar
