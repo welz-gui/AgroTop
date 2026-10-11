@@ -349,8 +349,7 @@ class OfflineQueue {
       'movement_date': movementDate,
       'reason': reason,
       'notes': notes,
-      if (loteOrigemEsperado != null)
-        'lote_origem_esperado': loteOrigemEsperado,
+      'lote_origem_esperado': ?loteOrigemEsperado,
     };
     final item = QueueItem(
       clientUuid: clientUuid,
