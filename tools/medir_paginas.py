@@ -38,7 +38,6 @@ import statistics
 import sys
 import tempfile
 import time
-import urllib.request
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -96,6 +95,7 @@ def _instrumentar():
     sqlite3.connect = _connect_contado
 
     # Previsão do tempo é rede de terceiro: mediria o Open-Meteo, não o AgroTop.
+    import urllib.request
     urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(
         OSError("rede externa desligada durante a medição"))
 

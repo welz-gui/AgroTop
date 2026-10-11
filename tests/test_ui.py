@@ -22,6 +22,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROVAS = [
     "tests.ui_estados_prova",       # máquina de estados na tela de admin
     "tests.ui_integracoes_prova",   # identificadores, consistência e recomendações
+    "tests.ui_cadastrar_prova",     # tela de cadastro
     "tests.ui_nascimento_prova",    # §7.2: bloqueio impede, alerta pede confirmação
     "tests.ui_brincos_prova",       # §5: estado definitivo, divergência, troca
     "tests.ui_movimentacao_prova",  # §8: bloqueio, justificativa escrita, divergência
@@ -59,6 +60,10 @@ PROVAS = [
     "tests.ui_tema_nativo_prova", # CSS e Plotly recebem o tema nativo (Spec 0102)
     "tests.ui_sidebar_grupos_prova", # sidebar por tarefa preserva as rotas (Spec 0103)
     "tests.ui_dashboard_acoes_prova", # dashboard com prioridades e alertas acionáveis (Spec 0105)
+    "tests.ui_sanitario_prova", # acesso à tela de calendário sanitário
+    "tests.ui_animal_prova", # ficha do animal, estado quando nao encontrado, voltar, metricas
+    "tests.ui_lotes_pastagem_prova", # testes funcionais e estruturais para a página de lotes
+    "tests.ui_campo_prova", # modo campo e abas
 ]
 
 

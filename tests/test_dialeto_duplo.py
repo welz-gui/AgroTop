@@ -13,7 +13,6 @@ mais fraca que um banco de verdade, mas é a que cabe num CI sem Postgres — e
 teria pego exatamente o defeito que derrubou a produção.
 """
 
-import ast
 import inspect
 import os
 import sys

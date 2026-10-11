@@ -11,7 +11,6 @@ Sem vigência, a norma de hoje julgaria o que aconteceu antes de ela existir.
 """
 
 import os
-import sqlite3
 import sys
 import tempfile
 import unittest

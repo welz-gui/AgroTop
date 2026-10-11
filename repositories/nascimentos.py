@@ -91,6 +91,82 @@ def avaliar(mae_uuid: Optional[str], nascimento: str,
     return validar_vinculo(cria, mae, contexto)
 
 
+def _validar_registro_parto(dados: RegistroParto) -> tuple[Optional[dict], list[dict]]:
+    if not dados.crias:
+        return {"ok": False, "erro": "Nenhuma cria informada."}, []
+    if dados.data > date.today().isoformat():
+        return {"ok": False, "erro": f"Data de nascimento no futuro: {dados.data}."}, []
+
+    problemas = avaliar(dados.mae_uuid, dados.data, dados.propriedade_id)
+    bloqueios = [p for p in problemas if p["gravidade"] == "bloqueio"]
+    if bloqueios:
+        return {"ok": False, "erro": bloqueios[0]["mensagem"],
+                "problemas": problemas}, problemas
+
+    alertas = [p for p in problemas if p["gravidade"] == "alerta"]
+    if alertas and not dados.ignorar_alertas:
+        return {"ok": False, "exige_confirmacao": True, "problemas": problemas}, problemas
+
+    return None, problemas
+
+
+def _gravar_parto_e_crias(con, dados: RegistroParto, parto_id: str) -> list[str]:
+    propriedade_id = dados.propriedade_id
+    if propriedade_id is None:
+        r = con.execute(
+            "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
+        propriedade_id = r["id"] if r else None
+
+    if dados.mae_uuid:
+        con.execute(
+            """INSERT INTO partos
+               (id,mae_uuid,data,hora,tipo_parto,condicao,propriedade_id,
+                responsavel,data_estimada,observacoes)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (parto_id, dados.mae_uuid, dados.data, dados.hora or None, dados.tipo_parto, dados.condicao,
+             propriedade_id, dados.responsavel or None, int(dados.data_estimada),
+             dados.observacoes or None))
+
+    criadas = []
+    animal_params = []
+
+    for c in dados.crias:
+        uuid_cria = novo_uuid()
+        animal_params.append(
+            (c["id"], uuid_cria, c.get("raca", ""), c.get("sexo", "M"),
+             dados.data, int(dados.data_estimada), "propriedade",
+             dados.data, c.get("peso") or 0, c.get("peso") or 0,
+             c.get("peso_alvo") or 500,
+             c.get("lote_id"), propriedade_id, propriedade_id,
+             dados.mae_uuid, c.get("pai_uuid"),
+             parto_id if dados.mae_uuid else None,
+             c.get("peso"), "nascido")
+        )
+        criadas.append(uuid_cria)
+
+    con.executemany(
+        """INSERT INTO animals
+           (id,uuid,breed,sex,birth_date,birth_estimated,age_source,
+            entry_date,entry_weight,current_weight,target_weight,
+            lote_id,property_id,propriedade_nascimento_id,
+            mae_uuid,pai_uuid,parto_id,peso_nascimento,origem)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        animal_params
+    )
+
+    for uuid_cria in criadas:
+        observacoes_evt = f"parto {dados.tipo_parto}, {dados.condicao}"
+        if len(dados.crias) > 1:
+            observacoes_evt += f", {len(dados.crias)} crias"
+
+        eventos.registrar_em(
+            con, uuid_cria, "nascimento", ocorrido_em=dados.data,
+            usuario_registro=dados.responsavel, propriedade_id=propriedade_id,
+            observacoes=observacoes_evt)
+
+    return criadas
+
+
 @_writes
 def registrar(dados: RegistroParto) -> dict:
     """Registra um parto e as crias dele.
@@ -103,95 +179,22 @@ def registrar(dados: RegistroParto) -> dict:
     "emitir alerta, sem substituir a avaliação técnica". `ignorar_alertas=True`
     é a confirmação de quem avaliou.
     """
-    mae_uuid = dados.mae_uuid
-    data = dados.data
-    crias = dados.crias
-    hora = dados.hora
-    tipo_parto = dados.tipo_parto
-    condicao = dados.condicao
-    propriedade_id = dados.propriedade_id
-    responsavel = dados.responsavel
-    data_estimada = dados.data_estimada
-    observacoes = dados.observacoes
-    ignorar_alertas = dados.ignorar_alertas
-    if not crias:
-        return {"ok": False, "erro": "Nenhuma cria informada."}
-    if data > date.today().isoformat():
-        return {"ok": False, "erro": f"Data de nascimento no futuro: {data}."}
-
-    problemas = avaliar(mae_uuid, data, propriedade_id)
-    bloqueios = [p for p in problemas if p["gravidade"] == "bloqueio"]
-    if bloqueios:
-        return {"ok": False, "erro": bloqueios[0]["mensagem"],
-                "problemas": problemas}
-
-    alertas = [p for p in problemas if p["gravidade"] == "alerta"]
-    if alertas and not ignorar_alertas:
-        return {"ok": False, "exige_confirmacao": True, "problemas": problemas}
+    erro, problemas = _validar_registro_parto(dados)
+    if erro:
+        return erro
 
     parto_id = _novo_parto_id()
     with _conn() as con:
-        if propriedade_id is None:
-            r = con.execute(
-                "SELECT id FROM properties ORDER BY created_at LIMIT 1").fetchone()
-            propriedade_id = r["id"] if r else None
-
-        if mae_uuid:
-            con.execute(
-                """INSERT INTO partos
-                   (id,mae_uuid,data,hora,tipo_parto,condicao,propriedade_id,
-                    responsavel,data_estimada,observacoes)
-                   VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                (parto_id, mae_uuid, data, hora or None, tipo_parto, condicao,
-                 propriedade_id, responsavel or None, int(data_estimada),
-                 observacoes or None))
-
-        criadas = []
-        animal_params = []
-
-        for c in crias:
-            uuid_cria = novo_uuid()
-            animal_params.append(
-                (c["id"], uuid_cria, c.get("raca", ""), c.get("sexo", "M"),
-                 data, int(data_estimada), "propriedade",
-                 data, c.get("peso") or 0, c.get("peso") or 0,
-                 c.get("peso_alvo") or 500,
-                 c.get("lote_id"), propriedade_id, propriedade_id,
-                 mae_uuid, c.get("pai_uuid"),
-                 parto_id if mae_uuid else None,
-                 c.get("peso"), "nascido")
-            )
-
-            criadas.append(uuid_cria)
-
-        con.executemany(
-            """INSERT INTO animals
-               (id,uuid,breed,sex,birth_date,birth_estimated,age_source,
-                entry_date,entry_weight,current_weight,target_weight,
-                lote_id,property_id,propriedade_nascimento_id,
-                mae_uuid,pai_uuid,parto_id,peso_nascimento,origem)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            animal_params
-        )
-
-        for uuid_cria in criadas:
-            observacoes_evt = f"parto {tipo_parto}, {condicao}"
-            if len(crias) > 1:
-                observacoes_evt += f", {len(crias)} crias"
-
-            eventos.registrar_em(
-                con, uuid_cria, "nascimento", ocorrido_em=data,
-                usuario_registro=responsavel, propriedade_id=propriedade_id,
-                observacoes=observacoes_evt)
+        criadas = _gravar_parto_e_crias(con, dados, parto_id)
 
     eventos.auditar(
-        "registro_de_nascimento", usuario=responsavel,
+        "registro_de_nascimento", usuario=dados.responsavel,
         entidade="partos", entidade_id=parto_id,
-        registro_posterior={"mae_uuid": mae_uuid, "data": data,
-                            "crias": [c["id"] for c in crias]},
-        motivo=observacoes)
+        registro_posterior={"mae_uuid": dados.mae_uuid, "data": dados.data,
+                            "crias": [c["id"] for c in dados.crias]},
+        motivo=dados.observacoes)
 
-    return {"ok": True, "parto_id": parto_id if mae_uuid else None,
+    return {"ok": True, "parto_id": parto_id if dados.mae_uuid else None,
             "crias": criadas, "problemas": problemas}
 
 

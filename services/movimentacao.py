@@ -42,34 +42,9 @@ def _p(codigo: str, gravidade: str, mensagem: str) -> dict:
     return {"codigo": codigo, "gravidade": gravidade, "mensagem": mensagem}
 
 
-def pre_validar_saida(movimentacao: dict, animais: list[dict],
-                      contexto: Optional[dict] = None) -> list[dict]:
-    """Problemas antes de liberar a saída. Lista vazia = pode liberar.
 
-    `movimentacao`: {
-        "tipo", "propriedade_origem_id", "propriedade_destino_id",
-        "finalidade", "data_prevista", "gta_numero", "status",
-    }
-    `animais`: [{
-        "id", "uuid", "status", "property_id",
-        "tem_identificacao_oficial": bool,
-        "carencia_ate": "AAAA-MM-DD" | None,
-    }, ...]
-    `contexto`: {
-        "hoje": "AAAA-MM-DD",
-        "animais_em_outra_movimentacao": [uuid, ...],
-        "eventos_pendentes_de_sincronizacao": int,
-        "identificacao_obrigatoria": bool,   # §4.1 vira exigível em 2033
-    }
-
-    Chave ausente no contexto faz a validação correspondente ser **pulada**,
-    não falhar — mesmo contrato de `services/validacao_regulatoria.py`.
-    """
-    contexto = contexto or {}
+def _validar_movimentacao(movimentacao: dict, hoje: date) -> list[dict]:
     problemas: list[dict] = []
-    hoje = _data(contexto.get("hoje")) or date.today()
-
-    # ── A movimentação em si ─────────────────────────────────────────────────
     if movimentacao.get("status") == "concluida":
         problemas.append(_p("movimentacao_ja_concluida", "bloqueio",
                             "Movimentação já concluída não pode ser liberada de novo."))
@@ -93,16 +68,21 @@ def pre_validar_saida(movimentacao: dict, animais: list[dict],
     if not movimentacao.get("gta_numero"):
         problemas.append(_p("sem_gta", "alerta",
                             "Movimentação sem GTA informada."))
+    return problemas
 
-    # ── Os animais ───────────────────────────────────────────────────────────
+
+def _validar_animais(animais: list[dict], movimentacao: dict, contexto: dict, hoje: date) -> list[dict]:
+    problemas: list[dict] = []
     if not animais:
         problemas.append(_p("sem_animais", "bloqueio",
                             "Nenhum animal na movimentação."))
+        return problemas
 
     em_outra = set(contexto.get("animais_em_outra_movimentacao") or [])
     exige_id = contexto.get("identificacao_obrigatoria")
     abate = (movimentacao.get("finalidade") or "").lower() in FINALIDADES_ABATE \
         or movimentacao.get("tipo") == "frigorifico"
+    origem = movimentacao.get("propriedade_origem_id")
 
     for a in animais:
         rot = a.get("id") or a.get("uuid")
@@ -135,12 +115,48 @@ def pre_validar_saida(movimentacao: dict, animais: list[dict],
                 problemas.append(_p("animal_em_carencia_sem_abate", "informativo",
                                     f"Animal {rot} em carência até "
                                     f"{carencia.isoformat()}; destino não é abate."))
+    return problemas
 
-    # ── Sincronização pendente (§8.3) ────────────────────────────────────────
+
+def _validar_sincronizacao(contexto: dict) -> list[dict]:
+    problemas: list[dict] = []
     pend = contexto.get("eventos_pendentes_de_sincronizacao")
     if pend:
         problemas.append(_p("sincronizacao_pendente", "alerta",
                             f"{pend} evento(s) ainda não comunicados ao sistema oficial."))
+    return problemas
+
+def pre_validar_saida(movimentacao: dict, animais: list[dict],
+                      contexto: Optional[dict] = None) -> list[dict]:
+    """Problemas antes de liberar a saída. Lista vazia = pode liberar.
+
+    `movimentacao`: {
+        "tipo", "propriedade_origem_id", "propriedade_destino_id",
+        "finalidade", "data_prevista", "gta_numero", "status",
+    }
+    `animais`: [{
+        "id", "uuid", "status", "property_id",
+        "tem_identificacao_oficial": bool,
+        "carencia_ate": "AAAA-MM-DD" | None,
+    }, ...]
+    `contexto`: {
+        "hoje": "AAAA-MM-DD",
+        "animais_em_outra_movimentacao": [uuid, ...],
+        "eventos_pendentes_de_sincronizacao": int,
+        "identificacao_obrigatoria": bool,   # §4.1 vira exigível em 2033
+    }
+
+    Chave ausente no contexto faz a validação correspondente ser **pulada**,
+    não falhar — mesmo contrato de `services/validacao_regulatoria.py`.
+    """
+    contexto = contexto or {}
+    hoje = _data(contexto.get("hoje")) or date.today()
+
+    problemas: list[dict] = []
+
+    problemas.extend(_validar_movimentacao(movimentacao, hoje))
+    problemas.extend(_validar_animais(animais, movimentacao, contexto, hoje))
+    problemas.extend(_validar_sincronizacao(contexto))
 
     return problemas
 
