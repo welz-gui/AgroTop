@@ -42,6 +42,99 @@ class NovaCompra:
     notes: str = ""
 
 
+def _validar_compra(compra: NovaCompra) -> Optional[dict]:
+    if not compra.itens:
+        return {"ok": False, "erro": "compra sem nenhum item"}
+    for item in compra.itens:
+        if float(item["quantidade"]) <= 0:
+            return {"ok": False, "erro": "quantidade deve ser maior que zero"}
+        if float(item["custo_unitario"]) < 0:
+            return {"ok": False, "erro": "custo unitário não pode ser negativo"}
+    return None
+
+
+def _carregar_estoque_atual(con, itens: list[dict]) -> dict:
+    insumos_db = {}
+    insumo_ids = list({item["insumo_id"] for item in itens})
+    if insumo_ids:
+        placeholders = ",".join("?" for _ in insumo_ids)
+        rows = con.execute(
+            f"SELECT id, current_stock, cost_per_unit FROM insumos WHERE id IN ({placeholders})",
+            insumo_ids,
+        ).fetchall()
+
+        for r in rows:
+            insumos_db[r["id"]] = {
+                "current_stock": float(r["current_stock"] or 0),
+                "cost_per_unit": float(r["cost_per_unit"] or 0),
+            }
+    return insumos_db
+
+
+def _preparar_itens_e_estoque(
+    compra: NovaCompra, compra_id: str, insumos_db: dict
+) -> tuple[list, list, list]:
+    compra_itens_params = []
+    insumo_updates = []
+    insumo_tx_params = []
+
+    for item in compra.itens:
+        insumo_id = item["insumo_id"]
+        quantidade = float(item["quantidade"])
+        custo_unitario = float(item["custo_unitario"])
+        subtotal = round(quantidade * custo_unitario, 2)
+
+        compra_itens_params.append(
+            (compra_id, insumo_id, quantidade, custo_unitario, subtotal)
+        )
+
+        atual = insumos_db.get(insumo_id, {"current_stock": 0.0, "cost_per_unit": 0.0})
+        novo_custo = custo_medio_ponderado(
+            atual["current_stock"], atual["cost_per_unit"], quantidade, custo_unitario
+        )
+
+        atual["current_stock"] += quantidade
+        atual["cost_per_unit"] = novo_custo
+
+        insumo_updates.append((quantidade, novo_custo, insumo_id))
+
+        insumo_tx_params.append(
+            (
+                insumo_id,
+                "entrada",
+                quantidade,
+                "compra",
+                compra.data_recebimento,
+                compra.operator,
+                f"compra {compra_id}",
+                compra_id,
+            )
+        )
+
+    return compra_itens_params, insumo_updates, insumo_tx_params
+
+
+def _preparar_contas_pagar(compra: NovaCompra, compra_id: str, parcelas: list) -> list:
+    rotulo_fornecedor = compra.fornecedor_nome or "fornecedor não informado"
+    rotulo_doc = compra.documento_numero or compra_id[:8]
+    contas_params = []
+    for p in parcelas:
+        contas_params.append(
+            (
+                compra_id,
+                compra.fornecedor_nome,
+                f"Compra {rotulo_doc} — {rotulo_fornecedor}",
+                p["valor"],
+                p["vencimento"],
+                p["numero"],
+                p["total"],
+                "aberto",
+                compra.operator,
+            )
+        )
+    return contas_params
+
+
 @_writes
 def registrar(compra: NovaCompra) -> dict:
     """Registra a compra inteira: cabeçalho, itens, estoque e contas a pagar.
@@ -51,16 +144,14 @@ def registrar(compra: NovaCompra) -> dict:
     `insumo_transactions` vinculada a esta compra. As parcelas usam
     `services.compras.gerar_parcelas` a partir do total real da nota.
     """
-    if not compra.itens:
-        return {"ok": False, "erro": "compra sem nenhum item"}
-    for item in compra.itens:
-        if float(item["quantidade"]) <= 0:
-            return {"ok": False, "erro": "quantidade deve ser maior que zero"}
-        if float(item["custo_unitario"]) < 0:
-            return {"ok": False, "erro": "custo unitário não pode ser negativo"}
+    erro = _validar_compra(compra)
+    if erro:
+        return erro
 
     valor_total = total_compra(compra.itens)
-    parcelas = gerar_parcelas(valor_total, compra.num_parcelas, compra.primeiro_vencimento)
+    parcelas = gerar_parcelas(
+        valor_total, compra.num_parcelas, compra.primeiro_vencimento
+    )
     compra_id = _novo_id()
 
     with _conn() as con:
@@ -69,84 +160,61 @@ def registrar(compra: NovaCompra) -> dict:
                (id, fornecedor_id, fornecedor_nome, documento_numero, documento_serie,
                 data_emissao, data_recebimento, valor_total, operator, notes)
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (compra_id, compra.fornecedor_id, compra.fornecedor_nome, compra.documento_numero,
-             compra.documento_serie, compra.data_emissao, compra.data_recebimento, valor_total,
-             compra.operator, compra.notes))
+            (
+                compra_id,
+                compra.fornecedor_id,
+                compra.fornecedor_nome,
+                compra.documento_numero,
+                compra.documento_serie,
+                compra.data_emissao,
+                compra.data_recebimento,
+                valor_total,
+                compra.operator,
+                compra.notes,
+            ),
+        )
 
-        insumos_db = {}
-        insumo_ids = list({item["insumo_id"] for item in compra.itens})
-        if insumo_ids:
-            placeholders = ",".join("?" for _ in insumo_ids)
-            rows = con.execute(
-                f"SELECT id, current_stock, cost_per_unit FROM insumos WHERE id IN ({placeholders})",
-                insumo_ids).fetchall()
-
-            for r in rows:
-                insumos_db[r["id"]] = {
-                    "current_stock": float(r["current_stock"] or 0),
-                    "cost_per_unit": float(r["cost_per_unit"] or 0)
-                }
-
-        compra_itens_params = []
-        insumo_updates = []
-        insumo_tx_params = []
-
-        for item in compra.itens:
-            insumo_id = item["insumo_id"]
-            quantidade = float(item["quantidade"])
-            custo_unitario = float(item["custo_unitario"])
-            subtotal = round(quantidade * custo_unitario, 2)
-
-            compra_itens_params.append((compra_id, insumo_id, quantidade, custo_unitario, subtotal))
-
-            atual = insumos_db.get(insumo_id, {"current_stock": 0.0, "cost_per_unit": 0.0})
-            novo_custo = custo_medio_ponderado(
-                atual["current_stock"],
-                atual["cost_per_unit"],
-                quantidade, custo_unitario)
-
-            atual["current_stock"] += quantidade
-            atual["cost_per_unit"] = novo_custo
-
-            insumo_updates.append((quantidade, novo_custo, insumo_id))
-
-            insumo_tx_params.append((
-                insumo_id, "entrada", quantidade, "compra", compra.data_recebimento,
-                compra.operator, f"compra {compra_id}", compra_id))
+        insumos_db = _carregar_estoque_atual(con, compra.itens)
+        compra_itens_params, insumo_updates, insumo_tx_params = (
+            _preparar_itens_e_estoque(compra, compra_id, insumos_db)
+        )
 
         con.executemany(
             """INSERT INTO compra_itens
                (compra_id, insumo_id, quantidade, custo_unitario, subtotal)
-               VALUES (?,?,?,?,?)""", compra_itens_params)
+               VALUES (?,?,?,?,?)""",
+            compra_itens_params,
+        )
 
         con.executemany(
             "UPDATE insumos SET current_stock=current_stock+?, cost_per_unit=? WHERE id=?",
-            insumo_updates)
+            insumo_updates,
+        )
 
         con.executemany(
             """INSERT INTO insumo_transactions
                (insumo_id, type, quantity, reason, transaction_date, operator,
                 notes, compra_id)
-               VALUES (?,?,?,?,?,?,?,?)""", insumo_tx_params)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            insumo_tx_params,
+        )
 
-        rotulo_fornecedor = compra.fornecedor_nome or "fornecedor não informado"
-        rotulo_doc = compra.documento_numero or compra_id[:8]
-        contas_params = []
-        for p in parcelas:
-            contas_params.append((
-                compra_id, compra.fornecedor_nome,
-                f"Compra {rotulo_doc} — {rotulo_fornecedor}",
-                p["valor"], p["vencimento"], p["numero"], p["total"],
-                "aberto", compra.operator))
+        contas_params = _preparar_contas_pagar(compra, compra_id, parcelas)
 
         con.executemany(
             """INSERT INTO contas_pagar
                (compra_id, fornecedor_nome, descricao, valor, vencimento,
                 parcela_numero, parcela_total, status, operator)
-               VALUES (?,?,?,?,?,?,?,?,?)""", contas_params)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            contas_params,
+        )
 
-    return {"ok": True, "compra_id": compra_id, "valor_total": valor_total,
-            "parcelas": len(parcelas)}
+    return {
+        "ok": True,
+        "compra_id": compra_id,
+        "valor_total": valor_total,
+        "parcelas": len(parcelas),
+    }
 
 
 def get_compra(compra_id: str) -> Optional[dict]:
@@ -157,10 +225,13 @@ def get_compra(compra_id: str) -> Optional[dict]:
         itens = con.execute(
             """SELECT ci.*, i.name AS insumo_nome, i.unit AS insumo_unidade
                FROM compra_itens ci JOIN insumos i ON i.id=ci.insumo_id
-               WHERE ci.compra_id=?""", (compra_id,)).fetchall()
+               WHERE ci.compra_id=?""",
+            (compra_id,),
+        ).fetchall()
         parcelas = con.execute(
             "SELECT * FROM contas_pagar WHERE compra_id=? ORDER BY parcela_numero",
-            (compra_id,)).fetchall()
+            (compra_id,),
+        ).fetchall()
     out = dict(c)
     out["itens"] = [dict(i) for i in itens]
     out["parcelas"] = [dict(p) for p in parcelas]
@@ -171,7 +242,8 @@ def listar_compras(limit: int = 50) -> list[dict]:
     with _conn() as con:
         rows = con.execute(
             "SELECT * FROM compras ORDER BY data_recebimento DESC, created_at DESC LIMIT ?",
-            (limit,)).fetchall()
+            (limit,),
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -197,7 +269,8 @@ def marcar_pago(conta_id: int, data_pagamento: str, forma_pagamento: str = "") -
         cur = con.execute(
             """UPDATE contas_pagar SET status='pago', data_pagamento=?,
                forma_pagamento=? WHERE id=? AND status='aberto'""",
-            (data_pagamento, forma_pagamento, conta_id))
+            (data_pagamento, forma_pagamento, conta_id),
+        )
         return cur.rowcount > 0
 
 
@@ -207,5 +280,6 @@ def cancelar(conta_id: int) -> bool:
     with _conn() as con:
         cur = con.execute(
             "UPDATE contas_pagar SET status='cancelado' WHERE id=? AND status='aberto'",
-            (conta_id,))
+            (conta_id,),
+        )
         return cur.rowcount > 0
