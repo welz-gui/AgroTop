@@ -1,7 +1,7 @@
 import unittest
 import os
-import sqlite3
 import database as db
+
 
 class TestAdminSecurity(unittest.TestCase):
     def setUp(self):
@@ -19,7 +19,9 @@ class TestAdminSecurity(unittest.TestCase):
         with db._conn() as con:
             con.executescript(db._SCHEMA_SQL)
             # Make sure it creates users
-            con.execute("INSERT INTO users (username, password_hash, name, role) VALUES ('admin', 'hash', 'Admin', 'admin')")
+            con.execute(
+                "INSERT INTO users (username, password_hash, name, role) VALUES ('admin', 'hash', 'Admin', 'admin')"
+            )
             self.user_id = con.execute("SELECT id FROM users").fetchone()["id"]
 
     def tearDown(self):
@@ -41,7 +43,9 @@ class TestAdminSecurity(unittest.TestCase):
         res = db.admin_apply_changes("users", updates, [], [])
         self.assertEqual(res["updated"], 1)
         with db._conn() as con:
-            user = con.execute("SELECT * FROM users WHERE id=?", (self.user_id,)).fetchone()
+            user = con.execute(
+                "SELECT * FROM users WHERE id=?", (self.user_id,)
+            ).fetchone()
             self.assertEqual(user["name"], "Changed")
             self.assertEqual(user["role"], "admin")
 
@@ -51,8 +55,11 @@ class TestAdminSecurity(unittest.TestCase):
         res = db.admin_apply_changes("users", updates, [], [])
         self.assertEqual(res["updated"], 1)
         with db._conn() as con:
-            user = con.execute("SELECT name FROM users WHERE id=?", (self.user_id,)).fetchone()
+            user = con.execute(
+                "SELECT name FROM users WHERE id=?", (self.user_id,)
+            ).fetchone()
             self.assertEqual(user["name"], malicious_value)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
