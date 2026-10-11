@@ -7,6 +7,22 @@ import '../offline_queue.dart';
 import '../shallow_cache.dart';
 import 'offline_cache_banner.dart';
 
+/// Piquete de origem comum a todos os animais, ou null se não há um só.
+///
+/// ponytail: o servidor aceita uma única origem esperada por pedido, então
+/// seleção com piquetes diferentes (ou algum sem piquete) vai sem conferência.
+/// Agrupar por piquete em um pedido por grupo se isso começar a importar.
+String? origemComum(Iterable<Object?> lotes) {
+  String? comum;
+  for (final lote in lotes) {
+    final atual = lote?.toString();
+    if (atual == null || atual.isEmpty) return null;
+    if (comum != null && comum != atual) return null;
+    comum = atual;
+  }
+  return comum;
+}
+
 class MovementPage extends StatefulWidget {
   const MovementPage({
     super.key,
@@ -16,10 +32,14 @@ class MovementPage extends StatefulWidget {
     this.initialDate,
     this.offlineQueue,
     this.shallowCache,
+    this.loteOrigemEsperado,
   });
 
   final ApiClient api;
   final List<String> animalIds;
+  // Piquete em que o operador viu os animais. O servidor recusa a movimentação
+  // (409) se algum já estiver em outro, em vez de gravar com a origem errada.
+  final String? loteOrigemEsperado;
   final VoidCallback onUnauthorized;
   final DateTime? initialDate;
   final OfflineQueue? offlineQueue;
@@ -120,6 +140,7 @@ class _MovementPageState extends State<MovementPage> {
         toLoteId: toLote,
         movementDate: dateVal,
         notes: notesVal,
+        loteOrigemEsperado: widget.loteOrigemEsperado,
       );
       if (mounted) setState(() => _result = result);
     } on ApiException catch (error) {
@@ -136,6 +157,7 @@ class _MovementPageState extends State<MovementPage> {
         toLoteId: toLote,
         movementDate: dateVal,
         notes: notesVal,
+        loteOrigemEsperado: widget.loteOrigemEsperado,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

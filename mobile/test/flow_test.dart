@@ -339,6 +339,8 @@ void main() {
             'movement_date': '2026-08-22',
             'reason': 'manejo',
             'notes': null,
+            // A ficha foi carregada com o animal em P01: é o que o operador viu.
+            'lote_origem_esperado': 'P01',
           });
           currentLote = 'P02';
           return _json({
@@ -791,6 +793,7 @@ void main() {
 
     var movementRequests = 0;
     final sentIds = <String>[];
+    Map<String, dynamic>? sentBody;
     final animals = ['BR0001', 'BR0002', 'BR0003']
         .map(
           (id) => {
@@ -829,6 +832,7 @@ void main() {
             request.url.path == '/animais/movimentar') {
           movementRequests++;
           final body = jsonDecode(request.body) as Map<String, dynamic>;
+          sentBody = body;
           sentIds.addAll(List<String>.from(body['animal_ids'] as List));
           return _json({
             'movidos': ['BR0001'],
@@ -873,6 +877,8 @@ void main() {
 
     expect(movementRequests, 1);
     expect(sentIds, ['BR0001', 'BR0002', 'BR0003']);
+    // Piquetes de origem diferentes (P01, P02, P01): sem conferência de origem.
+    expect(sentBody!.containsKey('lote_origem_esperado'), isFalse);
     expect(find.text('Movidos (1)'), findsOneWidget);
     expect(find.text('• BR0001'), findsOneWidget);
     expect(find.text('Já estavam no destino (1)'), findsOneWidget);

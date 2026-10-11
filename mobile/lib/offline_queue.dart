@@ -340,6 +340,7 @@ class OfflineQueue {
     required String movementDate,
     String? reason = 'manejo',
     String? notes,
+    String? loteOrigemEsperado,
   }) async {
     final clientUuid = _uuid.v4();
     final payload = {
@@ -348,6 +349,7 @@ class OfflineQueue {
       'movement_date': movementDate,
       'reason': reason,
       'notes': notes,
+      'lote_origem_esperado': ?loteOrigemEsperado,
     };
     final item = QueueItem(
       clientUuid: clientUuid,
@@ -440,6 +442,8 @@ class OfflineQueue {
               reason: p['reason'] as String?,
               notes: p['notes'] as String?,
               idempotencyKey: item.clientUuid,
+              // Itens enfileirados antes deste campo não o têm: null = não confere.
+              loteOrigemEsperado: p['lote_origem_esperado']?.toString(),
             );
           }
 

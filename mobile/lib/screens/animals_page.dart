@@ -292,6 +292,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
   });
 
   Future<void> _openMovement(List<String> animalIds) async {
+    final loteVisto = {for (final a in _animals) a.id: a.loteId};
     final moved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => MovementPage(
@@ -300,6 +301,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
           onUnauthorized: widget.onUnauthorized,
           offlineQueue: _offlineQueue,
           shallowCache: _shallowCache,
+          loteOrigemEsperado: origemComum(animalIds.map((id) => loteVisto[id])),
         ),
       ),
     );
@@ -849,7 +851,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     );
   }
 
-  Future<void> _openMovement() async {
+  Future<void> _openMovement(Object? loteVisto) async {
     final moved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => MovementPage(
@@ -858,6 +860,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
           onUnauthorized: widget.onUnauthorized,
           offlineQueue: _offlineQueue,
           shallowCache: _shallowCache,
+          loteOrigemEsperado: origemComum([loteVisto]),
         ),
       ),
     );
@@ -995,7 +998,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const ValueKey('open-movement'),
-              onPressed: _openMovement,
+              onPressed: () => _openMovement(animal.loteId),
               icon: const Icon(Icons.swap_horiz),
               label: const Text('Mover de piquete'),
             ),

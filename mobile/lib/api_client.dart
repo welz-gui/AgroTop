@@ -454,6 +454,7 @@ class ApiClient {
     String? reason = 'manejo',
     String? notes,
     String? idempotencyKey,
+    String? loteOrigemEsperado,
   }) async {
     final response = await _authorized(
       (headers) => _http.post(
@@ -470,6 +471,7 @@ class ApiClient {
           'movement_date': movementDate,
           'reason': reason,
           'notes': notes,
+          'lote_origem_esperado': ?loteOrigemEsperado,
         }),
       ),
     );
@@ -757,6 +759,10 @@ class ApiClient {
     if (body is! Map<String, dynamic>) return fallback;
     final detail = body['detail'];
     if (detail is String) return detail;
+    // 409 de origem divergente na movimentação: {mensagem, divergentes, ...}.
+    if (detail is Map && detail['mensagem'] is String) {
+      return detail['mensagem'] as String;
+    }
     if (detail is List && detail.isNotEmpty) {
       if (detail.first is String) {
         return detail.map((e) => e.toString()).join('\n');
