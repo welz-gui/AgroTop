@@ -55,6 +55,18 @@ class TestHelpersFormatacao(unittest.TestCase):
         self.assertEqual(_fmt_dose({}, "ml"), "{} ml")
         self.assertEqual(_fmt_dose(None, "dose"), "None dose")
 
+    def test_data_br_typeerror_fallback(self):
+        class UnsliceableStr(str):
+            def __getitem__(self, key):
+                raise TypeError("Simulated TypeError on slice")
+
+        class BadObject:
+            def __str__(self):
+                return UnsliceableStr("bad_object")
+
+        obj = BadObject()
+        self.assertEqual(_data_br(obj), "bad_object")
+
 
 class TestClassificacaoAuditoria(unittest.TestCase):
     def test_assinaturas_do_contrato(self):
