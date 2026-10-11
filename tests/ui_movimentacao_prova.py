@@ -23,6 +23,7 @@ import sys
 import tempfile
 import unittest
 from datetime import date, timedelta
+from unittest.mock import patch
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
@@ -124,6 +125,16 @@ class TestTelaMovimentacao(unittest.TestCase):
         at = self._tela()
         self.assertIn("🚚 Movimentação entre Propriedades",
                       " ".join(m.value for m in at.markdown))
+
+    @patch("database.propriedades.listar")
+    def test_avisa_se_so_tem_uma_propriedade(self, mock_listar):
+        """Não permite movimentação se não houver pelo menos 2 propriedades."""
+        mock_listar.return_value = [self.origem]
+        at = self._tela()
+
+        info_texts = " ".join(m.value for m in at.info)
+        self.assertIn("duas ou mais propriedades cadastradas", info_texts)
+        self.assertIn("Para trocar de piquete dentro da mesma fazenda", info_texts)
 
     def test_sem_gta_e_alerta_e_pede_justificativa_escrita(self):
         """§8.4: o que fica registrado é o texto de quem avaliou."""
