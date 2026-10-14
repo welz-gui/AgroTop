@@ -2124,6 +2124,19 @@ ADMIN_TABLES = [
     "pluviometria", "users",
 ]
 
+# Tabelas que guardam o histórico de cada animal (pesagem, sanidade, movimentação,
+# venda, morte, custo e movimento de estoque). A tela de administração edita e
+# insere nelas, mas não exclui: correção de histórico não pode apagar o registro
+# original (plano de rastreabilidade, "correção sem exclusão").
+ADMIN_SEM_EXCLUSAO = frozenset({
+    "weighings", "medications", "animal_movements", "sales", "deaths",
+    "animal_costs", "insumo_transactions",
+})
+
+
+class ExclusaoNaoPermitida(ValueError):
+    """Pedido de exclusão em tabela de histórico. Nada é gravado."""
+
 
 def admin_table_info(table: str) -> tuple[list[str], str]:
     """Retorna (colunas, coluna_pk) de uma tabela permitida."""
@@ -2165,6 +2178,11 @@ def admin_apply_changes(table: str, updates: list[dict],
     coluna→valor (updates precisam conter a PK). Retorna contagem por operação."""
     if table not in ADMIN_TABLES:
         raise ValueError(f"Tabela não permitida: {table}")
+    if delete_pks and table in ADMIN_SEM_EXCLUSAO:
+        # Antes de qualquer escrita: um pedido misto (editar + excluir) não grava nada.
+        raise ExclusaoNaoPermitida(
+            f"Registros de '{table}' não podem ser excluídos: fazem parte do "
+            "histórico do animal. Corrija o valor da linha em vez de removê-la.")
     cols, pk = admin_table_info(table)
     valid = set(cols)
     n_upd = n_ins = n_del = 0

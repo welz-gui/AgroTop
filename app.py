@@ -7478,6 +7478,9 @@ def page_admin():
         orig_df = pd.DataFrame(orig_rows, columns=cols)
 
         st.caption(f"Tabela **{tab}** · chave primária: **{pk}** · {len(orig_rows)} registro(s)")
+        if tab in db.ADMIN_SEM_EXCLUSAO:
+            st.info("🔒 Esta tabela guarda o histórico dos animais: dá para **corrigir** e "
+                    "**acrescentar** linhas, mas não **remover**. Corrija o valor em vez de apagar.")
 
         edited = st.data_editor(
             orig_df, num_rows="dynamic", use_container_width=True,
@@ -7535,6 +7538,8 @@ def page_admin():
                 st.success(f"✅ Salvo em **{tab}**: {res['updated']} atualizada(s), "
                            f"{res['inserted']} inserida(s), {res['deleted']} excluída(s).")
                 st.rerun()
+            except db.ExclusaoNaoPermitida as e:
+                st.error(f"🔒 {e}")
             except Exception as e:
                 st.error(f"❌ Erro ao salvar: {e}")
 
