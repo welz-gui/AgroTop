@@ -7534,7 +7534,9 @@ def page_admin():
             delete_pks = [k for k in orig_by_pk if k not in seen]
 
             try:
-                res = db.admin_apply_changes(tab, updates, inserts, delete_pks)
+                res = db.admin_apply_changes(
+                    tab, updates, inserts, delete_pks,
+                    usuario=st.session_state.user.get("username") or st.session_state.user.get("name", ""))
                 st.success(f"✅ Salvo em **{tab}**: {res['updated']} atualizada(s), "
                            f"{res['inserted']} inserida(s), {res['deleted']} excluída(s).")
                 st.rerun()

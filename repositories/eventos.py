@@ -411,17 +411,42 @@ def auditar(acao: str, *,
     exatamente mudou, não só que algo mudou.
     """
     with _conn() as con:
-        con.execute(
-            """INSERT INTO audit_logs
-               (usuario,ocorrido_em,dispositivo,ip,acao,entidade,entidade_id,
-                registro_anterior,registro_posterior,motivo,autorizacao,
-                origem,protocolo_externo)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (usuario or None, _agora(), dispositivo, ip, acao, entidade,
-             str(entidade_id) if entidade_id is not None else None,
-             _json(registro_anterior), _json(registro_posterior),
-             motivo or None, autorizacao or None, origem, protocolo_externo),
-        )
+        return auditar_em(
+            con, acao, usuario=usuario, entidade=entidade, entidade_id=entidade_id,
+            registro_anterior=registro_anterior, registro_posterior=registro_posterior,
+            motivo=motivo, autorizacao=autorizacao, origem=origem,
+            dispositivo=dispositivo, ip=ip, protocolo_externo=protocolo_externo)
+
+
+def auditar_em(con, acao: str, *,
+               usuario: str = "",
+               entidade: Optional[str] = None,
+               entidade_id: Optional[str] = None,
+               registro_anterior=None,
+               registro_posterior=None,
+               motivo: str = "",
+               autorizacao: str = "",
+               origem: str = "web",
+               dispositivo: Optional[str] = None,
+               ip: Optional[str] = None,
+               protocolo_externo: Optional[str] = None) -> dict:
+    """`auditar` na **conexão do chamador**, dentro da transação dele.
+
+    Mesma razão de `registrar_em`: `_conn()` abre conexão nova, e auditar de dentro
+    de um bloco de escrita travaria no SQLite. Além disso a alteração e a trilha
+    entram juntas ou não entram.
+    """
+    con.execute(
+        """INSERT INTO audit_logs
+           (usuario,ocorrido_em,dispositivo,ip,acao,entidade,entidade_id,
+            registro_anterior,registro_posterior,motivo,autorizacao,
+            origem,protocolo_externo)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (usuario or None, _agora(), dispositivo, ip, acao, entidade,
+         str(entidade_id) if entidade_id is not None else None,
+         _json(registro_anterior), _json(registro_posterior),
+         motivo or None, autorizacao or None, origem, protocolo_externo),
+    )
     return {"ok": True}
 
 

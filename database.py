@@ -2138,6 +2138,31 @@ class ExclusaoNaoPermitida(ValueError):
     """Pedido de exclusão em tabela de histórico. Nada é gravado."""
 
 
+# A trilha de auditoria da edição direta guarda o valor anterior e o novo, mas
+# não pode virar um segundo lugar com segredo à mostra.
+_ADMIN_COLUNAS_SECRETAS = frozenset({"password_hash"})
+_ADMIN_CHAVES_SECRETAS = ("key", "token", "secret", "senha", "password")
+
+
+def _admin_para_auditoria(table: str, campos: dict, linha_ref: dict) -> dict:
+    """Campos prontos para o JSON da auditoria: valores simples e sem segredo.
+
+    `linha_ref` é a linha inteira (para decidir, em `settings`, se a chave indica
+    segredo mesmo quando só o valor mudou).
+    """
+    segredo_settings = table == "settings" and any(
+        s in str(linha_ref.get("key", "")).lower() for s in _ADMIN_CHAVES_SECRETAS)
+    out = {}
+    for k, v in campos.items():
+        if k in _ADMIN_COLUNAS_SECRETAS or (segredo_settings and k == "value"):
+            out[k] = "[oculto]"
+        elif v is None or isinstance(v, (str, int, float, bool)):
+            out[k] = v
+        else:
+            out[k] = str(v)
+    return out
+
+
 def admin_table_info(table: str) -> tuple[list[str], str]:
     """Retorna (colunas, coluna_pk) de uma tabela permitida."""
     if table not in ADMIN_TABLES:
@@ -2173,9 +2198,15 @@ def admin_get_rows(table: str) -> list[dict]:
 
 @_writes
 def admin_apply_changes(table: str, updates: list[dict],
-                        inserts: list[dict], delete_pks: list) -> dict:
+                        inserts: list[dict], delete_pks: list,
+                        usuario: str = "") -> dict:
     """Aplica alterações vindas do editor. `updates` e `inserts` são dicts de
-    coluna→valor (updates precisam conter a PK). Retorna contagem por operação."""
+    coluna→valor (updates precisam conter a PK). Retorna contagem por operação.
+
+    Cada exclusão, edição e inclusão deixa um registro em `audit_logs` (ação
+    `admin_exclusao`, `admin_edicao`, `admin_inclusao`) na MESMA transação: a edição
+    guarda só os campos que mudaram, antes e depois; se a trilha falhar, nada é
+    gravado. `usuario` é quem fez a alteração."""
     if table not in ADMIN_TABLES:
         raise ValueError(f"Tabela não permitida: {table}")
     if delete_pks and table in ADMIN_SEM_EXCLUSAO:
@@ -2189,17 +2220,27 @@ def admin_apply_changes(table: str, updates: list[dict],
     with _conn() as con:
         qt = _quote_ident(table)
         qpk = _quote_ident(pk)
+        def _linha(pkv) -> dict:
+            r = con.execute(f"SELECT * FROM {qt} WHERE {qpk}=?", (pkv,)).fetchone()  # nosec B608
+            return dict(r) if r is not None else {}
+
         # Exclusões
         for pkv in delete_pks:
+            antes = _linha(pkv)
             # Seguro: qt e qpk são validados via ADMIN_TABLES e PRAGMA e scappados via _quote_ident.
             con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))  # nosec B608
             n_del += 1
+            if antes:
+                eventos.auditar_em(
+                    con, "admin_exclusao", usuario=usuario, entidade=table, entidade_id=pkv,
+                    registro_anterior=_admin_para_auditoria(table, antes, antes))
         # Atualizações
         for row in updates:
             pkv = row.get(pk)
             fields = {k: v for k, v in row.items() if k in valid and k != pk}
             if not fields:
                 continue
+            antes = _linha(pkv)
             sets = ", ".join(f"{_quote_ident(k)}=?" for k in fields)
             # Seguro: B608 falso positivo. O nome da tabela (qt)
             # whitelist (ADMIN_TABLES) antes desta função. As colunas (sets)
@@ -2210,6 +2251,13 @@ def admin_apply_changes(table: str, updates: list[dict],
             con.execute(f"UPDATE {qt} SET {sets} WHERE {qpk}=?",  # nosec B608
                         (*fields.values(), pkv))
             n_upd += 1
+            mudou = {k: v for k, v in fields.items() if str(antes.get(k)) != str(v)}
+            if mudou:
+                eventos.auditar_em(
+                    con, "admin_edicao", usuario=usuario, entidade=table, entidade_id=pkv,
+                    registro_anterior=_admin_para_auditoria(
+                        table, {k: antes.get(k) for k in mudou}, antes or fields),
+                    registro_posterior=_admin_para_auditoria(table, mudou, antes or fields))
         # Inserções
         for row in inserts:
             fields = {k: v for k, v in row.items()
@@ -2223,10 +2271,15 @@ def admin_apply_changes(table: str, updates: list[dict],
             # e ao esquema da tabela retornado pela query protegida do
             # banco, escapadas adequadamente com _quote_ident. Valores
             # injetados são puramente binds SQL (?/%s).
-            con.execute(
+            cur = con.execute(
                 f"INSERT INTO {qt} ({cols_str}) VALUES ({placeholders})",  # nosec B608
                 tuple(fields.values()))
             n_ins += 1
+            # No Postgres o id gerado não vem do cursor; a trilha guarda os valores.
+            novo_id = fields.get(pk) or (None if _conexao.USE_PG else cur.lastrowid)
+            eventos.auditar_em(
+                con, "admin_inclusao", usuario=usuario, entidade=table, entidade_id=novo_id,
+                registro_posterior=_admin_para_auditoria(table, fields, fields))
     return {"updated": n_upd, "inserted": n_ins, "deleted": n_del}
 
 
