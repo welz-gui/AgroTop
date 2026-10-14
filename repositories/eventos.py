@@ -403,7 +403,9 @@ def auditar(acao: str, *,
             origem: str = "web",
             dispositivo: Optional[str] = None,
             ip: Optional[str] = None,
-            protocolo_externo: Optional[str] = None) -> dict:
+            protocolo_externo: Optional[str] = None,
+            organizacao_id: Optional[str] = None,
+            property_id: Optional[str] = None) -> dict:
     """Registra uma ação na trilha de auditoria.
 
     `registro_anterior` e `registro_posterior` aceitam dicionário — viram JSON.
@@ -415,7 +417,8 @@ def auditar(acao: str, *,
             con, acao, usuario=usuario, entidade=entidade, entidade_id=entidade_id,
             registro_anterior=registro_anterior, registro_posterior=registro_posterior,
             motivo=motivo, autorizacao=autorizacao, origem=origem,
-            dispositivo=dispositivo, ip=ip, protocolo_externo=protocolo_externo)
+            dispositivo=dispositivo, ip=ip, protocolo_externo=protocolo_externo,
+            organizacao_id=organizacao_id, property_id=property_id)
 
 
 def auditar_em(con, acao: str, *,
@@ -429,23 +432,35 @@ def auditar_em(con, acao: str, *,
                origem: str = "web",
                dispositivo: Optional[str] = None,
                ip: Optional[str] = None,
-               protocolo_externo: Optional[str] = None) -> dict:
+               protocolo_externo: Optional[str] = None,
+               organizacao_id: Optional[str] = None,
+               property_id: Optional[str] = None) -> dict:
     """`auditar` na **conexão do chamador**, dentro da transação dele.
+
+    O vínculo do autor (organização e propriedade) é gravado junto, para a trilha
+    dizer de quem era quem no momento da ação. Se não vier explícito, busca pelo
+    login em `usuario`; quando `usuario` não é um login (nome livre), fica vazio.
 
     Mesma razão de `registrar_em`: `_conn()` abre conexão nova, e auditar de dentro
     de um bloco de escrita travaria no SQLite. Além disso a alteração e a trilha
     entram juntas ou não entram.
     """
+    if usuario and organizacao_id is None and property_id is None:
+        v = con.execute("SELECT organizacao_id, property_id FROM users WHERE username=?",
+                        (usuario,)).fetchone()
+        if v is not None:
+            organizacao_id, property_id = v["organizacao_id"], v["property_id"]
     con.execute(
         """INSERT INTO audit_logs
            (usuario,ocorrido_em,dispositivo,ip,acao,entidade,entidade_id,
             registro_anterior,registro_posterior,motivo,autorizacao,
-            origem,protocolo_externo)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            origem,protocolo_externo,organizacao_id,property_id)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (usuario or None, _agora(), dispositivo, ip, acao, entidade,
          str(entidade_id) if entidade_id is not None else None,
          _json(registro_anterior), _json(registro_posterior),
-         motivo or None, autorizacao or None, origem, protocolo_externo),
+         motivo or None, autorizacao or None, origem, protocolo_externo,
+         organizacao_id, property_id),
     )
     return {"ok": True}
 

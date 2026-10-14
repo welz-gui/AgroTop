@@ -168,7 +168,9 @@ _SCHEMA_SQL = """
                 username      TEXT    UNIQUE NOT NULL,
                 password_hash TEXT    NOT NULL,
                 name          TEXT    NOT NULL,
-                role          TEXT    NOT NULL DEFAULT 'operator'
+                role          TEXT    NOT NULL DEFAULT 'operator',
+                organizacao_id TEXT   REFERENCES organizacoes(id),
+                property_id    TEXT   REFERENCES properties(id)
             );
 
             -- Fornecedores / Origem
@@ -967,7 +969,9 @@ _SCHEMA_SQL = """
                 autorizacao        TEXT,      -- quem autorizou a ação sensível
                 origem             TEXT NOT NULL DEFAULT 'web',
                 protocolo_externo  TEXT,
-                created_at         TEXT DEFAULT (datetime('now','localtime'))
+                created_at         TEXT DEFAULT (datetime('now','localtime')),
+                organizacao_id     TEXT,      -- vínculo do autor no momento da ação
+                property_id        TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_audit_ocorrido
                 ON audit_logs (ocorrido_em DESC);
@@ -1059,6 +1063,7 @@ def init_db(forcar: bool = False) -> None:
         # Safety net só para banco EXISTENTE, criado antes da B4 — o seed
         # novo acima já não deixa NULL nenhum para este backfill cobrir.
         propriedades._backfill_property_id(con)
+        propriedades._backfill_user_org(con)
 
     # Só depois de tudo dar certo: um init que falhou no meio precisa rodar de novo.
     _INICIALIZADO_EM = alvo
@@ -1102,6 +1107,14 @@ def _migrate(con) -> None:
         con.execute("ALTER TABLE api_idempotency_keys ADD COLUMN estado TEXT NOT NULL DEFAULT 'concluida'")
     if "reservada_em" not in icols:
         con.execute("ALTER TABLE api_idempotency_keys ADD COLUMN reservada_em TEXT")
+    # Vínculo do usuário com organização/propriedade (D1) e o mesmo na auditoria.
+    for _t, _c in (("users", "organizacao_id"), ("users", "property_id"),
+                   ("audit_logs", "organizacao_id"), ("audit_logs", "property_id")):
+        _tc = {r["name"] for r in con.execute(f"PRAGMA table_info({_quote_ident(_t)})").fetchall()}
+        if _c not in _tc:
+            _ref = (" REFERENCES organizacoes(id)" if (_t, _c) == ("users", "organizacao_id")
+                    else " REFERENCES properties(id)" if (_t, _c) == ("users", "property_id") else "")
+            con.execute(f"ALTER TABLE {_quote_ident(_t)} ADD COLUMN {_c} TEXT{_ref}")
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")
@@ -1427,7 +1440,8 @@ def get_session_user(token: str) -> Optional[dict]:
         except (ValueError, TypeError):
             return None
         u = con.execute(
-            "SELECT id, username, name, role FROM users WHERE id=?", (row["user_id"],)
+            "SELECT id, username, name, role, organizacao_id, property_id "
+            "FROM users WHERE id=?", (row["user_id"],)
         ).fetchone()
     return dict(u) if u else None
 
@@ -1443,7 +1457,11 @@ def delete_session(token: str) -> None:
 def get_all_users() -> list[dict]:
     with _conn() as con:
         rows = con.execute(
-            "SELECT id, username, name, role FROM users ORDER BY role, username"
+            "SELECT u.id, u.username, u.name, u.role, u.organizacao_id, u.property_id, "
+            "o.nome AS organizacao_nome, p.nome AS property_nome "
+            "FROM users u LEFT JOIN organizacoes o ON o.id = u.organizacao_id "
+            "LEFT JOIN properties p ON p.id = u.property_id "
+            "ORDER BY u.role, u.username"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -1451,7 +1469,8 @@ def get_all_users() -> list[dict]:
 def get_user(user_id: int) -> Optional[dict]:
     with _conn() as con:
         row = con.execute(
-            "SELECT id, username, name, role FROM users WHERE id=?", (user_id,)
+            "SELECT id, username, name, role, organizacao_id, property_id "
+            "FROM users WHERE id=?", (user_id,)
         ).fetchone()
     return dict(row) if row else None
 
@@ -1470,12 +1489,34 @@ def username_exists(username: str, exclude_id: Optional[int] = None) -> bool:
 
 
 @_writes
-def add_user(username: str, password: str, name: str, role: str = "operator") -> None:
+def add_user(username: str, password: str, name: str, role: str = "operator", *,
+             organizacao_id: Optional[str] = None,
+             property_id: Optional[str] = None) -> None:
+    """Cria o usuário. Sem vínculo informado, usa a organização do banco se houver
+    uma só; com várias, fica sem vínculo (o administrador define depois)."""
     with _conn() as con:
+        organizacao_id, property_id = propriedades.resolver_vinculo(
+            con, organizacao_id, property_id)
+        if organizacao_id is None:
+            organizacao_id = propriedades.organizacao_unica(con)
         con.execute(
-            "INSERT INTO users (username,password_hash,name,role) VALUES(?,?,?,?)",
-            (username, _hash(password), name, role),
+            "INSERT INTO users (username,password_hash,name,role,organizacao_id,property_id) "
+            "VALUES(?,?,?,?,?,?)",
+            (username, _hash(password), name, role, organizacao_id, property_id),
         )
+
+
+@_writes
+def definir_vinculo_usuario(user_id: int, organizacao_id: Optional[str],
+                            property_id: Optional[str] = None) -> None:
+    """Define a organização e a propriedade do usuário (None = sem vínculo / todas)."""
+    with _conn() as con:
+        if con.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone() is None:
+            raise ValueError("Usuário não encontrado.")
+        organizacao_id, property_id = propriedades.resolver_vinculo(
+            con, organizacao_id, property_id)
+        con.execute("UPDATE users SET organizacao_id=?, property_id=? WHERE id=?",
+                    (organizacao_id, property_id, user_id))
 
 
 @_writes
