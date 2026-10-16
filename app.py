@@ -17,6 +17,7 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from repositories.pesagens import WeighingCreate
 from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
@@ -1378,7 +1379,7 @@ def _tab_pesagem(animal):
         _cc1, _cc2 = st.columns(2)
         if _cc1.button("✅ Está correto, salvar", key=f"okpeso_{animal['id']}",
                        use_container_width=True):
-            db.add_weighing(db.WeighingCreate(
+            db.add_weighing(WeighingCreate(
                 animal_id=animal["id"], weight=_pend_alerta["peso"], weigh_date=_pend_alerta["data"],
                 operator=st.session_state.user["name"], notes=_pend_alerta["notas"],
                 method=_pend_alerta["metodo"]))
@@ -1420,7 +1421,7 @@ def _tab_pesagem(animal):
                     "metodo": metodo_peso}
                 st.rerun()
 
-            db.add_weighing(db.WeighingCreate(
+            db.add_weighing(WeighingCreate(
                 animal_id=animal["id"], weight=nw_final, weigh_date=wd_.strftime("%Y-%m-%d"),
                 operator=st.session_state.user["name"], notes=notes_p, method=metodo_peso))
             for _a in _alertas:
@@ -1745,7 +1746,7 @@ def _campo_importar():
     if st.button(f"💾 Gravar {len(aceitas)} pesagem(ns)", type="primary"):
         gravadas = 0
         for linha in aceitas:
-            db.add_weighing(db.WeighingCreate(
+            db.add_weighing(WeighingCreate(
                 animal_id=linha["animal_id"], weight=linha["peso"], weigh_date=linha["data"],
                 operator=st.session_state.user["name"],
                 notes=f"importado de {arquivo.name}"))
