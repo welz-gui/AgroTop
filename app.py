@@ -17,6 +17,7 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from repositories.sanidade import delete_protocol
 from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
@@ -5395,7 +5396,7 @@ def _render_tab_gestao_protocolos(insumos):
                 db.set_protocol_active(p["id"], 0 if p["active"] else 1); st.rerun()
         with c3:
             if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
-                db.delete_protocol(p["id"]); st.rerun()
+                delete_protocol(p["id"]); st.rerun()
 
     st.markdown("---")
     st.markdown("**➕ Novo Protocolo**")
