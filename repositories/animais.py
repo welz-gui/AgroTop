@@ -366,8 +366,11 @@ def move_animals_bulk(animal_ids: list, params: MovementParams) -> dict:
             con.execute("UPDATE lotes SET last_entry_date=? WHERE id=?", (params.movement_date, params.to_lote_id))
 
             if from_lotes:
-                for from_lote in from_lotes:
-                    con.execute("UPDATE lotes SET last_exit_date=? WHERE id=?", (params.movement_date, from_lote))
+                # Optimize N+1 queries by updating all affected source lotes in a single operation
+                con.executemany(
+                    "UPDATE lotes SET last_exit_date=? WHERE id=?",
+                    [(params.movement_date, from_lote) for from_lote in from_lotes]
+                )
 
     return {"movidos": movidos, "ja_no_destino": ja_no_destino, "erros": erros}
 
