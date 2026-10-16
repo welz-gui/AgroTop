@@ -2225,15 +2225,25 @@ def admin_apply_changes(table: str, updates: list[dict],
             return dict(r) if r is not None else {}
 
         # Exclusões
-        for pkv in delete_pks:
-            antes = _linha(pkv)
-            # Seguro: qt e qpk são validados via ADMIN_TABLES e PRAGMA e scappados via _quote_ident.
-            con.execute(f"DELETE FROM {qt} WHERE {qpk}=?", (pkv,))  # nosec B608
-            n_del += 1
-            if antes:
-                eventos.auditar_em(
-                    con, "admin_exclusao", usuario=usuario, entidade=table, entidade_id=pkv,
-                    registro_anterior=_admin_para_auditoria(table, antes, antes))
+        if delete_pks:
+            chunk_size = 900
+            for i in range(0, len(delete_pks), chunk_size):
+                chunk = delete_pks[i:i + chunk_size]
+                placeholders = ",".join("?" for _ in chunk)
+                # Busca registros anteriores em lote para auditoria
+                # Seguro: qt e qpk validados e escapados previamente.
+                res = con.execute(f"SELECT * FROM {qt} WHERE {qpk} IN ({placeholders})", chunk).fetchall()  # nosec B608
+                antes_map = {str(r[pk]): dict(r) for r in res}
+                # Exclui em lote
+                con.execute(f"DELETE FROM {qt} WHERE {qpk} IN ({placeholders})", chunk)  # nosec B608
+                n_del += len(chunk)
+                # Audita as exclusões
+                for pkv in chunk:
+                    antes = antes_map.get(str(pkv))
+                    if antes:
+                        eventos.auditar_em(
+                            con, "admin_exclusao", usuario=usuario, entidade=table, entidade_id=pkv,
+                            registro_anterior=_admin_para_auditoria(table, antes, antes))
         # Atualizações
         for row in updates:
             pkv = row.get(pk)
