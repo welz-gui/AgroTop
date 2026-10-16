@@ -5538,12 +5538,7 @@ def _render_tab_comparativo_piquete():
                     "das próximas confirmações de trato (na aba Trato do Modo Campo).")
 
 
-def _render_tab_simulador_terminacao(animals):
-    st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
-               "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
-               "de cada estratégia — os valores são **editáveis** e salvos para as "
-               "próximas simulações.")
-
+def _render_simulador_inputs(animals):
     pesos = sorted(a["current_weight"] for a in animals)
     peso_medio = round(pesos[len(pesos)//2], 0) if pesos else 380.0
     metas = [a.get("target_weight") for a in animals if a.get("target_weight")]
@@ -5570,7 +5565,9 @@ def _render_tab_simulador_terminacao(animals):
             max_value=100000.0, value=0.0, step=50.0, format="%.2f",
             help="Opcional — aquisição/valor do animal hoje. Igual para todos os "
                  "cenários; deixe 0 para analisar só a etapa de terminação.")
+    return peso_atual, peso_meta, preco_arroba, custo_boi
 
+def _render_simulador_cenarios(preco_arroba):
     st.markdown("**Cenários** — edite GMD (kg/dia), custo/dia (R$) e rendimento de carcaça (%)")
     cen = db.get_terminacao_cenarios()
     df_cen = pd.DataFrame(cen)[["nome", "gmd", "custo_dia", "rendimento"]]
@@ -5581,7 +5578,7 @@ def _render_tab_simulador_terminacao(animals):
             "gmd": st.column_config.NumberColumn("GMD (kg/dia)", min_value=0.0,
                 max_value=3.0, step=0.05, format="%.3f"),
             "custo_dia": st.column_config.NumberColumn("Custo/dia (R$)", min_value=0.0,
-                step=0.5, format="R$ %.2f"),
+                step=0.5, format="R\\$ %.2f"),
             "rendimento": st.column_config.NumberColumn("Rendimento (%)", min_value=0.30,
                 max_value=0.70, step=0.01, format="%.2f")})
 
@@ -5592,9 +5589,9 @@ def _render_tab_simulador_terminacao(animals):
             db.set_setting("preco_arroba", round(preco_arroba, 2))
             st.success("Cenários e preço da @ salvos!"); st.rerun()
 
-    cenarios = [r for r in edited.to_dict("records") if r.get("nome")]
-    sim = simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+    return [r for r in edited.to_dict("records") if r.get("nome")]
 
+def _render_simulador_resultados(sim, peso_atual, peso_meta):
     if peso_meta - peso_atual <= 0:
         st.warning("O peso de abate precisa ser maior que o peso atual.")
     elif not any(s["dias"] for s in sim):
@@ -5613,11 +5610,11 @@ def _render_tab_simulador_terminacao(animals):
         st.dataframe(df, use_container_width=True, hide_index=True,
             column_config={
                 "@ produzidas":st.column_config.NumberColumn(format="%.2f"),
-                "Custo alimentar (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Receita (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Lucro (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
-                "Lucro/dia (R$)":st.column_config.NumberColumn(format="R$ %.2f"),
+                "Custo alimentar (R$)":st.column_config.NumberColumn(format="R\\$ %.2f"),
+                "Custo/@ produzida (R$)":st.column_config.NumberColumn(format="R\\$ %.2f"),
+                "Receita (R$)":st.column_config.NumberColumn(format="R\\$ %.2f"),
+                "Lucro (R$)":st.column_config.NumberColumn(format="R\\$ %.2f"),
+                "Lucro/dia (R$)":st.column_config.NumberColumn(format="R\\$ %.2f"),
                 "Margem (%)":st.column_config.NumberColumn(format="%.1f%%")})
 
         validos = [s for s in sim if s["lucro"] is not None]
@@ -5648,6 +5645,17 @@ def _render_tab_simulador_terminacao(animals):
                    "Lucro = receita − custo alimentar (dias × custo/dia) − custo do boi magro. "
                    "O confinamento costuma dar **mais lucro/dia** (gira o capital mais rápido), "
                    "mesmo com custo/dia maior; o pasto costuma ter **menor custo por @ produzida**.")
+
+def _render_tab_simulador_terminacao(animals):
+    st.caption("Compare a viabilidade econômica de **terminar o boi** em pasto, "
+               "semiconfinamento ou confinamento. Ajuste GMD, custo/dia e rendimento "
+               "de cada estratégia — os valores são **editáveis** e salvos para as "
+               "próximas simulações.")
+
+    peso_atual, peso_meta, preco_arroba, custo_boi = _render_simulador_inputs(animals)
+    cenarios = _render_simulador_cenarios(preco_arroba)
+    sim = simular_terminacao(peso_atual, peso_meta, preco_arroba, cenarios, custo_boi)
+    _render_simulador_resultados(sim, peso_atual, peso_meta)
 
 
 def _render_tab_correlacao_chuva_gmd():
