@@ -2,6 +2,9 @@
 
 from datetime import date, timedelta
 import unittest
+from unittest.mock import patch
+import csv
+
 
 from services.importacao import _eh_cabecalho, _parse_data, parse_pesagens
 
@@ -188,6 +191,20 @@ class TestEhCabecalho(unittest.TestCase):
 
     def test_invalido_ordem_errada(self):
         self.assertFalse(_eh_cabecalho(["peso", "animal_id", "data"]))
+
+
+class TestCsvErrorMock(unittest.TestCase):
+    @patch("services.importacao.csv.reader")
+    def test_mock_csv_error(self, mock_reader):
+        mock_reader.side_effect = csv.Error("mocked error")
+        resultado = parse_pesagens("BR0001,450.5,2026-01-10")
+        self.assertEqual(len(resultado["aceitas"]), 0)
+        self.assertEqual(len(resultado["rejeitadas"]), 1)
+        self.assertEqual(
+            resultado["rejeitadas"][0]["motivo"],
+            "esperado 3 colunas, encontrado 0",
+        )
+        self.assertEqual(resultado["rejeitadas"][0]["linha"], 1)
 
 
 if __name__ == "__main__":
