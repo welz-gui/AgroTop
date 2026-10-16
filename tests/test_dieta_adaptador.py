@@ -158,6 +158,27 @@ class TestDietaAdaptador(unittest.TestCase):
 
 
 
+    def test_converter_quantidade_exception_retorna_none(self):
+        """Testa que se o converter_quantidade levantar Exception, o plano é ignorado."""
+        planos = [
+            {
+                "insumo_id": 1,
+                "quantity": 20.0,
+                "unit": "xyz",
+                "frequency": "diario",
+                "active": True,
+            }
+        ]
+        insumos = {1: {"name": "Milho", "unit": "abc", "cost_per_unit": 1.0}}
+
+        def broken_converter(qty, u_p, u_i):
+            raise Exception("Falha na conversão")
+
+        res = ingredientes_por_cabeca(
+            planos, insumos, cabecas_no_piquete=10, converter_quantidade=broken_converter
+        )
+        self.assertEqual(res, [])
+
     def test_cabecas_invalido_devolve_lista_vazia(self):
         """Testa o tratamento de erros para cabecas_no_piquete inválido (ValueError, TypeError)."""
         planos = [
