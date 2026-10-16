@@ -2,6 +2,8 @@
 
 from datetime import date, timedelta
 import unittest
+from unittest.mock import patch
+import csv
 
 from services.importacao import _eh_cabecalho, _parse_data, parse_pesagens
 
@@ -156,6 +158,20 @@ class TestParsePesagens(unittest.TestCase):
     def test_rejeita_linha_com_erro_de_csv_field_limit(self):
         conteudo_gigante = "A" * 131073
         resultado = parse_pesagens(conteudo_gigante)
+
+        self.assertEqual(len(resultado["aceitas"]), 0)
+        self.assertEqual(len(resultado["rejeitadas"]), 1)
+        self.assertEqual(
+            resultado["rejeitadas"][0]["motivo"],
+            "esperado 3 colunas, encontrado 0",
+        )
+        self.assertEqual(resultado["rejeitadas"][0]["linha"], 1)
+        self.assertEqual(resultado["total_linhas"], 1)
+
+    @patch("services.importacao.csv.reader")
+    def test_rejeita_linha_com_csv_error_mock(self, mock_reader):
+        mock_reader.side_effect = csv.Error("Mocked error")
+        resultado = parse_pesagens("BR0001,450.5,2026-01-10")
 
         self.assertEqual(len(resultado["aceitas"]), 0)
         self.assertEqual(len(resultado["rejeitadas"]), 1)
