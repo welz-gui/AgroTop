@@ -5218,6 +5218,107 @@ def _admin_users():
                     st.rerun()
 
 
+
+def _tab_clima_previsao():
+    lat = db.get_setting("farm_lat")
+    lon = db.get_setting("farm_lon")
+    with st.expander("📍 Localização da fazenda (para a previsão)",
+                     expanded=not (lat and lon)):
+        st.caption("Pegue as coordenadas no Google Maps: clique no local do mapa e "
+                   "copie os números que aparecem (latitude, longitude).")
+        lc1, lc2 = st.columns(2)
+        with lc1:
+            nlat = st.number_input("Latitude", value=float(lat) if lat else -15.60000,
+                format="%.5f", step=0.001)
+        with lc2:
+            nlon = st.number_input("Longitude", value=float(lon) if lon else -56.10000,
+                format="%.5f", step=0.001)
+        if st.button("💾 Salvar localização", type="primary"):
+            db.set_setting("farm_lat", nlat)
+            db.set_setting("farm_lon", nlon)
+            st.success("📍 Localização salva!"); st.rerun()
+
+    propriedades_ativas = db.propriedades.listar()
+    localizacoes = localizacoes_para_previsao(
+        propriedades_ativas,
+        float(lat) if lat else None,
+        float(lon) if lon else None,
+    )
+
+    if not localizacoes:
+        st.info("Defina a **localização da fazenda** acima para ver a previsão do tempo.")
+    elif len(localizacoes) == 1:
+        # Uma só coordenada resolvida — não há o que separar por aba,
+        # mesmo comportamento de sempre (spec 0046: não gera ruído
+        # dividindo o que é, na prática, a mesma previsão).
+        _renderizar_previsao_tempo(localizacoes[0])
+    else:
+        # Propriedades em coordenadas diferentes (ADR 0004: um produtor
+        # pode ter mais de uma) — uma aba por localização, agrupando
+        # quem cai na mesma coordenada.
+        abas = st.tabs([" / ".join(p["nome"] for p in loc["propriedades"])
+                        for loc in localizacoes])
+        for aba, loc in zip(abas, localizacoes):
+            with aba:
+                _renderizar_previsao_tempo(loc)
+
+def _tab_clima_registrar_chuva(lotes):
+    st.caption("Registre a leitura do pluviômetro. Se houver um pluviômetro por piquete, "
+               "escolha o piquete; se for um só, deixe em **Geral / Sede**.")
+    with st.form("f_rain", clear_on_submit=True):
+        r1, r2 = st.columns(2)
+        with r1: rdate = st.date_input("Data da leitura", value=date.today())
+        with r2: rmm = st.number_input("Chuva medida (mm)", min_value=0.0, step=1.0, format="%.1f")
+        lote_sel = st.selectbox("Piquete", [None]+lotes,
+            format_func=lambda x: "Geral / Sede" if x is None else f"{x['id']} — {x['name']}")
+        rnotes = st.text_input("Observações", placeholder="Opcional")
+        if st.form_submit_button("💧 Registrar chuva", type="primary", use_container_width=True):
+            db.add_rain(rdate.strftime("%Y-%m-%d"), rmm,
+                lote_sel["id"] if lote_sel else None,
+                st.session_state.user["name"], rnotes)
+            st.success(f"✅ {_num_br(rmm, 1)} mm registrados."); st.rerun()
+
+def _tab_clima_historico_chuva():
+    h1, h2 = st.columns(2)
+    with h1: start = st.date_input("De", value=date(date.today().year,1,1), key="rain_start")
+    with h2: end = st.date_input("Até", value=date.today(), key="rain_end")
+    chuvas = db.get_rain(start.isoformat(), end.isoformat())
+    total = db.get_rain_total(start.isoformat(), end.isoformat())
+    st.metric("🌧️ Chuva acumulada no período", f"{_num_br(total, 0)} mm")
+    if chuvas:
+        df = pd.DataFrame(chuvas)
+        df["read_date"] = pd.to_datetime(df["read_date"])
+        df["piquete"] = df["lote_name"].fillna("Geral / Sede")
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            st.markdown("**Por mês**")
+            dfm = (df.groupby(df["read_date"].dt.to_period("M").astype(str))["rain_mm"]
+                   .sum().reset_index())
+            dfm.columns = ["Mês","Chuva (mm)"]
+            figm = px.bar(dfm, x="Mês", y="Chuva (mm)",
+                color_discrete_sequence=[c["info_secundario"]])
+            figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor=c["superficie"]),
+                yaxis=dict(gridcolor=c["superficie"])))
+            st.plotly_chart(figm, use_container_width=True)
+        with gc2:
+            st.markdown("**Por piquete**")
+            dfl = df.groupby("piquete")["rain_mm"].sum().reset_index().sort_values("rain_mm")
+            figl = px.bar(dfl, x="rain_mm", y="piquete", orientation="h",
+                color="rain_mm", color_continuous_scale=[c["texto_secundario"], c["info_secundario"]],
+                labels={"rain_mm":"Chuva (mm)","piquete":""})
+            figl.update_layout(**_layout(height=250, coloraxis_showscale=False,
+                xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"])))
+            st.plotly_chart(figl, use_container_width=True)
+        dft = df[["read_date","rain_mm","piquete","operator"]].copy()
+        dft["read_date"] = dft["read_date"].dt.strftime("%d/%m/%Y")
+        dft.columns = ["Data","Chuva (mm)","Piquete","Registrado por"]
+        st.dataframe(dft, use_container_width=True, hide_index=True,
+            column_config={"Chuva (mm)":st.column_config.NumberColumn(format="%.1f")})
+    else:
+        st.info("Nenhum registro de chuva no período. Registre na aba **Registrar Chuva**.")
+
+
+
 def page_clima():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -5226,106 +5327,14 @@ def page_clima():
 
     ct1, ct2, ct3 = st.tabs(["🌦️ Previsão do Tempo", "💧 Registrar Chuva", "📊 Histórico de Chuva"])
 
-    # ── Previsão do tempo ─────────────────────────────────────────────────────
     with ct1:
-        lat = db.get_setting("farm_lat")
-        lon = db.get_setting("farm_lon")
-        with st.expander("📍 Localização da fazenda (para a previsão)",
-                         expanded=not (lat and lon)):
-            st.caption("Pegue as coordenadas no Google Maps: clique no local do mapa e "
-                       "copie os números que aparecem (latitude, longitude).")
-            lc1, lc2 = st.columns(2)
-            with lc1:
-                nlat = st.number_input("Latitude", value=float(lat) if lat else -15.60000,
-                    format="%.5f", step=0.001)
-            with lc2:
-                nlon = st.number_input("Longitude", value=float(lon) if lon else -56.10000,
-                    format="%.5f", step=0.001)
-            if st.button("💾 Salvar localização", type="primary"):
-                db.set_setting("farm_lat", nlat)
-                db.set_setting("farm_lon", nlon)
-                st.success("📍 Localização salva!"); st.rerun()
+        _tab_clima_previsao()
 
-        propriedades_ativas = db.propriedades.listar()
-        localizacoes = localizacoes_para_previsao(
-            propriedades_ativas,
-            float(lat) if lat else None,
-            float(lon) if lon else None,
-        )
-
-        if not localizacoes:
-            st.info("Defina a **localização da fazenda** acima para ver a previsão do tempo.")
-        elif len(localizacoes) == 1:
-            # Uma só coordenada resolvida — não há o que separar por aba,
-            # mesmo comportamento de sempre (spec 0046: não gera ruído
-            # dividindo o que é, na prática, a mesma previsão).
-            _renderizar_previsao_tempo(localizacoes[0])
-        else:
-            # Propriedades em coordenadas diferentes (ADR 0004: um produtor
-            # pode ter mais de uma) — uma aba por localização, agrupando
-            # quem cai na mesma coordenada.
-            abas = st.tabs([" / ".join(p["nome"] for p in loc["propriedades"])
-                            for loc in localizacoes])
-            for aba, loc in zip(abas, localizacoes):
-                with aba:
-                    _renderizar_previsao_tempo(loc)
-
-    # ── Registrar chuva (por piquete) ─────────────────────────────────────────
     with ct2:
-        st.caption("Registre a leitura do pluviômetro. Se houver um pluviômetro por piquete, "
-                   "escolha o piquete; se for um só, deixe em **Geral / Sede**.")
-        with st.form("f_rain", clear_on_submit=True):
-            r1, r2 = st.columns(2)
-            with r1: rdate = st.date_input("Data da leitura", value=date.today())
-            with r2: rmm = st.number_input("Chuva medida (mm)", min_value=0.0, step=1.0, format="%.1f")
-            lote_sel = st.selectbox("Piquete", [None]+lotes,
-                format_func=lambda x: "Geral / Sede" if x is None else f"{x['id']} — {x['name']}")
-            rnotes = st.text_input("Observações", placeholder="Opcional")
-            if st.form_submit_button("💧 Registrar chuva", type="primary", use_container_width=True):
-                db.add_rain(rdate.strftime("%Y-%m-%d"), rmm,
-                    lote_sel["id"] if lote_sel else None,
-                    st.session_state.user["name"], rnotes)
-                st.success(f"✅ {_num_br(rmm, 1)} mm registrados."); st.rerun()
+        _tab_clima_registrar_chuva(lotes)
 
-    # ── Histórico de chuva ────────────────────────────────────────────────────
     with ct3:
-        h1, h2 = st.columns(2)
-        with h1: start = st.date_input("De", value=date(date.today().year,1,1), key="rain_start")
-        with h2: end = st.date_input("Até", value=date.today(), key="rain_end")
-        chuvas = db.get_rain(start.isoformat(), end.isoformat())
-        total = db.get_rain_total(start.isoformat(), end.isoformat())
-        st.metric("🌧️ Chuva acumulada no período", f"{_num_br(total, 0)} mm")
-        if chuvas:
-            df = pd.DataFrame(chuvas)
-            df["read_date"] = pd.to_datetime(df["read_date"])
-            df["piquete"] = df["lote_name"].fillna("Geral / Sede")
-            gc1, gc2 = st.columns(2)
-            with gc1:
-                st.markdown("**Por mês**")
-                dfm = (df.groupby(df["read_date"].dt.to_period("M").astype(str))["rain_mm"]
-                       .sum().reset_index())
-                dfm.columns = ["Mês","Chuva (mm)"]
-                figm = px.bar(dfm, x="Mês", y="Chuva (mm)",
-                    color_discrete_sequence=[c["info_secundario"]])
-                figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor=c["superficie"]),
-                    yaxis=dict(gridcolor=c["superficie"])))
-                st.plotly_chart(figm, use_container_width=True)
-            with gc2:
-                st.markdown("**Por piquete**")
-                dfl = df.groupby("piquete")["rain_mm"].sum().reset_index().sort_values("rain_mm")
-                figl = px.bar(dfl, x="rain_mm", y="piquete", orientation="h",
-                    color="rain_mm", color_continuous_scale=[c["texto_secundario"], c["info_secundario"]],
-                    labels={"rain_mm":"Chuva (mm)","piquete":""})
-                figl.update_layout(**_layout(height=250, coloraxis_showscale=False,
-                    xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"])))
-                st.plotly_chart(figl, use_container_width=True)
-            dft = df[["read_date","rain_mm","piquete","operator"]].copy()
-            dft["read_date"] = dft["read_date"].dt.strftime("%d/%m/%Y")
-            dft.columns = ["Data","Chuva (mm)","Piquete","Registrado por"]
-            st.dataframe(dft, use_container_width=True, hide_index=True,
-                column_config={"Chuva (mm)":st.column_config.NumberColumn(format="%.1f")})
-        else:
-            st.info("Nenhum registro de chuva no período. Registre na aba **Registrar Chuva**.")
+        _tab_clima_historico_chuva()
 
 
 def _render_tab_plano_vacinacao():
