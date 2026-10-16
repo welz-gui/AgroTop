@@ -311,14 +311,19 @@ def _gerar_contas_receber_venda(con, params: SaleParams, tot_receita: float, lot
     rotulo = f"Venda {lot_ref}" if lot_ref else "Venda"
     rotulo += f" — {params.buyer or 'comprador não informado'}"
 
-    for p in gerar_parcelas(round(tot_receita, 2), params.num_parcelas, params.primeiro_vencimento):
-        con.execute(
+    parcelas = [
+        (lot_ref, params.buyer, rotulo, p["valor"], p["vencimento"],
+         p["numero"], p["total"], "aberto", params.operator)
+        for p in gerar_parcelas(round(tot_receita, 2), params.num_parcelas, params.primeiro_vencimento)
+    ]
+    if parcelas:
+        con.executemany(
             """INSERT INTO contas_receber
                (lot_ref, comprador, descricao, valor, vencimento,
                 parcela_numero, parcela_total, status, operator)
                VALUES (?,?,?,?,?,?,?,?,?)""",
-            (lot_ref, params.buyer, rotulo, p["valor"], p["vencimento"],
-             p["numero"], p["total"], "aberto", params.operator))
+            parcelas
+        )
     return params.num_parcelas
 
 
