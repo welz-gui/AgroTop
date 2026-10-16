@@ -27,7 +27,8 @@ from datetime import date, timedelta
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
-import database as db  # noqa: E402
+import database as db
+from repositories import pesagens as pesagens_repo  # noqa: E402
 
 try:
     from streamlit.testing.v1 import AppTest
@@ -111,7 +112,7 @@ class TestCompletudeDeDadosNaTela(unittest.TestCase):
 
         hoje = date.today()
         animais_ativos = db.count_animals(status="ativo")
-        pesagens = normalizar_pesagens(db.get_all_weighings())
+        pesagens = normalizar_pesagens(pesagens_repo.get_all_weighings())
 
         inicio = date(hoje.year, hoje.month, 1)
         prox_mes = date(hoje.year + (1 if hoje.month == 12 else 0),

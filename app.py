@@ -17,6 +17,7 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from repositories import pesagens as pesagens_repo
 from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
@@ -973,7 +974,7 @@ def _dash_alerts(alerts):
 
 def _dash_chart_evolucao_peso():
     st.subheader("📈 Evolução de Peso do Rebanho")
-    raw = db.get_all_weighings()
+    raw = pesagens_repo.get_all_weighings()
     if raw:
         raw.sort(key=lambda x: (x["animal_id"], x["weigh_date"]))
 
@@ -1156,7 +1157,7 @@ def _dash_completude():
             meses.append((a, m))
 
         animais_ativos = db.count_animals(status="ativo")
-        pesagens = normalizar_pesagens(db.get_all_weighings())
+        pesagens = normalizar_pesagens(pesagens_repo.get_all_weighings())
 
         linhas = []
         alertas_ultimo_mes = []
@@ -4666,7 +4667,7 @@ def _tab_relatorio_inventario(animals):
 
 def _tab_relatorio_pesagens():
     st.subheader("⚖️ Histórico de Pesagens")
-    raw = db.get_all_weighings()
+    raw = pesagens_repo.get_all_weighings()
     if raw:
         df_p = pd.DataFrame(raw)[["animal_id", "weigh_date", "weight", "method", "lote_id", "operator", "notes"]].copy()
         df_p["method"] = df_p["method"].fillna("pesado").map(lambda m: db.WEIGH_METHODS.get(m, m))
@@ -5656,7 +5657,7 @@ def _render_tab_correlacao_chuva_gmd():
                "Correlação não demonstra causalidade.")
 
     leituras = db.get_rain()
-    pesagens = db.get_all_weighings()
+    pesagens = pesagens_repo.get_all_weighings()
     series = series_mensais(leituras, pesagens)
 
     if not series:

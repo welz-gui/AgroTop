@@ -31,7 +31,8 @@ from datetime import date, timedelta
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
 
-import database as db  # noqa: E402
+import database as db
+from repositories import pesagens as pesagens_repo  # noqa: E402
 from repositories.animais import get_animal  # noqa: E402
 
 try:
@@ -117,7 +118,7 @@ class TestProjecaoNaTela(unittest.TestCase):
         from services.projecao import correlacao_chuva_gmd
 
         leituras = db.get_rain()
-        pesagens = db.get_all_weighings()
+        pesagens = pesagens_repo.get_all_weighings()
         series = series_mensais(leituras, pesagens)
         resultado = correlacao_chuva_gmd(series)
 

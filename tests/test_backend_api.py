@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 import backend_api.main as main_mod
 import database as db
+from repositories import pesagens as pesagens_repo
 from backend_api.config import (
     ACCESS_TOKEN_EXPIRE_SECONDS,
     TOKEN_ALGORITHM,
@@ -3087,8 +3088,8 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
         datas = [p["data"] for p in pesagens]
         self.assertEqual(datas, sorted(datas))
 
-        # Confere 1:1 com db.get_all_weighings()
-        expected = db.get_all_weighings()
+        # Confere 1:1 com pesagens_repo.get_all_weighings()
+        expected = pesagens_repo.get_all_weighings()
         self.assertEqual(len(pesagens), len(expected))
         for p, exp in zip(pesagens, expected):
             self.assertEqual(p["animal_id"], str(exp["animal_id"]))

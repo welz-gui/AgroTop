@@ -94,12 +94,12 @@ from repositories.animais import (
 )
 from repositories.conexao import ping as ping_banco
 from repositories.dispositivos import mudar_status, por_codigo
+from repositories import pesagens
 from repositories.pesagens import (
     WeighingCreate,
     add_weighing,
     calculate_gmd,
     calculate_gmd_bulk,
-    get_all_weighings,
     get_weighings_batch,
 )
 from repositories.sanidade import (
@@ -1081,7 +1081,7 @@ def get_relatorio_pesagens(
     _user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> list[dict[str, Any]]:
     """Retorna o histórico de pesagens ordenado por data."""
-    raw = get_all_weighings()
+    raw = pesagens.get_all_weighings()
     itens = []
     for w in raw:
         itens.append({
