@@ -17,6 +17,7 @@ from streamlit_folium import st_folium
 from datetime import date, datetime, timedelta
 from typing import Optional  # usado em _decode_qr e _ocr_number
 import database as db
+from repositories.pesagens import get_last_estimate
 from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
@@ -1339,7 +1340,7 @@ def _teclado_numerico():
 
 def _tab_pesagem(animal):
     # Comparação com estimativa anterior pendente
-    pend = db.get_last_estimate(animal["id"])
+    pend = get_last_estimate(animal["id"])
     if pend:
         met_lbl = db.WEIGH_METHODS.get(pend.get("method"),"estimativa")
         st.info(f"📋 Última pesagem foi **{met_lbl.lower()}**: "
