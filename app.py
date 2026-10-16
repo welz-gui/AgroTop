@@ -1869,7 +1869,7 @@ def page_rebanho():
 # ══════════════════════════════════════════════════════════════════════════════
 _ICONE_GRAVIDADE = {"bloqueio": "🔴", "alerta": "🟡", "informativo": "🔵"}
 
-# Validações que hoje disparam em TODO animal porque cobram campo que o schema
+# Validações que hoje disparam em todos os animais porque cobram campo que o schema
 # ainda não tem: `propriedade_id` chega na etapa B4 e genealogia na B3 do ADR
 # 0004. Não são erro de cadastro — são funcionalidade ausente, e mostrá-las em
 # cada ficha ensina o usuário a ignorar o aviso inteiro. Voltam quando os campos
