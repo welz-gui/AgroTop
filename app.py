@@ -986,7 +986,8 @@ def _dash_chart_evolucao_peso():
             hovertemplate="<b>%{fullData.name}</b><br>%{x|%d/%m/%Y}<br>%{y:.1f} kg<extra></extra>"
         )
 
-        raw_avg = db.get_average_weighings_by_date()
+        from repositories.pesagens import get_average_weighings_by_date
+        raw_avg = get_average_weighings_by_date()
         x_data = [d["Data"] for d in raw_avg]
         y_data = [d["Peso Médio (kg)"] for d in raw_avg]
 
