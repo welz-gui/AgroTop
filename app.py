@@ -22,6 +22,7 @@ from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
 from services.carencia import fim_da_carencia
 from repositories.animais import get_animal
+from repositories.pesagens import get_weighings_batch
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
 from services.zootecnia import calculate_gmd_total
@@ -1718,7 +1719,7 @@ def _campo_importar():
     # Qualidade: o histórico acumula as próprias linhas do arquivo, senão duas
     # pesagens do mesmo animal no mesmo CSV não se enxergariam.
     animal_ids = {linha["animal_id"] for linha in aceitas}
-    all_weighings = db.get_weighings_batch(animal_ids)
+    all_weighings = get_weighings_batch(animal_ids)
     hist = {}
     for a_id in animal_ids:
         hist[a_id] = [{"peso": w["weight"], "data": w["weigh_date"]}
