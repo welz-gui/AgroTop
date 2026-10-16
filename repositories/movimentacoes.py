@@ -205,11 +205,11 @@ def criar(
                 documento_comercial or None,
             ),
         )
-        for u in animais or []:
-            con.execute(
+        if animais:
+            con.executemany(
                 "INSERT INTO movimentacao_animais (movimentacao_id,animal_uuid) "
                 "VALUES(?,?)",
-                (mid, u),
+                [(mid, u) for u in animais],
             )
 
     eventos.auditar(
