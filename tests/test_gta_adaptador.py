@@ -114,5 +114,13 @@ class TestGtaAdaptador(unittest.TestCase):
         self.assertIsInstance(problemas, list)
 
 
+    def test_criterio_6_quantidade_declarada_invalida(self):
+        """Critério 6: quantidade_declarada inválida não quebra e ignora o campo."""
+        movimentacao = {"gta_numero": "GTA-123"}
+        dados_doc = {"quantidade_declarada": "abc"}
+        gta, _ = montar_contexto(movimentacao, dados_doc, [], [], "2026-08-06")
+        self.assertNotIn("quantidade", gta)
+
+
 if __name__ == "__main__":
     unittest.main()
