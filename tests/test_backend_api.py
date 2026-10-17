@@ -2889,10 +2889,7 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
         response = self.client.get("/relatorios/inventario")
         self.assertEqual(response.status_code, 401)
 
-    def test_relatorio_inventario_campos_conferem_com_fontes_reais(self):
-        """Critério 2: GET /relatorios/inventario com pelo menos 3 animais
-        (nascimento conhecido/estimado, com/sem carência, com/sem fornecedor) -> 200,
-        cada campo bate com chamadas independentes às mesmas funções."""
+    def _setup_inventario_test_data(self):
         with _conn() as con:
             row_forn = con.execute("SELECT id, name FROM fornecedores LIMIT 1").fetchone()
             forn_id = row_forn["id"] if row_forn else None
@@ -2937,71 +2934,53 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
             med_date=date.today().isoformat(),
             applied_by="Veterinario",
         ))
+        return forn_name
 
-        db.clear_cache()
+    def _assert_inventario_item_matches_db(self, item, a, expected_gmd, expected_wd):
+        aid = str(a["id"])
+        self.assertEqual(item["id"], aid)
+        self.assertEqual(item["raca"], a.get("breed") or None)
+        self.assertEqual(item["sexo"], a.get("sex") or None)
+        self.assertEqual(item["categoria_idade"], get_age_category(a.get("birth_date")))
+        self.assertEqual(item["idade_display"], get_age_display(a))
+        self.assertEqual(item["data_nascimento"], a.get("birth_date") or None)
+        self.assertEqual(item["nascimento_estimado"], bool(a.get("birth_estimated")))
 
-        response = self.client.get("/relatorios/inventario", headers=self._headers())
-        self.assertEqual(response.status_code, 200)
-        itens = response.json()
-        self.assertGreaterEqual(len(itens), 3)
+        expected_origem = a.get("age_source") or "propriedade"
+        if expected_origem not in db.AGE_SOURCES:
+            expected_origem = "propriedade"
+        self.assertEqual(item["origem_idade"], expected_origem)
 
-        itens_by_id = {item["id"]: item for item in itens}
+        self.assertEqual(item["data_entrada"], str(a["entry_date"]))
+        self.assertEqual(item["peso_entrada_kg"], float(a["entry_weight"]))
+        self.assertEqual(item["peso_atual_kg"], float(a["current_weight"]))
+        self.assertEqual(
+            item["ganho_kg"],
+            round(float(a["current_weight"]) - float(a["entry_weight"]), 1),
+        )
+        self.assertEqual(
+            item["arrobas_atuais"],
+            float(db.kg_to_arrobas(a["current_weight"])),
+        )
+        self.assertEqual(item["gmd_kg_dia"], expected_gmd)
+        self.assertEqual(item["status"], str(a["status"]))
+        self.assertEqual(
+            item["lote_id"],
+            str(a["lote_id"]) if a.get("lote_id") else None,
+        )
+        self.assertEqual(item["fornecedor"], a.get("fornecedor_name") or None)
+        self.assertEqual(item["nf"], a.get("nf_number") or None)
+        self.assertEqual(item["gta"], a.get("gta_number") or None)
 
-        all_animals = db.get_all_animals(status=None)
-        a_ids = [str(a["id"]) for a in all_animals]
-        expected_gmds = db.calculate_gmd_bulk(a_ids)
-        expected_wds = db.get_withdrawal_end_batch(a_ids)
+        if hasattr(expected_wd, "isoformat"):
+            expected_wd_str = expected_wd.isoformat()
+        elif expected_wd:
+            expected_wd_str = str(expected_wd)
+        else:
+            expected_wd_str = None
+        self.assertEqual(item["carencia_ate"], expected_wd_str)
 
-        # Prova real campo por campo para todos os animais
-        for a in all_animals:
-            aid = str(a["id"])
-            self.assertIn(aid, itens_by_id)
-            item = itens_by_id[aid]
-
-            self.assertEqual(item["id"], aid)
-            self.assertEqual(item["raca"], a.get("breed") or None)
-            self.assertEqual(item["sexo"], a.get("sex") or None)
-            self.assertEqual(item["categoria_idade"], get_age_category(a.get("birth_date")))
-            self.assertEqual(item["idade_display"], get_age_display(a))
-            self.assertEqual(item["data_nascimento"], a.get("birth_date") or None)
-            self.assertEqual(item["nascimento_estimado"], bool(a.get("birth_estimated")))
-
-            expected_origem = a.get("age_source") or "propriedade"
-            if expected_origem not in db.AGE_SOURCES:
-                expected_origem = "propriedade"
-            self.assertEqual(item["origem_idade"], expected_origem)
-
-            self.assertEqual(item["data_entrada"], str(a["entry_date"]))
-            self.assertEqual(item["peso_entrada_kg"], float(a["entry_weight"]))
-            self.assertEqual(item["peso_atual_kg"], float(a["current_weight"]))
-            self.assertEqual(
-                item["ganho_kg"],
-                round(float(a["current_weight"]) - float(a["entry_weight"]), 1),
-            )
-            self.assertEqual(
-                item["arrobas_atuais"],
-                float(db.kg_to_arrobas(a["current_weight"])),
-            )
-            self.assertEqual(item["gmd_kg_dia"], expected_gmds.get(aid))
-            self.assertEqual(item["status"], str(a["status"]))
-            self.assertEqual(
-                item["lote_id"],
-                str(a["lote_id"]) if a.get("lote_id") else None,
-            )
-            self.assertEqual(item["fornecedor"], a.get("fornecedor_name") or None)
-            self.assertEqual(item["nf"], a.get("nf_number") or None)
-            self.assertEqual(item["gta"], a.get("gta_number") or None)
-
-            wd = expected_wds.get(aid)
-            if hasattr(wd, "isoformat"):
-                expected_wd_str = wd.isoformat()
-            elif wd:
-                expected_wd_str = str(wd)
-            else:
-                expected_wd_str = None
-            self.assertEqual(item["carencia_ate"], expected_wd_str)
-
-        # Verificações específicas para os 3 animais modelo do Critério 2:
+    def _assert_animais_modelo(self, itens_by_id, forn_name):
         # 1. BR0001: nascimento conhecido, com carência, com fornecedor
         br1 = itens_by_id["BR0001"]
         self.assertEqual(br1["nascimento_estimado"], False)
@@ -3024,6 +3003,40 @@ class TestRelatoriosEndpoints(BackendApiTestCase):
         self.assertIsNone(br3["carencia_ate"])
         if forn_name:
             self.assertEqual(br3["fornecedor"], forn_name)
+
+    def test_relatorio_inventario_campos_conferem_com_fontes_reais(self):
+        """Critério 2: GET /relatorios/inventario com pelo menos 3 animais
+        (nascimento conhecido/estimado, com/sem carência, com/sem fornecedor) -> 200,
+        cada campo bate com chamadas independentes às mesmas funções."""
+        forn_name = self._setup_inventario_test_data()
+
+        db.clear_cache()
+
+        response = self.client.get("/relatorios/inventario", headers=self._headers())
+        self.assertEqual(response.status_code, 200)
+        itens = response.json()
+        self.assertGreaterEqual(len(itens), 3)
+
+        itens_by_id = {item["id"]: item for item in itens}
+
+        all_animals = db.get_all_animals(status=None)
+        a_ids = [str(a["id"]) for a in all_animals]
+        expected_gmds = db.calculate_gmd_bulk(a_ids)
+        expected_wds = db.get_withdrawal_end_batch(a_ids)
+
+        # Prova real campo por campo para todos os animais
+        for a in all_animals:
+            aid = str(a["id"])
+            self.assertIn(aid, itens_by_id)
+            self._assert_inventario_item_matches_db(
+                itens_by_id[aid],
+                a,
+                expected_gmds.get(aid),
+                expected_wds.get(aid),
+            )
+
+        # Verificações específicas para os 3 animais modelo do Critério 2:
+        self._assert_animais_modelo(itens_by_id, forn_name)
 
     def test_relatorio_inventario_inclui_todos_os_status(self):
         """Critério 3: GET /relatorios/inventario inclui animais de todos os status,
