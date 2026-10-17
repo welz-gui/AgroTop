@@ -39,6 +39,11 @@ class TestIdentificadores(unittest.TestCase):
         resultado = validar("br-123", {"padrao": r"BR\d{3}"})
         self.assertTrue(resultado["valido"])
 
+    def test_padrao_invalido_adiciona_erro(self):
+        resultado = validar("br-123", {"padrao": "["})
+        self.assertFalse(resultado["valido"])
+        self.assertIn("padrão inválido", resultado["erros"])
+
     def test_mod10_verifica_digito(self):
         resultado = validar("79927398713", {"digito_verificador": "mod10"})
         self.assertTrue(resultado["valido"])

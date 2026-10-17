@@ -128,6 +128,11 @@ class TestImportacaoGeometria(unittest.TestCase):
             ler_kml("isto nao e um xml")
         self.assertIn("XML", str(ctx_xml.exception))
 
+        # XML malformado
+        with self.assertRaises(ValueError) as ctx_xml_malformed:
+            ler_kml("<kml><unclosed>")
+        self.assertIn("XML KML inválido ou corrompido", str(ctx_xml_malformed.exception))
+
         # XML sem Polygon
         with self.assertRaises(ValueError) as ctx_no_poly:
             ler_kml("<kml><Document><name>Teste</name></Document></kml>")

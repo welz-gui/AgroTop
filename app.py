@@ -1869,7 +1869,7 @@ def page_rebanho():
 # ══════════════════════════════════════════════════════════════════════════════
 _ICONE_GRAVIDADE = {"bloqueio": "🔴", "alerta": "🟡", "informativo": "🔵"}
 
-# Validações que hoje disparam em TODO animal porque cobram campo que o schema
+# Validações que hoje disparam em todos os animais porque cobram campo que o schema
 # ainda não tem: `propriedade_id` chega na etapa B4 e genealogia na B3 do ADR
 # 0004. Não são erro de cadastro — são funcionalidade ausente, e mostrá-las em
 # cada ficha ensina o usuário a ignorar o aviso inteiro. Voltam quando os campos
@@ -4998,11 +4998,32 @@ def page_cadastrar():
         _cadastro_compra()
 
 
-def _cadastro_compra():
-    fornecedores=db.get_all_fornecedores()
-    lotes=[l for l in db.get_all_lotes() if l["status"]=="ativo"]
 
-    # Campos fora do form (para reagir à troca de método de idade/peso)
+@dataclass
+class CompraBasicoData:
+    aid: str
+    breed: str
+    sex: str
+    entry_date: date
+    target_weight: float
+
+@dataclass
+class CompraPesoData:
+    peso_metodo: str
+    entry_weight: float
+    medida_nota: str
+
+@dataclass
+class CompraDetalhesData:
+    compra_modo: str
+    purchase_price: float
+    lote_sel: dict | None
+    forn_sel: dict | None
+    notes: str
+    nf_number: str
+    gta_number: str
+
+def _render_compra_basico() -> CompraBasicoData:
     c_top1, c_top2 = st.columns(2)
     with c_top1:
         aid=st.text_input("🏷️ ID / Brinco *",placeholder="Ex: BR0015").strip().upper()
@@ -5012,12 +5033,9 @@ def _cadastro_compra():
         entry_date=st.date_input("📅 Data de Entrada *",value=date.today())
         target_weight=st.number_input("🎯 Peso-Alvo de Abate (kg)",
             min_value=0.0,max_value=2000.0,value=500.0,step=5.0,format="%.1f")
+    return CompraBasicoData(aid, breed, sex, entry_date, target_weight)
 
-    st.markdown("**📆 Definição de Idade / Categoria**")
-    birth_date_str, birth_est, age_src, age_err = _age_inputs(entry_date, "cad_")
-    is_propriedade = (age_src == "propriedade")
-
-    # ── Peso de entrada (com método) ──────────────────────────────────────────
+def _render_compra_peso() -> CompraPesoData:
     st.markdown("**⚖️ Peso de Entrada**")
     st.caption("Não é obrigatório pesar na balança — pode estimar ou usar medição.")
     peso_metodo = st.radio("Como obter o peso?",
@@ -5042,78 +5060,50 @@ def _cadastro_compra():
         entry_weight=st.number_input(lbl,min_value=0.1,max_value=2000.0,
             step=0.5,format="%.1f",key="cad_peso_valor")
         medida_nota = ""
+    return CompraPesoData(peso_metodo, entry_weight, medida_nota)
 
-    with st.form("f_cad",clear_on_submit=False):
-        cf1, cf2 = st.columns(2)
-        with cf1:
-            # Valor de compra só para animais adquiridos (não nascidos na propriedade)
-            if not is_propriedade:
-                compra_modo = st.selectbox("💰 Como foi a compra?",
-                    ["cabeca","kg"],
-                    format_func=lambda m: "Por cabeça (valor fechado)" if m=="cabeca" else "Por kg (peso × preço/kg)")
-                if compra_modo == "kg":
-                    preco_kg_compra = st.number_input("Preço por kg (R$)",
-                        min_value=0.0, step=0.10, format="%.2f")
-                    purchase_price = round(entry_weight * preco_kg_compra, 2)
-                    st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({_num_br(entry_weight, 0)} kg × R\\$ {_num_br(preco_kg_compra, 2)})")
-                else:
-                    purchase_price=st.number_input("Valor de Compra (R$)",
-                        min_value=0.0,step=10.0,format="%.2f")
-            else:
-                purchase_price=0.0
-                compra_modo="propriedade"
-                st.caption("💰 Valor de compra não se aplica a animais nascidos na propriedade.")
-            lote_sel=st.selectbox("🌿 Lote de Destino",
-                [None]+lotes,format_func=lambda x:"— Sem lote —" if x is None else f"{x['id']} — {x['name']}")
-        with cf2:
-            forn_sel=st.selectbox("🚚 Fornecedor / Origem",
-                [None]+fornecedores,format_func=lambda x:"— Não informado —" if x is None else f"{x['name']} ({x['city']}/{x['state']})")
-            notes=st.text_area("📝 Observações",height=70,
-                placeholder="Opcional",value=medida_nota)
-
+def _render_compra_detalhes(is_propriedade: bool, entry_weight: float, medida_nota: str, lotes: list, fornecedores: list) -> CompraDetalhesData:
+    cf1, cf2 = st.columns(2)
+    with cf1:
         if not is_propriedade:
-            st.caption("📄 Documentos de compra (opcional)")
-            cd1, cd2 = st.columns(2)
-            with cd1:
-                nf_number=st.text_input("Número da NF",placeholder="Ex: 012345",
-                    help="Nota Fiscal — opcional").strip()
-            with cd2:
-                gta_number=st.text_input("Número da GTA",placeholder="Ex: MT-0009876",
-                    help="Guia de Trânsito Animal — opcional").strip()
-        else:
-            nf_number=gta_number=""
-
-        if st.form_submit_button("✅ Cadastrar Animal",type="primary",use_container_width=True):
-            errs=[]
-            if not aid:             errs.append("ID do animal é obrigatório.")
-            elif get_animal(aid):errs.append(f"Animal **{aid}** já existe.")
-            if entry_weight<=0:     errs.append("Peso de entrada deve ser > 0.")
-            if age_err:             errs.append(age_err)
-            if errs:
-                for e in errs: st.error(f"❌ {e}")
+            compra_modo = st.selectbox("💰 Como foi a compra?",
+                ["cabeca","kg"],
+                format_func=lambda m: "Por cabeça (valor fechado)" if m=="cabeca" else "Por kg (peso × preço/kg)")
+            if compra_modo == "kg":
+                preco_kg_compra = st.number_input("Preço por kg (R$)",
+                    min_value=0.0, step=0.10, format="%.2f")
+                purchase_price = round(entry_weight * preco_kg_compra, 2)
+                st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({_num_br(entry_weight, 0)} kg × R\\$ {_num_br(preco_kg_compra, 2)})")
             else:
-                db.add_animal(
-                    db.AnimalData(aid, breed,
-                    "M" if "Macho" in sex else "F",
-                    birth_date_str,
-                    entry_date.strftime("%Y-%m-%d"),
-                    entry_weight, target_weight, purchase_price,
-                    lote_sel["id"] if lote_sel else None,
-                    forn_sel["id"] if forn_sel else None,
-                    notes,
-                    birth_estimated=birth_est,
-                    age_source=age_src,
-                    nf_number=nf_number,
-                    gta_number=gta_number,
-                    weight_method=peso_metodo,
-                    purchase_mode=compra_modo,
-                ))
-                cat = get_age_category(birth_date_str)
-                st.success(f"✅ Animal **{aid}** cadastrado! Categoria: **{cat}** · "
-                           f"Peso: {_num_br(entry_weight, 1)} kg ({db.WEIGH_METHODS[peso_metodo]})")
-                st.balloons()
+                purchase_price=st.number_input("Valor de Compra (R$)",
+                    min_value=0.0,step=10.0,format="%.2f")
+        else:
+            purchase_price=0.0
+            compra_modo="propriedade"
+            st.caption("💰 Valor de compra não se aplica a animais nascidos na propriedade.")
+        lote_sel=st.selectbox("🌿 Lote de Destino",
+            [None]+lotes,format_func=lambda x:"— Sem lote —" if x is None else f"{x['id']} — {x['name']}")
+    with cf2:
+        forn_sel=st.selectbox("🚚 Fornecedor / Origem",
+            [None]+fornecedores,format_func=lambda x:"— Não informado —" if x is None else f"{x['name']} ({x['city']}/{x['state']})")
+        notes=st.text_area("📝 Observações",height=70,
+            placeholder="Opcional",value=medida_nota)
 
-    # Cadastrar Fornecedor rápido
+    if not is_propriedade:
+        st.caption("📄 Documentos de compra (opcional)")
+        cd1, cd2 = st.columns(2)
+        with cd1:
+            nf_number=st.text_input("Número da NF",placeholder="Ex: 012345",
+                help="Nota Fiscal — opcional").strip()
+        with cd2:
+            gta_number=st.text_input("Número da GTA",placeholder="Ex: MT-0009876",
+                help="Guia de Trânsito Animal — opcional").strip()
+    else:
+        nf_number=gta_number=""
+
+    return CompraDetalhesData(compra_modo, purchase_price, lote_sel, forn_sel, notes, nf_number, gta_number)
+
+def _render_cadastrar_fornecedor_rapido():
     with st.expander("➕ Cadastrar novo Fornecedor / Origem"):
         with st.form("f_forn",clear_on_submit=True):
             ff1,ff2,ff3=st.columns(3)
@@ -5125,6 +5115,56 @@ def _cadastro_compra():
                 if fn:
                     db.add_fornecedor(fn,fc,fs,fcontact)
                     st.success(f"✅ {fn} cadastrado!"); st.rerun()
+
+def _cadastro_compra():
+    fornecedores=db.get_all_fornecedores()
+    lotes=[l for l in db.get_all_lotes() if l["status"]=="ativo"]
+
+    # Campos fora do form (para reagir à troca de método de idade/peso)
+    basico = _render_compra_basico()
+
+    st.markdown("**📆 Definição de Idade / Categoria**")
+    birth_date_str, birth_est, age_src, age_err = _age_inputs(basico.entry_date, "cad_")
+    is_propriedade = (age_src == "propriedade")
+
+    # ── Peso de entrada (com método) ──────────────────────────────────────────
+    peso_data = _render_compra_peso()
+
+    with st.form("f_cad",clear_on_submit=False):
+        detalhes = _render_compra_detalhes(
+            is_propriedade, peso_data.entry_weight, peso_data.medida_nota, lotes, fornecedores)
+
+        if st.form_submit_button("✅ Cadastrar Animal",type="primary",use_container_width=True):
+            errs=[]
+            if not basico.aid:             errs.append("ID do animal é obrigatório.")
+            elif get_animal(basico.aid):errs.append(f"Animal **{basico.aid}** já existe.")
+            if peso_data.entry_weight<=0:     errs.append("Peso de entrada deve ser > 0.")
+            if age_err:             errs.append(age_err)
+            if errs:
+                for e in errs: st.error(f"❌ {e}")
+            else:
+                db.add_animal(
+                    db.AnimalData(basico.aid, basico.breed,
+                    "M" if "Macho" in basico.sex else "F",
+                    birth_date_str,
+                    basico.entry_date.strftime("%Y-%m-%d"),
+                    peso_data.entry_weight, basico.target_weight, detalhes.purchase_price,
+                    detalhes.lote_sel["id"] if detalhes.lote_sel else None,
+                    detalhes.forn_sel["id"] if detalhes.forn_sel else None,
+                    detalhes.notes,
+                    birth_estimated=birth_est,
+                    age_source=age_src,
+                    nf_number=detalhes.nf_number,
+                    gta_number=detalhes.gta_number,
+                    weight_method=peso_data.peso_metodo,
+                    purchase_mode=detalhes.compra_modo,
+                ))
+                cat = get_age_category(birth_date_str)
+                st.success(f"✅ Animal **{basico.aid}** cadastrado! Categoria: **{cat}** · "
+                           f"Peso: {_num_br(peso_data.entry_weight, 1)} kg ({db.WEIGH_METHODS[peso_data.peso_metodo]})")
+                st.balloons()
+
+    _render_cadastrar_fornecedor_rapido()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ADMIN
@@ -5218,6 +5258,107 @@ def _admin_users():
                     st.rerun()
 
 
+
+def _tab_clima_previsao():
+    lat = db.get_setting("farm_lat")
+    lon = db.get_setting("farm_lon")
+    with st.expander("📍 Localização da fazenda (para a previsão)",
+                     expanded=not (lat and lon)):
+        st.caption("Pegue as coordenadas no Google Maps: clique no local do mapa e "
+                   "copie os números que aparecem (latitude, longitude).")
+        lc1, lc2 = st.columns(2)
+        with lc1:
+            nlat = st.number_input("Latitude", value=float(lat) if lat else -15.60000,
+                format="%.5f", step=0.001)
+        with lc2:
+            nlon = st.number_input("Longitude", value=float(lon) if lon else -56.10000,
+                format="%.5f", step=0.001)
+        if st.button("💾 Salvar localização", type="primary"):
+            db.set_setting("farm_lat", nlat)
+            db.set_setting("farm_lon", nlon)
+            st.success("📍 Localização salva!"); st.rerun()
+
+    propriedades_ativas = db.propriedades.listar()
+    localizacoes = localizacoes_para_previsao(
+        propriedades_ativas,
+        float(lat) if lat else None,
+        float(lon) if lon else None,
+    )
+
+    if not localizacoes:
+        st.info("Defina a **localização da fazenda** acima para ver a previsão do tempo.")
+    elif len(localizacoes) == 1:
+        # Uma só coordenada resolvida — não há o que separar por aba,
+        # mesmo comportamento de sempre (spec 0046: não gera ruído
+        # dividindo o que é, na prática, a mesma previsão).
+        _renderizar_previsao_tempo(localizacoes[0])
+    else:
+        # Propriedades em coordenadas diferentes (ADR 0004: um produtor
+        # pode ter mais de uma) — uma aba por localização, agrupando
+        # quem cai na mesma coordenada.
+        abas = st.tabs([" / ".join(p["nome"] for p in loc["propriedades"])
+                        for loc in localizacoes])
+        for aba, loc in zip(abas, localizacoes):
+            with aba:
+                _renderizar_previsao_tempo(loc)
+
+def _tab_clima_registrar_chuva(lotes):
+    st.caption("Registre a leitura do pluviômetro. Se houver um pluviômetro por piquete, "
+               "escolha o piquete; se for um só, deixe em **Geral / Sede**.")
+    with st.form("f_rain", clear_on_submit=True):
+        r1, r2 = st.columns(2)
+        with r1: rdate = st.date_input("Data da leitura", value=date.today())
+        with r2: rmm = st.number_input("Chuva medida (mm)", min_value=0.0, step=1.0, format="%.1f")
+        lote_sel = st.selectbox("Piquete", [None]+lotes,
+            format_func=lambda x: "Geral / Sede" if x is None else f"{x['id']} — {x['name']}")
+        rnotes = st.text_input("Observações", placeholder="Opcional")
+        if st.form_submit_button("💧 Registrar chuva", type="primary", use_container_width=True):
+            db.add_rain(rdate.strftime("%Y-%m-%d"), rmm,
+                lote_sel["id"] if lote_sel else None,
+                st.session_state.user["name"], rnotes)
+            st.success(f"✅ {_num_br(rmm, 1)} mm registrados."); st.rerun()
+
+def _tab_clima_historico_chuva():
+    h1, h2 = st.columns(2)
+    with h1: start = st.date_input("De", value=date(date.today().year,1,1), key="rain_start")
+    with h2: end = st.date_input("Até", value=date.today(), key="rain_end")
+    chuvas = db.get_rain(start.isoformat(), end.isoformat())
+    total = db.get_rain_total(start.isoformat(), end.isoformat())
+    st.metric("🌧️ Chuva acumulada no período", f"{_num_br(total, 0)} mm")
+    if chuvas:
+        df = pd.DataFrame(chuvas)
+        df["read_date"] = pd.to_datetime(df["read_date"])
+        df["piquete"] = df["lote_name"].fillna("Geral / Sede")
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            st.markdown("**Por mês**")
+            dfm = (df.groupby(df["read_date"].dt.to_period("M").astype(str))["rain_mm"]
+                   .sum().reset_index())
+            dfm.columns = ["Mês","Chuva (mm)"]
+            figm = px.bar(dfm, x="Mês", y="Chuva (mm)",
+                color_discrete_sequence=[c["info_secundario"]])
+            figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor=c["superficie"]),
+                yaxis=dict(gridcolor=c["superficie"])))
+            st.plotly_chart(figm, use_container_width=True)
+        with gc2:
+            st.markdown("**Por piquete**")
+            dfl = df.groupby("piquete")["rain_mm"].sum().reset_index().sort_values("rain_mm")
+            figl = px.bar(dfl, x="rain_mm", y="piquete", orientation="h",
+                color="rain_mm", color_continuous_scale=[c["texto_secundario"], c["info_secundario"]],
+                labels={"rain_mm":"Chuva (mm)","piquete":""})
+            figl.update_layout(**_layout(height=250, coloraxis_showscale=False,
+                xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"])))
+            st.plotly_chart(figl, use_container_width=True)
+        dft = df[["read_date","rain_mm","piquete","operator"]].copy()
+        dft["read_date"] = dft["read_date"].dt.strftime("%d/%m/%Y")
+        dft.columns = ["Data","Chuva (mm)","Piquete","Registrado por"]
+        st.dataframe(dft, use_container_width=True, hide_index=True,
+            column_config={"Chuva (mm)":st.column_config.NumberColumn(format="%.1f")})
+    else:
+        st.info("Nenhum registro de chuva no período. Registre na aba **Registrar Chuva**.")
+
+
+
 def page_clima():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -5226,106 +5367,14 @@ def page_clima():
 
     ct1, ct2, ct3 = st.tabs(["🌦️ Previsão do Tempo", "💧 Registrar Chuva", "📊 Histórico de Chuva"])
 
-    # ── Previsão do tempo ─────────────────────────────────────────────────────
     with ct1:
-        lat = db.get_setting("farm_lat")
-        lon = db.get_setting("farm_lon")
-        with st.expander("📍 Localização da fazenda (para a previsão)",
-                         expanded=not (lat and lon)):
-            st.caption("Pegue as coordenadas no Google Maps: clique no local do mapa e "
-                       "copie os números que aparecem (latitude, longitude).")
-            lc1, lc2 = st.columns(2)
-            with lc1:
-                nlat = st.number_input("Latitude", value=float(lat) if lat else -15.60000,
-                    format="%.5f", step=0.001)
-            with lc2:
-                nlon = st.number_input("Longitude", value=float(lon) if lon else -56.10000,
-                    format="%.5f", step=0.001)
-            if st.button("💾 Salvar localização", type="primary"):
-                db.set_setting("farm_lat", nlat)
-                db.set_setting("farm_lon", nlon)
-                st.success("📍 Localização salva!"); st.rerun()
+        _tab_clima_previsao()
 
-        propriedades_ativas = db.propriedades.listar()
-        localizacoes = localizacoes_para_previsao(
-            propriedades_ativas,
-            float(lat) if lat else None,
-            float(lon) if lon else None,
-        )
-
-        if not localizacoes:
-            st.info("Defina a **localização da fazenda** acima para ver a previsão do tempo.")
-        elif len(localizacoes) == 1:
-            # Uma só coordenada resolvida — não há o que separar por aba,
-            # mesmo comportamento de sempre (spec 0046: não gera ruído
-            # dividindo o que é, na prática, a mesma previsão).
-            _renderizar_previsao_tempo(localizacoes[0])
-        else:
-            # Propriedades em coordenadas diferentes (ADR 0004: um produtor
-            # pode ter mais de uma) — uma aba por localização, agrupando
-            # quem cai na mesma coordenada.
-            abas = st.tabs([" / ".join(p["nome"] for p in loc["propriedades"])
-                            for loc in localizacoes])
-            for aba, loc in zip(abas, localizacoes):
-                with aba:
-                    _renderizar_previsao_tempo(loc)
-
-    # ── Registrar chuva (por piquete) ─────────────────────────────────────────
     with ct2:
-        st.caption("Registre a leitura do pluviômetro. Se houver um pluviômetro por piquete, "
-                   "escolha o piquete; se for um só, deixe em **Geral / Sede**.")
-        with st.form("f_rain", clear_on_submit=True):
-            r1, r2 = st.columns(2)
-            with r1: rdate = st.date_input("Data da leitura", value=date.today())
-            with r2: rmm = st.number_input("Chuva medida (mm)", min_value=0.0, step=1.0, format="%.1f")
-            lote_sel = st.selectbox("Piquete", [None]+lotes,
-                format_func=lambda x: "Geral / Sede" if x is None else f"{x['id']} — {x['name']}")
-            rnotes = st.text_input("Observações", placeholder="Opcional")
-            if st.form_submit_button("💧 Registrar chuva", type="primary", use_container_width=True):
-                db.add_rain(rdate.strftime("%Y-%m-%d"), rmm,
-                    lote_sel["id"] if lote_sel else None,
-                    st.session_state.user["name"], rnotes)
-                st.success(f"✅ {_num_br(rmm, 1)} mm registrados."); st.rerun()
+        _tab_clima_registrar_chuva(lotes)
 
-    # ── Histórico de chuva ────────────────────────────────────────────────────
     with ct3:
-        h1, h2 = st.columns(2)
-        with h1: start = st.date_input("De", value=date(date.today().year,1,1), key="rain_start")
-        with h2: end = st.date_input("Até", value=date.today(), key="rain_end")
-        chuvas = db.get_rain(start.isoformat(), end.isoformat())
-        total = db.get_rain_total(start.isoformat(), end.isoformat())
-        st.metric("🌧️ Chuva acumulada no período", f"{_num_br(total, 0)} mm")
-        if chuvas:
-            df = pd.DataFrame(chuvas)
-            df["read_date"] = pd.to_datetime(df["read_date"])
-            df["piquete"] = df["lote_name"].fillna("Geral / Sede")
-            gc1, gc2 = st.columns(2)
-            with gc1:
-                st.markdown("**Por mês**")
-                dfm = (df.groupby(df["read_date"].dt.to_period("M").astype(str))["rain_mm"]
-                       .sum().reset_index())
-                dfm.columns = ["Mês","Chuva (mm)"]
-                figm = px.bar(dfm, x="Mês", y="Chuva (mm)",
-                    color_discrete_sequence=[c["info_secundario"]])
-                figm.update_layout(**_layout(height=250, xaxis=dict(gridcolor=c["superficie"]),
-                    yaxis=dict(gridcolor=c["superficie"])))
-                st.plotly_chart(figm, use_container_width=True)
-            with gc2:
-                st.markdown("**Por piquete**")
-                dfl = df.groupby("piquete")["rain_mm"].sum().reset_index().sort_values("rain_mm")
-                figl = px.bar(dfl, x="rain_mm", y="piquete", orientation="h",
-                    color="rain_mm", color_continuous_scale=[c["texto_secundario"], c["info_secundario"]],
-                    labels={"rain_mm":"Chuva (mm)","piquete":""})
-                figl.update_layout(**_layout(height=250, coloraxis_showscale=False,
-                    xaxis=dict(gridcolor=c["superficie"]), yaxis=dict(gridcolor=c["superficie"])))
-                st.plotly_chart(figl, use_container_width=True)
-            dft = df[["read_date","rain_mm","piquete","operator"]].copy()
-            dft["read_date"] = dft["read_date"].dt.strftime("%d/%m/%Y")
-            dft.columns = ["Data","Chuva (mm)","Piquete","Registrado por"]
-            st.dataframe(dft, use_container_width=True, hide_index=True,
-                column_config={"Chuva (mm)":st.column_config.NumberColumn(format="%.1f")})
-        else:
-            st.info("Nenhum registro de chuva no período. Registre na aba **Registrar Chuva**.")
+        _tab_clima_historico_chuva()
 
 
 def _render_tab_plano_vacinacao():
@@ -7456,6 +7505,156 @@ def _sinc_fechar_em_lote(pendentes: list[dict]):
         else:
             st.error(f"🚫 {r.get('erro')} (parou no evento #{r.get('parou_em')})")
 
+def _admin_tab_dados():
+    st.subheader("✏️ Edição Direta de Dados")
+    st.caption("Corrija qualquer registro: edite células, adicione linhas (+) ou remova (🗑). "
+               "Clique em **Salvar alterações** para gravar no banco.")
+    st.warning("⚠️ Área técnica: alterações são gravadas diretamente no banco. "
+               "Edite com cuidado — não há desfazer.")
+
+    tab=st.selectbox("Tabela", db.ADMIN_TABLES, key="admin_tab_edit")
+    cols, pk = db.admin_table_info(tab)
+    orig_rows = db.admin_get_rows(tab)
+    orig_df = pd.DataFrame(orig_rows, columns=cols)
+
+    st.caption(f"Tabela **{tab}** · chave primária: **{pk}** · {len(orig_rows)} registro(s)")
+    if tab in db.ADMIN_SEM_EXCLUSAO:
+        st.info("🔒 Esta tabela guarda o histórico dos animais: dá para **corrigir** e "
+                "**acrescentar** linhas, mas não **remover**. Corrija o valor em vez de apagar.")
+
+    edited = st.data_editor(
+        orig_df, num_rows="dynamic", use_container_width=True,
+        hide_index=True, key=f"editor_{tab}",
+        column_config={pk: st.column_config.Column(f"{pk} (chave)", help="Chave primária")},
+    )
+
+    cbtn1, cbtn2 = st.columns([1,3])
+    with cbtn1:
+        do_save = st.button("💾 Salvar alterações", type="primary",
+                            use_container_width=True, key=f"savebtn_{tab}")
+    with cbtn2:
+        st.caption("Para inserir: use a linha em branco no fim da tabela. "
+                   "Em tabelas com ID automático, deixe a chave vazia.")
+
+    if do_save:
+        def _pyval(v):
+            if v is None: return None
+            try:
+                if pd.isna(v): return None
+            except (TypeError, ValueError): pass
+            if hasattr(v, "item"):
+                try: v = v.item()
+                except Exception: pass
+            if isinstance(v, float) and v.is_integer(): return int(v)
+            return v
+
+        def _is_empty_pk(v):
+            pv = _pyval(v)
+            return pv is None or (isinstance(pv, str) and pv.strip() == "")
+
+        orig_by_pk = {_pyval(r[pk]): r for r in orig_rows}
+        updates, inserts, seen = [], [], set()
+
+        for rec in edited.to_dict("records"):
+            clean = {col: _pyval(rec.get(col)) for col in cols}
+            pkv = clean.get(pk)
+            if _is_empty_pk(pkv) or pkv not in orig_by_pk:
+                row_ins = dict(clean)
+                if _is_empty_pk(pkv):
+                    row_ins.pop(pk, None)   # deixa o banco gerar o ID
+                # ignora linhas totalmente vazias
+                if any(v is not None and str(v) != "" for v in row_ins.values()):
+                    inserts.append(row_ins)
+            else:
+                seen.add(pkv)
+                orig = orig_by_pk[pkv]
+                if any(str(_pyval(orig.get(col))) != str(clean.get(col)) for col in cols):
+                    updates.append(clean)
+
+        delete_pks = [k for k in orig_by_pk if k not in seen]
+
+        try:
+            res = db.admin_apply_changes(
+                tab, updates, inserts, delete_pks,
+                usuario=st.session_state.user.get("username") or st.session_state.user.get("name", ""))
+            st.success(f"✅ Salvo em **{tab}**: {res['updated']} atualizada(s), "
+                       f"{res['inserted']} inserida(s), {res['deleted']} excluída(s).")
+            st.rerun()
+        except db.ExclusaoNaoPermitida as e:
+            st.error(f"🔒 {e}")
+        except Exception as e:
+            st.error(f"❌ Erro ao salvar: {e}")
+
+def _admin_tab_status():
+    st.subheader("Alterar Status de Animal")
+    all_a=db.get_all_animals(status=None)
+    por_id={a["id"]:a for a in all_a}
+    ac1,ac2=st.columns(2)
+    with ac1: sel_a=st.selectbox("Animal",[a["id"] for a in all_a])
+    with ac2: new_st=st.selectbox("Novo Status",["ativo","vendido","morto","carencia"])
+
+    atual = por_id[sel_a]["status"] if sel_a in por_id else ""
+    # A autorização vem do PAPEL, e não de ter chegado nesta página. O
+    # dispatch já restringe operador a OPERATOR_PAGES, mas quem decide uma
+    # transição sensível é a permissão do usuário (§14.2) — não a rota.
+    eh_admin = st.session_state.user["role"] == "admin"
+    veredito = db.transicao_permitida(atual, new_st, tem_autorizacao=eh_admin)
+
+    st.caption(f"Status atual: **{atual or '—'}** → **{new_st}**")
+
+    justificativa = ""
+    if veredito["exige_justificativa"]:
+        st.warning(f"⚠️ {veredito['motivo']}")
+        justificativa = st.text_area(
+            "Justificativa (obrigatória)",
+            placeholder="Por que este animal está saindo de um estado final?",
+            key=f"just_{sel_a}_{new_st}")
+    elif not veredito["permitida"]:
+        st.error(f"🚫 {veredito['motivo']}")
+
+    pode = veredito["permitida"] and (
+        not veredito["exige_justificativa"] or justificativa.strip())
+    if st.button("✅ Atualizar",type="primary",disabled=not pode):
+        r = db.update_animal_status(
+            sel_a, new_st,
+            tem_autorizacao=eh_admin,
+            justificativa=justificativa,
+            operador=st.session_state.user["name"])
+        if r.get("ok"):
+            st.success(f"{sel_a}: {r['de']} → {r['para']}")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('motivo','Transição recusada.')}")
+
+def _admin_tab_banco():
+    import os
+    if db.USE_PG:
+        st.markdown("**Banco de Dados:** PostgreSQL / Supabase (nuvem) ☁️")
+        st.caption("Os dados ficam no Supabase e são acessíveis de qualquer lugar.")
+        for t in db.ADMIN_TABLES:
+            try:
+                n = db.admin_get_rows(t)
+                st.write(f"• `{t}`: {len(n)} registro(s)")
+            except Exception:
+                pass
+    else:
+        st.markdown("**Banco de Dados:** SQLite local `agrotop.db` — funciona offline")
+        if os.path.exists(db.DB_PATH):
+            st.metric("Tamanho",f"{_num_br(os.path.getsize(db.DB_PATH)/1024, 1)} KB")
+
+    st.markdown("---")
+    st.subheader("💾 Backup dos Dados")
+    st.caption("Baixe uma cópia completa de todos os dados em Excel (uma aba por tabela). "
+               "Guarde em local seguro (pen drive, nuvem). O Supabase também mantém "
+               "backups automáticos diários no servidor.")
+    if st.button("📥 Gerar backup completo (Excel)", type="primary"):
+        data = _backup_xlsx()
+        st.download_button(
+            "⬇️ Baixar backup agora", data,
+            f"agrotop_backup_{date.today().isoformat()}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True)
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -7466,154 +7665,13 @@ def page_admin():
         _admin_users()
 
     with at1:
-        st.subheader("✏️ Edição Direta de Dados")
-        st.caption("Corrija qualquer registro: edite células, adicione linhas (+) ou remova (🗑). "
-                   "Clique em **Salvar alterações** para gravar no banco.")
-        st.warning("⚠️ Área técnica: alterações são gravadas diretamente no banco. "
-                   "Edite com cuidado — não há desfazer.")
-
-        tab=st.selectbox("Tabela", db.ADMIN_TABLES, key="admin_tab_edit")
-        cols, pk = db.admin_table_info(tab)
-        orig_rows = db.admin_get_rows(tab)
-        orig_df = pd.DataFrame(orig_rows, columns=cols)
-
-        st.caption(f"Tabela **{tab}** · chave primária: **{pk}** · {len(orig_rows)} registro(s)")
-        if tab in db.ADMIN_SEM_EXCLUSAO:
-            st.info("🔒 Esta tabela guarda o histórico dos animais: dá para **corrigir** e "
-                    "**acrescentar** linhas, mas não **remover**. Corrija o valor em vez de apagar.")
-
-        edited = st.data_editor(
-            orig_df, num_rows="dynamic", use_container_width=True,
-            hide_index=True, key=f"editor_{tab}",
-            column_config={pk: st.column_config.Column(f"{pk} (chave)", help="Chave primária")},
-        )
-
-        cbtn1, cbtn2 = st.columns([1,3])
-        with cbtn1:
-            do_save = st.button("💾 Salvar alterações", type="primary",
-                                use_container_width=True, key=f"savebtn_{tab}")
-        with cbtn2:
-            st.caption("Para inserir: use a linha em branco no fim da tabela. "
-                       "Em tabelas com ID automático, deixe a chave vazia.")
-
-        if do_save:
-            def _pyval(v):
-                if v is None: return None
-                try:
-                    if pd.isna(v): return None
-                except (TypeError, ValueError): pass
-                if hasattr(v, "item"):
-                    try: v = v.item()
-                    except Exception: pass
-                if isinstance(v, float) and v.is_integer(): return int(v)
-                return v
-
-            def _is_empty_pk(v):
-                pv = _pyval(v)
-                return pv is None or (isinstance(pv, str) and pv.strip() == "")
-
-            orig_by_pk = {_pyval(r[pk]): r for r in orig_rows}
-            updates, inserts, seen = [], [], set()
-
-            for rec in edited.to_dict("records"):
-                clean = {col: _pyval(rec.get(col)) for col in cols}
-                pkv = clean.get(pk)
-                if _is_empty_pk(pkv) or pkv not in orig_by_pk:
-                    row_ins = dict(clean)
-                    if _is_empty_pk(pkv):
-                        row_ins.pop(pk, None)   # deixa o banco gerar o ID
-                    # ignora linhas totalmente vazias
-                    if any(v is not None and str(v) != "" for v in row_ins.values()):
-                        inserts.append(row_ins)
-                else:
-                    seen.add(pkv)
-                    orig = orig_by_pk[pkv]
-                    if any(str(_pyval(orig.get(col))) != str(clean.get(col)) for col in cols):
-                        updates.append(clean)
-
-            delete_pks = [k for k in orig_by_pk if k not in seen]
-
-            try:
-                res = db.admin_apply_changes(
-                    tab, updates, inserts, delete_pks,
-                    usuario=st.session_state.user.get("username") or st.session_state.user.get("name", ""))
-                st.success(f"✅ Salvo em **{tab}**: {res['updated']} atualizada(s), "
-                           f"{res['inserted']} inserida(s), {res['deleted']} excluída(s).")
-                st.rerun()
-            except db.ExclusaoNaoPermitida as e:
-                st.error(f"🔒 {e}")
-            except Exception as e:
-                st.error(f"❌ Erro ao salvar: {e}")
+        _admin_tab_dados()
 
     with at2:
-        st.subheader("Alterar Status de Animal")
-        all_a=db.get_all_animals(status=None)
-        por_id={a["id"]:a for a in all_a}
-        ac1,ac2=st.columns(2)
-        with ac1: sel_a=st.selectbox("Animal",[a["id"] for a in all_a])
-        with ac2: new_st=st.selectbox("Novo Status",["ativo","vendido","morto","carencia"])
-
-        atual = por_id[sel_a]["status"] if sel_a in por_id else ""
-        # A autorização vem do PAPEL, e não de ter chegado nesta página. O
-        # dispatch já restringe operador a OPERATOR_PAGES, mas quem decide uma
-        # transição sensível é a permissão do usuário (§14.2) — não a rota.
-        eh_admin = st.session_state.user["role"] == "admin"
-        veredito = db.transicao_permitida(atual, new_st, tem_autorizacao=eh_admin)
-
-        st.caption(f"Status atual: **{atual or '—'}** → **{new_st}**")
-
-        justificativa = ""
-        if veredito["exige_justificativa"]:
-            st.warning(f"⚠️ {veredito['motivo']}")
-            justificativa = st.text_area(
-                "Justificativa (obrigatória)",
-                placeholder="Por que este animal está saindo de um estado final?",
-                key=f"just_{sel_a}_{new_st}")
-        elif not veredito["permitida"]:
-            st.error(f"🚫 {veredito['motivo']}")
-
-        pode = veredito["permitida"] and (
-            not veredito["exige_justificativa"] or justificativa.strip())
-        if st.button("✅ Atualizar",type="primary",disabled=not pode):
-            r = db.update_animal_status(
-                sel_a, new_st,
-                tem_autorizacao=eh_admin,
-                justificativa=justificativa,
-                operador=st.session_state.user["name"])
-            if r.get("ok"):
-                st.success(f"{sel_a}: {r['de']} → {r['para']}")
-                st.rerun()
-            else:
-                st.error(f"🚫 {r.get('motivo','Transição recusada.')}")
+        _admin_tab_status()
 
     with at3:
-        import os
-        if db.USE_PG:
-            st.markdown("**Banco de Dados:** PostgreSQL / Supabase (nuvem) ☁️")
-            st.caption("Os dados ficam no Supabase e são acessíveis de qualquer lugar.")
-            for t in db.ADMIN_TABLES:
-                try:
-                    n = db.admin_get_rows(t)
-                    st.write(f"• `{t}`: {len(n)} registro(s)")
-                except Exception:
-                    pass
-        else:
-            st.markdown("**Banco de Dados:** SQLite local `agrotop.db` — funciona offline")
-            if os.path.exists(db.DB_PATH):
-                st.metric("Tamanho",f"{_num_br(os.path.getsize(db.DB_PATH)/1024, 1)} KB")
-
-        st.markdown("---")
-        st.subheader("💾 Backup dos Dados")
-        st.caption("Baixe uma cópia completa de todos os dados em Excel (uma aba por tabela). "
-                   "Guarde em local seguro (pen drive, nuvem). O Supabase também mantém "
-                   "backups automáticos diários no servidor.")
-        if st.button("📥 Gerar backup completo (Excel)", type="primary"):
-            data = _backup_xlsx()
-            st.download_button(
-                "⬇️ Baixar backup agora", data,
-                f"agrotop_backup_{date.today().isoformat()}.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
+        _admin_tab_banco()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ROTEADOR
