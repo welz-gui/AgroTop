@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-10-10 por tools/dump_schema_nuvem.py
+# Extraído em 2026-10-17 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -119,6 +119,8 @@ audit_logs.autorizacao
 audit_logs.origem
 audit_logs.protocolo_externo
 audit_logs.created_at
+audit_logs.organizacao_id
+audit_logs.property_id
 category_prices.id
 category_prices.age_band
 category_prices.sex
@@ -439,6 +441,8 @@ users.username
 users.password_hash
 users.name
 users.role
+users.organizacao_id
+users.property_id
 weighings.id
 weighings.weight
 weighings.weigh_date
