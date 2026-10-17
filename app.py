@@ -7505,6 +7505,153 @@ def _sinc_fechar_em_lote(pendentes: list[dict]):
         else:
             st.error(f"🚫 {r.get('erro')} (parou no evento #{r.get('parou_em')})")
 
+def _admin_tab_dados():
+    st.subheader("✏️ Edição Direta de Dados")
+    st.caption("Corrija qualquer registro: edite células, adicione linhas (+) ou remova (🗑). "
+               "Clique em **Salvar alterações** para gravar no banco.")
+    st.warning("⚠️ Área técnica: alterações são gravadas diretamente no banco. "
+               "Edite com cuidado — não há desfazer.")
+
+    tab=st.selectbox("Tabela", db.ADMIN_TABLES, key="admin_tab_edit")
+    cols, pk = db.admin_table_info(tab)
+    orig_rows = db.admin_get_rows(tab)
+    orig_df = pd.DataFrame(orig_rows, columns=cols)
+
+    st.caption(f"Tabela **{tab}** · chave primária: **{pk}** · {len(orig_rows)} registro(s)")
+    if tab in db.ADMIN_SEM_EXCLUSAO:
+        st.info("🔒 Esta tabela guarda o histórico dos animais: dá para **corrigir** e "
+                "**acrescentar** linhas, mas não **remover**. Corrija o valor em vez de apagar.")
+
+    edited = st.data_editor(
+        orig_df, num_rows="dynamic", use_container_width=True,
+        hide_index=True, key=f"editor_{tab}",
+        column_config={pk: st.column_config.Column(f"{pk} (chave)", help="Chave primária")},
+    )
+
+    cbtn1, cbtn2 = st.columns([1,3])
+    with cbtn1:
+        do_save = st.button("💾 Salvar alterações", type="primary",
+                            use_container_width=True, key=f"savebtn_{tab}")
+    with cbtn2:
+        st.caption("Para inserir: use a linha em branco no fim da tabela. "
+                   "Em tabelas com ID automático, deixe a chave vazia.")
+
+    if do_save:
+        def _pyval(v):
+            if v is None: return None
+            try:
+                if pd.isna(v): return None
+            except (TypeError, ValueError): pass
+            if hasattr(v, "item"):
+                try: v = v.item()
+                except Exception: pass
+            if isinstance(v, float) and v.is_integer(): return int(v)
+            return v
+
+        def _is_empty_pk(v):
+            pv = _pyval(v)
+            return pv is None or (isinstance(pv, str) and pv.strip() == "")
+
+        orig_by_pk = {_pyval(r[pk]): r for r in orig_rows}
+        updates, inserts, seen = [], [], set()
+
+        for rec in edited.to_dict("records"):
+            clean = {col: _pyval(rec.get(col)) for col in cols}
+            pkv = clean.get(pk)
+            if _is_empty_pk(pkv) or pkv not in orig_by_pk:
+                row_ins = dict(clean)
+                if _is_empty_pk(pkv):
+                    row_ins.pop(pk, None)   # deixa o banco gerar o ID
+                # ignora linhas totalmente vazias
+                if any(v is not None and str(v) != "" for v in row_ins.values()):
+                    inserts.append(row_ins)
+            else:
+                seen.add(pkv)
+                orig = orig_by_pk[pkv]
+                if any(str(_pyval(orig.get(col))) != str(clean.get(col)) for col in cols):
+                    updates.append(clean)
+
+        delete_pks = [k for k in orig_by_pk if k not in seen]
+
+        try:
+            res = db.admin_apply_changes(
+                tab, updates, inserts, delete_pks,
+                usuario=st.session_state.user.get("username") or st.session_state.user.get("name", ""))
+            st.success(f"✅ Salvo em **{tab}**: {res['updated']} atualizada(s), "
+                       f"{res['inserted']} inserida(s), {res['deleted']} excluída(s).")
+            st.rerun()
+        except db.ExclusaoNaoPermitida as e:
+            st.error(f"🔒 {e}")
+        except Exception as e:
+            st.error(f"❌ Erro ao salvar: {e}")
+
+def _admin_tab_status():
+    st.subheader("Alterar Status de Animal")
+    all_a=db.get_all_animals(status=None)
+    por_id={a["id"]:a for a in all_a}
+    ac1,ac2=st.columns(2)
+    with ac1: sel_a=st.selectbox("Animal",[a["id"] for a in all_a])
+    with ac2: new_st=st.selectbox("Novo Status",["ativo","vendido","morto","carencia"])
+
+    atual = por_id[sel_a]["status"] if sel_a in por_id else ""
+    eh_admin = st.session_state.user["role"] == "admin"
+    veredito = db.transicao_permitida(atual, new_st, tem_autorizacao=eh_admin)
+
+    st.caption(f"Status atual: **{atual or '—'}** → **{new_st}**")
+
+    justificativa = ""
+    if veredito["exige_justificativa"]:
+        st.warning(f"⚠️ {veredito['motivo']}")
+        justificativa = st.text_area(
+            "Justificativa (obrigatória)",
+            placeholder="Por que este animal está saindo de um estado final?",
+            key=f"just_{sel_a}_{new_st}")
+    elif not veredito["permitida"]:
+        st.error(f"🚫 {veredito['motivo']}")
+
+    pode = veredito["permitida"] and (
+        not veredito["exige_justificativa"] or justificativa.strip())
+    if st.button("✅ Atualizar",type="primary",disabled=not pode):
+        r = db.update_animal_status(
+            sel_a, new_st,
+            tem_autorizacao=eh_admin,
+            justificativa=justificativa,
+            operador=st.session_state.user["name"])
+        if r.get("ok"):
+            st.success(f"{sel_a}: {r['de']} → {r['para']}")
+            st.rerun()
+        else:
+            st.error(f"🚫 {r.get('motivo','Transição recusada.')}")
+
+def _admin_tab_banco():
+    import os
+    if db.USE_PG:
+        st.markdown("**Banco de Dados:** PostgreSQL / Supabase (nuvem) ☁️")
+        st.caption("Os dados ficam no Supabase e são acessíveis de qualquer lugar.")
+        for t in db.ADMIN_TABLES:
+            try:
+                n = db.admin_get_rows(t)
+                st.write(f"• `{t}`: {len(n)} registro(s)")
+            except Exception:
+                pass
+    else:
+        st.markdown("**Banco de Dados:** SQLite local `agrotop.db` — funciona offline")
+        if os.path.exists(db.DB_PATH):
+            st.metric("Tamanho",f"{_num_br(os.path.getsize(db.DB_PATH)/1024, 1)} KB")
+
+    st.markdown("---")
+    st.subheader("💾 Backup dos Dados")
+    st.caption("Baixe uma cópia completa de todos os dados em Excel (uma aba por tabela). "
+               "Guarde em local seguro (pen drive, nuvem). O Supabase também mantém "
+               "backups automáticos diários no servidor.")
+    if st.button("📥 Gerar backup completo (Excel)", type="primary"):
+        data = _backup_xlsx()
+        st.download_button(
+            "⬇️ Baixar backup agora", data,
+            f"agrotop_backup_{date.today().isoformat()}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True)
+
 def page_admin():
     if st.session_state.user["role"]!="admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
@@ -7515,154 +7662,13 @@ def page_admin():
         _admin_users()
 
     with at1:
-        st.subheader("✏️ Edição Direta de Dados")
-        st.caption("Corrija qualquer registro: edite células, adicione linhas (+) ou remova (🗑). "
-                   "Clique em **Salvar alterações** para gravar no banco.")
-        st.warning("⚠️ Área técnica: alterações são gravadas diretamente no banco. "
-                   "Edite com cuidado — não há desfazer.")
-
-        tab=st.selectbox("Tabela", db.ADMIN_TABLES, key="admin_tab_edit")
-        cols, pk = db.admin_table_info(tab)
-        orig_rows = db.admin_get_rows(tab)
-        orig_df = pd.DataFrame(orig_rows, columns=cols)
-
-        st.caption(f"Tabela **{tab}** · chave primária: **{pk}** · {len(orig_rows)} registro(s)")
-        if tab in db.ADMIN_SEM_EXCLUSAO:
-            st.info("🔒 Esta tabela guarda o histórico dos animais: dá para **corrigir** e "
-                    "**acrescentar** linhas, mas não **remover**. Corrija o valor em vez de apagar.")
-
-        edited = st.data_editor(
-            orig_df, num_rows="dynamic", use_container_width=True,
-            hide_index=True, key=f"editor_{tab}",
-            column_config={pk: st.column_config.Column(f"{pk} (chave)", help="Chave primária")},
-        )
-
-        cbtn1, cbtn2 = st.columns([1,3])
-        with cbtn1:
-            do_save = st.button("💾 Salvar alterações", type="primary",
-                                use_container_width=True, key=f"savebtn_{tab}")
-        with cbtn2:
-            st.caption("Para inserir: use a linha em branco no fim da tabela. "
-                       "Em tabelas com ID automático, deixe a chave vazia.")
-
-        if do_save:
-            def _pyval(v):
-                if v is None: return None
-                try:
-                    if pd.isna(v): return None
-                except (TypeError, ValueError): pass
-                if hasattr(v, "item"):
-                    try: v = v.item()
-                    except Exception: pass
-                if isinstance(v, float) and v.is_integer(): return int(v)
-                return v
-
-            def _is_empty_pk(v):
-                pv = _pyval(v)
-                return pv is None or (isinstance(pv, str) and pv.strip() == "")
-
-            orig_by_pk = {_pyval(r[pk]): r for r in orig_rows}
-            updates, inserts, seen = [], [], set()
-
-            for rec in edited.to_dict("records"):
-                clean = {col: _pyval(rec.get(col)) for col in cols}
-                pkv = clean.get(pk)
-                if _is_empty_pk(pkv) or pkv not in orig_by_pk:
-                    row_ins = dict(clean)
-                    if _is_empty_pk(pkv):
-                        row_ins.pop(pk, None)   # deixa o banco gerar o ID
-                    # ignora linhas totalmente vazias
-                    if any(v is not None and str(v) != "" for v in row_ins.values()):
-                        inserts.append(row_ins)
-                else:
-                    seen.add(pkv)
-                    orig = orig_by_pk[pkv]
-                    if any(str(_pyval(orig.get(col))) != str(clean.get(col)) for col in cols):
-                        updates.append(clean)
-
-            delete_pks = [k for k in orig_by_pk if k not in seen]
-
-            try:
-                res = db.admin_apply_changes(
-                    tab, updates, inserts, delete_pks,
-                    usuario=st.session_state.user.get("username") or st.session_state.user.get("name", ""))
-                st.success(f"✅ Salvo em **{tab}**: {res['updated']} atualizada(s), "
-                           f"{res['inserted']} inserida(s), {res['deleted']} excluída(s).")
-                st.rerun()
-            except db.ExclusaoNaoPermitida as e:
-                st.error(f"🔒 {e}")
-            except Exception as e:
-                st.error(f"❌ Erro ao salvar: {e}")
+        _admin_tab_dados()
 
     with at2:
-        st.subheader("Alterar Status de Animal")
-        all_a=db.get_all_animals(status=None)
-        por_id={a["id"]:a for a in all_a}
-        ac1,ac2=st.columns(2)
-        with ac1: sel_a=st.selectbox("Animal",[a["id"] for a in all_a])
-        with ac2: new_st=st.selectbox("Novo Status",["ativo","vendido","morto","carencia"])
-
-        atual = por_id[sel_a]["status"] if sel_a in por_id else ""
-        # A autorização vem do PAPEL, e não de ter chegado nesta página. O
-        # dispatch já restringe operador a OPERATOR_PAGES, mas quem decide uma
-        # transição sensível é a permissão do usuário (§14.2) — não a rota.
-        eh_admin = st.session_state.user["role"] == "admin"
-        veredito = db.transicao_permitida(atual, new_st, tem_autorizacao=eh_admin)
-
-        st.caption(f"Status atual: **{atual or '—'}** → **{new_st}**")
-
-        justificativa = ""
-        if veredito["exige_justificativa"]:
-            st.warning(f"⚠️ {veredito['motivo']}")
-            justificativa = st.text_area(
-                "Justificativa (obrigatória)",
-                placeholder="Por que este animal está saindo de um estado final?",
-                key=f"just_{sel_a}_{new_st}")
-        elif not veredito["permitida"]:
-            st.error(f"🚫 {veredito['motivo']}")
-
-        pode = veredito["permitida"] and (
-            not veredito["exige_justificativa"] or justificativa.strip())
-        if st.button("✅ Atualizar",type="primary",disabled=not pode):
-            r = db.update_animal_status(
-                sel_a, new_st,
-                tem_autorizacao=eh_admin,
-                justificativa=justificativa,
-                operador=st.session_state.user["name"])
-            if r.get("ok"):
-                st.success(f"{sel_a}: {r['de']} → {r['para']}")
-                st.rerun()
-            else:
-                st.error(f"🚫 {r.get('motivo','Transição recusada.')}")
+        _admin_tab_status()
 
     with at3:
-        import os
-        if db.USE_PG:
-            st.markdown("**Banco de Dados:** PostgreSQL / Supabase (nuvem) ☁️")
-            st.caption("Os dados ficam no Supabase e são acessíveis de qualquer lugar.")
-            for t in db.ADMIN_TABLES:
-                try:
-                    n = db.admin_get_rows(t)
-                    st.write(f"• `{t}`: {len(n)} registro(s)")
-                except Exception:
-                    pass
-        else:
-            st.markdown("**Banco de Dados:** SQLite local `agrotop.db` — funciona offline")
-            if os.path.exists(db.DB_PATH):
-                st.metric("Tamanho",f"{_num_br(os.path.getsize(db.DB_PATH)/1024, 1)} KB")
-
-        st.markdown("---")
-        st.subheader("💾 Backup dos Dados")
-        st.caption("Baixe uma cópia completa de todos os dados em Excel (uma aba por tabela). "
-                   "Guarde em local seguro (pen drive, nuvem). O Supabase também mantém "
-                   "backups automáticos diários no servidor.")
-        if st.button("📥 Gerar backup completo (Excel)", type="primary"):
-            data = _backup_xlsx()
-            st.download_button(
-                "⬇️ Baixar backup agora", data,
-                f"agrotop_backup_{date.today().isoformat()}.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
+        _admin_tab_banco()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ROTEADOR
