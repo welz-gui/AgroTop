@@ -23,6 +23,10 @@ AMOSTRA = RAIZ / "tests" / "fixtures" / "car_area_imovel_real.zip"
 
 
 class TestImportacaoCar(unittest.TestCase):
+    def test_conteudo_invalido_levanta_erro_de_zip(self):
+        with self.assertRaisesRegex(ValueError, "O arquivo não é um \\.zip válido\\."):
+            ler_shapefile_car(b"not a zip file")
+
     def test_amostra_real_do_geobases_tem_perimetro_e_reprojeta(self):
         camadas = ler_shapefile_car(AMOSTRA.read_bytes())
         self.assertIn("Área do Imóvel", camadas)
