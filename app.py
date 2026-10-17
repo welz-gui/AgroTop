@@ -4998,11 +4998,32 @@ def page_cadastrar():
         _cadastro_compra()
 
 
-def _cadastro_compra():
-    fornecedores=db.get_all_fornecedores()
-    lotes=[l for l in db.get_all_lotes() if l["status"]=="ativo"]
 
-    # Campos fora do form (para reagir à troca de método de idade/peso)
+@dataclass
+class CompraBasicoData:
+    aid: str
+    breed: str
+    sex: str
+    entry_date: date
+    target_weight: float
+
+@dataclass
+class CompraPesoData:
+    peso_metodo: str
+    entry_weight: float
+    medida_nota: str
+
+@dataclass
+class CompraDetalhesData:
+    compra_modo: str
+    purchase_price: float
+    lote_sel: dict | None
+    forn_sel: dict | None
+    notes: str
+    nf_number: str
+    gta_number: str
+
+def _render_compra_basico() -> CompraBasicoData:
     c_top1, c_top2 = st.columns(2)
     with c_top1:
         aid=st.text_input("🏷️ ID / Brinco *",placeholder="Ex: BR0015").strip().upper()
@@ -5012,12 +5033,9 @@ def _cadastro_compra():
         entry_date=st.date_input("📅 Data de Entrada *",value=date.today())
         target_weight=st.number_input("🎯 Peso-Alvo de Abate (kg)",
             min_value=0.0,max_value=2000.0,value=500.0,step=5.0,format="%.1f")
+    return CompraBasicoData(aid, breed, sex, entry_date, target_weight)
 
-    st.markdown("**📆 Definição de Idade / Categoria**")
-    birth_date_str, birth_est, age_src, age_err = _age_inputs(entry_date, "cad_")
-    is_propriedade = (age_src == "propriedade")
-
-    # ── Peso de entrada (com método) ──────────────────────────────────────────
+def _render_compra_peso() -> CompraPesoData:
     st.markdown("**⚖️ Peso de Entrada**")
     st.caption("Não é obrigatório pesar na balança — pode estimar ou usar medição.")
     peso_metodo = st.radio("Como obter o peso?",
@@ -5042,78 +5060,50 @@ def _cadastro_compra():
         entry_weight=st.number_input(lbl,min_value=0.1,max_value=2000.0,
             step=0.5,format="%.1f",key="cad_peso_valor")
         medida_nota = ""
+    return CompraPesoData(peso_metodo, entry_weight, medida_nota)
 
-    with st.form("f_cad",clear_on_submit=False):
-        cf1, cf2 = st.columns(2)
-        with cf1:
-            # Valor de compra só para animais adquiridos (não nascidos na propriedade)
-            if not is_propriedade:
-                compra_modo = st.selectbox("💰 Como foi a compra?",
-                    ["cabeca","kg"],
-                    format_func=lambda m: "Por cabeça (valor fechado)" if m=="cabeca" else "Por kg (peso × preço/kg)")
-                if compra_modo == "kg":
-                    preco_kg_compra = st.number_input("Preço por kg (R$)",
-                        min_value=0.0, step=0.10, format="%.2f")
-                    purchase_price = round(entry_weight * preco_kg_compra, 2)
-                    st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({_num_br(entry_weight, 0)} kg × R\\$ {_num_br(preco_kg_compra, 2)})")
-                else:
-                    purchase_price=st.number_input("Valor de Compra (R$)",
-                        min_value=0.0,step=10.0,format="%.2f")
-            else:
-                purchase_price=0.0
-                compra_modo="propriedade"
-                st.caption("💰 Valor de compra não se aplica a animais nascidos na propriedade.")
-            lote_sel=st.selectbox("🌿 Lote de Destino",
-                [None]+lotes,format_func=lambda x:"— Sem lote —" if x is None else f"{x['id']} — {x['name']}")
-        with cf2:
-            forn_sel=st.selectbox("🚚 Fornecedor / Origem",
-                [None]+fornecedores,format_func=lambda x:"— Não informado —" if x is None else f"{x['name']} ({x['city']}/{x['state']})")
-            notes=st.text_area("📝 Observações",height=70,
-                placeholder="Opcional",value=medida_nota)
-
+def _render_compra_detalhes(is_propriedade: bool, entry_weight: float, medida_nota: str, lotes: list, fornecedores: list) -> CompraDetalhesData:
+    cf1, cf2 = st.columns(2)
+    with cf1:
         if not is_propriedade:
-            st.caption("📄 Documentos de compra (opcional)")
-            cd1, cd2 = st.columns(2)
-            with cd1:
-                nf_number=st.text_input("Número da NF",placeholder="Ex: 012345",
-                    help="Nota Fiscal — opcional").strip()
-            with cd2:
-                gta_number=st.text_input("Número da GTA",placeholder="Ex: MT-0009876",
-                    help="Guia de Trânsito Animal — opcional").strip()
-        else:
-            nf_number=gta_number=""
-
-        if st.form_submit_button("✅ Cadastrar Animal",type="primary",use_container_width=True):
-            errs=[]
-            if not aid:             errs.append("ID do animal é obrigatório.")
-            elif get_animal(aid):errs.append(f"Animal **{aid}** já existe.")
-            if entry_weight<=0:     errs.append("Peso de entrada deve ser > 0.")
-            if age_err:             errs.append(age_err)
-            if errs:
-                for e in errs: st.error(f"❌ {e}")
+            compra_modo = st.selectbox("💰 Como foi a compra?",
+                ["cabeca","kg"],
+                format_func=lambda m: "Por cabeça (valor fechado)" if m=="cabeca" else "Por kg (peso × preço/kg)")
+            if compra_modo == "kg":
+                preco_kg_compra = st.number_input("Preço por kg (R$)",
+                    min_value=0.0, step=0.10, format="%.2f")
+                purchase_price = round(entry_weight * preco_kg_compra, 2)
+                st.caption(f"→ Total: **R\\$ {purchase_price:,.2f}** ({_num_br(entry_weight, 0)} kg × R\\$ {_num_br(preco_kg_compra, 2)})")
             else:
-                db.add_animal(
-                    db.AnimalData(aid, breed,
-                    "M" if "Macho" in sex else "F",
-                    birth_date_str,
-                    entry_date.strftime("%Y-%m-%d"),
-                    entry_weight, target_weight, purchase_price,
-                    lote_sel["id"] if lote_sel else None,
-                    forn_sel["id"] if forn_sel else None,
-                    notes,
-                    birth_estimated=birth_est,
-                    age_source=age_src,
-                    nf_number=nf_number,
-                    gta_number=gta_number,
-                    weight_method=peso_metodo,
-                    purchase_mode=compra_modo,
-                ))
-                cat = get_age_category(birth_date_str)
-                st.success(f"✅ Animal **{aid}** cadastrado! Categoria: **{cat}** · "
-                           f"Peso: {_num_br(entry_weight, 1)} kg ({db.WEIGH_METHODS[peso_metodo]})")
-                st.balloons()
+                purchase_price=st.number_input("Valor de Compra (R$)",
+                    min_value=0.0,step=10.0,format="%.2f")
+        else:
+            purchase_price=0.0
+            compra_modo="propriedade"
+            st.caption("💰 Valor de compra não se aplica a animais nascidos na propriedade.")
+        lote_sel=st.selectbox("🌿 Lote de Destino",
+            [None]+lotes,format_func=lambda x:"— Sem lote —" if x is None else f"{x['id']} — {x['name']}")
+    with cf2:
+        forn_sel=st.selectbox("🚚 Fornecedor / Origem",
+            [None]+fornecedores,format_func=lambda x:"— Não informado —" if x is None else f"{x['name']} ({x['city']}/{x['state']})")
+        notes=st.text_area("📝 Observações",height=70,
+            placeholder="Opcional",value=medida_nota)
 
-    # Cadastrar Fornecedor rápido
+    if not is_propriedade:
+        st.caption("📄 Documentos de compra (opcional)")
+        cd1, cd2 = st.columns(2)
+        with cd1:
+            nf_number=st.text_input("Número da NF",placeholder="Ex: 012345",
+                help="Nota Fiscal — opcional").strip()
+        with cd2:
+            gta_number=st.text_input("Número da GTA",placeholder="Ex: MT-0009876",
+                help="Guia de Trânsito Animal — opcional").strip()
+    else:
+        nf_number=gta_number=""
+
+    return CompraDetalhesData(compra_modo, purchase_price, lote_sel, forn_sel, notes, nf_number, gta_number)
+
+def _render_cadastrar_fornecedor_rapido():
     with st.expander("➕ Cadastrar novo Fornecedor / Origem"):
         with st.form("f_forn",clear_on_submit=True):
             ff1,ff2,ff3=st.columns(3)
@@ -5125,6 +5115,56 @@ def _cadastro_compra():
                 if fn:
                     db.add_fornecedor(fn,fc,fs,fcontact)
                     st.success(f"✅ {fn} cadastrado!"); st.rerun()
+
+def _cadastro_compra():
+    fornecedores=db.get_all_fornecedores()
+    lotes=[l for l in db.get_all_lotes() if l["status"]=="ativo"]
+
+    # Campos fora do form (para reagir à troca de método de idade/peso)
+    basico = _render_compra_basico()
+
+    st.markdown("**📆 Definição de Idade / Categoria**")
+    birth_date_str, birth_est, age_src, age_err = _age_inputs(basico.entry_date, "cad_")
+    is_propriedade = (age_src == "propriedade")
+
+    # ── Peso de entrada (com método) ──────────────────────────────────────────
+    peso_data = _render_compra_peso()
+
+    with st.form("f_cad",clear_on_submit=False):
+        detalhes = _render_compra_detalhes(
+            is_propriedade, peso_data.entry_weight, peso_data.medida_nota, lotes, fornecedores)
+
+        if st.form_submit_button("✅ Cadastrar Animal",type="primary",use_container_width=True):
+            errs=[]
+            if not basico.aid:             errs.append("ID do animal é obrigatório.")
+            elif get_animal(basico.aid):errs.append(f"Animal **{basico.aid}** já existe.")
+            if peso_data.entry_weight<=0:     errs.append("Peso de entrada deve ser > 0.")
+            if age_err:             errs.append(age_err)
+            if errs:
+                for e in errs: st.error(f"❌ {e}")
+            else:
+                db.add_animal(
+                    db.AnimalData(basico.aid, basico.breed,
+                    "M" if "Macho" in basico.sex else "F",
+                    birth_date_str,
+                    basico.entry_date.strftime("%Y-%m-%d"),
+                    peso_data.entry_weight, basico.target_weight, detalhes.purchase_price,
+                    detalhes.lote_sel["id"] if detalhes.lote_sel else None,
+                    detalhes.forn_sel["id"] if detalhes.forn_sel else None,
+                    detalhes.notes,
+                    birth_estimated=birth_est,
+                    age_source=age_src,
+                    nf_number=detalhes.nf_number,
+                    gta_number=detalhes.gta_number,
+                    weight_method=peso_data.peso_metodo,
+                    purchase_mode=detalhes.compra_modo,
+                ))
+                cat = get_age_category(birth_date_str)
+                st.success(f"✅ Animal **{basico.aid}** cadastrado! Categoria: **{cat}** · "
+                           f"Peso: {_num_br(peso_data.entry_weight, 1)} kg ({db.WEIGH_METHODS[peso_data.peso_metodo]})")
+                st.balloons()
+
+    _render_cadastrar_fornecedor_rapido()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ADMIN
