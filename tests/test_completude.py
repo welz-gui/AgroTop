@@ -1,6 +1,6 @@
 import unittest
 
-from services.completude import avaliar_mes
+from services.completude import _data, avaliar_mes
 
 
 def _pesagem(animal_id, data, lote_id="lote-1", method="balança"):
@@ -167,6 +167,33 @@ class TestCompletudeMensal(unittest.TestCase):
 
         self.assertEqual(resultado["animais_com_pesagem_em_dia"], 1.0)
         self.assertEqual(resultado["execucao_nutricional"], 1.0)
+
+
+    def test_data_invalida_retorna_none(self):
+        self.assertIsNone(_data(None))
+        self.assertIsNone(_data("not-a-date"))
+        self.assertIsNone(_data("2026-13-45"))
+        self.assertIsNone(_data(12345))
+
+    def test_avaliar_mes_ignora_datas_invalidas(self):
+        resultado = avaliar_mes(
+            2026,
+            1,
+            1,
+            [
+                _pesagem("a", "2026-01-01"),
+                _pesagem("a", "invalid-date"),
+                _pesagem("a", None),
+            ],
+            {
+                "dias_lote_planejados": 1,
+                "dias_lote_executados": 1,
+                "semanas_com_chuva": 1,
+                "semanas_no_mes": 1,
+            },
+        )
+        self.assertEqual(resultado["animais_com_pesagem_em_dia"], 1.0)
+        self.assertEqual(resultado["intervalos_uteis_gmd"], 0.0)
 
 
 if __name__ == "__main__":
