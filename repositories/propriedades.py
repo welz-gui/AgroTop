@@ -47,7 +47,8 @@ def novo_id() -> str:
 @_cache
 def listar(*, apenas_ativas: bool = True) -> list[dict]:
     """Propriedades, com o nome do produtor e da organização."""
-    sql = """SELECT p.*, pr.nome AS produtor_nome, o.nome AS organizacao_nome
+    sql = """SELECT p.*, pr.nome AS produtor_nome, pr.organizacao_id AS organizacao_id,
+                    o.nome AS organizacao_nome
              FROM properties p
              JOIN produtores pr   ON pr.id = p.produtor_id
              JOIN organizacoes o  ON o.id  = pr.organizacao_id"""
@@ -56,6 +57,43 @@ def listar(*, apenas_ativas: bool = True) -> list[dict]:
     sql += " ORDER BY p.nome"
     with _conn() as con:
         return [dict(r) for r in con.execute(sql).fetchall()]
+
+
+def listar_organizacoes() -> list[dict]:
+    with _conn() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT * FROM organizacoes ORDER BY nome").fetchall()]
+
+
+def resolver_vinculo(con, organizacao_id: Optional[str],
+                     property_id: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Valida o vínculo de um usuário e devolve (organizacao_id, property_id).
+
+    Propriedade sem organização herda a organização da propriedade. Propriedade
+    de outra organização é recusada: vínculo cruzado é pertencimento inventado.
+    `(None, None)` é válido (usuário ainda sem vínculo).
+    """
+    if property_id is not None:
+        row = con.execute(
+            "SELECT pr.organizacao_id AS oid FROM properties p "
+            "JOIN produtores pr ON pr.id = p.produtor_id WHERE p.id=?",
+            (property_id,)).fetchone()
+        if row is None:
+            raise ValueError("Propriedade não encontrada.")
+        if organizacao_id is None:
+            organizacao_id = row["oid"]
+        elif row["oid"] != organizacao_id:
+            raise ValueError("A propriedade não pertence à organização informada.")
+    if organizacao_id is not None and con.execute(
+            "SELECT 1 FROM organizacoes WHERE id=?", (organizacao_id,)).fetchone() is None:
+        raise ValueError("Organização não encontrada.")
+    return organizacao_id, property_id
+
+
+def organizacao_unica(con) -> Optional[str]:
+    """A organização do banco, se existe exatamente uma; senão None."""
+    rows = con.execute("SELECT id FROM organizacoes").fetchall()
+    return rows[0]["id"] if len(rows) == 1 else None
 
 
 def listar_produtores() -> list[dict]:
@@ -177,6 +215,20 @@ def _seed_hierarquia(con) -> Optional[str]:
     con.execute("INSERT INTO properties (id,produtor_id,nome) VALUES(?,?,?)",
                 (prid, pid, NOME_PADRAO))
     return prid
+
+
+def _backfill_user_org(con) -> int:
+    """Liga à organização os usuários sem vínculo, só se houver UMA organização.
+
+    Mesma regra de `_backfill_property_id`: com várias, escolher por eles seria
+    inventar pertencimento. A propriedade fica vazia (= todas da organização).
+    """
+    oid = organizacao_unica(con)
+    if oid is None:
+        return 0
+    cur = con.execute(
+        "UPDATE users SET organizacao_id=? WHERE organizacao_id IS NULL", (oid,))
+    return getattr(cur, "rowcount", 0) or 0
 
 
 def _backfill_property_id(con) -> int:

@@ -280,6 +280,8 @@ def login(request: Request, data: LoginInput) -> TokenOutput:
             username=user["username"],
             name=user["name"],
             role=user["role"],
+            organizacao_id=user.get("organizacao_id"),
+            property_id=user.get("property_id"),
         ),
     )
 

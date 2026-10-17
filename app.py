@@ -5169,14 +5169,33 @@ def _cadastro_compra():
 # ══════════════════════════════════════════════════════════════════════════════
 # ADMIN
 # ══════════════════════════════════════════════════════════════════════════════
+def _vinculo_opcoes() -> list[tuple]:
+    """Opções do seletor de vínculo: (rótulo, organizacao_id, property_id).
+
+    Um seletor só (em vez de dois) porque dentro de `st.form` o segundo não
+    reagiria à escolha do primeiro; assim a combinação inválida nem aparece.
+    """
+    opcoes = [("— sem vínculo —", None, None)]
+    props = db.propriedades.listar(apenas_ativas=False)
+    for o in db.propriedades.listar_organizacoes():
+        opcoes.append((f"🏢 {o['nome']} · todas as propriedades", o["id"], None))
+        for p in props:
+            if p["organizacao_id"] == o["id"]:
+                opcoes.append((f"🏞️ {o['nome']} · {p['nome']}", o["id"], p["id"]))
+    return opcoes
+
+
 def _admin_users():
     st.subheader("👥 Gestão de Usuários")
     users = db.get_all_users()
+    vinculos = _vinculo_opcoes()
 
     # ── Lista de usuários ─────────────────────────────────────────────────────
     df_u = pd.DataFrame([{
         "ID": u["id"], "Usuário": u["username"], "Nome": u["name"],
         "Papel": "Administrador" if u["role"]=="admin" else "Operador",
+        "Organização": u.get("organizacao_nome") or "—",
+        "Propriedade": u.get("property_nome") or ("todas" if u.get("organizacao_id") else "—"),
     } for u in users])
     st.dataframe(df_u, use_container_width=True, hide_index=True)
 
@@ -5194,6 +5213,10 @@ def _admin_users():
             e_role = st.selectbox("Papel", ["operator","admin"],
                 index=0 if sel["role"]=="operator" else 1,
                 format_func=lambda r: "Operador" if r=="operator" else "Administrador")
+            _atual = next((i for i, v in enumerate(vinculos)
+                           if (v[1], v[2]) == (sel.get("organizacao_id"), sel.get("property_id"))), 0)
+            e_vinc = st.selectbox("Vínculo de acesso", vinculos, index=_atual,
+                                  format_func=lambda v: v[0], key=f"edit_vinc_{sel['id']}")
             st.caption("Deixe a senha em branco para mantê-la. Preencha para redefinir.")
             e_pwd = st.text_input("Nova senha", type="password", placeholder="••••••••")
             e_pwd2 = st.text_input("Confirmar nova senha", type="password", placeholder="••••••••")
@@ -5213,6 +5236,7 @@ def _admin_users():
                     if e_username != sel["username"]:
                         db.update_username(sel["id"], e_username)
                     db.update_user(sel["id"], e_name, e_role, e_pwd or None)
+                    db.definir_vinculo_usuario(sel["id"], e_vinc[1], e_vinc[2])
                     st.success(f"✅ Usuário '{e_username}' atualizado!")
                     # Se editou a si mesmo, atualiza a sessão
                     if sel["id"] == st.session_state.user["id"]:
@@ -5241,6 +5265,9 @@ def _admin_users():
             n_name = st.text_input("Nome *", placeholder="ex: Maria Operadora").strip()
             n_role = st.selectbox("Papel *", ["operator","admin"],
                 format_func=lambda r: "Operador" if r=="operator" else "Administrador")
+            _padrao = next((i for i, v in enumerate(vinculos) if v[1] and v[2] is None), 0)
+            n_vinc = st.selectbox("Vínculo de acesso", vinculos, index=_padrao,
+                                  format_func=lambda v: v[0], key="new_user_vinc")
             n_pwd = st.text_input("Senha *", type="password", placeholder="••••••••")
             n_pwd2 = st.text_input("Confirmar senha *", type="password", placeholder="••••••••")
             if st.form_submit_button("✅ Criar Usuário", type="primary", use_container_width=True):
@@ -5253,7 +5280,8 @@ def _admin_users():
                 if errs:
                     for x in errs: st.error(f"❌ {x}")
                 else:
-                    db.add_user(n_username, n_pwd, n_name, n_role)
+                    db.add_user(n_username, n_pwd, n_name, n_role,
+                                organizacao_id=n_vinc[1], property_id=n_vinc[2])
                     st.success(f"✅ Usuário '{n_username}' criado!")
                     st.rerun()
 

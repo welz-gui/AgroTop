@@ -27,7 +27,8 @@ def authenticate_user(username: str, password: str) -> dict[str, Any] | None:
     """Valida as credenciais do usuário usando PBKDF2/SHA-256 e efetua migração transparente."""
     with _conn() as con:
         row = con.execute(
-            "SELECT id, username, password_hash, name, role FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, name, role, organizacao_id, property_id "
+            "FROM users WHERE username = ?",
             (username,),
         ).fetchone()
 
@@ -40,6 +41,8 @@ def authenticate_user(username: str, password: str) -> dict[str, Any] | None:
         "username": row["username"],
         "name": row["name"],
         "role": row["role"],
+        "organizacao_id": row["organizacao_id"],
+        "property_id": row["property_id"],
     }
 
 
@@ -51,6 +54,9 @@ def create_access_token(user: dict[str, Any]) -> str:
         "username": user["username"],
         "name": user["name"],
         "role": user["role"],
+        # Vínculo do usuário (D1). None = ainda sem vínculo / todas as propriedades.
+        "organizacao_id": user.get("organizacao_id"),
+        "property_id": user.get("property_id"),
         "iat": now,
         "exp": now + timedelta(seconds=ACCESS_TOKEN_EXPIRE_SECONDS),
         "iss": TOKEN_ISSUER,
@@ -107,7 +113,8 @@ def verify_refresh_token(token: str) -> dict[str, Any]:
 
     with _conn() as con:
         user_row = con.execute(
-            "SELECT id, username, name, role FROM users WHERE id = ?",
+            "SELECT id, username, name, role, organizacao_id, property_id "
+            "FROM users WHERE id = ?",
             (row["user_id"],),
         ).fetchone()
 
@@ -122,6 +129,8 @@ def verify_refresh_token(token: str) -> dict[str, Any]:
         "username": user_row["username"],
         "name": user_row["name"],
         "role": user_row["role"],
+        "organizacao_id": user_row["organizacao_id"],
+        "property_id": user_row["property_id"],
     }
 
 

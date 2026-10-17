@@ -18,6 +18,8 @@ class UserSummary(BaseModel):
     username: str
     name: str
     role: str
+    organizacao_id: Optional[str] = None
+    property_id: Optional[str] = None
 
 
 class TokenOutput(BaseModel):
