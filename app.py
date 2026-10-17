@@ -7594,6 +7594,9 @@ def _admin_tab_status():
     with ac2: new_st=st.selectbox("Novo Status",["ativo","vendido","morto","carencia"])
 
     atual = por_id[sel_a]["status"] if sel_a in por_id else ""
+    # A autorização vem do PAPEL, e não de ter chegado nesta página. O
+    # dispatch já restringe operador a OPERATOR_PAGES, mas quem decide uma
+    # transição sensível é a permissão do usuário (§14.2) — não a rota.
     eh_admin = st.session_state.user["role"] == "admin"
     veredito = db.transicao_permitida(atual, new_st, tem_autorizacao=eh_admin)
 
