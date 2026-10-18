@@ -472,7 +472,12 @@ void main() {
         find.byKey(const ValueKey('medication-date')),
         '2026-08-22',
       );
-      await tester.tap(find.byKey(const ValueKey('save-medication')));
+      // O formulário ganhou princípio ativo, lote e validade: o botão desce
+      // além da dobra da janela de 390x844, então rola até ele antes de tocar.
+      final salvarMedicamento = find.byKey(const ValueKey('save-medication'));
+      await tester.ensureVisible(salvarMedicamento);
+      await tester.pumpAndSettle();
+      await tester.tap(salvarMedicamento);
       await tester.pumpAndSettle();
 
       expect(medicationRequests, 1);
