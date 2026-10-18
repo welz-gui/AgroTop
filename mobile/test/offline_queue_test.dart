@@ -59,6 +59,9 @@ class FakeApiClient extends ApiClient {
     int? protocoloId,
     String? notas,
     String? idempotencyKey,
+    String? principioAtivo,
+    String? lote,
+    String? validade,
   }) async {
     if (throwNetworkExceptionOnMedication) {
       throw Exception('SocketException: Connection refused');
@@ -74,6 +77,9 @@ class FakeApiClient extends ApiClient {
       'protocolo_id': protocoloId,
       'notas': notas,
       'idempotency_key': idempotencyKey,
+      'principio_ativo': principioAtivo,
+      'lote': lote,
+      'validade': validade,
     });
     return '2026-09-15';
   }
@@ -237,6 +243,42 @@ void main() {
       expect(report.sincronizados.length, equals(2));
       expect(fakeApi.movementsReceived[0]['lote_origem_esperado'], equals('P01'));
       expect(fakeApi.movementsReceived[1]['lote_origem_esperado'], isNull);
+    });
+
+    test('medicamento enfileirado reenvia princípio ativo, lote e validade', () async {
+      final fakeApi = FakeApiClient();
+      await queue.enqueueMedication(
+        animalId: 'BR0001',
+        medicamento: 'Ivermectina 1%',
+        dose: 5.0,
+        unidade: 'ml',
+        via: 'Subcutânea',
+        carenciaDias: 28,
+        data: '2026-08-27',
+        principioAtivo: 'ivermectina',
+        lote: 'L2410A',
+        validade: '2027-02-01',
+      );
+      // Item de versão anterior do app: sem os campos, vão como "não informado".
+      await queue.enqueueMedication(
+        animalId: 'BR0002',
+        medicamento: 'Aftosa',
+        dose: 2.0,
+        unidade: 'dose',
+        via: 'Subcutânea',
+        carenciaDias: 0,
+        data: '2026-08-27',
+      );
+
+      final report = await queue.sync(fakeApi);
+
+      expect(report.sincronizados.length, equals(2));
+      expect(fakeApi.medicationsReceived[0]['principio_ativo'], equals('ivermectina'));
+      expect(fakeApi.medicationsReceived[0]['lote'], equals('L2410A'));
+      expect(fakeApi.medicationsReceived[0]['validade'], equals('2027-02-01'));
+      expect(fakeApi.medicationsReceived[1]['principio_ativo'], isNull);
+      expect(fakeApi.medicationsReceived[1]['lote'], isNull);
+      expect(fakeApi.medicationsReceived[1]['validade'], isNull);
     });
 
     test('item rejeitado pelo servidor (ApiException) sai da fila e vai para rejeitados', () async {

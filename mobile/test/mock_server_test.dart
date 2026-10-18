@@ -264,6 +264,80 @@ void main() {
       expect(server.lastMovementBody?['lote_origem_esperado'], 'P01');
     }, PassthroughHttpOverrides());
   });
+
+  test('medicamento grava princípio ativo, lote e validade; vencido recebe 422', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      await api.registerMedication(
+        'BR0001',
+        medicamento: 'Ivermectina 1%',
+        dose: 8.0,
+        unidade: 'ml',
+        via: 'Subcutânea',
+        carenciaDias: 0,
+        data: '2026-08-22',
+        principioAtivo: 'ivermectina',
+        lote: 'L2410A',
+        validade: '2027-02-01',
+      );
+      expect(server.lastMedicationBody?['principio_ativo'], 'ivermectina');
+      expect(server.lastMedicationBody?['lote'], 'L2410A');
+      expect(server.lastMedicationBody?['validade'], '2027-02-01');
+      final aplicacao = (await api.getAnimalMedications('BR0001')).aplicacoes.first;
+      expect(aplicacao.principioAtivo, 'ivermectina');
+      expect(aplicacao.lote, 'L2410A');
+      expect(aplicacao.validade, '2027-02-01');
+      expect(
+        aplicacao.produtoAplicado,
+        'princípio ativo ivermectina · lote L2410A · val. 2027-02-01',
+      );
+
+      // Sem os campos, o corpo nem leva as chaves (compatível com o servidor antigo).
+      await api.registerMedication(
+        'BR0001',
+        medicamento: 'Aftosa',
+        dose: 2.0,
+        unidade: 'dose',
+        via: 'Subcutânea',
+        carenciaDias: 0,
+        data: '2026-08-23',
+      );
+      expect(server.lastMedicationBody?.containsKey('lote'), isFalse);
+      expect(server.lastMedicationBody?.containsKey('validade'), isFalse);
+      expect((await api.getAnimalMedications('BR0001')).aplicacoes.first.produtoAplicado, '');
+
+      // Produto vencido na data da aplicação: 422 com a mensagem do servidor.
+      await expectLater(
+        api.registerMedication(
+          'BR0001',
+          medicamento: 'Velha',
+          dose: 1.0,
+          unidade: 'ml',
+          via: 'Subcutânea',
+          carenciaDias: 0,
+          data: '2026-08-24',
+          lote: 'L-VELHO',
+          validade: '2026-08-23',
+        ),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 422)
+              .having((e) => e.message, 'message', contains('vencido')),
+        ),
+      );
+    }, PassthroughHttpOverrides());
+  });
 }
 
 Uint8List _testPhoto() {

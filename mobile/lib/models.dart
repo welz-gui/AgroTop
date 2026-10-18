@@ -235,6 +235,9 @@ class MedicationApplication {
     required this.carenciaDias,
     required this.data,
     this.protocoloId,
+    this.principioAtivo,
+    this.lote,
+    this.validade,
   });
 
   final String medicamento;
@@ -244,6 +247,17 @@ class MedicationApplication {
   final int carenciaDias;
   final String data;
   final int? protocoloId;
+  // Produto aplicado (opcionais): o que foi, de qual lote e até quando valia.
+  final String? principioAtivo;
+  final String? lote;
+  final String? validade;
+
+  /// 'princípio ativo X · lote Y · val. AAAA-MM-DD' (só o que foi informado).
+  String get produtoAplicado => [
+    if (principioAtivo != null) 'princípio ativo $principioAtivo',
+    if (lote != null) 'lote $lote',
+    if (validade != null) 'val. $validade',
+  ].join(' · ');
 
   factory MedicationApplication.fromJson(Map<String, dynamic> json) =>
       MedicationApplication(
@@ -254,6 +268,9 @@ class MedicationApplication {
         carenciaDias: (json['carencia_dias'] as num?)?.toInt() ?? 0,
         data: json['data'] as String,
         protocoloId: json['protocolo_id'] as int?,
+        principioAtivo: json['principio_ativo'] as String?,
+        lote: json['lote'] as String?,
+        validade: json['validade'] as String?,
       );
 }
 

@@ -33,6 +33,9 @@ class _MedicationPageState extends State<MedicationPage> {
   final _via = TextEditingController(text: 'Subcutânea');
   final _carenciaDias = TextEditingController(text: '0');
   final _notes = TextEditingController();
+  final _principioAtivo = TextEditingController();
+  final _lote = TextEditingController();
+  final _validade = TextEditingController();
   late final TextEditingController _date;
   late final OfflineQueue _offlineQueue;
 
@@ -60,6 +63,9 @@ class _MedicationPageState extends State<MedicationPage> {
     _via.dispose();
     _carenciaDias.dispose();
     _notes.dispose();
+    _principioAtivo.dispose();
+    _lote.dispose();
+    _validade.dispose();
     _date.dispose();
     super.dispose();
   }
@@ -78,6 +84,40 @@ class _MedicationPageState extends State<MedicationPage> {
       return 'Informe uma data válida.';
     }
     return null;
+  }
+
+  // Mesmos limites do servidor (services/tratamento.py).
+  String? _validateMaximo(String? value, int limite) =>
+      (value ?? '').trim().length > limite
+      ? 'Máximo de $limite caracteres.'
+      : null;
+
+  /// Opcional. Preenchida, precisa ser uma data válida e cobrir a data da
+  /// aplicação: produto vencido não se aplica (o servidor também recusa, mas
+  /// quem está offline só descobriria na sincronização).
+  String? _validateValidade(String? value) {
+    final validade = (value ?? '').trim();
+    if (validade.isEmpty) return null;
+    final erro = _validateDate(validade);
+    if (erro != null) return erro;
+    final aplicacao = _date.text.trim();
+    if (_validateDate(aplicacao) == null && validade.compareTo(aplicacao) < 0) {
+      return 'Produto vencido em $validade: não pode ser aplicado em $aplicacao.';
+    }
+    return null;
+  }
+
+  Future<void> _pickValidade() async {
+    final current = DateTime.tryParse(_validade.text) ?? DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (selected != null) {
+      setState(() => _validade.text = _formatDate(selected));
+    }
   }
 
   Future<void> _pickDate() async {
@@ -143,6 +183,13 @@ class _MedicationPageState extends State<MedicationPage> {
     final dataVal = _date.text.trim();
     final protoVal = _selectedProtocolo?.id;
     final notasVal = _notes.text.trim().isEmpty ? null : _notes.text.trim();
+    final principioVal = _principioAtivo.text.trim().isEmpty
+        ? null
+        : _principioAtivo.text.trim();
+    final loteVal = _lote.text.trim().isEmpty ? null : _lote.text.trim();
+    final validadeVal = _validade.text.trim().isEmpty
+        ? null
+        : _validade.text.trim();
     try {
       final carenciaAte = await widget.api.registerMedication(
         widget.animalId,
@@ -154,6 +201,9 @@ class _MedicationPageState extends State<MedicationPage> {
         data: dataVal,
         protocoloId: protoVal,
         notas: notasVal,
+        principioAtivo: principioVal,
+        lote: loteVal,
+        validade: validadeVal,
       );
       if (mounted) Navigator.of(context).pop<String?>(carenciaAte ?? '');
     } on ApiException catch (error) {
@@ -175,6 +225,9 @@ class _MedicationPageState extends State<MedicationPage> {
         data: dataVal,
         protocoloId: protoVal,
         notas: notasVal,
+        principioAtivo: principioVal,
+        lote: loteVal,
+        validade: validadeVal,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -343,6 +396,44 @@ class _MedicationPageState extends State<MedicationPage> {
                           ),
                         ),
                         validator: _validateDate,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        key: const ValueKey('medication-active-ingredient'),
+                        controller: _principioAtivo,
+                        decoration: const InputDecoration(
+                          labelText: 'Princípio ativo (opcional)',
+                          prefixIcon: Icon(Icons.biotech_outlined),
+                          helperText: 'O que foi aplicado, ex.: ivermectina',
+                        ),
+                        validator: (value) => _validateMaximo(value, 120),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        key: const ValueKey('medication-batch'),
+                        controller: _lote,
+                        decoration: const InputDecoration(
+                          labelText: 'Lote do produto (opcional)',
+                          prefixIcon: Icon(Icons.inventory_2_outlined),
+                        ),
+                        validator: (value) => _validateMaximo(value, 60),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        key: const ValueKey('medication-expiry'),
+                        controller: _validade,
+                        decoration: InputDecoration(
+                          labelText: 'Validade do produto (opcional)',
+                          prefixIcon: const Icon(Icons.event_busy_outlined),
+                          helperText:
+                              'AAAA-MM-DD. Produto vencido não pode ser aplicado.',
+                          suffixIcon: IconButton(
+                            tooltip: 'Escolher validade',
+                            onPressed: _pickValidade,
+                            icon: const Icon(Icons.edit_calendar_outlined),
+                          ),
+                        ),
+                        validator: _validateValidade,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
