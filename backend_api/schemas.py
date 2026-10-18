@@ -187,6 +187,10 @@ class MedicamentoInput(BaseModel):
     data: str
     protocolo_id: Optional[int] = None
     notas: Optional[str] = None
+    # Produto aplicado (opcionais). Validade AAAA-MM-DD anterior à data é recusada (422).
+    principio_ativo: Optional[str] = None
+    lote: Optional[str] = None
+    validade: Optional[str] = None
 
 
 class AplicacaoMedicamentoOutput(BaseModel):
@@ -197,6 +201,9 @@ class AplicacaoMedicamentoOutput(BaseModel):
     carencia_dias: int
     data: str
     protocolo_id: Optional[int] = None
+    principio_ativo: Optional[str] = None
+    lote: Optional[str] = None
+    validade: Optional[str] = None
 
 
 class MedicamentosOutput(BaseModel):

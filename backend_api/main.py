@@ -115,6 +115,7 @@ from services.estados_dispositivo import estados, transicao_permitida
 from services.importacao import parse_pesagens
 from services.geometria import perimetro_metros, validar
 from services.qualidade import avaliar_pesagem
+from services.tratamento import TratamentoInvalido
 from services.recomendacoes import avaliar as avaliar_recomendacoes
 from services.zootecnia import (
     calculate_gmd_total,
@@ -860,6 +861,9 @@ def list_medicamentos(
                 "carencia_dias": int(aplicacao.get("withdrawal_days") or 0),
                 "data": aplicacao["med_date"],
                 "protocolo_id": aplicacao.get("protocol_id"),
+                "principio_ativo": aplicacao.get("principio_ativo") or None,
+                "lote": aplicacao.get("lote_produto") or None,
+                "validade": aplicacao.get("validade_produto") or None,
             }
             for aplicacao in aplicacoes
         ],
@@ -893,7 +897,15 @@ def register_medicamento(
                 insumo_id=None,
                 notes=data.notas or "",
                 protocol_id=data.protocolo_id,
+                principio_ativo=data.principio_ativo or "",
+                lote_produto=data.lote or "",
+                validade_produto=data.validade or "",
             ))
+        except TratamentoInvalido as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            )
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

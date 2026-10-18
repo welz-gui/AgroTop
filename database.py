@@ -25,6 +25,7 @@ class InsumoCreate:
     min_stock: float
     cost_per_unit: float
     prazo_reposicao_dias: int = 0
+    principio_ativo: str = ""
 
 @dataclass
 class FeedingPlanCreate:
@@ -88,6 +89,7 @@ from services.previsao_estoque_adaptador import consumo_diario_planejado  # noqa
 from repositories import identificadores as identificadores  # noqa: F401
 from repositories import eventos as eventos  # noqa: F401
 from repositories import propriedades as propriedades  # noqa: F401
+from services.tratamento import TratamentoInvalido  # noqa: F401
 from repositories import nascimentos as nascimentos  # noqa: F401
 from repositories import movimentacoes as movimentacoes  # noqa: F401
 from repositories.compras import NovaCompra as NovaCompra  # noqa: F401
@@ -506,7 +508,8 @@ _SCHEMA_SQL = """
                 prazo_reposicao_dias INTEGER NOT NULL DEFAULT 0,
                 supplier             TEXT,
                 notes                TEXT,
-                created_at           TEXT DEFAULT (datetime('now','localtime'))
+                created_at           TEXT DEFAULT (datetime('now','localtime')),
+                principio_ativo      TEXT
             );
 
             -- Medicamentos / Vacinas aplicados
@@ -524,6 +527,9 @@ _SCHEMA_SQL = """
                 notes             TEXT,
                 protocol_id       INTEGER,
                 created_at        TEXT DEFAULT (datetime('now','localtime')),
+                principio_ativo   TEXT,
+                lote_produto      TEXT,
+                validade_produto  TEXT,
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
                 FOREIGN KEY (protocol_id) REFERENCES health_protocols(id)
@@ -1115,6 +1121,12 @@ def _migrate(con) -> None:
             _ref = (" REFERENCES organizacoes(id)" if (_t, _c) == ("users", "organizacao_id")
                     else " REFERENCES properties(id)" if (_t, _c) == ("users", "property_id") else "")
             con.execute(f"ALTER TABLE {_quote_ident(_t)} ADD COLUMN {_c} TEXT{_ref}")
+    # Produto aplicado no tratamento: princípio ativo, lote e validade.
+    for _t, _c in (("medications", "principio_ativo"), ("medications", "lote_produto"),
+                   ("medications", "validade_produto"), ("insumos", "principio_ativo")):
+        _tc = {r["name"] for r in con.execute(f"PRAGMA table_info({_quote_ident(_t)})").fetchall()}
+        if _c not in _tc:
+            con.execute(f"ALTER TABLE {_quote_ident(_t)} ADD COLUMN {_c} TEXT")
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")
@@ -1832,8 +1844,9 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
 def add_new_insumo(insumo: InsumoCreate) -> None:
     with _conn() as con:
         con.execute(
-            "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit,prazo_reposicao_dias) VALUES(?,?,?,?,?,?,?)",
-            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit, insumo.prazo_reposicao_dias),
+            "INSERT INTO insumos (name,category,unit,current_stock,min_stock,cost_per_unit,prazo_reposicao_dias,principio_ativo) VALUES(?,?,?,?,?,?,?,?)",
+            (insumo.name, insumo.category, insumo.unit, insumo.initial_stock, insumo.min_stock, insumo.cost_per_unit, insumo.prazo_reposicao_dias,
+             " ".join(str(insumo.principio_ativo or "").split()) or None),
         )
 
 # ─── Custos por Animal ───────────────────────────────────────────────────────

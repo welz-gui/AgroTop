@@ -13,6 +13,7 @@ from .animais import get_all_animals
 from .animais import uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
+from services.tratamento import normalizar_produto
 from services.zootecnia import get_age_months
 
 
@@ -29,6 +30,11 @@ class MedicationData:
     insumo_id: Optional[int] = None
     notes: str = ""
     protocol_id: Optional[int] = None
+    # Produto aplicado (opcionais). Princípio ativo vazio + insumo ligado = usa o do
+    # cadastro do insumo. Validade (AAAA-MM-DD) anterior à data da aplicação é recusada.
+    principio_ativo: str = ""
+    lote_produto: str = ""
+    validade_produto: str = ""
 
 
 @dataclass
@@ -73,15 +79,24 @@ def add_medication(data: MedicationData) -> None:
         _uuid = uuid_de(con, data.animal_id)
         if _uuid is None:
             raise ValueError(f"Animal {data.animal_id} não encontrado.")
+        produto = normalizar_produto(
+            data.principio_ativo, data.lote_produto, data.validade_produto, data.med_date)
+        if not produto["principio_ativo"] and data.insumo_id:
+            r = con.execute("SELECT principio_ativo FROM insumos WHERE id=?",
+                            (data.insumo_id,)).fetchone()
+            produto["principio_ativo"] = (r["principio_ativo"] or "") if r else ""
         con.execute(
             """INSERT INTO medications
                (animal_uuid,medication_name,dose,unit,application_route,
-                withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id,
+                principio_ativo,lote_produto,validade_produto)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (_uuid, data.medication_name, data.dose, data.unit,
              data.application_route,
              data.withdrawal_days, data.med_date, data.applied_by, data.insumo_id or None, data.notes,
-             data.protocol_id or None),
+             data.protocol_id or None,
+             produto["principio_ativo"] or None, produto["lote_produto"] or None,
+             produto["validade_produto"] or None),
         )
         # Baixa automática no estoque
         if data.insumo_id and data.dose > 0:
@@ -101,6 +116,9 @@ def add_medication(data: MedicationData) -> None:
             con, _uuid, "manejo_sanitario", ocorrido_em=data.med_date,
             usuario_registro=data.applied_by,
             observacoes=f"{data.medication_name} {data.dose}{data.unit}"
+                        + (f", principio ativo {produto['principio_ativo']}" if produto["principio_ativo"] else "")
+                        + (f", lote {produto['lote_produto']}" if produto["lote_produto"] else "")
+                        + (f", validade {produto['validade_produto']}" if produto["validade_produto"] else "")
                         + (f", carencia {data.withdrawal_days}d" if data.withdrawal_days else ""))
 
         # Atualiza status do animal se há carência
@@ -258,11 +276,18 @@ def get_protocol_plan(protocol: dict, ref_date: Optional[date] = None) -> dict:
 
 
 @_writes
-def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "") -> dict:
-    """Aplica o protocolo a todos os animais pendentes (registra + baixa estoque)."""
+def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "", *,
+                            lote_produto: str = "", validade_produto: str = "") -> dict:
+    """Aplica o protocolo a todos os animais pendentes (registra + baixa estoque).
+
+    `lote_produto` e `validade_produto` valem para o frasco usado na campanha toda; a
+    validade é conferida ANTES de aplicar no primeiro animal, para a campanha não
+    ficar pela metade com produto vencido.
+    """
     prot = next((p for p in get_protocols(active_only=False) if p["id"] == protocol_id), None)
     if not prot:
         return {"n": 0, "doses": 0}
+    normalizar_produto("", lote_produto, validade_produto, med_date)
     try:
         ref = datetime.strptime(med_date, "%Y-%m-%d").date()
     except ValueError:
@@ -282,7 +307,9 @@ def apply_protocol_campaign(protocol_id: int, med_date: str, operator: str = "")
             applied_by=operator,
             insumo_id=prot.get("insumo_id"),
             notes="Campanha sanitária",
-            protocol_id=prot["id"]
+            protocol_id=prot["id"],
+            lote_produto=lote_produto,
+            validade_produto=validade_produto,
         ))
         n += 1
     return {"n": n, "doses": plan["doses_needed"]}
