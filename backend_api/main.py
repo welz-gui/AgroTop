@@ -635,6 +635,7 @@ def movimentar_animais(
                     operator=operador,
                     notes=observacoes,
                     from_lote_esperado=data.lote_origem_esperado,
+                    origens_esperadas=data.origens_esperadas,
                 )
             )
         except OrigemDivergente as exc:
@@ -644,6 +645,7 @@ def movimentar_animais(
                     "codigo": "origem_divergente",
                     "mensagem": str(exc),
                     "lote_origem_esperado": exc.esperado,
+                    "esperados": exc.esperados,
                     "divergentes": exc.divergentes,
                 },
             )

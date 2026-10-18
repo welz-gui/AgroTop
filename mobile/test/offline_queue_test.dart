@@ -102,6 +102,7 @@ class FakeApiClient extends ApiClient {
     String? notes,
     String? idempotencyKey,
     String? loteOrigemEsperado,
+    Map<String, String>? origensEsperadas,
   }) async {
     if (throwConflitoOnMovement) {
       throw const ApiException(
@@ -117,6 +118,7 @@ class FakeApiClient extends ApiClient {
       'notes': notes,
       'idempotency_key': idempotencyKey,
       'lote_origem_esperado': loteOrigemEsperado,
+      'origens_esperadas': origensEsperadas,
     });
     return MovementResult(
       movidos: animalIds,
@@ -258,6 +260,25 @@ void main() {
       expect(report.sincronizados.length, equals(2));
       expect(fakeApi.movementsReceived[0]['lote_origem_esperado'], equals('P01'));
       expect(fakeApi.movementsReceived[1]['lote_origem_esperado'], isNull);
+    });
+
+    test('movimentação enfileirada reenvia o mapa de origens por animal', () async {
+      final fakeApi = FakeApiClient();
+      await queue.enqueueMovement(
+        animalIds: ['BR0001', 'BR0002'],
+        toLoteId: 'P03',
+        movementDate: '2026-08-27',
+        origensEsperadas: {'BR0001': 'P01', 'BR0002': 'P02'},
+      );
+
+      final report = await queue.sync(fakeApi);
+
+      expect(report.sincronizados.length, equals(1));
+      expect(fakeApi.movementsReceived.single['origens_esperadas'], {
+        'BR0001': 'P01',
+        'BR0002': 'P02',
+      });
+      expect(fakeApi.movementsReceived.single['lote_origem_esperado'], isNull);
     });
 
     test('medicamento enfileirado reenvia princípio ativo, lote e validade', () async {

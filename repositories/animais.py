@@ -47,22 +47,33 @@ class MovementParams:
     # Piquete em que quem registrou viu os animais (mobile offline, ADR 0006 / D2).
     # None = não confere (comportamento de sempre: a origem é o que o servidor tem).
     from_lote_esperado: str | None = None
+    # Piquete visto POR ANIMAL (animal → piquete), para seleção com origens diferentes.
+    # Vale no lugar de `from_lote_esperado` para os animais listados; quem não está no
+    # mapa cai no valor único (ou não confere, se ele também for None).
+    origens_esperadas: dict | None = None
 
 
 class OrigemDivergente(ValueError):
     """Animal não está mais no piquete em que o operador o viu.
 
-    `.divergentes` mapeia animal → piquete atual (None = sem piquete). Nada é
-    gravado: quem decide o que fazer é o operador (ADR 0006, zero merge automático).
+    `.divergentes` mapeia animal → piquete atual (None = sem piquete) e `.esperados`
+    animal → piquete em que foi visto. `.esperado` é o piquete esperado quando é o
+    mesmo para todos os divergentes, senão None. Nada é gravado: quem decide o que
+    fazer é o operador (ADR 0006, zero merge automático).
     """
 
-    def __init__(self, esperado: str, divergentes: dict):
+    def __init__(self, esperado: str | None, divergentes: dict, esperados: dict | None = None):
         self.esperado = esperado
         self.divergentes = divergentes
-        super().__init__(
-            f"{len(divergentes)} animal(is) não estão mais no piquete {esperado}: "
-            + ", ".join(f"{a} (agora em {l or 'sem piquete'})" for a, l in divergentes.items())
-        )
+        self.esperados = esperados or {a: esperado for a in divergentes}
+        if esperado is not None:
+            msg = (f"{len(divergentes)} animal(is) não estão mais no piquete {esperado}: "
+                   + ", ".join(f"{a} (agora em {l or 'sem piquete'})" for a, l in divergentes.items()))
+        else:
+            msg = (f"{len(divergentes)} animal(is) não estão mais no piquete em que foram vistos: "
+                   + ", ".join(f"{a} (visto em {self.esperados[a]}, agora em {l or 'sem piquete'})"
+                               for a, l in divergentes.items()))
+        super().__init__(msg)
 
 
 def _confere_origem(params: MovementParams, atuais: dict) -> None:
@@ -72,14 +83,22 @@ def _confere_origem(params: MovementParams, atuais: dict) -> None:
     aconteceu (é o `ja_no_destino`), e recusar impediria repetir um pedido
     cuja resposta se perdeu.
     """
-    if params.from_lote_esperado is None:
+    unico = params.from_lote_esperado
+    mapa = params.origens_esperadas or {}
+    if unico is None and not mapa:
         return
-    divergentes = {
-        a: lote for a, lote in atuais.items()
-        if lote != params.from_lote_esperado and lote != params.to_lote_id
-    }
+    divergentes: dict = {}
+    esperados: dict = {}
+    for animal, lote in atuais.items():
+        esperado = mapa.get(animal, unico)
+        if esperado is None or lote == esperado or lote == params.to_lote_id:
+            continue
+        divergentes[animal] = lote
+        esperados[animal] = esperado
     if divergentes:
-        raise OrigemDivergente(params.from_lote_esperado, divergentes)
+        distintos = set(esperados.values())
+        raise OrigemDivergente(next(iter(distintos)) if len(distintos) == 1 else None,
+                               divergentes, esperados)
 
 
 def uuid_de(con, animal_id: str) -> str | None:

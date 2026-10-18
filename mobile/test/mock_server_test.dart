@@ -266,6 +266,56 @@ void main() {
     }, PassthroughHttpOverrides());
   });
 
+  test('movimentação mista confere cada animal com a sua origem; divergência não move ninguém', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      // BR0001 está em P01 e BR0002 em P02; o operador achava os dois em P01.
+      await expectLater(
+        api.moveAnimals(
+          animalIds: ['BR0001', 'BR0002'],
+          toLoteId: 'P03',
+          movementDate: '2026-08-22',
+          origensEsperadas: {'BR0001': 'P01', 'BR0002': 'P01'},
+        ),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.emProcessamento, 'emProcessamento', isFalse)
+              .having((e) => e.message, 'message', contains('P01')),
+        ),
+      );
+      expect((await api.getAnimal('BR0001')).loteId, 'P01');
+      expect((await api.getAnimal('BR0002')).loteId, 'P02');
+
+      final ok = await api.moveAnimals(
+        animalIds: ['BR0001', 'BR0002'],
+        toLoteId: 'P03',
+        movementDate: '2026-08-22',
+        origensEsperadas: {'BR0001': 'P01', 'BR0002': 'P02'},
+      );
+      expect(ok.movidos, ['BR0001', 'BR0002']);
+      expect(server.lastMovementBody?['origens_esperadas'], {
+        'BR0001': 'P01',
+        'BR0002': 'P02',
+      });
+      expect(
+        server.lastMovementBody?.containsKey('lote_origem_esperado'),
+        isFalse,
+      );
+    }, PassthroughHttpOverrides());
+  });
+
   test('409 de chave em processamento vira ApiException marcada; os outros 409 não', () async {
     final server = await MockApiServer.start();
     addTearDown(server.close);

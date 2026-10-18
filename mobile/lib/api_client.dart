@@ -464,6 +464,7 @@ class ApiClient {
     String? notes,
     String? idempotencyKey,
     String? loteOrigemEsperado,
+    Map<String, String>? origensEsperadas,
   }) async {
     final response = await _authorized(
       (headers) => _http.post(
@@ -481,6 +482,7 @@ class ApiClient {
           'reason': reason,
           'notes': notes,
           'lote_origem_esperado': ?loteOrigemEsperado,
+          'origens_esperadas': ?origensEsperadas,
         }),
       ),
     );

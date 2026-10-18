@@ -1583,6 +1583,46 @@ class TestMovimentarOrigemEsperadaApi(BackendApiTestCase):
         self.assertEqual(res2.status_code, 200)
         self.assertEqual(res2.json()["movidos"], [a2])
 
+    def test_origens_por_animal_conferem_e_movem_a_selecao_mista(self):
+        a1, a2, origem, outro, destino = self._setup()
+        headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+
+        res = self.client.post("/animais/movimentar", headers=headers, json={
+            "animal_ids": [a1, a2], "to_lote_id": destino, "movement_date": "2026-08-25",
+            "origens_esperadas": {a1: origem, a2: outro}})
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(sorted(res.json()["movidos"]), sorted([a1, a2]))
+        self.assertEqual(self._lote_de(a1), destino)
+        self.assertEqual(self._lote_de(a2), destino)
+
+    def test_origens_por_animal_divergente_devolve_409_com_esperados_e_nao_move_ninguem(self):
+        a1, a2, origem, outro, destino = self._setup()
+        headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+        # a2 está em `outro`, mas o operador o viu em `origem` (como a1).
+        payload = {"animal_ids": [a1, a2], "to_lote_id": destino, "movement_date": "2026-08-25",
+                   "origens_esperadas": {a1: origem, a2: origem}}
+
+        res = self.client.post("/animais/movimentar", headers=headers, json=payload)
+
+        self.assertEqual(res.status_code, 409)
+        detalhe = res.json()["detail"]
+        self.assertEqual(detalhe["codigo"], "origem_divergente")
+        self.assertEqual(detalhe["divergentes"], {a2: outro})
+        self.assertEqual(detalhe["esperados"], {a2: origem})
+        self.assertEqual(self._lote_de(a1), origem)
+        self.assertEqual(self._lote_de(a2), outro)
+
+    def test_origens_por_animal_prevalecem_sobre_o_unico_e_ausentes_nao_sao_conferidos(self):
+        a1, a2, origem, outro, destino = self._setup()
+        headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+        # O mapa dá a origem de a1; a2 não está no mapa e não há único: segue sem conferência.
+        res = self.client.post("/animais/movimentar", headers=headers, json={
+            "animal_ids": [a1, a2], "to_lote_id": destino, "movement_date": "2026-08-25",
+            "origens_esperadas": {a1: origem}})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(sorted(res.json()["movidos"]), sorted([a1, a2]))
+
 
 class TestImportarPesagensCsvEndpoint(BackendApiTestCase):
     def _headers(self):

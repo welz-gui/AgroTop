@@ -787,23 +787,37 @@ class MockApiServer {
         lastMovementBody = body;
         final destination = body['to_lote_id'] as String;
         final esperado = body['lote_origem_esperado'] as String?;
-        if (esperado != null) {
-          // Mesma regra do servidor: divergente = fora do esperado e do destino.
-          final divergentes = {
-            for (final id in List<String>.from(
-              body['animal_ids'] as List<dynamic>,
-            ))
-              if (_animalLotes[id] != null &&
-                  _animalLotes[id] != esperado &&
-                  _animalLotes[id] != destination)
-                id: _animalLotes[id],
-          };
+        final porAnimal = Map<String, String>.from(
+          (body['origens_esperadas'] as Map<String, dynamic>?) ?? const {},
+        );
+        if (esperado != null || porAnimal.isNotEmpty) {
+          // Mesma regra do servidor: o mapa vale no lugar do único, e divergente
+          // = fora do esperado e do destino.
+          final esperados = <String, String>{};
+          final divergentes = <String, String?>{};
+          for (final id in List<String>.from(
+            body['animal_ids'] as List<dynamic>,
+          )) {
+            final exp = porAnimal[id] ?? esperado;
+            final atual = _animalLotes[id];
+            if (exp != null &&
+                atual != null &&
+                atual != exp &&
+                atual != destination) {
+              esperados[id] = exp;
+              divergentes[id] = atual;
+            }
+          }
           if (divergentes.isNotEmpty) {
+            final unico = esperados.values.toSet();
             await _json(request, 409, {
               'detail': {
-                'mensagem':
-                    '${divergentes.length} animal(is) não estão mais no piquete $esperado',
-                'lote_origem_esperado': esperado,
+                'codigo': 'origem_divergente',
+                'mensagem': unico.length == 1
+                    ? '${divergentes.length} animal(is) não estão mais no piquete ${unico.first}'
+                    : '${divergentes.length} animal(is) não estão mais no piquete em que foram vistos',
+                'lote_origem_esperado': unico.length == 1 ? unico.first : null,
+                'esperados': esperados,
                 'divergentes': divergentes,
               },
             });

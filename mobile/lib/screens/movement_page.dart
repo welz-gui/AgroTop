@@ -9,9 +9,8 @@ import 'offline_cache_banner.dart';
 
 /// Piquete de origem comum a todos os animais, ou null se não há um só.
 ///
-/// ponytail: o servidor aceita uma única origem esperada por pedido, então
-/// seleção com piquetes diferentes (ou algum sem piquete) vai sem conferência.
-/// Agrupar por piquete em um pedido por grupo se isso começar a importar.
+/// Seleção com piquetes diferentes (ou algum sem piquete) não tem origem comum:
+/// o pedido leva então o mapa de [origensPorAnimal].
 String? origemComum(Iterable<Object?> lotes) {
   String? comum;
   for (final lote in lotes) {
@@ -21,6 +20,24 @@ String? origemComum(Iterable<Object?> lotes) {
     comum = atual;
   }
   return comum;
+}
+
+/// Animal → piquete em que o operador o viu, só para os de piquete conhecido.
+///
+/// Vai no mesmo pedido quando a seleção mistura piquetes: o servidor confere cada
+/// animal com a sua origem e recusa o lote inteiro se algum divergir (tudo ou nada,
+/// um único item na fila). Animal sem piquete conhecido fica de fora: não se confere.
+/// Vazio vira null, para o campo nem ir no pedido.
+Map<String, String>? origensPorAnimal(
+  Iterable<String> animalIds,
+  Map<String, Object?> loteVisto,
+) {
+  final mapa = <String, String>{};
+  for (final id in animalIds) {
+    final lote = loteVisto[id]?.toString();
+    if (lote != null && lote.isNotEmpty) mapa[id] = lote;
+  }
+  return mapa.isEmpty ? null : mapa;
 }
 
 class MovementPage extends StatefulWidget {
@@ -33,6 +50,7 @@ class MovementPage extends StatefulWidget {
     this.offlineQueue,
     this.shallowCache,
     this.loteOrigemEsperado,
+    this.origensEsperadas,
   });
 
   final ApiClient api;
@@ -40,6 +58,8 @@ class MovementPage extends StatefulWidget {
   // Piquete em que o operador viu os animais. O servidor recusa a movimentação
   // (409) se algum já estiver em outro, em vez de gravar com a origem errada.
   final String? loteOrigemEsperado;
+  // Seleção com piquetes diferentes: animal → piquete em que foi visto.
+  final Map<String, String>? origensEsperadas;
   final VoidCallback onUnauthorized;
   final DateTime? initialDate;
   final OfflineQueue? offlineQueue;
@@ -141,6 +161,7 @@ class _MovementPageState extends State<MovementPage> {
         movementDate: dateVal,
         notes: notesVal,
         loteOrigemEsperado: widget.loteOrigemEsperado,
+        origensEsperadas: widget.origensEsperadas,
       );
       if (mounted) setState(() => _result = result);
     } on ApiException catch (error) {
@@ -158,6 +179,7 @@ class _MovementPageState extends State<MovementPage> {
         movementDate: dateVal,
         notes: notesVal,
         loteOrigemEsperado: widget.loteOrigemEsperado,
+        origensEsperadas: widget.origensEsperadas,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
