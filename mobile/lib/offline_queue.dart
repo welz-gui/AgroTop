@@ -462,6 +462,20 @@ class OfflineQueue {
             SyncItemSuccess(item: item, description: item.description),
           );
         } on ApiException catch (e) {
+          if (e.emProcessamento) {
+            // O servidor ainda conclui este mesmo item (reenvio antes do fim): não é
+            // recusa. Fica na fila e segue com os demais, que são independentes.
+            if (item.id != null) await recordAttempt(item.id!, e.message);
+            pendentes.add(
+              SyncItemPending(
+                item: item,
+                description: item.description,
+                reason:
+                    'O servidor ainda está processando este item; será reenviado na próxima sincronização.',
+              ),
+            );
+            continue;
+          }
           if (item.id != null) await deleteItem(item.id!);
           rejeitados.add(
             SyncItemRejected(

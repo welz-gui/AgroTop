@@ -20,10 +20,19 @@ abstract interface class TokenStore {
 }
 
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(
+    this.message, {
+    this.statusCode,
+    this.emProcessamento = false,
+  });
 
   final String message;
   final int? statusCode;
+
+  /// 409 "a chave de idempotência ainda está em processamento": o servidor está
+  /// concluindo este mesmo pedido (um reenvio chegou antes de ele terminar). Não é
+  /// recusa: o item deve ficar pendente e ser reenviado, nunca descartado.
+  final bool emProcessamento;
 
   @override
   String toString() => message;
@@ -697,6 +706,34 @@ class ApiClient {
   }
 
   Future<http.Response> _authorized(
+    Future<http.Response> Function(Map<String, String> headers) send,
+  ) async {
+    final response = await _authorizedSemChecagem(send);
+    _lancarSeEmProcessamento(response);
+    return response;
+  }
+
+  /// Reconhece pelo código do corpo, e não por qualquer 409: há 409 de conflito de
+  /// verdade (origem divergente na movimentação, id de lote repetido).
+  void _lancarSeEmProcessamento(http.Response response) {
+    if (response.statusCode != 409) return;
+    try {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      final detail = body is Map<String, dynamic> ? body['detail'] : null;
+      if (detail is Map && detail['codigo'] == 'em_processamento') {
+        throw ApiException(
+          (detail['mensagem'] as String?) ??
+              'O servidor ainda está processando este pedido.',
+          statusCode: 409,
+          emProcessamento: true,
+        );
+      }
+    } on FormatException {
+      return;
+    }
+  }
+
+  Future<http.Response> _authorizedSemChecagem(
     Future<http.Response> Function(Map<String, String> headers) send,
   ) async {
     var tokens = await _requireTokens();

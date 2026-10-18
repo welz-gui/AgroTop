@@ -249,6 +249,7 @@ void main() {
         throwsA(
           isA<ApiException>()
               .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.emProcessamento, 'emProcessamento', isFalse)
               .having((e) => e.message, 'message', contains('P02')),
         ),
       );
@@ -262,6 +263,42 @@ void main() {
       );
       expect(ok.movidos, ['BR0001']);
       expect(server.lastMovementBody?['lote_origem_esperado'], 'P01');
+    }, PassthroughHttpOverrides());
+  });
+
+  test('409 de chave em processamento vira ApiException marcada; os outros 409 não', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+    server.pesagensEmProcessamento = 1;
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      await expectLater(
+        api.registerWeighing('BR0001', peso: 401.2, data: '2026-08-22', idempotencyKey: 'k-1'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.emProcessamento, 'emProcessamento', isTrue)
+              .having((e) => e.message, 'message', contains('processamento')),
+        ),
+      );
+
+      // Na repetição o servidor já concluiu e a pesagem passa.
+      final ok = await api.registerWeighing(
+        'BR0001',
+        peso: 401.2,
+        data: '2026-08-22',
+        idempotencyKey: 'k-1',
+      );
+      expect(ok.peso, 401.2);
     }, PassthroughHttpOverrides());
   });
 
