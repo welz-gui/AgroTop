@@ -17,6 +17,8 @@ class FakeApiClient extends ApiClient {
 
   bool throwApiExceptionOnWeighing = false;
   bool throwNetworkExceptionOnMedication = false;
+  bool throwEmProcessamentoOnMedication = false;
+  bool throwConflitoOnMovement = false;
 
   @override
   Future<WeighingResult> registerWeighing(
@@ -66,6 +68,13 @@ class FakeApiClient extends ApiClient {
     if (throwNetworkExceptionOnMedication) {
       throw Exception('SocketException: Connection refused');
     }
+    if (throwEmProcessamentoOnMedication) {
+      throw const ApiException(
+        'Requisição com esta Idempotency-Key ainda está em processamento.',
+        statusCode: 409,
+        emProcessamento: true,
+      );
+    }
     medicationsReceived.add({
       'animal_id': animalId,
       'medicamento': medicamento,
@@ -94,6 +103,12 @@ class FakeApiClient extends ApiClient {
     String? idempotencyKey,
     String? loteOrigemEsperado,
   }) async {
+    if (throwConflitoOnMovement) {
+      throw const ApiException(
+        '1 animal(is) não estão mais no piquete P01',
+        statusCode: 409,
+      );
+    }
     movementsReceived.add({
       'animal_ids': animalIds,
       'to_lote_id': toLoteId,
@@ -279,6 +294,57 @@ void main() {
       expect(fakeApi.medicationsReceived[1]['principio_ativo'], isNull);
       expect(fakeApi.medicationsReceived[1]['lote'], isNull);
       expect(fakeApi.medicationsReceived[1]['validade'], isNull);
+    });
+
+    test('409 de chave em processamento mantém o item na fila e segue com os outros', () async {
+      final fakeApi = FakeApiClient()..throwEmProcessamentoOnMedication = true;
+      await queue.enqueueMedication(
+        animalId: 'BR0001',
+        medicamento: 'Aftosa',
+        dose: 5.0,
+        unidade: 'ml',
+        via: 'Subcutânea',
+        carenciaDias: 14,
+        data: '2026-08-27',
+      );
+      await queue.enqueueWeighing(
+        animalId: 'BR0001',
+        peso: 450.0,
+        data: '2026-08-27',
+      );
+
+      final report = await queue.sync(fakeApi);
+
+      expect(report.pendentes.length, equals(1));
+      expect(report.pendentes.single.reason, contains('ainda está processando'));
+      expect(report.rejeitados, isEmpty);
+      expect(report.sincronizados.length, equals(1), reason: 'a pesagem seguinte não pode ficar presa');
+      expect(await queue.countPending(), equals(1));
+      expect(fakeApi.weighingsReceived.length, equals(1));
+
+      // Na sincronização seguinte o servidor já concluiu: o item sai da fila.
+      fakeApi.throwEmProcessamentoOnMedication = false;
+      final segunda = await queue.sync(fakeApi);
+      expect(segunda.sincronizados.length, equals(1));
+      expect(segunda.pendentes, isEmpty);
+      expect(await queue.countPending(), equals(0));
+    });
+
+    test('409 de conflito real (sem o código) continua rejeitado e sai da fila', () async {
+      final fakeApi = FakeApiClient()..throwConflitoOnMovement = true;
+      await queue.enqueueMovement(
+        animalIds: ['BR0001'],
+        toLoteId: 'P02',
+        movementDate: '2026-08-27',
+        loteOrigemEsperado: 'P01',
+      );
+
+      final report = await queue.sync(fakeApi);
+
+      expect(report.rejeitados.length, equals(1));
+      expect(report.rejeitados.single.reason, contains('não estão mais no piquete'));
+      expect(report.pendentes, isEmpty);
+      expect(await queue.countPending(), equals(0));
     });
 
     test('item rejeitado pelo servidor (ApiException) sai da fila e vai para rejeitados', () async {

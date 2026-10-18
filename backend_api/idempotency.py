@@ -23,6 +23,9 @@ from repositories.conexao import _conn
 # reserva e a resposta) e pode ser retomada por outra tentativa.
 PRAZO_RESERVA = timedelta(minutes=5)
 
+# Código do 409 de reserva em andamento; o app mobile o reconhece (OfflineQueue.sync).
+CODIGO_EM_PROCESSAMENTO = "em_processamento"
+
 _EM_ANDAMENTO = "em_andamento"
 _CONCLUIDA = "concluida"
 
@@ -205,9 +208,15 @@ def executar_idempotente(
             detail="Idempotency-Key já foi usada com outro conteúdo. Gere uma chave nova para um novo registro.",
         )
     except RequisicaoEmAndamento:
+        # `codigo` deixa o cliente distinguir este 409 (transitório: repetir depois)
+        # dos outros 409 (conflito de verdade, como origem divergente na movimentação).
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Requisição com esta Idempotency-Key ainda está em processamento.",
+            detail={
+                "codigo": CODIGO_EM_PROCESSAMENTO,
+                "mensagem": "Requisição com esta Idempotency-Key ainda está em processamento.",
+            },
+            headers={"Retry-After": "5"},
         )
 
     if cached is not None:

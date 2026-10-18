@@ -641,6 +641,7 @@ def movimentar_animais(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
+                    "codigo": "origem_divergente",
                     "mensagem": str(exc),
                     "lote_origem_esperado": exc.esperado,
                     "divergentes": exc.divergentes,

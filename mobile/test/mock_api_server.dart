@@ -20,6 +20,8 @@ class MockApiServer {
   final List<Map<String, dynamic>> _medications = [];
   Map<String, dynamic>? lastMovementBody;
   Map<String, dynamic>? lastMedicationBody;
+  // Quantas próximas pesagens respondem 409 "em processamento" antes de aceitar.
+  int pesagensEmProcessamento = 0;
   int photoUploadRequests = 0;
   int csvImportRequests = 0;
   final List<List<int>> csvImportFiles = [];
@@ -833,6 +835,18 @@ class MockApiServer {
       }
       if (request.method == 'POST' && path == '/animais/BR0001/pesagens') {
         weighingRequests++;
+        // Simula a reserva da chave de idempotência ainda em andamento (409).
+        if (pesagensEmProcessamento > 0) {
+          pesagensEmProcessamento--;
+          await _json(request, 409, {
+            'detail': {
+              'codigo': 'em_processamento',
+              'mensagem':
+                  'Requisição com esta Idempotency-Key ainda está em processamento.',
+            },
+          });
+          return;
+        }
         final body = await _body(request);
         final expectedKeys = {'peso', 'data', 'method', 'notes'};
         if (body.keys.toSet().difference(expectedKeys).isNotEmpty ||

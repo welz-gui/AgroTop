@@ -1420,6 +1420,10 @@ class TestIdempotency(BackendApiTestCase):
 
         res = self.client.post(url, json=payload, headers=headers)
         self.assertEqual(res.status_code, 409)
+        # O app distingue este 409 (repetir depois) dos de conflito real pelo código.
+        self.assertEqual(res.json()["detail"]["codigo"], "em_processamento")
+        self.assertIn("processamento", res.json()["detail"]["mensagem"])
+        self.assertEqual(res.headers.get("Retry-After"), "5")
         self.assertEqual(self._pesagens_com_nota("em andamento"), 0)
         # Reserva sem resposta não pode ser lida como resposta guardada.
         self.assertIsNone(get_cached_response("chave-em-andamento"))
@@ -1551,6 +1555,7 @@ class TestMovimentarOrigemEsperadaApi(BackendApiTestCase):
 
         self.assertEqual(res.status_code, 409)
         detalhe = res.json()["detail"]
+        self.assertEqual(detalhe["codigo"], "origem_divergente")
         self.assertEqual(detalhe["lote_origem_esperado"], origem)
         self.assertEqual(detalhe["divergentes"], {a2: outro})
         self.assertEqual(self._lote_de(a1), origem)
