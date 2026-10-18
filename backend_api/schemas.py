@@ -141,6 +141,14 @@ class MovimentarInput(BaseModel):
             "nada é movido e a API responde 409 com a divergência. Omitido = não confere."
         ),
     )
+    origens_esperadas: Optional[dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Para seleção com piquetes de origem diferentes: animal → piquete em que o operador o viu. "
+            "Vale no lugar de lote_origem_esperado para os animais listados. Divergência em qualquer um "
+            "recusa o lote inteiro (409), sem mover ninguém."
+        ),
+    )
 
 
 class MovimentarOutput(BaseModel):

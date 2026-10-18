@@ -89,6 +89,54 @@ class TestOrigemEsperada(BaseRegras):
             db.move_animal(a, self._params(esperado="P1"))
         self.assertEqual(self._lote(a), "P3")
 
+    # ── origem por animal (seleção com piquetes diferentes) ────────────────
+
+    def _params_mapa(self, mapa, destino="P3", unico=None):
+        return db.MovementParams(destino, HOJE.isoformat(), from_lote_esperado=unico,
+                                 origens_esperadas=mapa)
+
+    def test_mapa_com_origens_diferentes_confere_e_move_todos(self):
+        a = self.animal("M1", lote="P1")
+        b = self.animal("M2", lote="P2")
+        r = db.move_animals_bulk([a, b], self._params_mapa({a: "P1", b: "P2"}))
+        self.assertEqual(sorted(r["movidos"]), ["M1", "M2"])
+        self.assertEqual(self._lote(a), "P3")
+        self.assertEqual(self._lote(b), "P3")
+
+    def test_mapa_divergente_recusa_o_lote_inteiro_e_informa_o_esperado_de_cada_um(self):
+        a = self.animal("M3", lote="P1")
+        b = self.animal("M4", lote="P1")   # visto em P2, mas alguém o levou para P1
+        with self.assertRaises(OrigemDivergente) as ctx:
+            db.move_animals_bulk([a, b], self._params_mapa({a: "P1", b: "P2"}))
+        self.assertEqual(ctx.exception.divergentes, {"M4": "P1"})
+        self.assertEqual(ctx.exception.esperados, {"M4": "P2"})
+        self.assertEqual(ctx.exception.esperado, "P2", "um só divergente: o esperado dele")
+        self.assertEqual(self._lote(a), "P1", "o que conferia também não pode ter sido movido")
+
+    def test_mapa_diferente_para_dois_divergentes_deixa_esperado_none(self):
+        a = self.animal("M7", lote="P3")
+        b = self.animal("M8", lote="P3")
+        with self.assertRaises(OrigemDivergente) as ctx:
+            db.move_animals_bulk([a, b], self._params_mapa({a: "P1", b: "P2"}, destino="P1"))
+        # destino P1: M7 (esperado P1, está em P3) diverge; M8 (esperado P2, em P3) diverge.
+        self.assertEqual(set(ctx.exception.divergentes), {"M7", "M8"})
+        self.assertIsNone(ctx.exception.esperado)
+        self.assertIn("visto em P1", str(ctx.exception))
+        self.assertIn("visto em P2", str(ctx.exception))
+
+    def test_mapa_prevalece_sobre_o_esperado_unico_e_ausentes_caem_nele(self):
+        a = self.animal("M9", lote="P2")
+        b = self.animal("M10", lote="P1")
+        # M9 está em P2: o mapa diz P2 (confere) mesmo com o único P1; M10 cai no único P1.
+        r = db.move_animals_bulk([a, b], self._params_mapa({a: "P2"}, unico="P1"))
+        self.assertEqual(sorted(r["movidos"]), ["M10", "M9"])
+
+    def test_animal_fora_do_mapa_e_sem_unico_nao_e_conferido(self):
+        a = self.animal("M11", lote="P1")
+        b = self.animal("M12", lote="P2")   # sem piquete conhecido pelo app: não confere
+        r = db.move_animals_bulk([a, b], self._params_mapa({a: "P1"}))
+        self.assertEqual(sorted(r["movidos"]), ["M11", "M12"])
+
 
 if __name__ == "__main__":
     unittest.main()

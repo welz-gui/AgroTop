@@ -882,8 +882,14 @@ void main() {
 
     expect(movementRequests, 1);
     expect(sentIds, ['BR0001', 'BR0002', 'BR0003']);
-    // Piquetes de origem diferentes (P01, P02, P01): sem conferência de origem.
+    // Piquetes de origem diferentes (P01, P02, P01): cada animal leva o seu, no
+    // mesmo pedido (tudo ou nada), e não há origem única.
     expect(sentBody!.containsKey('lote_origem_esperado'), isFalse);
+    expect(sentBody!['origens_esperadas'], {
+      'BR0001': 'P01',
+      'BR0002': 'P02',
+      'BR0003': 'P01',
+    });
     expect(find.text('Movidos (1)'), findsOneWidget);
     expect(find.text('• BR0001'), findsOneWidget);
     expect(find.text('Já estavam no destino (1)'), findsOneWidget);

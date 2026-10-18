@@ -293,6 +293,7 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
 
   Future<void> _openMovement(List<String> animalIds) async {
     final loteVisto = {for (final a in _animals) a.id: a.loteId};
+    final comum = origemComum(animalIds.map((id) => loteVisto[id]));
     final moved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => MovementPage(
@@ -301,7 +302,10 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
           onUnauthorized: widget.onUnauthorized,
           offlineQueue: _offlineQueue,
           shallowCache: _shallowCache,
-          loteOrigemEsperado: origemComum(animalIds.map((id) => loteVisto[id])),
+          loteOrigemEsperado: comum,
+          origensEsperadas: comum == null
+              ? origensPorAnimal(animalIds, loteVisto)
+              : null,
         ),
       ),
     );

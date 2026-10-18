@@ -347,6 +347,7 @@ class OfflineQueue {
     String? reason = 'manejo',
     String? notes,
     String? loteOrigemEsperado,
+    Map<String, String>? origensEsperadas,
   }) async {
     final clientUuid = _uuid.v4();
     final payload = {
@@ -356,6 +357,7 @@ class OfflineQueue {
       'reason': reason,
       'notes': notes,
       'lote_origem_esperado': ?loteOrigemEsperado,
+      'origens_esperadas': ?origensEsperadas,
     };
     final item = QueueItem(
       clientUuid: clientUuid,
@@ -454,6 +456,8 @@ class OfflineQueue {
               idempotencyKey: item.clientUuid,
               // Itens enfileirados antes deste campo não o têm: null = não confere.
               loteOrigemEsperado: p['lote_origem_esperado']?.toString(),
+              origensEsperadas: (p['origens_esperadas'] as Map<String, dynamic>?)
+                  ?.map((k, v) => MapEntry(k, v.toString())),
             );
           }
 
