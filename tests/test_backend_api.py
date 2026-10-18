@@ -869,6 +869,10 @@ class TestSanidadeEndpoint(BackendApiTestCase):
                 "carencia_dias": 9,
                 "data": hoje,
                 "protocolo_id": None,
+                # Produto aplicado: opcionais, nulos quando não informados.
+                "principio_ativo": None,
+                "lote": None,
+                "validade": None,
             },
             data["aplicacoes"],
         )

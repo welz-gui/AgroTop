@@ -653,8 +653,11 @@ def _adicionar_pagina_animal(pdf, venda: dict, texto, tabela) -> None:
     ])
 
     medicamentos = db.get_medications(animal_id) or []
-    tabela("Sanidade / Medicamentos", ["Data", "Medicamento", "Dose", "Carência (dias)", "Aplicado por"], [
+    tabela("Sanidade / Medicamentos",
+           ["Data", "Medicamento", "Princípio ativo", "Lote", "Validade", "Dose", "Carência (dias)", "Aplicado por"], [
         (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
+         item.get("principio_ativo") or "—", item.get("lote_produto") or "—",
+         _evidencias_data(item.get("validade_produto")) if item.get("validade_produto") else "—",
          f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
          item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
         for item in medicamentos
@@ -1436,6 +1439,18 @@ def _tab_pesagem(animal):
             st.rerun()
 
 
+def _produto_aplicado_txt(m: dict) -> str:
+    """'princípio ativo X · lote Y · val. DD/MM/AAAA' (só o que foi informado), já escapado."""
+    partes = []
+    if m.get("principio_ativo"):
+        partes.append(f"princípio ativo {html.escape(str(m['principio_ativo']))}")
+    if m.get("lote_produto"):
+        partes.append(f"lote {html.escape(str(m['lote_produto']))}")
+    if m.get("validade_produto"):
+        partes.append(f"val. {_data_br(m['validade_produto'])}")
+    return " · ".join(partes)
+
+
 def _tab_medicamento(animal):
     ROUTES = ["Subcutânea (SC)","Intramuscular (IM)","Intravenosa (IV)","Oral (PO)","Tópica (Pour-on)","Intramamária"]
     insumos=[i for i in db.get_all_insumos() if i["category"] in ("medicamento","vacina")]
@@ -1455,25 +1470,40 @@ def _tab_medicamento(animal):
         with mc3: route=st.selectbox("Via",ROUTES)
         wd_c=st.number_input("Carência (dias)",min_value=0,max_value=180,value=0,step=1)
         md_=st.date_input("Data Aplicação",value=date.today())
+        pa1,pa2,pa3=st.columns(3)
+        with pa1: principio=st.text_input("Princípio ativo",placeholder="Vazio = o do cadastro do insumo",
+                        key="med_principio_ativo",
+                        help="O que foi aplicado (ex.: ivermectina). Se ficar vazio e o produto vier do estoque, usa o princípio ativo cadastrado no insumo.")
+        with pa2: lote_prod=st.text_input("Lote do produto",placeholder="Ex: L2410A",key="med_lote_produto")
+        with pa3: validade_prod=st.date_input("Validade do produto",value=None,format="DD/MM/YYYY",
+                        key="med_validade_produto",
+                        help="Validade da embalagem. Produto vencido na data da aplicação não pode ser registrado.")
         notes_m=st.text_area("Obs.",height=60,placeholder="Opcional")
         if st.form_submit_button("✅ Salvar Medicamento",type="primary",use_container_width=True):
             if not med_name:
                 st.error("Informe o medicamento.")
             else:
-                db.add_medication(db.MedicationData(
-                    animal_id=animal["id"],
-                    medication_name=med_name,
-                    dose=dose,
-                    unit=unit,
-                    application_route=route,
-                    withdrawal_days=int(wd_c),
-                    med_date=md_.strftime("%Y-%m-%d"),
-                    applied_by=st.session_state.user["name"],
-                    insumo_id=insumo_id,
-                    notes=notes_m
-                ))
-                st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
-                st.rerun()
+                try:
+                    db.add_medication(db.MedicationData(
+                        animal_id=animal["id"],
+                        medication_name=med_name,
+                        dose=dose,
+                        unit=unit,
+                        application_route=route,
+                        withdrawal_days=int(wd_c),
+                        med_date=md_.strftime("%Y-%m-%d"),
+                        applied_by=st.session_state.user["name"],
+                        insumo_id=insumo_id,
+                        notes=notes_m,
+                        principio_ativo=principio,
+                        lote_produto=lote_prod,
+                        validade_produto=validade_prod.strftime("%Y-%m-%d") if validade_prod else ""
+                    ))
+                except db.TratamentoInvalido as e:
+                    st.error(f"🚫 {e}")
+                else:
+                    st.success(f"✅ {med_name} registrado!" + (f" Carência: {wd_c} dias" if wd_c else ""))
+                    st.rerun()
 
 
 def _tab_movimentacao(animal):
@@ -1552,6 +1582,7 @@ def _tab_historico(animal):
                 f'<span style="color:{paleta["texto_terciario"]};font-size:.78rem">'
                 f'{_fmt_dose(m["dose"], m["unit"])} · {html.escape(str(m["application_route"]))} · {m["med_date"]}'
                 f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
+                f'{"  ·  "+_produto_aplicado_txt(m) if _produto_aplicado_txt(m) else ""}'
                 f'</span></div>',unsafe_allow_html=True)
         st.markdown("**🚚 Movimentações**")
         for mv in db.get_movements(animal["id"], limit=4):
@@ -2193,6 +2224,7 @@ def _render_tab_med(meds):
                 f'{_data_br(m_["med_date"])} · {_fmt_dose(m_["dose"], m_["unit"])} · {html.escape(str(m_["application_route"]))}'
                 f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+_data_br(end_)+")" if m_["withdrawal_days"] else ""}'
                 f'{"  ·  por: "+html.escape(str(m_["applied_by"])) if m_["applied_by"] else ""}'
+                f'{"  ·  "+_produto_aplicado_txt(m_) if _produto_aplicado_txt(m_) else ""}'
                 f'</span></div>',unsafe_allow_html=True)
     else:
         st.info("Nenhum medicamento registrado.")
@@ -4213,9 +4245,12 @@ def _render_tab_novo_insumo():
         ni_min=st.number_input("Estoque Mínimo (alerta)",min_value=0.0,step=1.0,format="%.1f")
         ni_cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f")
         ni_prazo=st.number_input("Prazo de Reposição (dias)",min_value=0,step=1,value=0,help="Quantos dias demora para chegar após comprar")
+        ni_principio=st.text_input("Princípio ativo (medicamento/vacina)",placeholder="Opcional — ex.: ivermectina",
+            help="Vira o padrão do campo 'Princípio ativo' ao aplicar este produto num animal.")
         if st.form_submit_button("✅ Criar Insumo",type="primary",use_container_width=True):
             if ni_name:
-                insumo_data = db.InsumoCreate(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu,ni_prazo)
+                insumo_data = db.InsumoCreate(ni_name,ni_cat,ni_unit,ni_stk,ni_min,ni_cpu,ni_prazo,
+                                              principio_ativo=ni_principio)
                 db.add_new_insumo(insumo_data)
                 st.success(f"✅ Insumo {ni_name} criado!"); st.rerun()
             else:
@@ -5438,20 +5473,30 @@ def _render_tab_plano_vacinacao():
                        f"sem idade definida — verifique se precisam.")
         if plan["n_pending"] > 0:
             with st.form(f"camp_{p['id']}", clear_on_submit=True):
-                cc1, cc2 = st.columns([1,2])
+                cc1, cc2, cc3 = st.columns([1,1,1])
                 with cc1:
                     cd = st.date_input("Data", value=date.today(), key=f"cd_{p['id']}")
                 with cc2:
-                    if plan["shortfall"] > 0:
-                        st.warning(f"Estoque insuficiente (faltam {plan['shortfall']:g}). "
-                                   "A aplicação prossegue e o estoque vai a zero.")
+                    c_lote = st.text_input("Lote do produto", placeholder="Opcional", key=f"cl_{p['id']}")
+                with cc3:
+                    c_val = st.date_input("Validade do produto", value=None, format="DD/MM/YYYY",
+                                          key=f"cv_{p['id']}")
+                if plan["shortfall"] > 0:
+                    st.warning(f"Estoque insuficiente (faltam {plan['shortfall']:g}). "
+                               "A aplicação prossegue e o estoque vai a zero.")
                 if st.form_submit_button(
                         f"💉 Aplicar campanha em {plan['n_pending']} animais",
                         type="primary", use_container_width=True):
-                    r = db.apply_protocol_campaign(p["id"], cd.strftime("%Y-%m-%d"),
-                                                   st.session_state.user["name"])
-                    st.success(f"✅ Aplicado em {r['n']} animais ({r['doses']:g} {p['dose_unit']}).")
-                    st.rerun()
+                    try:
+                        r = db.apply_protocol_campaign(
+                            p["id"], cd.strftime("%Y-%m-%d"), st.session_state.user["name"],
+                            lote_produto=c_lote,
+                            validade_produto=c_val.strftime("%Y-%m-%d") if c_val else "")
+                    except db.TratamentoInvalido as e:
+                        st.error(f"🚫 {e}")
+                    else:
+                        st.success(f"✅ Aplicado em {r['n']} animais ({r['doses']:g} {p['dose_unit']}).")
+                        st.rerun()
         else:
             st.success("✅ Todos os elegíveis já estão em dia com este protocolo.")
         st.markdown("---")
