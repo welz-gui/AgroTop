@@ -61,6 +61,12 @@ void main() {
   // A tela faz Navigator.pop ao salvar, então é aberta por cima de outra rota.
   Future<void> abrirTela(WidgetTester tester) async {
     resultado = 'não voltou';
+    // Janela alta: o formulário inteiro cabe, sem depender de rolagem para
+    // alcançar o botão de salvar (na janela padrão de 800x600 o toque errava).
+    tester.view.physicalSize = const Size(800, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -95,15 +101,11 @@ void main() {
     String chave,
     String texto,
   ) async {
-    final finder = find.byKey(ValueKey(chave));
-    await tester.ensureVisible(finder);
-    await tester.enterText(finder, texto);
+    await tester.enterText(find.byKey(ValueKey(chave)), texto);
   }
 
   Future<void> salvar(WidgetTester tester) async {
-    final botao = find.byKey(const ValueKey('save-medication'));
-    await tester.ensureVisible(botao);
-    await tester.tap(botao);
+    await tester.tap(find.byKey(const ValueKey('save-medication')));
     await tester.pumpAndSettle();
   }
 
