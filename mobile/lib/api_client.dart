@@ -534,6 +534,9 @@ class ApiClient {
     int? protocoloId,
     String? notas,
     String? idempotencyKey,
+    String? principioAtivo,
+    String? lote,
+    String? validade,
   }) async {
     final response = await _authorized(
       (headers) => _http.post(
@@ -555,6 +558,9 @@ class ApiClient {
           'data': data,
           'protocolo_id': protocoloId,
           'notas': notas,
+          'principio_ativo': ?principioAtivo,
+          'lote': ?lote,
+          'validade': ?validade,
         }),
       ),
     );

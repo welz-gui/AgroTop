@@ -1122,7 +1122,8 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                           ),
                           subtitle: Text(
                             '${app.data} · Via ${app.via}'
-                            '${app.carenciaDias > 0 ? ' · Carência: ${app.carenciaDias}d' : ''}',
+                            '${app.carenciaDias > 0 ? ' · Carência: ${app.carenciaDias}d' : ''}'
+                            '${app.produtoAplicado.isEmpty ? '' : '\n${app.produtoAplicado}'}',
                           ),
                         ),
                   ],

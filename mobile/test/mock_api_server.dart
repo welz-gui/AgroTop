@@ -569,6 +569,18 @@ class MockApiServer {
         postMedicationRequests++;
         final body = await _body(request);
         lastMedicationBody = body;
+        // Mesma regra do backend (services/tratamento.py): validade anterior à
+        // data da aplicação é recusada com 422.
+        final validade = body['validade'] as String?;
+        if (validade != null &&
+            validade.isNotEmpty &&
+            validade.compareTo(body['data'] as String) < 0) {
+          await _json(request, 422, {
+            'detail':
+                'Produto vencido em $validade: não pode ser aplicado em ${body['data']}.',
+          });
+          return;
+        }
         final carenciaDias = (body['carencia_dias'] as num).toInt();
         if (carenciaDias > 0) {
           final dataApp = DateTime.parse(body['data'] as String);
@@ -586,6 +598,9 @@ class MockApiServer {
           'carencia_dias': carenciaDias,
           'data': body['data'],
           'protocolo_id': body['protocolo_id'],
+          'principio_ativo': body['principio_ativo'],
+          'lote': body['lote'],
+          'validade': validade,
         });
         await _json(request, 201, {'carencia_ate': carenciaAte});
         return;

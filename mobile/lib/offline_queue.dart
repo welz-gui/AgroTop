@@ -310,6 +310,9 @@ class OfflineQueue {
     required String data,
     int? protocoloId,
     String? notas,
+    String? principioAtivo,
+    String? lote,
+    String? validade,
   }) async {
     final clientUuid = _uuid.v4();
     final payload = {
@@ -322,6 +325,9 @@ class OfflineQueue {
       'data': data,
       'protocolo_id': protocoloId,
       'notas': notas,
+      'principio_ativo': ?principioAtivo,
+      'lote': ?lote,
+      'validade': ?validade,
     };
     final item = QueueItem(
       clientUuid: clientUuid,
@@ -430,6 +436,10 @@ class OfflineQueue {
               protocoloId: (p['protocolo_id'] as num?)?.toInt(),
               notas: p['notas'] as String?,
               idempotencyKey: item.clientUuid,
+              // Itens enfileirados antes destes campos não os têm: null = não informado.
+              principioAtivo: p['principio_ativo'] as String?,
+              lote: p['lote'] as String?,
+              validade: p['validade'] as String?,
             );
           } else if (item.endpoint.contains('/movimentar')) {
             final animalIds = (p['animal_ids'] as List<dynamic>)
