@@ -236,7 +236,8 @@ def _recusar_abate_em_carencia(con, animal_ids: tuple, data_venda: str) -> None:
     rows = con.execute(
         f"""SELECT a.id AS animal_id, m.med_date, m.withdrawal_days
             FROM medications m JOIN animals a ON a.uuid = m.animal_uuid
-            WHERE m.withdrawal_days > 0 AND a.id IN ({qmarks})""", animal_ids
+            WHERE m.withdrawal_days > 0 AND m.cancelada_em IS NULL
+              AND a.id IN ({qmarks})""", animal_ids
     ).fetchall()
     por_animal: dict[str, list[dict]] = {}
     for r in rows:

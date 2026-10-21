@@ -55,7 +55,7 @@ def _animais_para_validacao(con, uuids: list[str]) -> list[dict]:
 
     meds_rows = con.execute(
         f"SELECT animal_uuid, med_date, withdrawal_days FROM medications "
-        f"WHERE animal_uuid IN ({marcas}) AND withdrawal_days > 0",
+        f"WHERE animal_uuid IN ({marcas}) AND withdrawal_days > 0 AND cancelada_em IS NULL",
         uuids,
     ).fetchall()
 

@@ -2212,22 +2212,93 @@ def _render_tab_peso(ws, target_weight=None):
             column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f")})
 
 def _render_tab_med(meds):
+    """Histórico de aplicações, vigentes e canceladas. A cancelada fica riscada, com o motivo,
+    e a vigente oferece corrigir ou cancelar (a original nunca é apagada)."""
     if meds:
         for m_ in meds:
+            cancelada = bool(m_.get("cancelada_em"))
             end_=datetime.strptime(m_["med_date"],"%Y-%m-%d").date()+timedelta(days=m_["withdrawal_days"] or 0)
-            active=m_["withdrawal_days"] and end_>=date.today()
-            bc=f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}"
+            active=not cancelada and m_["withdrawal_days"] and end_>=date.today()
+            bc=(f"border-left-color:{c['texto_terciario']};opacity:.65" if cancelada
+                else f"border-left-color:{c['perigo']}" if active else f"border-left-color:{c['info']}")
+            nome=html.escape(str(m_["medication_name"]))
+            rotulo=(f'<s>{nome}</s>  <span class="badge-gray">Cancelada</span>' if cancelada else nome)
+            rodape=""
+            if cancelada:
+                rodape=(f'<br><span style="color:{c["texto_secundario"]};font-size:.8rem">'
+                        f'cancelada por {html.escape(str(m_.get("cancelada_por") or "—"))} em '
+                        f'{_data_br(str(m_["cancelada_em"])[:10])} · motivo: '
+                        f'{html.escape(str(m_.get("motivo_cancelamento") or "—"))}</span>')
+            elif m_.get("corrige_id"):
+                rodape=(f'<br><span style="color:{c["texto_secundario"]};font-size:.8rem">'
+                        f'corrige a aplicação nº {m_["corrige_id"]}</span>')
             st.markdown(f'<div class="hist-item" style="{bc}">'
-                f'<b style="font-size:1rem">{html.escape(str(m_["medication_name"]))}</b>'
+                f'<b style="font-size:1rem">{rotulo}</b>'
                 f'{"  "+_gmd_badge(None).replace("badge-gray","badge-yellow").replace("N/D","Carência ativa") if active else ""}<br>'
                 f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
                 f'{_data_br(m_["med_date"])} · {_fmt_dose(m_["dose"], m_["unit"])} · {html.escape(str(m_["application_route"]))}'
                 f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+_data_br(end_)+")" if m_["withdrawal_days"] else ""}'
                 f'{"  ·  por: "+html.escape(str(m_["applied_by"])) if m_["applied_by"] else ""}'
                 f'{"  ·  "+_produto_aplicado_txt(m_) if _produto_aplicado_txt(m_) else ""}'
-                f'</span></div>',unsafe_allow_html=True)
+                f'</span>{rodape}</div>',unsafe_allow_html=True)
+            if not cancelada:
+                _revisar_aplicacao(m_)
     else:
         st.info("Nenhum medicamento registrado.")
+
+
+def _revisar_aplicacao(m: dict):
+    """Corrigir ou cancelar uma aplicação vigente. O motivo é obrigatório e fica gravado."""
+    mid = m["id"]
+    vias = ["Subcutânea (SC)","Intramuscular (IM)","Intravenosa (IV)","Oral (PO)","Tópica (Pour-on)","Intramamária"]
+    atual = m.get("application_route") or vias[0]
+    if atual not in vias:
+        vias = [atual] + vias
+    try:
+        validade_atual = datetime.strptime(m["validade_produto"], "%Y-%m-%d").date() if m.get("validade_produto") else None
+    except ValueError:
+        validade_atual = None
+    with st.expander("✏️ Corrigir ou cancelar esta aplicação"):
+        with st.form(f"corr_form_{mid}"):
+            motivo = st.text_input("Motivo (obrigatório)", key=f"corr_motivo_{mid}",
+                help="Fica gravado com o seu nome. A aplicação original continua no histórico.")
+            f1, f2, f3 = st.columns(3)
+            with f1: nome = st.text_input("Medicamento", value=str(m["medication_name"]), key=f"corr_nome_{mid}")
+            with f2: dose = st.number_input("Dose", min_value=0.0, value=float(m["dose"] or 0), step=0.5, key=f"corr_dose_{mid}")
+            with f3: unid = st.text_input("Unidade", value=str(m["unit"] or ""), key=f"corr_unid_{mid}")
+            g1, g2, g3 = st.columns(3)
+            with g1: via = st.selectbox("Via", vias, index=vias.index(atual), key=f"corr_via_{mid}")
+            with g2: carencia = st.number_input("Carência (dias)", min_value=0, max_value=180,
+                        value=int(m["withdrawal_days"] or 0), step=1, key=f"corr_carencia_{mid}")
+            with g3: data_ap = st.date_input("Data da aplicação", value=datetime.strptime(m["med_date"], "%Y-%m-%d").date(),
+                        format="DD/MM/YYYY", key=f"corr_data_{mid}")
+            h1, h2, h3 = st.columns(3)
+            with h1: principio = st.text_input("Princípio ativo", value=str(m.get("principio_ativo") or ""), key=f"corr_principio_{mid}")
+            with h2: lote = st.text_input("Lote do produto", value=str(m.get("lote_produto") or ""), key=f"corr_lote_{mid}")
+            with h3: validade = st.date_input("Validade do produto", value=validade_atual, format="DD/MM/YYYY", key=f"corr_validade_{mid}")
+            b1, b2 = st.columns(2)
+            with b1: salvar = st.form_submit_button("💾 Salvar correção", type="primary", use_container_width=True)
+            with b2: cancelar = st.form_submit_button("🗑️ Cancelar aplicação", use_container_width=True)
+        if not (salvar or cancelar):
+            return
+        user = st.session_state.user
+        quem = user.get("username") or user.get("name") or ""
+        try:
+            if cancelar:
+                db.cancelar_medicamento(mid, motivo, quem, animal_id=m["animal_id"])
+            else:
+                db.corrigir_medicamento(mid, db.MedicationData(
+                    animal_id=m["animal_id"], medication_name=nome, dose=dose, unit=unid,
+                    application_route=via, withdrawal_days=int(carencia),
+                    med_date=data_ap.strftime("%Y-%m-%d"), applied_by=m.get("applied_by") or quem,
+                    insumo_id=m.get("insumo_id"), notes=m.get("notes") or "",
+                    protocol_id=m.get("protocol_id"), principio_ativo=principio, lote_produto=lote,
+                    validade_produto=validade.strftime("%Y-%m-%d") if validade else ""), motivo, quem)
+        except (db.TratamentoInvalido, db.AplicacaoNaoEncontrada, db.AplicacaoJaCancelada) as e:
+            st.error(f"🚫 {e}")
+        else:
+            st.success("✅ Aplicação cancelada." if cancelar else "✅ Aplicação corrigida.")
+            st.rerun()
 
 def _render_tab_mov(movs):
     if movs:
@@ -2342,7 +2413,7 @@ def page_animal():
 
     gmd =db.calculate_gmd(aid)
     ws  =db.get_weighings(aid)
-    meds=db.get_medications(aid)
+    meds=db.get_medication_history(aid)     # vigentes e canceladas: a ficha mostra a correção ao lado da original
     movs=db.get_movements(aid)
     yield_     =animal.get("carcass_yield") or 0.52
     arrobas    =db.kg_to_arrobas(animal["current_weight"], yield_)

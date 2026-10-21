@@ -114,6 +114,10 @@ from repositories.sanidade import (
     _protocol_pending, get_protocol_plan, apply_protocol_campaign, dose_for_animal,
     ProtocolData,
 )
+from repositories.sanidade import (  # noqa: F401
+    get_medication_history, cancelar_medicamento, corrigir_medicamento,
+    AplicacaoNaoEncontrada, AplicacaoJaCancelada,
+)
 from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,
     AnimalCostData, FixedCostData, add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
@@ -530,6 +534,11 @@ _SCHEMA_SQL = """
                 principio_ativo   TEXT,
                 lote_produto      TEXT,
                 validade_produto  TEXT,
+                evento_id           INTEGER,   -- evento manejo_sanitario gravado junto (0035)
+                cancelada_em        TEXT,      -- nulo = vigente
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
                 FOREIGN KEY (protocol_id) REFERENCES health_protocols(id)
@@ -1127,6 +1136,12 @@ def _migrate(con) -> None:
         _tc = {r["name"] for r in con.execute(f"PRAGMA table_info({_quote_ident(_t)})").fetchall()}
         if _c not in _tc:
             con.execute(f"ALTER TABLE {_quote_ident(_t)} ADD COLUMN {_c} TEXT")
+    # Correção de tratamento por revisão (migration 0035).
+    _mc = {r["name"] for r in con.execute("PRAGMA table_info(medications)").fetchall()}
+    for _c, _tipo in (("evento_id", "INTEGER"), ("cancelada_em", "TEXT"), ("cancelada_por", "TEXT"),
+                      ("motivo_cancelamento", "TEXT"), ("corrige_id", "INTEGER")):
+        if _c not in _mc:
+            con.execute(f"ALTER TABLE medications ADD COLUMN {_c} {_tipo}")
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")

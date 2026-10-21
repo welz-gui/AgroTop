@@ -201,7 +201,26 @@ class MedicamentoInput(BaseModel):
     validade: Optional[str] = None
 
 
+class CancelarAplicacaoInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    motivo: str
+
+
+class CorrigirAplicacaoInput(MedicamentoInput):
+    """A aplicação como deveria ter sido registrada, mais o motivo da correção."""
+
+    motivo: str
+
+
+class RevisaoAplicacaoOutput(BaseModel):
+    carencia_ate: Optional[str] = None
+    # Id da aplicação que passou a valer (correção); nulo no cancelamento.
+    aplicacao_id: Optional[int] = None
+
+
 class AplicacaoMedicamentoOutput(BaseModel):
+    id: int
     medicamento: str
     dose: float
     unidade: str
