@@ -16,6 +16,7 @@ teria pego exatamente o defeito que derrubou a produção.
 import inspect
 import os
 import sys
+import tempfile
 import unittest
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -71,6 +72,12 @@ class TestSintaxeDeUmDialetoSo(unittest.TestCase):
 
 class TestColunas(unittest.TestCase):
     """`_colunas` é o auxiliar criado para não repetir o erro."""
+
+    def setUp(self):
+        # Banco próprio: sem isto o teste lê o que o teste anterior deixou configurado, e
+        # falha se esse banco já foi apagado (ex.: depois de um BackendApiTestCase).
+        db.configurar_sqlite(os.path.join(tempfile.mkdtemp(), "colunas.db"))
+        db.init_db()
 
     def test_tem_os_dois_ramos(self):
         fonte = inspect.getsource(db._colunas)
