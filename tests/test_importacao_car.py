@@ -11,6 +11,7 @@ import database as db
 from repositories import propriedades
 from services.importacao_car import (
     CamadaCar,
+    _crs_do_prj,
     area_camada_ha,
     camada_para_geojson,
     ler_shapefile_car,
@@ -23,6 +24,10 @@ AMOSTRA = RAIZ / "tests" / "fixtures" / "car_area_imovel_real.zip"
 
 
 class TestImportacaoCar(unittest.TestCase):
+    def test_crs_invalido_levanta_value_error(self):
+        with self.assertRaisesRegex(ValueError, "O sistema de coordenadas do Shapefile é inválido\\."):
+            _crs_do_prj(b"INVALID_WKT_CONTENT", [])
+
     def test_conteudo_invalido_levanta_erro_de_zip(self):
         with self.assertRaisesRegex(ValueError, "O arquivo não é um \\.zip válido\\."):
             ler_shapefile_car(b"not a zip file")
