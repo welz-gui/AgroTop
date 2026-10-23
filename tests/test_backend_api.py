@@ -860,6 +860,8 @@ class TestSanidadeEndpoint(BackendApiTestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data["carencia_ate"], esperado.isoformat())
+        # O id da aplicação varia com o banco: confere o resto e que ele existe.
+        self.assertTrue(all(isinstance(a["id"], int) for a in data["aplicacoes"]))
         self.assertIn(
             {
                 "medicamento": "Medicamento de comparação",
@@ -874,7 +876,7 @@ class TestSanidadeEndpoint(BackendApiTestCase):
                 "lote": None,
                 "validade": None,
             },
-            data["aplicacoes"],
+            [{k: v for k, v in a.items() if k != "id"} for a in data["aplicacoes"]],
         )
 
     def test_post_medicamento_persiste_usuario_carencia_e_nao_baixa_estoque(self):

@@ -33,8 +33,10 @@ from backend_api.schemas import (
     AnimalDetail,
     AnimalSummary,
     AlertasOutput,
+    CancelarAplicacaoInput,
     CarenciaOutput,
     ConfirmarTratoInput,
+    CorrigirAplicacaoInput,
     CriarLoteInput,
     DashboardResumoOutput,
     DispositivoOutput,
@@ -62,6 +64,7 @@ from backend_api.schemas import (
     RefreshOutput,
     RelatorioInventarioItemOutput,
     RelatorioPesagemItemOutput,
+    RevisaoAplicacaoOutput,
     SalvarPerimetroInput,
     TokenOutput,
     TratoPendenteOutput,
@@ -103,8 +106,12 @@ from repositories.pesagens import (
     get_weighings_batch,
 )
 from repositories.sanidade import (
+    AplicacaoJaCancelada,
+    AplicacaoNaoEncontrada,
     MedicationData,
     add_medication,
+    cancelar_medicamento,
+    corrigir_medicamento,
     dose_for_animal,
     get_medications,
     get_protocols,
@@ -857,6 +864,7 @@ def list_medicamentos(
         "carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None,
         "aplicacoes": [
             {
+                "id": aplicacao["id"],
                 "medicamento": aplicacao["medication_name"],
                 "dose": float(aplicacao.get("dose") or 0),
                 "unidade": aplicacao.get("unit") or "",
@@ -921,6 +929,92 @@ def register_medicamento(
     return executar_idempotente(
         idempotency_key, f"/animais/{animal_id}/medicamentos", data.model_dump(),
         response, status.HTTP_201_CREATED, executar,
+    )
+
+
+def _erro_da_revisao(exc: Exception) -> HTTPException:
+    """Traduz os erros de cancelar/corrigir aplicação. Nada foi gravado em nenhum deles."""
+    if isinstance(exc, AplicacaoNaoEncontrada):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, AplicacaoJaCancelada):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"codigo": "aplicacao_ja_cancelada", "mensagem": str(exc)})
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+
+@app.post(
+    "/animais/{animal_id}/medicamentos/{aplicacao_id}/cancelar",
+    response_model=RevisaoAplicacaoOutput,
+)
+def cancelar_aplicacao(
+    animal_id: str,
+    aplicacao_id: int,
+    data: CancelarAplicacaoInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Cancela uma aplicação registrada por engano. O registro fica, com motivo e autor."""
+    def executar() -> dict[str, Any]:
+        try:
+            cancelar_medicamento(aplicacao_id, data.motivo, user.get("username", ""),
+                                 origem="app", animal_id=animal_id)
+        except (AplicacaoNaoEncontrada, AplicacaoJaCancelada, TratamentoInvalido) as exc:
+            raise _erro_da_revisao(exc)
+        carencia_ate = get_withdrawal_end(animal_id)
+        return {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None,
+                "aplicacao_id": None}
+
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/medicamentos/{aplicacao_id}/cancelar",
+        data.model_dump(), response, status.HTTP_200_OK, executar,
+    )
+
+
+@app.post(
+    "/animais/{animal_id}/medicamentos/{aplicacao_id}/corrigir",
+    response_model=RevisaoAplicacaoOutput,
+)
+def corrigir_aplicacao(
+    animal_id: str,
+    aplicacao_id: int,
+    data: CorrigirAplicacaoInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Corrige uma aplicação: a original é cancelada e a certa é gravada, ligada a ela."""
+    def executar() -> dict[str, Any]:
+        try:
+            r = corrigir_medicamento(
+                aplicacao_id,
+                MedicationData(
+                    animal_id=animal_id,
+                    medication_name=data.medicamento,
+                    dose=data.dose,
+                    unit=data.unidade,
+                    application_route=data.via,
+                    withdrawal_days=data.carencia_dias,
+                    med_date=data.data,
+                    applied_by=user.get("username", ""),
+                    insumo_id=None,
+                    notes=data.notas or "",
+                    protocol_id=data.protocolo_id,
+                    principio_ativo=data.principio_ativo or "",
+                    lote_produto=data.lote or "",
+                    validade_produto=data.validade or "",
+                ),
+                data.motivo, user.get("username", ""), origem="app")
+        except (AplicacaoNaoEncontrada, AplicacaoJaCancelada, TratamentoInvalido) as exc:
+            raise _erro_da_revisao(exc)
+        carencia_ate = get_withdrawal_end(animal_id)
+        return {"carencia_ate": carencia_ate.isoformat() if carencia_ate is not None else None,
+                "aplicacao_id": r["nova"]}
+
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/medicamentos/{aplicacao_id}/corrigir",
+        data.model_dump(), response, status.HTTP_200_OK, executar,
     )
 
 

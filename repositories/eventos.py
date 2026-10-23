@@ -145,20 +145,21 @@ def _gravar(con, animal_uuid: str, tipo: str, *,
     if existe is None:
         return {"ok": False, "erro": f"Animal {animal_uuid} não encontrado."}
 
-    con.execute(
+    novo = con.execute(
         """INSERT INTO animal_events
            (animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
             local_interno,responsavel,usuario_registro,origem_informacao,
             latitude,longitude,observacoes,documento,anexos,
             justificativa,evento_anterior_id,versao)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           RETURNING id""",
         (animal_uuid, tipo, ocorrido_em or agora, agora, propriedade_id,
          local_interno, responsavel or None, usuario_registro or None,
          origem_informacao, latitude, longitude, observacoes or None,
          documento, _json(anexos), justificativa or None,
          evento_anterior_id, versao),
-    )
-    return {"ok": True}
+    ).fetchone()
+    return {"ok": True, "id": novo["id"]}
 
 
 @_writes
