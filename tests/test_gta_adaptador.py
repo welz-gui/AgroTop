@@ -121,6 +121,18 @@ class TestGtaAdaptador(unittest.TestCase):
         gta, _ = montar_contexto(movimentacao, dados_doc, [], [], "2026-08-06")
         self.assertNotIn("quantidade", gta)
 
+    def test_criterio_7_parametros_uuid_nao_lista_sao_convertidos(self):
+        """Critério 7: Argumentos de UUID que não são listas (ex: None, str) são convertidos em listas vazias."""
+        gta, contexto = montar_contexto(
+            movimentacao={},
+            dados_do_documento={},
+            animais_no_embarque_uuids=None,
+            animais_em_carencia_uuids="nao-sou-uma-lista",
+            hoje="2026-08-06",
+        )
+        self.assertEqual(contexto["animais_no_embarque"], [])
+        self.assertEqual(contexto["animais_em_carencia"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
