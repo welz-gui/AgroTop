@@ -2493,7 +2493,10 @@ def get_rebanho_stats() -> AnimalStats:
 
     weights = [a["current_weight"] for a in animals]
     gains   = [a["current_weight"] - a["entry_weight"] for a in animals]
-    gmds    = [g for g in (calculate_gmd(a["id"]) for a in animals) if g is not None]
+
+    animal_ids = [a["id"] for a in animals]
+    gmds_dict = calculate_gmd_bulk(animal_ids)
+    gmds = [g for g in gmds_dict.values() if g is not None]
 
     total_ua    = sum(w / UA_WEIGHT for w in weights)
     total_area  = sum(l["area_ha"] for l in lotes if l["area_ha"] and l["status"] == "ativo")
