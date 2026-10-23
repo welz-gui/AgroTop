@@ -15,6 +15,14 @@ class TestLotacao(unittest.TestCase):
         self.assertEqual(res["ua_total"], 10.0)
         self.assertEqual(res["ua_por_ha"], 1.0)
 
+    def test_lotacao_com_lista_vazia_animais(self):
+        """Lotacao with empty animais list returns expected zeroes."""
+        res_vazia = lotacao.lotacao(10.0, [])
+        self.assertEqual(res_vazia["ua_total"], 0.0)
+        self.assertEqual(res_vazia["ua_por_ha"], 0.0)
+        self.assertEqual(res_vazia["cabecas"], 0)
+        self.assertEqual(res_vazia["peso_total"], 0.0)
+
     def test_lista_vazia_e_area_zero_nao_dividem_por_zero(self):
         """Critério 5: Área zero e lista vazia não estouram nem dividem por zero."""
         res_vazia = lotacao.lotacao(10.0, [])
