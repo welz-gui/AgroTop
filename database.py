@@ -2634,11 +2634,14 @@ def get_performance_by_lote() -> list[dict]:
     for a in animals:
         by_lote.setdefault(a.get("lote_id"), []).append(a)
 
+    animal_ids = [a["id"] for a in animals if a.get("lote_id")]
+    all_gmds = calculate_gmd_bulk(animal_ids) if animal_ids else {}
+
     result = []
     for lid, ans in by_lote.items():
         if not lid:
             continue
-        gmds = [g for g in (calculate_gmd(a["id"]) for a in ans) if g is not None]
+        gmds = [g for g in (all_gmds.get(a["id"]) for a in ans) if g is not None]
         gmd_med = sum(gmds) / len(gmds) if gmds else 0.0
         n = len(ans)
         custo_nut = nut.get(lid, 0.0)
