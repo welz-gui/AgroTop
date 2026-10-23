@@ -25,7 +25,7 @@ def get_age_months(birth_date_str: Optional[str]) -> Optional[int]:
     try:
         birth = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
         return _months_between(birth, date.today())
-    except ValueError:
+    except (TypeError, ValueError):
         return None
 
 
