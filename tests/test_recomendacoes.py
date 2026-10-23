@@ -12,6 +12,9 @@ class TestMotorRecomendacoes(unittest.TestCase):
         self.assertEqual(avaliar({}), [])
         self.assertEqual(avaliar({"hoje": "2026-05-10"}), [])
 
+    def test_animais_lista_vazia(self):
+        self.assertEqual(avaliar({"animais": []}), [])
+
     def test_estoque_insuficiente_dispara_e_nao_dispara(self):
         ctx_dispara = {
             "insumos": [
