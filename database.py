@@ -2371,6 +2371,7 @@ def get_fornecedor_ranking() -> list[dict]:
 
     agg: dict[str, dict] = {}
     costs = _costs_by_animal()
+    gmds_bulk = calculate_gmd_bulk([a["id"] for a in animals])
     for a in animals:
         fname = a.get("fornecedor_name") or "Não informado"
         d = agg.setdefault(fname, {"n": 0, "ativos": 0, "vendidos": 0, "mortos": 0,
@@ -2384,7 +2385,7 @@ def get_fornecedor_ranking() -> list[dict]:
         else:
             d["ativos"] += 1
 
-        g = calculate_gmd(a["id"])
+        g = gmds_bulk.get(a["id"])
         if g is not None:
             d["gmds"].append(g)
 
