@@ -21,7 +21,7 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from repositories import eventos, regras  # noqa: E402
-from services.regras_regulatorias import _data, avaliar, simular, vigente_em  # noqa: E402
+from services.regras_regulatorias import _data, avaliar, pode_prosseguir, simular, vigente_em  # noqa: E402
 
 
 class BaseB5(unittest.TestCase):
@@ -218,6 +218,23 @@ class TestSimulacao(BaseB5):
 
     def test_lista_vazia_nao_divide_por_zero(self):
         self.assertEqual(simular({"nome": "X"}, [])["percentual"], 0.0)
+
+
+class TestPodeProsseguir(unittest.TestCase):
+    def test_pode_prosseguir_com_lista_vazia(self):
+        self.assertTrue(pode_prosseguir([]))
+
+    def test_pode_prosseguir_sem_bloqueio(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "alerta"}]
+        self.assertTrue(pode_prosseguir(disparadas))
+
+    def test_nao_pode_prosseguir_com_bloqueio(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "bloqueio"}, {"nivel": "alerta"}]
+        self.assertFalse(pode_prosseguir(disparadas))
+
+    def test_nao_pode_prosseguir_apenas_com_bloqueio(self):
+        disparadas = [{"nivel": "bloqueio"}]
+        self.assertFalse(pode_prosseguir(disparadas))
 
 
 class TestFuncaoData(unittest.TestCase):
