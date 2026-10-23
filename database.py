@@ -2558,9 +2558,14 @@ def get_gmd_target() -> float:
 def get_low_performance(meta: Optional[float] = None) -> list[dict]:
     """Animais com GMD abaixo da meta."""
     meta = meta if meta is not None else get_gmd_target()
+
+    animals = get_all_animals()
+    animal_ids = [a["id"] for a in animals]
+    gmds = calculate_gmd_bulk(animal_ids)
+
     out = []
-    for a in get_all_animals():
-        g = calculate_gmd(a["id"])
+    for a in animals:
+        g = gmds.get(a["id"])
         if g is not None and g < meta:
             out.append({**a, "gmd": g})
     return sorted(out, key=lambda x: x["gmd"])
