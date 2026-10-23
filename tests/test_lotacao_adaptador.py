@@ -101,6 +101,20 @@ class TestLotacaoAdaptador(unittest.TestCase):
         self.assertEqual(res["lote-1"]["animais"][0]["peso"], 0.0)
         self.assertEqual(res["lote-1"]["animais"][1]["peso"], 0.0)
 
+    def test_animais_lista_vazia_retorna_resultado_parcial(self):
+        """Se a lista de animais estiver vazia, retorna os lotes inicializados."""
+        lotes = [{"id": "lote-1", "area_ha": 10.0}]
+        res = lotacao_adaptador.por_lote([], lotes)
+        self.assertEqual(list(res.keys()), ["lote-1"])
+        self.assertEqual(res["lote-1"]["animais"], [])
+
+    def test_animais_nao_lista_retorna_resultado_parcial(self):
+        """Se animais não for lista, retorna os lotes inicializados."""
+        lotes = [{"id": "lote-1", "area_ha": 10.0}]
+        res = lotacao_adaptador.por_lote(None, lotes)
+        self.assertEqual(list(res.keys()), ["lote-1"])
+        self.assertEqual(res["lote-1"]["animais"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
