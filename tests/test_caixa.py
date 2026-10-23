@@ -147,6 +147,10 @@ class TestCaixa(unittest.TestCase):
         self.assertEqual(_to_float({}), 0.0)
         self.assertEqual(_to_float(None), 0.0)
 
+    def test_to_float_error_path(self):
+        self.assertEqual(_to_float("abc"), 0.0)
+        self.assertEqual(_to_float(None), 0.0)
+
     def test_lancamento_valido_com_chaves_ausentes_ou_vazias(self):
         # Missing keys entirely
         self.assertTrue(_lançamento_valido({}))
