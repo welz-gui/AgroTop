@@ -21,7 +21,7 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from repositories import eventos, regras  # noqa: E402
-from services.regras_regulatorias import _data, avaliar, simular, vigente_em  # noqa: E402
+from services.regras_regulatorias import _data, avaliar, exige_confirmacao, simular, vigente_em  # noqa: E402
 
 
 class BaseB5(unittest.TestCase):
@@ -244,6 +244,19 @@ class TestFuncaoData(unittest.TestCase):
             def __str__(self):
                 raise TypeError("Erro proposital")
         self.assertIsNone(_data(FalhaAoConverterStr()))
+
+
+class TestExigeConfirmacao(unittest.TestCase):
+    def test_exige_confirmacao_com_alerta(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "alerta"}]
+        self.assertTrue(exige_confirmacao(disparadas))
+
+    def test_exige_confirmacao_sem_alerta(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "bloqueio"}]
+        self.assertFalse(exige_confirmacao(disparadas))
+
+    def test_exige_confirmacao_lista_vazia(self):
+        self.assertFalse(exige_confirmacao([]))
 
 
 if __name__ == "__main__":
