@@ -168,14 +168,21 @@ class TestTelaRebanho(unittest.TestCase):
         self.assertIn(at.session_state["animal_detail"], nelores)
 
     def test_consultas_em_lote_chamadas_uma_vez(self):
-        """Critério 4: calculate_gmd_bulk e get_withdrawal_end_batch continuam em lote (1 chamada por tela)."""
+        """Critério 4: a tela não calcula GMD animal por animal; as consultas continuam em lote."""
         with patch.object(db, "calculate_gmd_bulk", wraps=db.calculate_gmd_bulk) as mock_gmd, \
+             patch.object(db, "calculate_gmd", wraps=db.calculate_gmd) as mock_gmd_um, \
              patch.object(db, "get_withdrawal_end_batch", wraps=db.get_withdrawal_end_batch) as mock_wd:
             self._tela()
             self.assertEqual(
-                mock_gmd.call_count,
-                1,
-                f"calculate_gmd_bulk deveria ser chamada exatamente 1 vez, foi {mock_gmd.call_count}",
+                mock_gmd_um.call_count,
+                0,
+                f"calculate_gmd (um animal por vez) não deve ser chamada na tela, foi {mock_gmd_um.call_count}",
+            )
+            # Uma chamada em lote por consulta da tela (estatísticas do rebanho, baixa performance e
+            # a própria lista): o número é constante, não cresce com a quantidade de animais.
+            self.assertTrue(
+                1 <= mock_gmd.call_count <= 3,
+                f"calculate_gmd_bulk deveria ser chamada de 1 a 3 vezes (uma por consulta), foi {mock_gmd.call_count}",
             )
             self.assertEqual(
                 mock_wd.call_count,
@@ -183,9 +190,8 @@ class TestTelaRebanho(unittest.TestCase):
                 f"get_withdrawal_end_batch deveria ser chamada exatamente 1 vez, foi {mock_wd.call_count}",
             )
             # Garante que a chamada recebeu todos os IDs do rebanho em lote
-            args_gmd, _ = mock_gmd.call_args
-            todos_ids = [a["id"] for a in db.get_all_animals(status=None)]
-            self.assertEqual(set(args_gmd[0]), set(todos_ids))
+            todos_ids = {a["id"] for a in db.get_all_animals(status=None)}
+            self.assertIn(todos_ids, [set(c.args[0]) for c in mock_gmd.call_args_list])
 
 
 if __name__ == "__main__":

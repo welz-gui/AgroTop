@@ -1,7 +1,8 @@
 import unittest
+import csv
 from unittest.mock import patch
 
-from services.arquivo_dispositivos import _eh_rodape, _separador, conferir_pareamento, ler
+from services.arquivo_dispositivos import _eh_rodape, _ler_colunas, _separador, conferir_pareamento, ler
 
 
 class TestLerArquivoDispositivos(unittest.TestCase):
@@ -173,6 +174,13 @@ class TestConferirPareamento(unittest.TestCase):
 
         conferir.assert_called_once_with("V1", "E1", digitos_comparados=4)
         self.assertEqual(resultado[0]["divergencia"], "resultado_do_servico")
+
+
+class TestLerColunas(unittest.TestCase):
+    @patch("services.arquivo_dispositivos.csv.reader")
+    def test_csv_error_retorna_none(self, mock_reader):
+        mock_reader.side_effect = csv.Error("Mocked error")
+        self.assertIsNone(_ler_colunas("algum,conteudo", ","))
 
 
 class TestSeparador(unittest.TestCase):

@@ -12,6 +12,9 @@ class TestMotorRecomendacoes(unittest.TestCase):
         self.assertEqual(avaliar({}), [])
         self.assertEqual(avaliar({"hoje": "2026-05-10"}), [])
 
+    def test_animais_lista_vazia(self):
+        self.assertEqual(avaliar({"animais": []}), [])
+
     def test_estoque_insuficiente_dispara_e_nao_dispara(self):
         ctx_dispara = {
             "insumos": [
@@ -228,6 +231,13 @@ class TestParseDate(unittest.TestCase):
         self.assertIsNone(_parse_date(None))
         self.assertIsNone(_parse_date(123))
         self.assertIsNone(_parse_date(["2023-10-05"]))
+
+    def test_parse_date_with_invalid_types_that_raises_typeerror(self):
+        class RaisesTypeErrorStr:
+            def __str__(self):
+                raise TypeError("Mock TypeError")
+
+        self.assertIsNone(_parse_date(RaisesTypeErrorStr()))
 
 
 if __name__ == "__main__":

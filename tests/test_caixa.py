@@ -140,6 +140,11 @@ class TestCaixa(unittest.TestCase):
             _parse_date("invalid-date")
         self.assertEqual(str(context.exception), "data inválida: invalid-date")
 
+    def test_parse_date_invalid_type_raises_value_error(self):
+        with self.assertRaises(ValueError) as context:
+            _parse_date(123)
+        self.assertEqual(str(context.exception), "data inválida: 123")
+
     def test_to_float_lida_com_tipos_invalidos_retornando_zero(self):
         self.assertEqual(_to_float("123.45"), 123.45)
         self.assertEqual(_to_float(10), 10.0)
