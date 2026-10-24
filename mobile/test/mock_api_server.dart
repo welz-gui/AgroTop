@@ -18,6 +18,10 @@ class MockApiServer {
   int postMedicationRequests = 0;
   String? carenciaAte;
   final List<Map<String, dynamic>> _medications = [];
+  final Set<int> _canceladas = {};
+  int _proximaAplicacao = 1;
+  Map<String, dynamic>? lastCorrectionBody;
+  int correctionRequests = 0;
   Map<String, dynamic>? lastMovementBody;
   Map<String, dynamic>? lastMedicationBody;
   // Quantas próximas pesagens respondem 409 "em processamento" antes de aceitar.
@@ -593,6 +597,7 @@ class MockApiServer {
               '${carenciaFim.day.toString().padLeft(2, '0')}';
         }
         _medications.insert(0, {
+          'id': _proximaAplicacao++,
           'medicamento': body['medicamento'],
           'dose': (body['dose'] as num).toDouble(),
           'unidade': body['unidade'],
@@ -605,6 +610,77 @@ class MockApiServer {
           'validade': validade,
         });
         await _json(request, 201, {'carencia_ate': carenciaAte});
+        return;
+      }
+      // POST /animais/{id}/medicamentos/{n}/corrigir | /cancelar (mesmas regras do backend:
+      // motivo obrigatório, 404 se não existe, 409 com código se já foi cancelada).
+      final revisao = RegExp(
+        r'^/animais/([^/]+)/medicamentos/(\d+)/(corrigir|cancelar)$',
+      ).firstMatch(path);
+      if (request.method == 'POST' && revisao != null) {
+        correctionRequests++;
+        final aplicacaoId = int.parse(revisao.group(2)!);
+        final acao = revisao.group(3)!;
+        final body = await _body(request);
+        lastCorrectionBody = body;
+        if (((body['motivo'] as String?) ?? '').trim().isEmpty) {
+          await _json(request, 422, {
+            'detail': 'Informe o motivo da correção.',
+          });
+          return;
+        }
+        if (_canceladas.contains(aplicacaoId)) {
+          await _json(request, 409, {
+            'detail': {
+              'codigo': 'aplicacao_ja_cancelada',
+              'mensagem': 'A aplicação $aplicacaoId já foi cancelada.',
+            },
+          });
+          return;
+        }
+        final indice = _medications.indexWhere((a) => a['id'] == aplicacaoId);
+        if (indice < 0) {
+          await _json(request, 404, {
+            'detail': 'Aplicação $aplicacaoId não encontrada.',
+          });
+          return;
+        }
+        _canceladas.add(aplicacaoId);
+        if (acao == 'cancelar') {
+          _medications.removeAt(indice);
+        } else {
+          _medications[indice] = {
+            'id': _proximaAplicacao++,
+            'medicamento': body['medicamento'],
+            'dose': (body['dose'] as num).toDouble(),
+            'unidade': body['unidade'],
+            'via': body['via'],
+            'carencia_dias': (body['carencia_dias'] as num).toInt(),
+            'data': body['data'],
+            'protocolo_id': body['protocolo_id'],
+            'principio_ativo': body['principio_ativo'],
+            'lote': body['lote'],
+            'validade': body['validade'],
+          };
+        }
+        // Carência vigente = a maior entre as aplicações que sobraram.
+        carenciaAte = null;
+        for (final a in _medications) {
+          final dias = (a['carencia_dias'] as num).toInt();
+          if (dias <= 0) continue;
+          final fim = DateTime.parse(a['data'] as String).add(Duration(days: dias));
+          final texto =
+              '${fim.year.toString().padLeft(4, '0')}-'
+              '${fim.month.toString().padLeft(2, '0')}-'
+              '${fim.day.toString().padLeft(2, '0')}';
+          if (carenciaAte == null || texto.compareTo(carenciaAte!) > 0) {
+            carenciaAte = texto;
+          }
+        }
+        await _json(request, 200, {
+          'carencia_ate': carenciaAte,
+          'aplicacao_id': acao == 'corrigir' ? _medications[indice]['id'] : null,
+        });
         return;
       }
       if (request.method == 'GET' && path == '/protocolos') {

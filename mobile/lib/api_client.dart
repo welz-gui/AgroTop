@@ -587,6 +587,100 @@ class ApiClient {
         : null;
   }
 
+  /// Corrige uma aplicação: o servidor cancela a original e grava a certa, ligada a ela.
+  /// Devolve a carência vigente depois da correção.
+  Future<String?> correctMedication(
+    String animalId,
+    int aplicacaoId, {
+    required String medicamento,
+    required double dose,
+    required String unidade,
+    required String via,
+    required int carenciaDias,
+    required String data,
+    required String motivo,
+    int? protocoloId,
+    String? notas,
+    String? idempotencyKey,
+    String? principioAtivo,
+    String? lote,
+    String? validade,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse(
+          '$baseUrl/animais/${Uri.encodeComponent(animalId)}'
+          '/medicamentos/$aplicacaoId/corrigir',
+        ),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
+        body: jsonEncode({
+          'medicamento': medicamento,
+          'dose': dose,
+          'unidade': unidade,
+          'via': via,
+          'carencia_dias': carenciaDias,
+          'data': data,
+          'motivo': motivo,
+          'protocolo_id': protocoloId,
+          'notas': notas,
+          'principio_ativo': ?principioAtivo,
+          'lote': ?lote,
+          'validade': ?validade,
+        }),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível corrigir a aplicação.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return body is Map<String, dynamic>
+        ? body['carencia_ate'] as String?
+        : null;
+  }
+
+  /// Cancela uma aplicação registrada por engano. O registro fica no histórico do
+  /// servidor, com o motivo. Devolve a carência vigente depois do cancelamento.
+  Future<String?> cancelMedication(
+    String animalId,
+    int aplicacaoId, {
+    required String motivo,
+    String? idempotencyKey,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse(
+          '$baseUrl/animais/${Uri.encodeComponent(animalId)}'
+          '/medicamentos/$aplicacaoId/cancelar',
+        ),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
+        body: jsonEncode({'motivo': motivo}),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível cancelar a aplicação.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return body is Map<String, dynamic>
+        ? body['carencia_ate'] as String?
+        : null;
+  }
+
   Future<List<AnimalPhoto>> listAnimalPhotos(String animalId) async {
     final response = await _authorized(
       (headers) => _http.get(

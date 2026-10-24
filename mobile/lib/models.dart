@@ -228,6 +228,7 @@ class ProtocoloSummary {
 
 class MedicationApplication {
   const MedicationApplication({
+    this.id,
     required this.medicamento,
     required this.dose,
     required this.unidade,
@@ -240,6 +241,9 @@ class MedicationApplication {
     this.validade,
   });
 
+  /// Id da aplicação no servidor. Nulo em servidor anterior à correção de tratamento:
+  /// sem id não há como corrigir nem cancelar.
+  final int? id;
   final String medicamento;
   final double dose;
   final String unidade;
@@ -261,6 +265,7 @@ class MedicationApplication {
 
   factory MedicationApplication.fromJson(Map<String, dynamic> json) =>
       MedicationApplication(
+        id: json['id'] as int?,
         medicamento: json['medicamento'] as String,
         dose: (json['dose'] as num).toDouble(),
         unidade: (json['unidade'] as String?) ?? '',
