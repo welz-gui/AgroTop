@@ -120,6 +120,9 @@ class TestZootecniaGetAgeMonths(unittest.TestCase):
         self.assertIsNone(get_age_months("2021-13-45"))
         self.assertIsNone(get_age_months("2021-02-29"))
 
+    def test_type_error_returns_none(self):
+        self.assertIsNone(get_age_months(123))
+
     @patch("services.zootecnia.date")
     def test_age_months_calculation(self, mock_date):
         # Set today's date to a fixed value for deterministic testing

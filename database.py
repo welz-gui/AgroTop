@@ -2386,6 +2386,7 @@ def get_fornecedor_ranking() -> list[dict]:
 
     agg: dict[str, dict] = {}
     costs = _costs_by_animal()
+    gmds_bulk = calculate_gmd_bulk([a["id"] for a in animals])
     for a in animals:
         fname = a.get("fornecedor_name") or "Não informado"
         d = agg.setdefault(fname, {"n": 0, "ativos": 0, "vendidos": 0, "mortos": 0,
@@ -2399,7 +2400,7 @@ def get_fornecedor_ranking() -> list[dict]:
         else:
             d["ativos"] += 1
 
-        g = calculate_gmd(a["id"])
+        g = gmds_bulk.get(a["id"])
         if g is not None:
             d["gmds"].append(g)
 
@@ -2508,7 +2509,10 @@ def get_rebanho_stats() -> AnimalStats:
 
     weights = [a["current_weight"] for a in animals]
     gains   = [a["current_weight"] - a["entry_weight"] for a in animals]
-    gmds    = [g for g in (calculate_gmd(a["id"]) for a in animals) if g is not None]
+
+    animal_ids = [a["id"] for a in animals]
+    gmds_dict = calculate_gmd_bulk(animal_ids)
+    gmds = [g for g in gmds_dict.values() if g is not None]
 
     total_ua    = sum(w / UA_WEIGHT for w in weights)
     total_area  = sum(l["area_ha"] for l in lotes if l["area_ha"] and l["status"] == "ativo")
@@ -2573,9 +2577,14 @@ def get_gmd_target() -> float:
 def get_low_performance(meta: Optional[float] = None) -> list[dict]:
     """Animais com GMD abaixo da meta."""
     meta = meta if meta is not None else get_gmd_target()
+
+    animals = get_all_animals()
+    animal_ids = [a["id"] for a in animals]
+    gmds = calculate_gmd_bulk(animal_ids)
+
     out = []
-    for a in get_all_animals():
-        g = calculate_gmd(a["id"])
+    for a in animals:
+        g = gmds.get(a["id"])
         if g is not None and g < meta:
             out.append({**a, "gmd": g})
     return sorted(out, key=lambda x: x["gmd"])
@@ -2649,11 +2658,14 @@ def get_performance_by_lote() -> list[dict]:
     for a in animals:
         by_lote.setdefault(a.get("lote_id"), []).append(a)
 
+    animal_ids = [a["id"] for a in animals if a.get("lote_id")]
+    all_gmds = calculate_gmd_bulk(animal_ids) if animal_ids else {}
+
     result = []
     for lid, ans in by_lote.items():
         if not lid:
             continue
-        gmds = [g for g in (calculate_gmd(a["id"]) for a in ans) if g is not None]
+        gmds = [g for g in (all_gmds.get(a["id"]) for a in ans) if g is not None]
         gmd_med = sum(gmds) / len(gmds) if gmds else 0.0
         n = len(ans)
         custo_nut = nut.get(lid, 0.0)

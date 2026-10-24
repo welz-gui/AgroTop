@@ -21,7 +21,9 @@ sys.path.insert(0, RAIZ)
 
 import database as db  # noqa: E402
 from repositories import eventos, regras  # noqa: E402
-from services.regras_regulatorias import _data, avaliar, simular, vigente_em  # noqa: E402
+from services.regras_regulatorias import (  # noqa: E402
+    _data, avaliar, exige_confirmacao, pode_prosseguir, simular, vigente_em,
+)
 
 
 class BaseB5(unittest.TestCase):
@@ -220,6 +222,23 @@ class TestSimulacao(BaseB5):
         self.assertEqual(simular({"nome": "X"}, [])["percentual"], 0.0)
 
 
+class TestPodeProsseguir(unittest.TestCase):
+    def test_pode_prosseguir_com_lista_vazia(self):
+        self.assertTrue(pode_prosseguir([]))
+
+    def test_pode_prosseguir_sem_bloqueio(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "alerta"}]
+        self.assertTrue(pode_prosseguir(disparadas))
+
+    def test_nao_pode_prosseguir_com_bloqueio(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "bloqueio"}, {"nivel": "alerta"}]
+        self.assertFalse(pode_prosseguir(disparadas))
+
+    def test_nao_pode_prosseguir_apenas_com_bloqueio(self):
+        disparadas = [{"nivel": "bloqueio"}]
+        self.assertFalse(pode_prosseguir(disparadas))
+
+
 class TestFuncaoData(unittest.TestCase):
     def test_retorna_proprio_date_se_for_date(self):
         hoje = date.today()
@@ -244,6 +263,19 @@ class TestFuncaoData(unittest.TestCase):
             def __str__(self):
                 raise TypeError("Erro proposital")
         self.assertIsNone(_data(FalhaAoConverterStr()))
+
+
+class TestExigeConfirmacao(unittest.TestCase):
+    def test_exige_confirmacao_com_alerta(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "alerta"}]
+        self.assertTrue(exige_confirmacao(disparadas))
+
+    def test_exige_confirmacao_sem_alerta(self):
+        disparadas = [{"nivel": "informativo"}, {"nivel": "bloqueio"}]
+        self.assertFalse(exige_confirmacao(disparadas))
+
+    def test_exige_confirmacao_lista_vazia(self):
+        self.assertFalse(exige_confirmacao([]))
 
 
 if __name__ == "__main__":

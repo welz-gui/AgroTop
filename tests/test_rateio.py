@@ -6,6 +6,13 @@ class TestRateio(unittest.TestCase):
     def test_lista_vazia(self):
         self.assertEqual(ratear(100.0, [], "igual"), [])
 
+    def test_criterio_invalido(self):
+        with self.assertRaisesRegex(ValueError, "criterio must be 'igual', 'peso' or 'peso_dia'"):
+            ratear(100.0, [{"id": "1"}], "invalido")
+
+    def test_animais_none(self):
+        self.assertEqual(ratear(100.0, None, "igual"), [])
+
     def test_cento_por_tres_fecha(self):
         animais = [
             {"id": "a", "peso": 100.0, "dias_no_lote": 10},
