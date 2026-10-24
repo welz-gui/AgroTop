@@ -316,6 +316,96 @@ void main() {
     }, PassthroughHttpOverrides());
   });
 
+  test('corrigir e cancelar aplicação: troca a vigente, tira a carência e recusa repetir', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      await api.registerMedication(
+        'BR0001',
+        medicamento: 'Ivermectina 1%',
+        dose: 50,
+        unidade: 'ml',
+        via: 'Subcutânea',
+        carenciaDias: 28,
+        data: '2026-08-22',
+      );
+      final original = (await api.getAnimalMedications('BR0001')).aplicacoes.single;
+      expect(original.id, isNotNull, reason: 'o servidor expõe o id da aplicação');
+
+      // Corrigir: a original sai da lista vigente e entra a certa, com outra carência.
+      final carencia = await api.correctMedication(
+        'BR0001',
+        original.id!,
+        medicamento: 'Ivermectina 1%',
+        dose: 5,
+        unidade: 'ml',
+        via: 'Subcutânea',
+        carenciaDias: 14,
+        data: '2026-08-22',
+        motivo: 'dose com zero a mais',
+        idempotencyKey: 'corr-1',
+      );
+      expect(carencia, '2026-09-05');
+      expect(server.lastCorrectionBody?['motivo'], 'dose com zero a mais');
+      final depois = (await api.getAnimalMedications('BR0001')).aplicacoes;
+      expect(depois, hasLength(1));
+      expect(depois.single.dose, 5.0);
+      expect(depois.single.id, isNot(original.id));
+
+      // Repetir a correção da original: o servidor já a cancelou (409, não é "em processamento").
+      await expectLater(
+        api.correctMedication(
+          'BR0001',
+          original.id!,
+          medicamento: 'Ivermectina 1%',
+          dose: 4,
+          unidade: 'ml',
+          via: 'Subcutânea',
+          carenciaDias: 0,
+          data: '2026-08-22',
+          motivo: 'de novo',
+        ),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.emProcessamento, 'emProcessamento', isFalse)
+              .having((e) => e.message, 'message', contains('já foi cancelada')),
+        ),
+      );
+
+      // Cancelar a vigente: a lista fica vazia e a carência some.
+      final semCarencia = await api.cancelMedication(
+        'BR0001',
+        depois.single.id!,
+        motivo: 'animal errado',
+      );
+      expect(semCarencia, isNull);
+      final vazia = await api.getAnimalMedications('BR0001');
+      expect(vazia.aplicacoes, isEmpty);
+      expect(vazia.carenciaAte, isNull);
+
+      // Sem motivo o servidor recusa; aplicação inexistente é 404.
+      await expectLater(
+        api.cancelMedication('BR0001', 999, motivo: '  '),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 422)),
+      );
+      await expectLater(
+        api.cancelMedication('BR0001', 999, motivo: 'erro'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 404)),
+      );
+    }, PassthroughHttpOverrides());
+  });
+
   test('409 de chave em processamento vira ApiException marcada; os outros 409 não', () async {
     final server = await MockApiServer.start();
     addTearDown(server.close);

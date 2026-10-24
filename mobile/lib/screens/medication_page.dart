@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../api_client.dart';
 import '../copy.dart';
@@ -13,6 +14,7 @@ class MedicationPage extends StatefulWidget {
     required this.onUnauthorized,
     this.initialDate,
     this.offlineQueue,
+    this.corrigir,
   });
 
   final ApiClient api;
@@ -20,6 +22,11 @@ class MedicationPage extends StatefulWidget {
   final VoidCallback onUnauthorized;
   final DateTime? initialDate;
   final OfflineQueue? offlineQueue;
+
+  /// Aplicação a corrigir ou cancelar (precisa ter `id`). Com ela, a tela abre
+  /// preenchida, pede o motivo e envia direto ao servidor: correção não entra na fila
+  /// offline, porque precisa da resposta dele (a aplicação pode já ter sido cancelada).
+  final MedicationApplication? corrigir;
 
   @override
   State<MedicationPage> createState() => _MedicationPageState();
@@ -36,8 +43,14 @@ class _MedicationPageState extends State<MedicationPage> {
   final _principioAtivo = TextEditingController();
   final _lote = TextEditingController();
   final _validade = TextEditingController();
+  final _motivo = TextEditingController();
   late final TextEditingController _date;
   late final OfflineQueue _offlineQueue;
+  final _uuid = const Uuid();
+  // Uma chave por tentativa: repetir o mesmo pedido (rede que caiu na resposta) devolve a
+  // resposta guardada; se o servidor respondeu com recusa, o pedido muda e a chave também.
+  late String _chaveCorrecao = _uuid.v4();
+  late String _chaveCancelamento = _uuid.v4();
 
   List<ProtocoloSummary>? _protocolos;
   ProtocoloSummary? _selectedProtocolo;
@@ -52,7 +65,21 @@ class _MedicationPageState extends State<MedicationPage> {
     _date = TextEditingController(
       text: _formatDate(widget.initialDate ?? DateTime.now()),
     );
-    _loadProtocolos();
+    final original = widget.corrigir;
+    if (original != null) {
+      _medicamento.text = original.medicamento;
+      _dose.text = original.dose.toString();
+      _unidade.text = original.unidade;
+      _via.text = original.via;
+      _carenciaDias.text = original.carenciaDias.toString();
+      _date.text = original.data;
+      _principioAtivo.text = original.principioAtivo ?? '';
+      _lote.text = original.lote ?? '';
+      _validade.text = original.validade ?? '';
+      _loadingProtocolos = false;
+    } else {
+      _loadProtocolos();
+    }
   }
 
   @override
@@ -66,6 +93,7 @@ class _MedicationPageState extends State<MedicationPage> {
     _principioAtivo.dispose();
     _lote.dispose();
     _validade.dispose();
+    _motivo.dispose();
     _date.dispose();
     super.dispose();
   }
@@ -181,7 +209,7 @@ class _MedicationPageState extends State<MedicationPage> {
     final viaVal = _via.text.trim();
     final carenciaVal = int.parse(_carenciaDias.text.trim());
     final dataVal = _date.text.trim();
-    final protoVal = _selectedProtocolo?.id;
+    final protoVal = widget.corrigir?.protocoloId ?? _selectedProtocolo?.id;
     final notasVal = _notes.text.trim().isEmpty ? null : _notes.text.trim();
     final principioVal = _principioAtivo.text.trim().isEmpty
         ? null
@@ -191,20 +219,39 @@ class _MedicationPageState extends State<MedicationPage> {
         ? null
         : _validade.text.trim();
     try {
-      final carenciaAte = await widget.api.registerMedication(
-        widget.animalId,
-        medicamento: medVal,
-        dose: doseVal,
-        unidade: unidadeVal,
-        via: viaVal,
-        carenciaDias: carenciaVal,
-        data: dataVal,
-        protocoloId: protoVal,
-        notas: notasVal,
-        principioAtivo: principioVal,
-        lote: loteVal,
-        validade: validadeVal,
-      );
+      final original = widget.corrigir;
+      final carenciaAte = original == null
+          ? await widget.api.registerMedication(
+              widget.animalId,
+              medicamento: medVal,
+              dose: doseVal,
+              unidade: unidadeVal,
+              via: viaVal,
+              carenciaDias: carenciaVal,
+              data: dataVal,
+              protocoloId: protoVal,
+              notas: notasVal,
+              principioAtivo: principioVal,
+              lote: loteVal,
+              validade: validadeVal,
+            )
+          : await widget.api.correctMedication(
+              widget.animalId,
+              original.id!,
+              medicamento: medVal,
+              dose: doseVal,
+              unidade: unidadeVal,
+              via: viaVal,
+              carenciaDias: carenciaVal,
+              data: dataVal,
+              motivo: _motivo.text.trim(),
+              protocoloId: protoVal,
+              notas: notasVal,
+              idempotencyKey: _chaveCorrecao,
+              principioAtivo: principioVal,
+              lote: loteVal,
+              validade: validadeVal,
+            );
       if (mounted) Navigator.of(context).pop<String?>(carenciaAte ?? '');
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -212,9 +259,14 @@ class _MedicationPageState extends State<MedicationPage> {
         Navigator.of(context).popUntil((route) => route.isFirst);
         widget.onUnauthorized();
       } else {
+        _chaveCorrecao = _uuid.v4();
         setState(() => _error = error.message);
       }
     } catch (_) {
+      if (widget.corrigir != null) {
+        if (mounted) setState(() => _error = kCorrecaoSemConexao);
+        return;
+      }
       await _offlineQueue.enqueueMedication(
         animalId: widget.animalId,
         medicamento: medVal,
@@ -240,9 +292,71 @@ class _MedicationPageState extends State<MedicationPage> {
     }
   }
 
+  Future<void> _cancelar() async {
+    final original = widget.corrigir!;
+    if (_motivo.text.trim().isEmpty) {
+      setState(() => _error = 'Informe o motivo para cancelar a aplicação.');
+      return;
+    }
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar esta aplicação?'),
+        content: Text(
+          '${original.medicamento} de ${original.data} deixa de valer. '
+          'O registro continua no histórico, com o motivo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-cancel-medication'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancelar aplicação'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final carenciaAte = await widget.api.cancelMedication(
+        widget.animalId,
+        original.id!,
+        motivo: _motivo.text.trim(),
+        idempotencyKey: _chaveCancelamento,
+      );
+      if (mounted) Navigator.of(context).pop<String?>(carenciaAte ?? '');
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      if (error.statusCode == 401) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        widget.onUnauthorized();
+      } else {
+        _chaveCancelamento = _uuid.v4();
+        setState(() => _error = error.message);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = kCorrecaoSemConexao);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('Sanidade ${widget.animalId}')),
+    appBar: AppBar(
+      title: Text(
+        widget.corrigir == null
+            ? 'Sanidade ${widget.animalId}'
+            : 'Corrigir aplicação ${widget.animalId}',
+      ),
+    ),
     body: SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -257,6 +371,24 @@ class _MedicationPageState extends State<MedicationPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (widget.corrigir != null) ...[
+                        TextFormField(
+                          key: const ValueKey('correction-reason'),
+                          controller: _motivo,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Motivo da correção',
+                            prefixIcon: Icon(Icons.rule_outlined),
+                            helperText:
+                                'Fica gravado com o seu nome. O registro original continua no histórico.',
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'Informe o motivo da correção.'
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       if (_loadingProtocolos)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
@@ -476,8 +608,23 @@ class _MedicationPageState extends State<MedicationPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: Text(_saving ? 'Salvando…' : 'Salvar aplicação'),
+                label: Text(
+                  _saving
+                      ? 'Salvando…'
+                      : widget.corrigir == null
+                      ? 'Salvar aplicação'
+                      : 'Salvar correção',
+                ),
               ),
+              if (widget.corrigir != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const ValueKey('cancel-medication'),
+                  onPressed: _saving ? null : _cancelar,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Cancelar esta aplicação'),
+                ),
+              ],
             ],
           ),
         ),

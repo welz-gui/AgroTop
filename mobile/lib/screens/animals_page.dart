@@ -835,6 +835,27 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
     }
   }
 
+  Future<void> _openCorrection(MedicationApplication aplicacao) async {
+    final result = await Navigator.of(context).push<dynamic>(
+      MaterialPageRoute(
+        builder: (_) => MedicationPage(
+          api: widget.api,
+          animalId: widget.id,
+          onUnauthorized: widget.onUnauthorized,
+          offlineQueue: _offlineQueue,
+          corrigir: aplicacao,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    _reload();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Aplicação atualizada. O original fica no histórico.')),
+    );
+  }
+
   Future<void> _openMedication() async {
     final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
@@ -1129,6 +1150,15 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                             '${app.carenciaDias > 0 ? ' · Carência: ${app.carenciaDias}d' : ''}'
                             '${app.produtoAplicado.isEmpty ? '' : '\n${app.produtoAplicado}'}',
                           ),
+                          // Sem id (servidor antigo) não há como corrigir.
+                          trailing: app.id == null
+                              ? null
+                              : IconButton(
+                                  key: ValueKey('correct-medication-${app.id}'),
+                                  tooltip: 'Corrigir ou cancelar',
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () => _openCorrection(app),
+                                ),
                         ),
                   ],
                 ),
