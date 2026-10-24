@@ -21,6 +21,7 @@ class TestLotacao(unittest.TestCase):
         self.assertEqual(res_vazia["ua_total"], 0.0)
         self.assertEqual(res_vazia["ua_por_ha"], 0.0)
         self.assertEqual(res_vazia["cabecas"], 0)
+        self.assertEqual(res_vazia["peso_total"], 0.0)
 
         res_area_zero = lotacao.lotacao(0.0, [{"id": "1", "peso": 450.0}])
         self.assertEqual(res_area_zero["ua_por_ha"], 0.0)
