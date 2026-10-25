@@ -98,12 +98,14 @@ from repositories import regras as regras  # noqa: F401
 from repositories import compras as compras  # noqa: F401
 from repositories.animais import uuid_de  # noqa: F401
 from repositories.animais import (  # noqa: F401
-    get_all_animals, get_all_animal_ids, count_animals, get_total_gain_kg, add_animal, move_animal, move_animals_bulk, get_movements, get_last_movements_bulk,
+    get_all_animals, get_all_animal_ids, count_animals, get_total_gain_kg, add_animal, move_animal, move_animals_bulk, get_movements,
+    movimentacao_revisavel, cancelar_movimentacao, corrigir_movimentacao, get_last_movements_bulk,
     _seed_animals, AnimalData, MovementParams,
 )
 from repositories.pesagens import (
     calculate_gmd_bulk,  # noqa: F401
     WeighingCreate, _weighings_by_animal, get_weighings, get_weighings_batch, add_weighing, get_all_weighings,  # noqa: F401
+    get_weighing_history, cancelar_pesagem, corrigir_pesagem,  # noqa: F401
     get_average_weighings_by_date, calculate_gmd, get_last_estimate
 )
 from repositories.sanidade import (
@@ -117,6 +119,9 @@ from repositories.sanidade import (
 from repositories.sanidade import (  # noqa: F401
     get_medication_history, cancelar_medicamento, corrigir_medicamento,
     AplicacaoNaoEncontrada, AplicacaoJaCancelada,
+)
+from repositories.revisao import (  # noqa: F401
+    RegistroNaoEncontrado, RegistroJaCancelado, RevisaoNaoPermitida,
 )
 from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,
@@ -497,6 +502,11 @@ _SCHEMA_SQL = """
                 method      TEXT DEFAULT 'pesado',
                 notes       TEXT,
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
+                evento_id           INTEGER,   -- evento `pesagem` gravado junto (0036)
+                cancelada_em        TEXT,      -- nulo = vigente
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -555,6 +565,11 @@ _SCHEMA_SQL = """
                 operator      TEXT,
                 notes         TEXT,
                 created_at    TEXT DEFAULT (datetime('now','localtime')),
+                evento_id           INTEGER,   -- evento `mudanca_lote` gravado junto (0036)
+                cancelada_em        TEXT,      -- nulo = vigente
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -1142,6 +1157,13 @@ def _migrate(con) -> None:
                       ("motivo_cancelamento", "TEXT"), ("corrige_id", "INTEGER")):
         if _c not in _mc:
             con.execute(f"ALTER TABLE medications ADD COLUMN {_c} {_tipo}")
+    # Revisão de pesagem e movimentação (migration 0036): as mesmas cinco colunas da 0035.
+    for _t in ("weighings", "animal_movements"):
+        _rc = {r["name"] for r in con.execute(f"PRAGMA table_info({_t})").fetchall()}
+        for _c, _tipo in (("evento_id", "INTEGER"), ("cancelada_em", "TEXT"), ("cancelada_por", "TEXT"),
+                          ("motivo_cancelamento", "TEXT"), ("corrige_id", "INTEGER")):
+            if _c not in _rc:
+                con.execute(f"ALTER TABLE {_t} ADD COLUMN {_c} {_tipo}")
     wcols = {r["name"] for r in con.execute("PRAGMA table_info(weighings)").fetchall()}
     if "method" not in wcols:
         con.execute("ALTER TABLE weighings ADD COLUMN method TEXT DEFAULT 'pesado'")
