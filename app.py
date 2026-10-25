@@ -2174,7 +2174,7 @@ def _cartao_de_evento(e: dict, correcoes: list[dict]):
                         st.error(f"🚫 {r.get('erro')}")
 
 
-def _render_tab_peso(ws, target_weight=None):
+def _render_tab_peso(ws, target_weight=None, aid=None):
     if len(ws)>=2:
         import numpy as np
         df_w=pd.DataFrame(ws)[["weigh_date","weight"]].sort_values("weigh_date")
@@ -2210,6 +2210,69 @@ def _render_tab_peso(ws, target_weight=None):
         df_wt.columns=["Data","Peso (kg)","Método","Lote","Operador","Obs"]
         st.dataframe(df_wt,use_container_width=True,hide_index=True,
             column_config={"Peso (kg)":st.column_config.NumberColumn(format="%.1f")})
+    if aid:
+        _revisar_pesagem(aid)
+
+
+def _usuario_da_sessao() -> str:
+    u = st.session_state.user
+    return u.get("username") or u.get("name") or ""
+
+
+def _revisar_pesagem(aid: str):
+    """Corrigir ou cancelar uma pesagem. A original nunca é apagada: fica no histórico, com o
+    motivo. A pesagem de entrada faz parte do cadastro e não entra aqui."""
+    hist = db.get_weighing_history(aid)
+    canceladas = [w for w in hist if w["cancelada_em"]]
+    ativas = [w for w in hist if not w["cancelada_em"] and (w.get("operator") or "") != "Cadastro"]
+    for w in canceladas:
+        st.markdown(f'<div class="hist-item" style="border-left-color:{c["texto_terciario"]};opacity:.65">'
+            f'<s>{_num_br(w["weight"], 1)} kg</s> · {_data_br(w["weigh_date"])} '
+            f'<span class="badge-gray">Cancelada</span><br>'
+            f'<span style="color:{c["texto_secundario"]};font-size:.8rem">'
+            f'cancelada por {html.escape(str(w.get("cancelada_por") or "—"))} em '
+            f'{_data_br(str(w["cancelada_em"])[:10])} · motivo: '
+            f'{html.escape(str(w.get("motivo_cancelamento") or "—"))}</span></div>',
+            unsafe_allow_html=True)
+    with st.expander("✏️ Corrigir ou cancelar uma pesagem"):
+        if not ativas:
+            st.info("Nenhuma pesagem pode ser corrigida: a de entrada faz parte do cadastro do animal.")
+            return
+        por_id = {x["id"]: x for x in ativas}
+        wid = st.selectbox("Pesagem", list(por_id), key=f"rev_peso_sel_{aid}",
+            format_func=lambda i: f"{_data_br(por_id[i]['weigh_date'])} · {_num_br(por_id[i]['weight'], 1)} kg")
+        w = por_id[wid]
+        metodos = list(db.WEIGH_METHODS)
+        atual = w.get("method") if w.get("method") in metodos else metodos[0]
+        with st.form(f"rev_peso_form_{wid}"):
+            motivo = st.text_input("Motivo (obrigatório)", key=f"rev_peso_motivo_{wid}",
+                help="Fica gravado com o seu nome. A pesagem original continua no histórico.")
+            p1, p2, p3 = st.columns(3)
+            with p1: peso = st.number_input("Peso (kg)", min_value=0.1, value=float(w["weight"]),
+                        step=0.5, key=f"rev_peso_peso_{wid}")
+            with p2: dia = st.date_input("Data da pesagem", format="DD/MM/YYYY", key=f"rev_peso_data_{wid}",
+                        value=datetime.strptime(str(w["weigh_date"])[:10], "%Y-%m-%d").date())
+            with p3: metodo = st.selectbox("Método", metodos, index=metodos.index(atual),
+                        format_func=lambda m: db.WEIGH_METHODS[m], key=f"rev_peso_metodo_{wid}")
+            b1, b2 = st.columns(2)
+            with b1: salvar = st.form_submit_button("💾 Salvar correção", type="primary", use_container_width=True)
+            with b2: cancelar = st.form_submit_button("🗑️ Cancelar pesagem", use_container_width=True)
+        if not (salvar or cancelar):
+            return
+        quem = _usuario_da_sessao()
+        try:
+            if cancelar:
+                db.cancelar_pesagem(wid, motivo, quem, animal_id=aid)
+            else:
+                db.corrigir_pesagem(wid, db.WeighingCreate(
+                    animal_id=aid, weight=float(peso), weigh_date=dia.strftime("%Y-%m-%d"),
+                    operator=w.get("operator") or quem, notes=w.get("notes") or "", method=metodo),
+                    motivo, quem)
+        except (db.RevisaoNaoPermitida, db.RegistroNaoEncontrado, db.RegistroJaCancelado) as e:
+            st.error(f"🚫 {e}")
+        else:
+            st.success("✅ Pesagem cancelada." if cancelar else "✅ Pesagem corrigida.")
+            st.rerun()
 
 def _render_tab_med(meds):
     """Histórico de aplicações, vigentes e canceladas. A cancelada fica riscada, com o motivo,
@@ -2300,16 +2363,80 @@ def _revisar_aplicacao(m: dict):
             st.success("✅ Aplicação cancelada." if cancelar else "✅ Aplicação corrigida.")
             st.rerun()
 
-def _render_tab_mov(movs):
+def _render_tab_mov(aid):
+    """Histórico de movimentações, vigentes e canceladas (a cancelada fica riscada, com o motivo)."""
+    movs = db.get_movements(aid, incluir_canceladas=True)
     if movs:
         for mv in movs:
-            st.markdown(f'<div class="hist-item" style="border-left-color:{c["destaque"]}">'
-                f'<b>{html.escape(str(mv.get("from_name") or "Entrada"))} → {html.escape(str(mv.get("to_name", "?")))}</b><br>'
+            cancelada = bool(mv.get("cancelada_em"))
+            rota = (f'{html.escape(str(mv.get("from_name") or "Entrada"))} → '
+                    f'{html.escape(str(mv.get("to_name", "?")))}')
+            rodape = ""
+            if cancelada:
+                rota = f'<s>{rota}</s>  <span class="badge-gray">Cancelada</span>'
+                rodape = (f'<br><span style="color:{c["texto_secundario"]};font-size:.8rem">'
+                          f'cancelada por {html.escape(str(mv.get("cancelada_por") or "—"))} em '
+                          f'{_data_br(str(mv["cancelada_em"])[:10])} · motivo: '
+                          f'{html.escape(str(mv.get("motivo_cancelamento") or "—"))}</span>')
+            elif mv.get("corrige_id"):
+                rodape = (f'<br><span style="color:{c["texto_secundario"]};font-size:.8rem">'
+                          f'corrige a movimentação nº {mv["corrige_id"]}</span>')
+            borda = c["texto_terciario"] if cancelada else c["destaque"]
+            st.markdown(f'<div class="hist-item" style="border-left-color:{borda}'
+                f'{";opacity:.65" if cancelada else ""}">'
+                f'<b>{rota}</b><br>'
                 f'<span style="color:{c["texto_secundario"]};font-size:.82rem">'
                 f'{mv["movement_date"]} · {html.escape(str(mv["reason"]))} · {html.escape(str(mv.get("operator") or "—"))}'
-                f'</span></div>',unsafe_allow_html=True)
+                f'</span>{rodape}</div>',unsafe_allow_html=True)
     else:
         st.info("Nenhuma movimentação registrada.")
+    _revisar_movimentacao(aid)
+
+
+def _revisar_movimentacao(aid: str):
+    """Corrigir ou cancelar a ÚLTIMA movimentação do animal (enquanto ele está no destino dela)."""
+    m = db.movimentacao_revisavel(aid)
+    with st.expander("✏️ Corrigir ou cancelar a última movimentação"):
+        if m is None:
+            st.info("Só a última movimentação pode ser revista, e enquanto o animal ainda está no "
+                    "piquete de destino dela. A entrada do animal não se desfaz por aqui.")
+            return
+        mid = m["id"]
+        st.write(f"Última: **{m['from_lote_id']} → {m['to_lote_id']}** em {_data_br(m['movement_date'])}.")
+        lotes = {l["id"]: l for l in db.get_all_lotes() if l["id"] != m["from_lote_id"]}
+        ids = list(lotes)
+        motivos_manejo = ["manejo", "pesagem", "tratamento", "separação", "venda", "óbito"]
+        if m.get("reason") and m["reason"] not in motivos_manejo:
+            motivos_manejo = [m["reason"]] + motivos_manejo
+        with st.form(f"rev_mov_form_{mid}"):
+            motivo = st.text_input("Motivo (obrigatório)", key=f"rev_mov_motivo_{mid}",
+                help="Fica gravado com o seu nome. A movimentação original continua no histórico.")
+            destino = st.selectbox("Destino correto (para corrigir)", ids, key=f"rev_mov_destino_{mid}",
+                index=ids.index(m["to_lote_id"]) if m["to_lote_id"] in ids else 0,
+                format_func=lambda i: f"{i} — {lotes[i]['name']}")
+            dia = st.date_input("Data da movimentação", format="DD/MM/YYYY", key=f"rev_mov_data_{mid}",
+                value=datetime.strptime(str(m["movement_date"])[:10], "%Y-%m-%d").date())
+            razao = st.selectbox("Motivo do manejo", motivos_manejo, key=f"rev_mov_razao_{mid}",
+                index=motivos_manejo.index(m["reason"]) if m.get("reason") in motivos_manejo else 0)
+            b1, b2 = st.columns(2)
+            with b1: salvar = st.form_submit_button("💾 Salvar correção", type="primary", use_container_width=True)
+            with b2: cancelar = st.form_submit_button(
+                f"🗑️ Cancelar e devolver a {m['from_lote_id']}", use_container_width=True)
+        if not (salvar or cancelar):
+            return
+        quem = _usuario_da_sessao()
+        try:
+            if cancelar:
+                db.cancelar_movimentacao(mid, motivo, quem, animal_id=aid)
+            else:
+                db.corrigir_movimentacao(mid, db.MovementParams(
+                    destino, dia.strftime("%Y-%m-%d"), razao, m.get("operator") or quem,
+                    m.get("notes") or ""), motivo, quem, animal_id=aid)
+        except (db.RevisaoNaoPermitida, db.RegistroNaoEncontrado, db.RegistroJaCancelado) as e:
+            st.error(f"🚫 {e}")
+        else:
+            st.success("✅ Movimentação cancelada." if cancelar else "✅ Movimentação corrigida.")
+            st.rerun()
 
 def _render_tab_fin(animal):
     aid = animal["id"]
@@ -2391,13 +2518,13 @@ def _render_animal_tabs(animal: dict, aid: str, ws: list, meds: list, movs: list
         _photo_section(aid, key_prefix="ficha_")
 
     with tl_peso:
-        _render_tab_peso(ws, target_weight)
+        _render_tab_peso(ws, target_weight, aid)
 
     with tl_med:
         _render_tab_med(meds)
 
     with tl_mov:
-        _render_tab_mov(movs)
+        _render_tab_mov(aid)
 
     with tl_fin:
         _render_tab_fin(animal)
