@@ -34,9 +34,12 @@ from backend_api.schemas import (
     AnimalSummary,
     AlertasOutput,
     CancelarAplicacaoInput,
+    CancelarRegistroInput,
     CarenciaOutput,
     ConfirmarTratoInput,
     CorrigirAplicacaoInput,
+    CorrigirMovimentacaoInput,
+    CorrigirPesagemInput,
     CriarLoteInput,
     DashboardResumoOutput,
     DispositivoOutput,
@@ -48,11 +51,13 @@ from backend_api.schemas import (
     MedicamentoInput,
     MedicamentosOutput,
     MovimentarInput,
+    MovimentacaoRegistroOutput,
     MovimentarOutput,
     MudarStatusDispositivoInput,
     MudarStatusDispositivoOutput,
     PesagemInput,
     PesagemOutput,
+    PesagemRegistroOutput,
     PerimetroOutput,
     PhotoSummary,
     PhotoUploadInput,
@@ -65,6 +70,8 @@ from backend_api.schemas import (
     RelatorioInventarioItemOutput,
     RelatorioPesagemItemOutput,
     RevisaoAplicacaoOutput,
+    RevisaoMovimentacaoOutput,
+    RevisaoPesagemOutput,
     SalvarPerimetroInput,
     TokenOutput,
     TratoPendenteOutput,
@@ -93,18 +100,23 @@ from database import (
     set_lote_poligono,
 )
 from repositories.animais import (
-    get_all_animals, get_all_animal_ids, get_animal, move_animals_bulk, MovementParams, OrigemDivergente,
+    cancelar_movimentacao, corrigir_movimentacao, get_all_animals, get_all_animal_ids, get_animal,
+    get_movements, move_animals_bulk, movimentacao_revisavel, MovementParams, OrigemDivergente,
 )
 from repositories.conexao import ping as ping_banco
 from repositories.dispositivos import mudar_status, por_codigo
 from repositories.pesagens import (
     WeighingCreate,
     add_weighing,
+    cancelar_pesagem,
+    corrigir_pesagem,
+    get_weighing_history,
     calculate_gmd,
     calculate_gmd_bulk,
     get_all_weighings,
     get_weighings_batch,
 )
+from repositories.revisao import RegistroJaCancelado, RegistroNaoEncontrado, RevisaoNaoPermitida
 from repositories.sanidade import (
     AplicacaoJaCancelada,
     AplicacaoNaoEncontrada,
@@ -933,14 +945,175 @@ def register_medicamento(
 
 
 def _erro_da_revisao(exc: Exception) -> HTTPException:
-    """Traduz os erros de cancelar/corrigir aplicação. Nada foi gravado em nenhum deles."""
-    if isinstance(exc, AplicacaoNaoEncontrada):
+    """Traduz os erros de cancelar/corrigir (aplicação, pesagem, movimentação). Nada foi gravado
+    em nenhum deles."""
+    if isinstance(exc, (AplicacaoNaoEncontrada, RegistroNaoEncontrado)):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, AplicacaoJaCancelada):
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"codigo": "aplicacao_ja_cancelada", "mensagem": str(exc)})
+    if isinstance(exc, RegistroJaCancelado):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"codigo": "registro_ja_cancelado", "mensagem": str(exc)})
     return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+
+def _peso_atual(animal_id: str) -> Optional[float]:
+    animal = get_animal(animal_id)
+    return float(animal["current_weight"]) if animal and animal.get("current_weight") is not None else None
+
+
+@app.get("/animais/{animal_id}/pesagens", response_model=list[PesagemRegistroOutput])
+def list_pesagens(
+    animal_id: str,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+    limite: int = Query(default=50, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    """Pesagens vigentes do animal, da mais recente à mais antiga (com o id para corrigir ou cancelar)."""
+    if get_animal(animal_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Animal não encontrado.")
+    vigentes = [w for w in get_weighing_history(animal_id) if not w["cancelada_em"]]
+    return [
+        {
+            "id": w["id"],
+            "data": str(w["weigh_date"])[:10],
+            "peso": float(w["weight"]),
+            "method": w.get("method") or "pesado",
+            "notes": w.get("notes") or None,
+            "revisavel": (w.get("operator") or "") != "Cadastro",
+        }
+        for w in vigentes[:limite]
+    ]
+
+
+@app.post("/animais/{animal_id}/pesagens/{pesagem_id}/cancelar", response_model=RevisaoPesagemOutput)
+def cancelar_pesagem_api(
+    animal_id: str,
+    pesagem_id: int,
+    data: CancelarRegistroInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Cancela uma pesagem lançada por engano; o peso atual volta ao da pesagem vigente anterior."""
+    def executar() -> dict[str, Any]:
+        try:
+            cancelar_pesagem(pesagem_id, data.motivo, user.get("username", ""),
+                             origem="app", animal_id=animal_id)
+        except (RegistroNaoEncontrado, RegistroJaCancelado, RevisaoNaoPermitida) as exc:
+            raise _erro_da_revisao(exc)
+        return {"peso_atual": _peso_atual(animal_id), "pesagem_id": None}
+
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/pesagens/{pesagem_id}/cancelar",
+        data.model_dump(), response, status.HTTP_200_OK, executar,
+    )
+
+
+@app.post("/animais/{animal_id}/pesagens/{pesagem_id}/corrigir", response_model=RevisaoPesagemOutput)
+def corrigir_pesagem_api(
+    animal_id: str,
+    pesagem_id: int,
+    data: CorrigirPesagemInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Corrige uma pesagem: a original é cancelada e a certa é gravada, ligada a ela."""
+    def executar() -> dict[str, Any]:
+        try:
+            r = corrigir_pesagem(
+                pesagem_id,
+                WeighingCreate(animal_id=animal_id, weight=data.peso, weigh_date=data.data,
+                               operator="", method=data.method, notes=data.notes),
+                data.motivo, user.get("username", ""), origem="app")
+        except (RegistroNaoEncontrado, RegistroJaCancelado, RevisaoNaoPermitida) as exc:
+            raise _erro_da_revisao(exc)
+        return {"peso_atual": _peso_atual(animal_id), "pesagem_id": r["nova"]}
+
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/pesagens/{pesagem_id}/corrigir",
+        data.model_dump(), response, status.HTTP_200_OK, executar,
+    )
+
+
+@app.get("/animais/{animal_id}/movimentacoes", response_model=list[MovimentacaoRegistroOutput])
+def list_movimentacoes(
+    animal_id: str,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+    limite: int = Query(default=50, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    """Movimentações vigentes do animal, da mais recente à mais antiga. Só a última, e só enquanto
+    o animal está no piquete de destino dela, vem com `revisavel` verdadeiro."""
+    if get_animal(animal_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Animal não encontrado.")
+    revisavel = movimentacao_revisavel(animal_id)
+    return [
+        {
+            "id": m["id"],
+            "de": m.get("from_lote_id"),
+            "para": m["to_lote_id"],
+            "data": str(m["movement_date"])[:10],
+            "motivo": m.get("reason"),
+            "revisavel": revisavel is not None and revisavel["id"] == m["id"],
+        }
+        for m in get_movements(animal_id, limite)
+    ]
+
+
+@app.post("/animais/{animal_id}/movimentacoes/{movimentacao_id}/cancelar",
+          response_model=RevisaoMovimentacaoOutput)
+def cancelar_movimentacao_api(
+    animal_id: str,
+    movimentacao_id: int,
+    data: CancelarRegistroInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Cancela a última movimentação do animal e o devolve ao piquete de origem."""
+    def executar() -> dict[str, Any]:
+        try:
+            r = cancelar_movimentacao(movimentacao_id, data.motivo, user.get("username", ""),
+                                      origem="app", animal_id=animal_id)
+        except (RegistroNaoEncontrado, RegistroJaCancelado, RevisaoNaoPermitida) as exc:
+            raise _erro_da_revisao(exc)
+        return {"lote_atual": r["devolvido_a"], "movimentacao_id": None}
+
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/movimentacoes/{movimentacao_id}/cancelar",
+        data.model_dump(), response, status.HTTP_200_OK, executar,
+    )
+
+
+@app.post("/animais/{animal_id}/movimentacoes/{movimentacao_id}/corrigir",
+          response_model=RevisaoMovimentacaoOutput)
+def corrigir_movimentacao_api(
+    animal_id: str,
+    movimentacao_id: int,
+    data: CorrigirMovimentacaoInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Corrige a última movimentação: o animal volta à origem e vai ao destino certo."""
+    def executar() -> dict[str, Any]:
+        try:
+            r = corrigir_movimentacao(
+                movimentacao_id,
+                MovementParams(to_lote_id=data.to_lote_id, movement_date=data.movement_date,
+                               reason=data.reason or "manejo", operator="", notes=data.notes or ""),
+                data.motivo, user.get("username", ""), animal_id=animal_id, origem="app")
+        except (RegistroNaoEncontrado, RegistroJaCancelado, RevisaoNaoPermitida) as exc:
+            raise _erro_da_revisao(exc)
+        return {"lote_atual": data.to_lote_id, "movimentacao_id": r["nova"]}
+
+    return executar_idempotente(
+        idempotency_key, f"/animais/{animal_id}/movimentacoes/{movimentacao_id}/corrigir",
+        data.model_dump(), response, status.HTTP_200_OK, executar,
+    )
 
 
 @app.post(

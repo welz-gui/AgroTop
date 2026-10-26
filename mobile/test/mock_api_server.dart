@@ -20,6 +20,24 @@ class MockApiServer {
   final List<Map<String, dynamic>> _medications = [];
   final Set<int> _canceladas = {};
   int _proximaAplicacao = 1;
+  // Pesagens do BR0001 (a primeira é a de entrada, não revisável) e movimentações de qualquer
+  // animal. O que foi cancelado ou corrigido sai da lista vigente.
+  final List<Map<String, dynamic>> _pesagens = [
+    {
+      'id': 1,
+      'data': '2026-01-10',
+      'peso': 278.2,
+      'method': 'pesado',
+      'notes': null,
+      'revisavel': false,
+    },
+  ];
+  final Set<int> _pesagensCanceladas = {};
+  int _proximaPesagem = 2;
+  final List<Map<String, dynamic>> _movimentos = [];
+  final Set<int> _movimentosCancelados = {};
+  int _proximoMovimento = 1;
+  Map<String, dynamic>? lastRevisionBody;
   Map<String, dynamic>? lastCorrectionBody;
   int correctionRequests = 0;
   Map<String, dynamic>? lastMovementBody;
@@ -912,6 +930,14 @@ class MockApiServer {
           } else if (currentLote == destination) {
             jaNoDestino.add(id);
           } else {
+            _movimentos.add({
+              'id': _proximoMovimento++,
+              'animal': id,
+              'de': currentLote,
+              'para': destination,
+              'data': body['movement_date'],
+              'motivo': body['reason'] ?? 'manejo',
+            });
             _animalLotes[id] = destination;
             movidos.add(id);
           }
@@ -920,6 +946,172 @@ class MockApiServer {
           'movidos': movidos,
           'ja_no_destino': jaNoDestino,
           'erros': erros,
+        });
+        return;
+      }
+      // ── revisão de pesagem (BR0001) e de movimentação ────────────────────────
+      if (request.method == 'GET' && path == '/animais/BR0001/pesagens') {
+        await _json(
+          request,
+          200,
+          _pesagens
+              .where((p) => !_pesagensCanceladas.contains(p['id']))
+              .toList(growable: false)
+              .reversed
+              .toList(growable: false),
+        );
+        return;
+      }
+      final revisaoPesagem = RegExp(
+        r'^/animais/BR0001/pesagens/(\d+)/(corrigir|cancelar)$',
+      ).firstMatch(path);
+      if (request.method == 'POST' && revisaoPesagem != null) {
+        final id = int.parse(revisaoPesagem.group(1)!);
+        final acao = revisaoPesagem.group(2)!;
+        final body = await _body(request);
+        lastRevisionBody = body;
+        if (((body['motivo'] as String?) ?? '').trim().isEmpty) {
+          await _json(request, 422, {'detail': 'Informe o motivo da correção.'});
+          return;
+        }
+        final indice = _pesagens.indexWhere((p) => p['id'] == id);
+        if (indice < 0) {
+          await _json(request, 404, {'detail': 'Pesagem $id não encontrada.'});
+          return;
+        }
+        if (_pesagensCanceladas.contains(id)) {
+          await _json(request, 409, {
+            'detail': {
+              'codigo': 'registro_ja_cancelado',
+              'mensagem': 'A pesagem $id já foi cancelada.',
+            },
+          });
+          return;
+        }
+        if (_pesagens[indice]['revisavel'] != true) {
+          await _json(request, 422, {
+            'detail':
+                'A pesagem de entrada faz parte do cadastro do animal e não se cancela nem se corrige aqui.',
+          });
+          return;
+        }
+        _pesagensCanceladas.add(id);
+        int? novoId;
+        if (acao == 'corrigir') {
+          novoId = _proximaPesagem++;
+          _pesagens.add({
+            'id': novoId,
+            'data': body['data'],
+            'peso': (body['peso'] as num).toDouble(),
+            'method': body['method'],
+            'notes': body['notes'],
+            'revisavel': true,
+          });
+        }
+        final vigentes = _pesagens.where(
+          (p) => !_pesagensCanceladas.contains(p['id']),
+        );
+        currentWeight = (vigentes.last['peso'] as num).toDouble();
+        await _json(request, 200, {
+          'peso_atual': currentWeight,
+          'pesagem_id': novoId,
+        });
+        return;
+      }
+      final listaMov = RegExp(r'^/animais/([^/]+)/movimentacoes$').firstMatch(path);
+      if (request.method == 'GET' && listaMov != null) {
+        final animal = Uri.decodeComponent(listaMov.group(1)!);
+        final vigentes = _movimentos
+            .where(
+              (m) =>
+                  m['animal'] == animal &&
+                  !_movimentosCancelados.contains(m['id']),
+            )
+            .toList(growable: false);
+        await _json(request, 200, [
+          for (final m in vigentes.reversed)
+            {
+              'id': m['id'],
+              'de': m['de'],
+              'para': m['para'],
+              'data': m['data'],
+              'motivo': m['motivo'],
+              'revisavel':
+                  m['id'] == vigentes.last['id'] &&
+                  _animalLotes[animal] == m['para'],
+            },
+        ]);
+        return;
+      }
+      final revisaoMov = RegExp(
+        r'^/animais/([^/]+)/movimentacoes/(\d+)/(corrigir|cancelar)$',
+      ).firstMatch(path);
+      if (request.method == 'POST' && revisaoMov != null) {
+        final animal = Uri.decodeComponent(revisaoMov.group(1)!);
+        final id = int.parse(revisaoMov.group(2)!);
+        final acao = revisaoMov.group(3)!;
+        final body = await _body(request);
+        lastRevisionBody = body;
+        if (((body['motivo'] as String?) ?? '').trim().isEmpty) {
+          await _json(request, 422, {'detail': 'Informe o motivo da correção.'});
+          return;
+        }
+        final indice = _movimentos.indexWhere(
+          (m) => m['id'] == id && m['animal'] == animal,
+        );
+        if (indice < 0) {
+          await _json(request, 404, {'detail': 'Movimentação $id não encontrada.'});
+          return;
+        }
+        if (_movimentosCancelados.contains(id)) {
+          await _json(request, 409, {
+            'detail': {
+              'codigo': 'registro_ja_cancelado',
+              'mensagem': 'A movimentação $id já foi cancelada.',
+            },
+          });
+          return;
+        }
+        final vigentes = _movimentos
+            .where(
+              (m) =>
+                  m['animal'] == animal &&
+                  !_movimentosCancelados.contains(m['id']),
+            )
+            .toList(growable: false);
+        final m = _movimentos[indice];
+        if (vigentes.last['id'] != id || _animalLotes[animal] != m['para']) {
+          await _json(request, 422, {
+            'detail':
+                'Há movimentação posterior a esta: cancele ou corrija primeiro a mais recente.',
+          });
+          return;
+        }
+        if (acao == 'corrigir' && body['to_lote_id'] == m['de']) {
+          await _json(request, 422, {
+            'detail':
+                'O destino corrigido é o piquete de origem: use Cancelar movimentação.',
+          });
+          return;
+        }
+        _movimentosCancelados.add(id);
+        _animalLotes[animal] = m['de'] as String;
+        int? novoId;
+        if (acao == 'corrigir') {
+          novoId = _proximoMovimento++;
+          _movimentos.add({
+            'id': novoId,
+            'animal': animal,
+            'de': m['de'],
+            'para': body['to_lote_id'],
+            'data': body['movement_date'],
+            'motivo': body['reason'] ?? 'manejo',
+          });
+          _animalLotes[animal] = body['to_lote_id'] as String;
+        }
+        await _json(request, 200, {
+          'lote_atual': _animalLotes[animal],
+          'movimentacao_id': novoId,
         });
         return;
       }
@@ -953,6 +1145,14 @@ class MockApiServer {
           return;
         }
         currentWeight = (body['peso'] as num).toDouble();
+        _pesagens.add({
+          'id': _proximaPesagem++,
+          'data': body['data'],
+          'peso': currentWeight,
+          'method': body['method'],
+          'notes': body['notes'],
+          'revisavel': true,
+        });
         await _json(request, 201, {
           'status': 'success',
           'message': 'Pesagem registrada com sucesso.',

@@ -95,6 +95,63 @@ class PesagemOutput(BaseModel):
     peso_atual_atualizado: bool = True
 
 
+class PesagemRegistroOutput(BaseModel):
+    """Uma pesagem vigente do animal. `revisavel` é falso na pesagem de entrada (faz parte do cadastro)."""
+
+    id: int
+    data: str
+    peso: float
+    method: str = "pesado"
+    notes: Optional[str] = None
+    revisavel: bool = True
+
+
+class MovimentacaoRegistroOutput(BaseModel):
+    """Uma movimentação vigente do animal. `revisavel` só é verdadeiro na última, enquanto o
+    animal está no piquete de destino dela."""
+
+    id: int
+    de: Optional[str] = None
+    para: str
+    data: str
+    motivo: Optional[str] = None
+    revisavel: bool = False
+
+
+class CancelarRegistroInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    motivo: str
+
+
+class CorrigirPesagemInput(PesagemInput):
+    """A pesagem como deveria ter sido registrada, mais o motivo da correção."""
+
+    motivo: str
+
+
+class CorrigirMovimentacaoInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    to_lote_id: str = Field(..., min_length=1, description="Piquete de destino correto")
+    movement_date: str = Field(..., description="Data da movimentação no formato AAAA-MM-DD")
+    reason: Optional[str] = Field(default="manejo")
+    notes: Optional[str] = Field(default="")
+    motivo: str
+
+
+class RevisaoPesagemOutput(BaseModel):
+    peso_atual: Optional[float] = None
+    # Id da pesagem que passou a valer (correção); nulo no cancelamento.
+    pesagem_id: Optional[int] = None
+
+
+class RevisaoMovimentacaoOutput(BaseModel):
+    lote_atual: Optional[str] = None
+    # Id da movimentação que passou a valer (correção); nulo no cancelamento.
+    movimentacao_id: Optional[int] = None
+
+
 class LoteSummary(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
