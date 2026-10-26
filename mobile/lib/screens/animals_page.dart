@@ -16,6 +16,7 @@ import 'csv_import_page.dart';
 import 'dashboard_resumo_page.dart';
 import 'devices_page.dart';
 import 'feeding_page.dart';
+import 'animal_revision_cards.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
 import 'offline_cache_banner.dart';
@@ -1163,6 +1164,16 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            // `ObjectKey(medications)`: a cada recarga da ficha chega um objeto novo e os
+            // cartões buscam de novo (depois de uma correção, por exemplo).
+            AnimalRevisionCards(
+              key: ObjectKey(medications),
+              api: widget.api,
+              animalId: widget.id,
+              onUnauthorized: widget.onUnauthorized,
+              onChanged: _reload,
             ),
             const SizedBox(height: 16),
             AnimalPhotoSection(

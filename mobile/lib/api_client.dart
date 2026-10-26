@@ -681,6 +681,169 @@ class ApiClient {
         : null;
   }
 
+  Future<List<WeighingRecord>> listAnimalWeighings(
+    String animalId, {
+    int limite = 10,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse(
+          '$baseUrl/animais/${Uri.encodeComponent(animalId)}/pesagens?limite=$limite',
+        ),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar as pesagens.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((e) => WeighingRecord.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<MovementRecord>> listAnimalMovements(
+    String animalId, {
+    int limite = 10,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse(
+          '$baseUrl/animais/${Uri.encodeComponent(animalId)}/movimentacoes?limite=$limite',
+        ),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar as movimentações.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((e) => MovementRecord.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Faz um POST de revisão (corrigir ou cancelar) e devolve o corpo da resposta.
+  Future<Map<String, dynamic>> _revisar(
+    String caminho,
+    Map<String, dynamic> corpo,
+    String? idempotencyKey,
+    String mensagemDeErro,
+  ) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl$caminho'),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
+        body: jsonEncode(corpo),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, mensagemDeErro),
+        statusCode: response.statusCode,
+      );
+    }
+    return body is Map<String, dynamic> ? body : const {};
+  }
+
+  /// Corrige uma pesagem: o servidor cancela a original e grava a certa, ligada a ela.
+  /// Devolve o peso atual do animal depois da correção.
+  Future<double?> correctWeighing(
+    String animalId,
+    int pesagemId, {
+    required double peso,
+    required String data,
+    required String method,
+    required String motivo,
+    String notes = '',
+    String? idempotencyKey,
+  }) async {
+    final body = await _revisar(
+      '/animais/${Uri.encodeComponent(animalId)}/pesagens/$pesagemId/corrigir',
+      {
+        'peso': peso,
+        'data': data,
+        'method': method,
+        'notes': notes,
+        'motivo': motivo,
+      },
+      idempotencyKey,
+      'Não foi possível corrigir a pesagem.',
+    );
+    return (body['peso_atual'] as num?)?.toDouble();
+  }
+
+  /// Cancela uma pesagem lançada por engano. Devolve o peso atual do animal depois disso.
+  Future<double?> cancelWeighing(
+    String animalId,
+    int pesagemId, {
+    required String motivo,
+    String? idempotencyKey,
+  }) async {
+    final body = await _revisar(
+      '/animais/${Uri.encodeComponent(animalId)}/pesagens/$pesagemId/cancelar',
+      {'motivo': motivo},
+      idempotencyKey,
+      'Não foi possível cancelar a pesagem.',
+    );
+    return (body['peso_atual'] as num?)?.toDouble();
+  }
+
+  /// Corrige a última movimentação: o animal volta à origem e vai ao destino certo.
+  /// Devolve o piquete em que o animal ficou.
+  Future<String?> correctMovement(
+    String animalId,
+    int movimentacaoId, {
+    required String toLoteId,
+    required String movementDate,
+    required String motivo,
+    String reason = 'manejo',
+    String notes = '',
+    String? idempotencyKey,
+  }) async {
+    final body = await _revisar(
+      '/animais/${Uri.encodeComponent(animalId)}/movimentacoes/$movimentacaoId/corrigir',
+      {
+        'to_lote_id': toLoteId,
+        'movement_date': movementDate,
+        'reason': reason,
+        'notes': notes,
+        'motivo': motivo,
+      },
+      idempotencyKey,
+      'Não foi possível corrigir a movimentação.',
+    );
+    return body['lote_atual'] as String?;
+  }
+
+  /// Cancela a última movimentação e devolve o animal ao piquete de origem. Devolve esse piquete.
+  Future<String?> cancelMovement(
+    String animalId,
+    int movimentacaoId, {
+    required String motivo,
+    String? idempotencyKey,
+  }) async {
+    final body = await _revisar(
+      '/animais/${Uri.encodeComponent(animalId)}/movimentacoes/$movimentacaoId/cancelar',
+      {'motivo': motivo},
+      idempotencyKey,
+      'Não foi possível cancelar a movimentação.',
+    );
+    return body['lote_atual'] as String?;
+  }
+
   Future<List<AnimalPhoto>> listAnimalPhotos(String animalId) async {
     final response = await _authorized(
       (headers) => _http.get(

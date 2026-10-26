@@ -406,6 +406,137 @@ void main() {
     }, PassthroughHttpOverrides());
   });
 
+  test('pesagem: lista com id, corrige, cancela e recusa a de entrada', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      await api.registerWeighing('BR0001', peso: 400.0, data: '2026-08-22');
+      var lista = await api.listAnimalWeighings('BR0001');
+      expect(lista.map((p) => p.peso), [400.0, 278.2], reason: 'mais recente primeiro');
+      expect(lista.first.revisavel, isTrue);
+      expect(lista.last.revisavel, isFalse, reason: 'a de entrada faz parte do cadastro');
+
+      // Corrigir: troca a vigente e o peso atual acompanha.
+      final pesoCorrigido = await api.correctWeighing(
+        'BR0001',
+        lista.first.id,
+        peso: 380.0,
+        data: '2026-08-22',
+        method: 'pesado',
+        motivo: 'digitei 400',
+        idempotencyKey: 'rev-p-1',
+      );
+      expect(pesoCorrigido, 380.0);
+      expect(server.lastRevisionBody?['motivo'], 'digitei 400');
+      lista = await api.listAnimalWeighings('BR0001');
+      expect(lista.map((p) => p.peso), [380.0, 278.2]);
+
+      // Repetir a original: já foi cancelada (409, e não é "em processamento").
+      await expectLater(
+        api.cancelWeighing('BR0001', 2, motivo: 'de novo'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.emProcessamento, 'emProcessamento', isFalse)
+              .having((e) => e.message, 'message', contains('já foi cancelada')),
+        ),
+      );
+
+      // Cancelar a vigente devolve o peso da anterior (a de entrada).
+      final pesoAnterior = await api.cancelWeighing(
+        'BR0001',
+        lista.first.id,
+        motivo: 'animal errado',
+      );
+      expect(pesoAnterior, 278.2);
+
+      // Sem motivo: 422. A de entrada: 422.
+      await expectLater(
+        api.cancelWeighing('BR0001', 1, motivo: 'erro'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 422)),
+      );
+      await expectLater(
+        api.cancelWeighing('BR0001', lista.first.id + 1, motivo: ' '),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 422)),
+      );
+    }, PassthroughHttpOverrides());
+  });
+
+  test('movimentação: só a última é revisável; cancelar devolve; corrigir leva ao destino certo', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      // BR0001 começa em P01: vai para P02 e depois para P03.
+      await api.moveAnimals(
+        animalIds: ['BR0001'],
+        toLoteId: 'P02',
+        movementDate: '2026-08-20',
+      );
+      await api.moveAnimals(
+        animalIds: ['BR0001'],
+        toLoteId: 'P03',
+        movementDate: '2026-08-22',
+      );
+      var lista = await api.listAnimalMovements('BR0001');
+      expect(lista.map((m) => '${m.de}>${m.para}:${m.revisavel}'), [
+        'P02>P03:true',
+        'P01>P02:false',
+      ]);
+
+      // A primeira não pode ser revista antes da última.
+      await expectLater(
+        api.cancelMovement('BR0001', lista.last.id, motivo: 'erro'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 422)
+              .having((e) => e.message, 'message', contains('posterior')),
+        ),
+      );
+
+      // Corrigir a última: o animal volta a P02 e vai para P01.
+      final lote = await api.correctMovement(
+        'BR0001',
+        lista.first.id,
+        toLoteId: 'P01',
+        movementDate: '2026-08-22',
+        motivo: 'era o P01',
+      );
+      expect(lote, 'P01');
+      expect((await api.getAnimal('BR0001')).loteId, 'P01');
+
+      // A revisável agora é a corrigida (P02 > P01): cancelá-la devolve o animal a P02.
+      lista = await api.listAnimalMovements('BR0001');
+      expect(lista.first.revisavel, isTrue);
+      final devolvido = await api.cancelMovement(
+        'BR0001',
+        lista.first.id,
+        motivo: 'piquete errado',
+      );
+      expect(devolvido, 'P02');
+      expect((await api.getAnimal('BR0001')).loteId, 'P02');
+    }, PassthroughHttpOverrides());
+  });
+
   test('409 de chave em processamento vira ApiException marcada; os outros 409 não', () async {
     final server = await MockApiServer.start();
     addTearDown(server.close);

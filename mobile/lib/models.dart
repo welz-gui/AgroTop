@@ -279,6 +279,64 @@ class MedicationApplication {
       );
 }
 
+/// Uma pesagem vigente do animal. `revisavel` é falso na pesagem de entrada, que faz parte
+/// do cadastro.
+class WeighingRecord {
+  const WeighingRecord({
+    required this.id,
+    required this.data,
+    required this.peso,
+    required this.method,
+    this.notes,
+    required this.revisavel,
+  });
+
+  final int id;
+  final String data;
+  final double peso;
+  final String method;
+  final String? notes;
+  final bool revisavel;
+
+  factory WeighingRecord.fromJson(Map<String, dynamic> json) => WeighingRecord(
+    id: json['id'] as int,
+    data: json['data'] as String,
+    peso: (json['peso'] as num).toDouble(),
+    method: (json['method'] as String?) ?? 'pesado',
+    notes: json['notes'] as String?,
+    revisavel: (json['revisavel'] as bool?) ?? false,
+  );
+}
+
+/// Uma movimentação vigente do animal. `revisavel` só é verdadeiro na última, enquanto o
+/// animal ainda está no piquete de destino dela.
+class MovementRecord {
+  const MovementRecord({
+    required this.id,
+    this.de,
+    required this.para,
+    required this.data,
+    this.motivo,
+    required this.revisavel,
+  });
+
+  final int id;
+  final String? de;
+  final String para;
+  final String data;
+  final String? motivo;
+  final bool revisavel;
+
+  factory MovementRecord.fromJson(Map<String, dynamic> json) => MovementRecord(
+    id: json['id'] as int,
+    de: json['de'] as String?,
+    para: json['para'] as String,
+    data: json['data'] as String,
+    motivo: json['motivo'] as String?,
+    revisavel: (json['revisavel'] as bool?) ?? false,
+  );
+}
+
 class AnimalMedications {
   const AnimalMedications({this.carenciaAte, required this.aplicacoes});
 
