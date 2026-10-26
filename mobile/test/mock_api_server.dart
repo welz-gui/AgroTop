@@ -781,7 +781,10 @@ class MockApiServer {
         await request.response.close();
         return;
       }
-      if (request.method == 'GET' && path.startsWith('/animais/')) {
+      // Detalhe do animal: `/animais/{id}`. Subrotas (`/pesagens`, `/movimentacoes`...) têm as suas.
+      if (request.method == 'GET' &&
+          path.startsWith('/animais/') &&
+          !path.substring('/animais/'.length).contains('/')) {
         final id = Uri.decodeComponent(path.substring('/animais/'.length));
         if (!_animalLotes.containsKey(id)) {
           await _json(request, 404, {'detail': 'Animal não encontrado'});
