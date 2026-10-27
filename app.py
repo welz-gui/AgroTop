@@ -4597,7 +4597,7 @@ def _estoque_compra_com_nota(insumos):
                     "insumo_id": ins_add["id"], "insumo_nome": ins_add["name"],
                     "unidade": ins_add["unit"], "quantidade": qtd_add,
                     "custo_unitario": custo_add, "lote": lote_add,
-                    "validade": validade_add.isoformat() if validade_add else ""})
+                    "validade": validade_add.strftime("%Y-%m-%d") if validade_add else ""})
                 st.rerun()
             else:
                 st.error("Escolha um insumo e uma quantidade maior que zero.")
