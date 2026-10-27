@@ -21,6 +21,7 @@ from services.zootecnia import get_age_category
 from services.zootecnia import estimate_weight_by_measurement
 from services.zootecnia import get_age_display
 from services.carencia import fim_da_carencia
+from services.validade_estoque import LoteInvalido, situacao as situacao_validade
 from repositories.animais import get_animal
 from services.constantes import AGE_BANDS
 from services.qualidade import avaliar_pesagem
@@ -4414,6 +4415,34 @@ def _render_tab_inventario(insumos):
         xaxis=dict(gridcolor=c["superficie"],title="% do Estoque Mínimo"),
         yaxis=dict(gridcolor=c["superficie"],title=""))
     st.plotly_chart(fig_e,use_container_width=True)
+    _render_lotes_em_estoque(insumos)
+
+
+def _render_lotes_em_estoque(insumos):
+    """O que resta de cada entrada, com a validade e a situação (estimativa PEPS)."""
+    por_insumo = db.lotes_em_estoque_por_insumo()
+    nomes = {i["id"]: i for i in insumos}
+    rotulo = {"vencido": "🔴 Vencido", "vencendo": "🟡 Vence em breve",
+              "ok": "🟢 No prazo", "sem_validade": "— sem validade"}
+    linhas = []
+    for insumo_id, lotes in por_insumo.items():
+        i = nomes.get(insumo_id)
+        if i is None:
+            continue
+        for l in lotes:
+            sit = situacao_validade(l["validade"], date.today())
+            linhas.append({"Insumo": i["name"], "Lote": l["lote"] or "sem lote",
+                "Validade": _data_br(l["validade"]) if l["validade"] else "—",
+                "Resta": l["restante"], "Unidade": i["unit"], "Situação": rotulo[sit],
+                "_ord": l["validade"] or "9999-12-31"})
+    if not linhas:
+        return
+    st.subheader("Lotes em estoque")
+    st.caption("Estimativa: o consumo com lote anotado sai desse lote; o restante sai da entrada "
+               "mais antiga (PEPS). Anote o lote ao aplicar o medicamento para a conta ficar exata.")
+    df_l=pd.DataFrame(sorted(linhas,key=lambda r:(r["_ord"],r["Insumo"]))).drop(columns="_ord")
+    st.dataframe(df_l,use_container_width=True,hide_index=True,
+        column_config={"Resta":st.column_config.NumberColumn(format="%.1f")})
 
 def _render_tab_entrada_estoque(insumos):
     with st.form("f_entrada",clear_on_submit=True):
@@ -4422,9 +4451,20 @@ def _render_tab_entrada_estoque(insumos):
         with ec1: qty=st.number_input("Quantidade",min_value=0.01,step=1.0,format="%.2f")
         with ec2: cpu=st.number_input("Custo por Unidade (R$)",min_value=0.0,step=0.01,format="%.2f",
             value=float(ins["cost_per_unit"]) if ins else 0.0)
+        el1,el2=st.columns(2)
+        with el1: lote_ent=st.text_input("Lote do produto (opcional)",key="entrada_lote",
+            placeholder="Ex: L2410A")
+        with el2: val_ent=st.date_input("Validade (opcional)",value=None,format="DD/MM/YYYY",
+            key="entrada_validade",
+            help="Validade da embalagem. Produto que já chegou vencido não pode ser registrado.")
         if st.form_submit_button("✅ Registrar Entrada",type="primary",use_container_width=True):
-            db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"])
-            st.success(f"✅ +{_num_br(qty, 1)} {ins['unit']} de {ins['name']}"); st.rerun()
+            try:
+                db.add_insumo_entry(ins["id"],qty,cpu,st.session_state.user["name"],
+                    lote_ent,val_ent.strftime("%Y-%m-%d") if val_ent else "")
+            except LoteInvalido as e:
+                st.error(f"🚫 {e}")
+            else:
+                st.success(f"✅ +{_num_br(qty, 1)} {ins['unit']} de {ins['name']}"); st.rerun()
 
 def _render_tab_novo_insumo():
     with st.form("f_new_ins",clear_on_submit=True):
@@ -4484,6 +4524,12 @@ def page_estoque():
     if low:
         st.warning(f"⚠️ **{_plural(len(low),'insumo','insumos')} abaixo do estoque mínimo:** " +
             ", ".join(f"**{i['name']}** ({_num_br(i['current_stock'],0)} {i['unit']})" for i in low))
+    venc=db.alertas_de_validade()
+    if venc:
+        st.error(f"⏳ **{_plural(len(venc),'lote','lotes')} vencido(s) ou perto de vencer:** " +
+            ", ".join(f"**{a['nome']}** lote {a['lote'] or 'sem identificação'} "
+                      f"({'venceu' if a['situacao']=='vencido' else 'vence'} {_data_br(a['validade'])})"
+                      for a in venc))
 
     et1,et2,et3,et4,et5=st.tabs(["📋 Inventário","📥 Entrada de Estoque","➕ Novo Insumo",
         "📈 Previsão de Ruptura","🛒 Compra com Nota Fiscal"])
@@ -4525,6 +4571,12 @@ def _estoque_compra_com_nota(insumos):
 
     st.markdown("**1. Itens da nota**")
     ic1, ic2, ic3, ic4 = st.columns([3, 1, 1, 1])
+    il1, il2 = st.columns(2)
+    with il1:
+        lote_add = st.text_input("Lote do produto (opcional)", key="compra_add_lote")
+    with il2:
+        validade_add = st.date_input("Validade (opcional)", value=None, format="DD/MM/YYYY",
+            key="compra_add_validade")
     with ic1:
         ins_add = st.selectbox("Insumo", insumos,
             format_func=lambda x: f"{x['name']} ({x['unit']})",
@@ -4544,7 +4596,8 @@ def _estoque_compra_com_nota(insumos):
                 st.session_state[itens_key].append({
                     "insumo_id": ins_add["id"], "insumo_nome": ins_add["name"],
                     "unidade": ins_add["unit"], "quantidade": qtd_add,
-                    "custo_unitario": custo_add})
+                    "custo_unitario": custo_add, "lote": lote_add,
+                    "validade": validade_add.isoformat() if validade_add else ""})
                 st.rerun()
             else:
                 st.error("Escolha um insumo e uma quantidade maior que zero.")
@@ -4556,7 +4609,9 @@ def _estoque_compra_com_nota(insumos):
             with rc1:
                 st.write(f"{item['insumo_nome']}: {_num_br(item['quantidade'], 2)} "
                     f"{item['unidade']} × R$ {_num_br(item['custo_unitario'], 2)} = "
-                    f"R$ {item['quantidade']*item['custo_unitario']:,.2f}")
+                    f"R$ {item['quantidade']*item['custo_unitario']:,.2f}"
+                    + (f" · lote {item['lote']}" if item.get("lote") else "")
+                    + (f" · val. {_data_br(item['validade'])}" if item.get("validade") else ""))
             with rc2:
                 if st.button("🗑️", key=f"compra_remover_{idx}"):
                     itens_atuais.pop(idx)
@@ -4592,7 +4647,8 @@ def _estoque_compra_com_nota(insumos):
             data_emissao=data_emissao.isoformat(),
             data_recebimento=data_recebimento.isoformat(),
             itens=[{"insumo_id": i["insumo_id"], "quantidade": i["quantidade"],
-                    "custo_unitario": i["custo_unitario"]} for i in itens_atuais],
+                    "custo_unitario": i["custo_unitario"], "lote": i.get("lote", ""),
+                    "validade": i.get("validade", "")} for i in itens_atuais],
             primeiro_vencimento=primeira_parcela.isoformat(),
             num_parcelas=int(num_parcelas),
             fornecedor_nome=fornecedor_nome, documento_numero=doc_numero,

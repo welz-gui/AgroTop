@@ -25,6 +25,7 @@ PROVAS = [
     "tests.ui_tratamento_produto_prova",  # tratamento: princípio ativo, lote e validade
     "tests.ui_correcao_tratamento_prova",  # tratamento: corrigir/cancelar por revisão
     "tests.ui_revisao_pesagem_movimentacao_prova",  # pesagem e movimentação: corrigir/cancelar por revisão
+    "tests.ui_validade_estoque_prova",  # estoque: lote e validade na entrada, aviso de vencimento
     "tests.ui_integracoes_prova",   # identificadores, consistência e recomendações
     "tests.ui_cadastrar_prova",     # tela de cadastro
     "tests.ui_nascimento_prova",    # §7.2: bloqueio impede, alerta pede confirmação

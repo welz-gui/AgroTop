@@ -587,6 +587,8 @@ _SCHEMA_SQL = """
                 lote_id          TEXT,
                 compra_id        TEXT,   -- anulável; preenchido só quando vem de repositories.compras.registrar
                 created_at       TEXT DEFAULT (datetime('now','localtime')),
+                lote_produto     TEXT,   -- lote da embalagem que entrou (0037); só em entradas
+                validade_produto TEXT,   -- validade, AAAA-MM-DD (0037); só em entradas
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
                 FOREIGN KEY (compra_id)   REFERENCES compras(id),
@@ -1157,6 +1159,11 @@ def _migrate(con) -> None:
                       ("motivo_cancelamento", "TEXT"), ("corrige_id", "INTEGER")):
         if _c not in _mc:
             con.execute(f"ALTER TABLE medications ADD COLUMN {_c} {_tipo}")
+    # Lote e validade por entrada de estoque (migration 0037).
+    _tc = {r["name"] for r in con.execute("PRAGMA table_info(insumo_transactions)").fetchall()}
+    for _c in ("lote_produto", "validade_produto"):
+        if _c not in _tc:
+            con.execute(f"ALTER TABLE insumo_transactions ADD COLUMN {_c} TEXT")
     # Revisão de pesagem e movimentação (migration 0036): as mesmas cinco colunas da 0035.
     for _t in ("weighings", "animal_movements"):
         _rc = {r["name"] for r in con.execute(f"PRAGMA table_info({_t})").fetchall()}
@@ -1843,7 +1850,7 @@ def get_all_insumos() -> list[dict]:
 
 @_writes
 def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
-                     operator: str = "") -> None:
+                     operator: str = "", lote_produto: str = "", validade_produto: str = "") -> None:
     """Registra entrada de insumo, atualizando o custo por **média ponderada**.
 
     Antes desta mudança o custo unitário era simplesmente sobrescrito pelo da
@@ -1852,8 +1859,14 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
 
     Ver docs/adr/0003-custo-medio-ponderado.md — a decisão é **não-retroativa**:
     vale para entradas novas, e o histórico já lançado permanece como está.
+
+    `lote_produto` e `validade_produto` são opcionais; validade anterior à data de entrada é
+    recusada (`LoteInvalido`) e nada é gravado.
     """
     from services.estoque import custo_medio_ponderado
+    from services.validade_estoque import normalizar_lote_entrada
+
+    produto = normalizar_lote_entrada(lote_produto, validade_produto, date.today().isoformat())
 
     with _conn() as con:
         today_str = date.today().isoformat()
@@ -1871,10 +1884,69 @@ def add_insumo_entry(insumo_id: int, quantity: float, cost_per_unit: float,
         )
         con.execute(
             """INSERT INTO insumo_transactions
-               (insumo_id,type,quantity,reason,transaction_date,operator)
-               VALUES(?,?,?,?,?,?)""",
-            (insumo_id, "entrada", quantity, "compra", today_str, operator),
+               (insumo_id,type,quantity,reason,transaction_date,operator,lote_produto,validade_produto)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (insumo_id, "entrada", quantity, "compra", today_str, operator,
+             produto["lote_produto"] or None, produto["validade_produto"] or None),
         )
+
+
+def lotes_em_estoque_por_insumo() -> dict:
+    """`{insumo_id: [lote, ...]}` com o que resta de cada entrada (estimativa PEPS; regra em
+    `services/validade_estoque.py`). Só entram insumos com saldo; cada lote traz `restante`."""
+    from services.validade_estoque import lotes_do_insumo
+
+    with _conn() as con:
+        entradas = con.execute(
+            """SELECT id, insumo_id, transaction_date, quantity, lote_produto, validade_produto
+               FROM insumo_transactions WHERE type='entrada'
+               ORDER BY transaction_date, id""").fetchall()
+        saidas = {r["insumo_id"]: float(r["s"] or 0) for r in con.execute(
+            """SELECT insumo_id, SUM(quantity) AS s FROM insumo_transactions
+               WHERE type='saida' GROUP BY insumo_id""").fetchall()}
+        com_lote = con.execute(
+            """SELECT insumo_id, lote_produto, SUM(dose) AS s FROM medications
+               WHERE insumo_id IS NOT NULL AND lote_produto IS NOT NULL AND lote_produto <> ''
+                 AND cancelada_em IS NULL GROUP BY insumo_id, lote_produto""").fetchall()
+    entradas_por_insumo: dict = {}
+    for e in entradas:
+        entradas_por_insumo.setdefault(e["insumo_id"], []).append({
+            "id": e["id"], "data": e["transaction_date"], "quantidade": float(e["quantity"]),
+            "lote": e["lote_produto"], "validade": e["validade_produto"]})
+    consumo_com_lote: dict = {}
+    for r in com_lote:
+        consumo_com_lote.setdefault(r["insumo_id"], {})[r["lote_produto"]] = float(r["s"] or 0)
+    out = {}
+    for i in get_all_insumos():
+        saldo = float(i.get("current_stock") or 0)
+        if saldo <= 0:
+            continue
+        lotes = lotes_do_insumo(entradas_por_insumo.get(i["id"], []), saldo,
+                                saidas.get(i["id"], 0.0), consumo_com_lote.get(i["id"], {}))
+        if lotes:
+            out[i["id"]] = lotes
+    return out
+
+
+def alertas_de_validade(dias: int = 30) -> list[dict]:
+    """Lotes em estoque vencidos ou que vencem em até `dias` dias, do mais urgente ao menos."""
+    from services.validade_estoque import situacao
+
+    hoje = date.today()
+    insumos = {i["id"]: i for i in get_all_insumos()}
+    alertas = []
+    for insumo_id, lotes in lotes_em_estoque_por_insumo().items():
+        for lote in lotes:
+            sit = situacao(lote["validade"], hoje, dias)
+            if sit in ("vencido", "vencendo"):
+                alertas.append({
+                    "insumo_id": insumo_id, "nome": insumos[insumo_id]["name"],
+                    "unidade": insumos[insumo_id]["unit"], "lote": lote["lote"],
+                    "validade": lote["validade"], "restante": lote["restante"],
+                    "situacao": sit,
+                    "dias": (date.fromisoformat(lote["validade"]) - hoje).days,
+                })
+    return sorted(alertas, key=lambda a: a["validade"])
 
 
 @_writes
@@ -2904,6 +2976,12 @@ def contexto_recomendacoes() -> dict:
                 "consumo_diario": consumo.get(i["id"], 0.0)}
                for i in get_all_insumos()]
 
+    lotes_estoque = [
+        {"insumo_id": a["insumo_id"], "nome": a["nome"], "unidade": a["unidade"], "lote": a["lote"],
+         "validade": a["validade"], "restante": a["restante"]}
+        for a in alertas_de_validade()
+    ]
+
     preco_arroba_val = get_setting("preco_arroba")
     preco_arroba = None
     if preco_arroba_val is not None:
@@ -2916,6 +2994,7 @@ def contexto_recomendacoes() -> dict:
         "animais": animais,
         "lotes": lotes,
         "insumos": insumos,
+        "lotes_estoque": lotes_estoque,
         "preco_arroba": preco_arroba,
         "custo_por_arroba": _custo_medio_por_arroba(),
         "hoje": hoje.isoformat(),
