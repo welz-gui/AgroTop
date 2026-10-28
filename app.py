@@ -5822,13 +5822,149 @@ def _render_tab_gestao_protocolos(insumos):
                 st.rerun()
 
 
+def _rotulo_registro_sda(v: dict) -> str:
+    """Estado do registro oficial no SDA, em uma linha."""
+    sit = v["situacao_prazo"]
+    prazo = _data_br(v["prazo_sda"]) if v.get("prazo_sda") else ""
+    if v["status_oficial"] == "registrado_sda":
+        return f"🟢 Registrada no SDA · atestado {v.get('referencia_atestado') or '—'}"
+    if v["status_oficial"] == "excecao":
+        return "⚪ Exceção justificada"
+    return {"atrasado": f"🔴 Atrasada: o prazo no SDA era {prazo}",
+            "vencendo": f"🟡 Perto do prazo no SDA: até {prazo}",
+            "no_prazo": f"⏳ Pendente no SDA: até {prazo}",
+            "sem_prazo": "⚪ Pendente no SDA (anterior a 01/01/2027: sem prazo exigido)"}.get(sit, sit)
+
+
+def _render_tab_brucelose_sda():
+    st.info("O AgroTop **não registra no SDA**: guarda o ato de vacinação e a ficha dos animais para o "
+            "veterinário lançar lá. Para vacinações a partir de **01/01/2027** o atestado só vale se "
+            "emitido pelo SDA, e o lançamento vai **até o quinto dia do mês seguinte**. O estado "
+            "\"registrada no SDA\" só muda aqui por confirmação de uma pessoa, com a referência do atestado.")
+    usuario = st.session_state.user["name"]
+    if "bru_msg" in st.session_state:
+        msg, avisos = st.session_state.pop("bru_msg")
+        st.success(msg)
+        for aviso in avisos:
+            st.warning(f"⚠️ {aviso}")
+
+    # ── atos já registrados ──
+    atos = db.vacinacao_brucelose.listar()
+    st.subheader("Vacinações registradas")
+    if not atos:
+        st.caption("Nenhuma vacinação contra brucelose registrada ainda.")
+    for v in atos:
+        vid = v["id"]
+        with st.expander(f"{_data_br(v['vacinado_em'])} · {v['property_nome']} · "
+                         f"{_plural(v['n_animais'],'animal','animais')} · {_rotulo_registro_sda(v)}"):
+            st.caption(f"Produto: **{v['produto']}**"
+                       + (f" · lote {v['lote_produto']}" if v.get("lote_produto") else "")
+                       + (f" · val. {_data_br(v['validade_produto'])}" if v.get("validade_produto") else "")
+                       + f" · dose {_num_br(v['dose'], 1)} {v.get('unidade') or ''} · "
+                       f"Vet.: {v['veterinario_nome']}"
+                       + (f" (CRMV {v['veterinario_crmv']}"
+                          + (f"/{v['veterinario_uf']}" if v.get("veterinario_uf") else "") + ")"
+                          if v.get("veterinario_crmv") else ""))
+            ficha = db.vacinacao_brucelose.animais_da_vacinacao(vid)
+            st.dataframe(pd.DataFrame([{
+                "Brinco": a["brinco"], "Identificador oficial": a["identificador_oficial"] or "—",
+                "Registro genealógico": a["registro_genealogico"] or "—"} for a in ficha]),
+                use_container_width=True, hide_index=True)
+            if v["status_oficial"] == "excecao":
+                st.caption(f"Justificativa: {v.get('justificativa_excecao') or '—'}")
+            if v["status_oficial"] != "pendente_sda":
+                continue
+            with st.form(f"bru_conf_{vid}", clear_on_submit=True):
+                ref = st.text_input("Referência do atestado emitido no SDA", key=f"bru_ref_{vid}",
+                    help="Número ou código do atestado, conforme emitido pelo SDA. Obrigatório.")
+                if st.form_submit_button("✅ Confirmar: registrada no SDA", type="primary"):
+                    try:
+                        db.vacinacao_brucelose.confirmar_registro_sda(vid, ref, usuario)
+                    except db.VacinacaoInvalida as e:
+                        st.error(f"🚫 {e}")
+                    else:
+                        st.rerun()
+            with st.form(f"bru_exc_{vid}", clear_on_submit=True):
+                just = st.text_input("Justificativa da exceção", key=f"bru_just_{vid}",
+                    help="Para fechar a pendência sem registro no SDA (ex.: vacinação anterior à exigência).")
+                if st.form_submit_button("Registrar exceção"):
+                    try:
+                        db.vacinacao_brucelose.registrar_excecao(vid, just, usuario)
+                    except db.VacinacaoInvalida as e:
+                        st.error(f"🚫 {e}")
+                    else:
+                        st.rerun()
+            with st.form(f"bru_canc_{vid}", clear_on_submit=True):
+                mot = st.text_input("Motivo do cancelamento", key=f"bru_mot_{vid}",
+                    help="Cancela o ato e cada aplicação, devolvendo o estoque. O registro fica no histórico.")
+                if st.form_submit_button("🗑️ Cancelar vacinação"):
+                    try:
+                        db.vacinacao_brucelose.cancelar(vid, mot, usuario)
+                    except (db.VacinacaoInvalida, db.RevisaoNaoPermitida) as e:
+                        st.error(f"🚫 {e}")
+                    else:
+                        st.rerun()
+
+    # ── novo ato ──
+    st.subheader("Nova vacinação")
+    props = db.propriedades.listar()
+    if not props:
+        st.warning("Cadastre uma propriedade antes.")
+        return
+    prop = st.selectbox("Propriedade", [p["id"] for p in props], key="bru_prop",
+        format_func=lambda i: next(p["nome"] for p in props if p["id"] == i))
+    candidatas = [a for a in db.get_all_animals() + db.get_all_animals(status="carencia")
+                  if a.get("sex") == "F" and a.get("property_id") == prop]
+    if not candidatas:
+        st.info("Esta propriedade não tem fêmeas no rebanho.")
+        return
+    insumos_vac = [i for i in db.get_all_insumos() if i["category"] in ("vacina", "medicamento")]
+    with st.form("bru_novo", clear_on_submit=True):
+        b1, b2 = st.columns(2)
+        with b1: data_v = st.date_input("Data da vacinação", value=date.today(), max_value=date.today(),
+                    format="DD/MM/YYYY", key="bru_data")
+        with b2: produto = st.text_input("Vacina", value="B19", key="bru_produto",
+                    help="Ex.: B19 (3 a 8 meses) ou RB51.")
+        animais_sel = st.multiselect("Fêmeas vacinadas", [a["id"] for a in candidatas], key="bru_animais",
+            format_func=lambda i: next(f"{a['id']} · piquete {a.get('lote_id') or '—'}" for a in candidatas
+                                       if a["id"] == i))
+        l1, l2, l3 = st.columns(3)
+        with l1: lote_v = st.text_input("Lote da vacina", key="bru_lote")
+        with l2: val_v = st.date_input("Validade da vacina", value=None, format="DD/MM/YYYY", key="bru_validade")
+        with l3: dose_v = st.number_input("Dose (ml)", min_value=0.1, value=2.0, step=0.5, key="bru_dose")
+        v1, v2, v3 = st.columns([3, 2, 1])
+        with v1: vet_nome = st.text_input("Médico-veterinário *", key="bru_vet")
+        with v2: vet_crmv = st.text_input("CRMV", key="bru_crmv")
+        with v3: vet_uf = st.text_input("UF", value="RS", max_chars=2, key="bru_uf")
+        ins = st.selectbox("Baixar do estoque (opcional)", [None] + [i["id"] for i in insumos_vac],
+            key="bru_insumo", format_func=lambda i: "— não baixar —" if i is None else
+            next(f"{x['name']} ({_num_br(x['current_stock'], 1)} {x['unit']})" for x in insumos_vac if x["id"] == i))
+        if st.form_submit_button("💉 Registrar vacinação", type="primary", use_container_width=True):
+            try:
+                r = db.vacinacao_brucelose.registrar(db.NovaVacinacao(
+                    property_id=prop, vacinado_em=data_v.strftime("%Y-%m-%d"), animal_ids=animais_sel,
+                    produto=produto, veterinario_nome=vet_nome, veterinario_crmv=vet_crmv,
+                    veterinario_uf=vet_uf, lote_produto=lote_v,
+                    validade_produto=val_v.strftime("%Y-%m-%d") if val_v else "",
+                    dose=float(dose_v), insumo_id=ins, operator=usuario))
+            except (db.VacinacaoInvalida, db.TratamentoInvalido) as e:
+                st.error(f"🚫 {e}")
+            else:
+                # A lista de cima precisa recarregar; a mensagem sobrevive ao rerun pelo estado da sessão.
+                st.session_state["bru_msg"] = (
+                    f"✅ Vacinação registrada em {_plural(r['n'],'animal','animais')}."
+                    + (f" Lançamento no SDA até {_data_br(r['prazo_sda'])}." if r["prazo_sda"] else ""),
+                    r["avisos"])
+                st.rerun()
+
+
 def page_sanitario():
     if st.session_state.user["role"] != "admin":
         st.error("🔒 Acesso restrito ao Administrador."); return
     st.markdown('<div class="page-title">💉 Calendário Sanitário</div>', unsafe_allow_html=True)
     insumos = [i for i in db.get_all_insumos() if i["category"] in ("vacina","medicamento")]
 
-    tp1, tp2 = st.tabs(["📋 Plano de Vacinação", "⚙️ Protocolos"])
+    tp1, tp2, tp3 = st.tabs(["📋 Plano de Vacinação", "⚙️ Protocolos", "🐄 Brucelose (SDA)"])
 
     # ── Plano de vacinação ────────────────────────────────────────────────────
     with tp1:
@@ -5837,6 +5973,10 @@ def page_sanitario():
     # ── Gestão de protocolos ──────────────────────────────────────────────────
     with tp2:
         _render_tab_gestao_protocolos(insumos)
+
+    # ── Brucelose: o ato e o registro oficial no SDA ──────────────────────────
+    with tp3:
+        _render_tab_brucelose_sda()
 
 
 def _render_tab_projecao_abate(animals):

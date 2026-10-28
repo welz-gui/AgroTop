@@ -95,11 +95,12 @@ def add_medication(data: MedicationData) -> None:
 
 def _inserir_aplicacao(con, data: MedicationData, *, corrige_id: Optional[int] = None,
                        evento_anterior_id: Optional[int] = None, versao: int = 1,
-                       justificativa: str = "") -> int:
+                       justificativa: str = "", tipo_evento: str = "manejo_sanitario") -> int:
     """Grava a aplicação, a baixa de estoque e o evento, na conexão do chamador.
 
     `corrige_id`/`evento_anterior_id`/`versao`/`justificativa` só vêm de uma correção:
-    ligam a linha nova (e o evento novo) ao que ela substitui. Devolve o id da aplicação.
+    ligam a linha nova (e o evento novo) ao que ela substitui. `tipo_evento` é o tipo do evento
+    gravado (a vacinação contra brucelose usa `vacinacao_brucelose`). Devolve o id da aplicação.
     """
     _uuid = uuid_de(con, data.animal_id)
     if _uuid is None:
@@ -111,9 +112,10 @@ def _inserir_aplicacao(con, data: MedicationData, *, corrige_id: Optional[int] =
                         (data.insumo_id,)).fetchone()
         produto["principio_ativo"] = (r["principio_ativo"] or "") if r else ""
     # `vacinacao` e `tratamento` sao tipos proprios no §6.1; sem campo que
-    # distinga um do outro, `manejo_sanitario` e o termo honesto.
+    # distinga um do outro, `manejo_sanitario` e o termo honesto (padrao). A vacinacao contra
+    # brucelose pede o seu tipo, que ja existe no vocabulario.
     evento = eventos.registrar_em(
-        con, _uuid, "manejo_sanitario", ocorrido_em=data.med_date,
+        con, _uuid, tipo_evento, ocorrido_em=data.med_date,
         usuario_registro=data.applied_by,
         justificativa=justificativa, evento_anterior_id=evento_anterior_id, versao=versao,
         observacoes=f"{data.medication_name} {data.dose}{data.unit}"

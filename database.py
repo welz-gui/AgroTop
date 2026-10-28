@@ -120,6 +120,8 @@ from repositories.sanidade import (  # noqa: F401
     get_medication_history, cancelar_medicamento, corrigir_medicamento,
     AplicacaoNaoEncontrada, AplicacaoJaCancelada,
 )
+from repositories import vacinacao_brucelose  # noqa: F401
+from repositories.vacinacao_brucelose import NovaVacinacao, VacinacaoInvalida  # noqa: F401
 from repositories.revisao import (  # noqa: F401
     RegistroNaoEncontrado, RegistroJaCancelado, RevisaoNaoPermitida,
 )
@@ -552,6 +554,48 @@ _SCHEMA_SQL = """
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
                 FOREIGN KEY (protocol_id) REFERENCES health_protocols(id)
+            );
+
+            -- Vacinação contra brucelose: o ato e o estado do registro oficial no SDA (0038).
+            CREATE TABLE IF NOT EXISTS vacinacoes_brucelose (
+                id                    TEXT PRIMARY KEY,
+                property_id           TEXT NOT NULL,
+                vacinado_em           TEXT NOT NULL,
+                produto               TEXT NOT NULL,
+                lote_produto          TEXT,
+                validade_produto      TEXT,
+                dose                  REAL,
+                unidade               TEXT,
+                via                   TEXT,
+                insumo_id             INTEGER,
+                veterinario_nome      TEXT NOT NULL,
+                veterinario_crmv      TEXT,
+                veterinario_uf        TEXT,
+                status_oficial        TEXT NOT NULL DEFAULT 'pendente_sda',
+                prazo_sda             TEXT,
+                referencia_atestado   TEXT,
+                confirmado_por        TEXT,
+                confirmado_em         TEXT,
+                justificativa_excecao TEXT,
+                registrado_por        TEXT,
+                notes                 TEXT,
+                created_at            TEXT DEFAULT (datetime('now','localtime')),
+                cancelada_em          TEXT,
+                cancelada_por         TEXT,
+                motivo_cancelamento   TEXT,
+                FOREIGN KEY (property_id) REFERENCES properties(id)
+            );
+            CREATE TABLE IF NOT EXISTS vacinacao_brucelose_animais (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                vacinacao_id          TEXT NOT NULL,
+                animal_uuid           TEXT NOT NULL,
+                brinco                TEXT NOT NULL,
+                identificador_oficial TEXT,
+                registro_genealogico  TEXT,
+                medication_id         INTEGER,
+                UNIQUE (vacinacao_id, animal_uuid),
+                FOREIGN KEY (vacinacao_id) REFERENCES vacinacoes_brucelose(id),
+                FOREIGN KEY (animal_uuid) REFERENCES animals(uuid)
             );
 
             -- Movimentações entre lotes
@@ -2995,6 +3039,7 @@ def contexto_recomendacoes() -> dict:
         "lotes": lotes,
         "insumos": insumos,
         "lotes_estoque": lotes_estoque,
+        "vacinacoes_sda": vacinacao_brucelose.pendencias_sda(),
         "preco_arroba": preco_arroba,
         "custo_por_arroba": _custo_medio_por_arroba(),
         "hoje": hoje.isoformat(),

@@ -106,6 +106,49 @@ def _regra_validade_estoque(contexto: dict) -> list[dict]:
     return recomended
 
 
+def _regra_vacinacao_sda(contexto: dict) -> list[dict]:
+    """Vacinação contra brucelose com lançamento no SDA exigido e ainda não confirmado: atrasada
+    (alta) ou com o prazo (quinto dia do mês seguinte) em até 5 dias (média)."""
+    recomended = []
+    pendentes = contexto.get("vacinacoes_sda")
+    if not isinstance(pendentes, list):
+        return recomended
+
+    for v in pendentes:
+        if not isinstance(v, dict):
+            continue
+        dias = v.get("dias")
+        if dias is None or dias > 5:
+            continue
+        prazo = _parse_date(v.get("prazo"))
+        quando = _parse_date(v.get("vacinado_em"))
+        atrasada = dias < 0
+        n = v.get("n_animais") or 0
+        propriedade = v.get("propriedade") or "propriedade"
+        recomended.append({
+            "regra": "vacinacao_sda_pendente",
+            "severidade": "alta" if atrasada else "media",
+            "titulo": ("Registro de vacinação no SDA atrasado" if atrasada
+                       else "Registro de vacinação no SDA perto do prazo"),
+            "motivo": (
+                f"Vacinação contra brucelose de {quando.strftime('%d/%m/%Y') if quando else '—'} "
+                f"({n} animal(is), {propriedade}): o lançamento no SDA vale até "
+                f"{prazo.strftime('%d/%m/%Y') if prazo else '—'}, "
+                + (f"há {-dias} dia(s)." if atrasada else f"faltam {dias} dia(s).")
+                + " O AgroTop não registra no SDA: o veterinário lança lá e a confirmação é feita aqui."
+            ),
+            "dados": {
+                "vacinacao_id": v.get("id"),
+                "prazo": prazo.isoformat() if prazo else None,
+                "dias": dias,
+                "animais": n,
+            },
+            "acao": ("Pedir ao veterinário o registro e o atestado do SDA e confirmar aqui com a "
+                     "referência do atestado, ou registrar a exceção com justificativa."),
+        })
+    return recomended
+
+
 def _regra_piquete_acima_da_capacidade(contexto: dict) -> list[dict]:
     recomended = []
     lotes = contexto.get("lotes")
@@ -268,6 +311,7 @@ def _regra_margem_em_risco(contexto: dict) -> list[dict]:
 REGRAS = [
     _regra_estoque_insuficiente,
     _regra_validade_estoque,
+    _regra_vacinacao_sda,
     _regra_piquete_acima_da_capacidade,
     _regra_animais,
     _regra_margem_em_risco,
@@ -285,6 +329,8 @@ def avaliar(contexto: dict | None = None) -> list[dict]:
           "insumos": [{"id", "nome", "saldo", "consumo_diario"}, ...],
           "lotes_estoque": [{"insumo_id", "nome", "unidade", "lote", "validade",
                              "restante"}, ...],
+          "vacinacoes_sda": [{"id", "vacinado_em", "prazo", "dias", "produto",
+                              "n_animais", "propriedade"}, ...],
           "preco_arroba": float|None,
           "custo_por_arroba": float|None,
           "hoje": "AAAA-MM-DD",

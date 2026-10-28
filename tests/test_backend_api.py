@@ -2453,13 +2453,14 @@ class TestRecomendacoesApi(BackendApiTestCase):
         """Critério 4: database.contexto_recomendacoes devolve estrutura esperada sem a API."""
         ctx = db.contexto_recomendacoes()
         self.assertIsInstance(ctx, dict)
-        chaves_esperadas = {"animais", "lotes", "insumos", "lotes_estoque", "preco_arroba",
-                            "custo_por_arroba", "hoje"}
+        chaves_esperadas = {"animais", "lotes", "insumos", "lotes_estoque", "vacinacoes_sda",
+                            "preco_arroba", "custo_por_arroba", "hoje"}
         self.assertEqual(set(ctx.keys()), chaves_esperadas)
         self.assertIsInstance(ctx["animais"], list)
         self.assertIsInstance(ctx["lotes"], list)
         self.assertIsInstance(ctx["insumos"], list)
         self.assertIsInstance(ctx["lotes_estoque"], list)
+        self.assertIsInstance(ctx["vacinacoes_sda"], list)
         self.assertIsInstance(ctx["hoje"], str)
 
     @patch('database.get_setting')
