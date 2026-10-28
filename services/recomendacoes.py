@@ -56,6 +56,56 @@ def _regra_estoque_insuficiente(contexto: dict) -> list[dict]:
     return recomended
 
 
+def _regra_validade_estoque(contexto: dict) -> list[dict]:
+    """Lote em estoque vencido (alta) ou que vence em até 30 dias (média)."""
+    recomended = []
+    lotes = contexto.get("lotes_estoque")
+    hoje = _parse_date(contexto.get("hoje")) or date.today()
+    if not isinstance(lotes, list):
+        return recomended
+
+    for lote in lotes:
+        if not isinstance(lote, dict):
+            continue
+        validade = _parse_date(lote.get("validade"))
+        restante = lote.get("restante")
+        if validade is None or not restante or restante <= 0:
+            continue
+        dias = (validade - hoje).days
+        if dias > 30:
+            continue
+        nome = lote.get("nome", str(lote.get("insumo_id", "")))
+        unidade = lote.get("unidade") or ""
+        id_lote = f"lote {lote['lote']}" if lote.get("lote") else "lote sem identificação"
+        vencido = dias < 0
+        recomended.append({
+            "regra": "validade_estoque",
+            "severidade": "alta" if vencido else "media",
+            "titulo": (f"Produto vencido em estoque: {nome}" if vencido
+                       else f"Produto perto de vencer: {nome}"),
+            "motivo": (
+                f"{id_lote.capitalize()} de {nome}: "
+                + (f"venceu há {-dias} dia(s)" if vencido else f"vence em {dias} dia(s)")
+                + f" (validade {validade.isoformat()}), com cerca de {restante:.1f} {unidade} "
+                "ainda em estoque (estimativa: o consumo sem lote anotado sai da entrada mais antiga)."
+            ),
+            "dados": {
+                "insumo_id": lote.get("insumo_id"),
+                "nome": nome,
+                "lote": lote.get("lote"),
+                "validade": validade.isoformat(),
+                "restante": float(restante),
+                "dias": dias,
+            },
+            "acao": (
+                f"Descartar o {id_lote} de {nome}; não aplicar produto vencido."
+                if vencido else
+                f"Usar o {id_lote} de {nome} antes da validade ou separá-lo para descarte."
+            ),
+        })
+    return recomended
+
+
 def _regra_piquete_acima_da_capacidade(contexto: dict) -> list[dict]:
     recomended = []
     lotes = contexto.get("lotes")
@@ -217,6 +267,7 @@ def _regra_margem_em_risco(contexto: dict) -> list[dict]:
 
 REGRAS = [
     _regra_estoque_insuficiente,
+    _regra_validade_estoque,
     _regra_piquete_acima_da_capacidade,
     _regra_animais,
     _regra_margem_em_risco,
@@ -232,6 +283,8 @@ def avaliar(contexto: dict | None = None) -> list[dict]:
                        "carencia_ate": "AAAA-MM-DD"|None}, ...],
           "lotes":   [{"id", "capacidade_ua", "ua_atual"}, ...],
           "insumos": [{"id", "nome", "saldo", "consumo_diario"}, ...],
+          "lotes_estoque": [{"insumo_id", "nome", "unidade", "lote", "validade",
+                             "restante"}, ...],
           "preco_arroba": float|None,
           "custo_por_arroba": float|None,
           "hoje": "AAAA-MM-DD",

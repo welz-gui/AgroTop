@@ -19,6 +19,7 @@ from typing import Optional
 
 from services.compras import gerar_parcelas, total_compra
 from services.estoque import custo_medio_ponderado
+from services.validade_estoque import LoteInvalido, normalizar_lote_entrada
 
 from .conexao import _conn, _writes
 
@@ -50,6 +51,10 @@ def _validar_compra(compra: NovaCompra) -> Optional[dict]:
             return {"ok": False, "erro": "quantidade deve ser maior que zero"}
         if float(item["custo_unitario"]) < 0:
             return {"ok": False, "erro": "custo unitário não pode ser negativo"}
+        try:
+            normalizar_lote_entrada(item.get("lote"), item.get("validade"), compra.data_recebimento)
+        except LoteInvalido as exc:
+            return {"ok": False, "erro": str(exc)}
     return None
 
 
@@ -98,6 +103,8 @@ def _preparar_itens_e_estoque(
 
         insumo_updates.append((quantidade, novo_custo, insumo_id))
 
+        produto = normalizar_lote_entrada(
+            item.get("lote"), item.get("validade"), compra.data_recebimento)
         insumo_tx_params.append(
             (
                 insumo_id,
@@ -108,6 +115,8 @@ def _preparar_itens_e_estoque(
                 compra.operator,
                 f"compra {compra_id}",
                 compra_id,
+                produto["lote_produto"] or None,
+                produto["validade_produto"] or None,
             )
         )
 
@@ -139,7 +148,8 @@ def _preparar_contas_pagar(compra: NovaCompra, compra_id: str, parcelas: list) -
 def registrar(compra: NovaCompra) -> dict:
     """Registra a compra inteira: cabeçalho, itens, estoque e contas a pagar.
 
-    `itens`: lista de `{"insumo_id": int, "quantidade": float, "custo_unitario": float}`.
+    `itens`: lista de `{"insumo_id": int, "quantidade": float, "custo_unitario": float}`, com
+    `"lote"` e `"validade"` (AAAA-MM-DD) opcionais: viram lote e validade da entrada no estoque.
     Cada item aplica custo médio ponderado (ADR 0003) e vira uma entrada em
     `insumo_transactions` vinculada a esta compra. As parcelas usam
     `services.compras.gerar_parcelas` a partir do total real da nota.
@@ -194,8 +204,8 @@ def registrar(compra: NovaCompra) -> dict:
         con.executemany(
             """INSERT INTO insumo_transactions
                (insumo_id, type, quantity, reason, transaction_date, operator,
-                notes, compra_id)
-               VALUES (?,?,?,?,?,?,?,?)""",
+                notes, compra_id, lote_produto, validade_produto)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             insumo_tx_params,
         )
 
