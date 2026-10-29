@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-10-27 por tools/dump_schema_nuvem.py
+# Extraído em 2026-10-28 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -459,6 +459,38 @@ users.name
 users.role
 users.organizacao_id
 users.property_id
+vacinacao_brucelose_animais.id
+vacinacao_brucelose_animais.vacinacao_id
+vacinacao_brucelose_animais.animal_uuid
+vacinacao_brucelose_animais.brinco
+vacinacao_brucelose_animais.identificador_oficial
+vacinacao_brucelose_animais.registro_genealogico
+vacinacao_brucelose_animais.medication_id
+vacinacoes_brucelose.id
+vacinacoes_brucelose.property_id
+vacinacoes_brucelose.vacinado_em
+vacinacoes_brucelose.produto
+vacinacoes_brucelose.lote_produto
+vacinacoes_brucelose.validade_produto
+vacinacoes_brucelose.dose
+vacinacoes_brucelose.unidade
+vacinacoes_brucelose.via
+vacinacoes_brucelose.insumo_id
+vacinacoes_brucelose.veterinario_nome
+vacinacoes_brucelose.veterinario_crmv
+vacinacoes_brucelose.veterinario_uf
+vacinacoes_brucelose.status_oficial
+vacinacoes_brucelose.prazo_sda
+vacinacoes_brucelose.referencia_atestado
+vacinacoes_brucelose.confirmado_por
+vacinacoes_brucelose.confirmado_em
+vacinacoes_brucelose.justificativa_excecao
+vacinacoes_brucelose.registrado_por
+vacinacoes_brucelose.notes
+vacinacoes_brucelose.created_at
+vacinacoes_brucelose.cancelada_em
+vacinacoes_brucelose.cancelada_por
+vacinacoes_brucelose.motivo_cancelamento
 weighings.id
 weighings.weight
 weighings.weigh_date
