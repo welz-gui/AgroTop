@@ -6,3 +6,7 @@ const kCorrecaoSemConexao =
 
 String erroCarregamento(String recurso) =>
     'Não foi possível carregar $recurso. Tente novamente.';
+
+const kBruceloseSemConexao =
+    'Sem conexão: confirmar ou cancelar uma vacinação precisa de internet. '
+    'Tente de novo quando houver sinal.';
