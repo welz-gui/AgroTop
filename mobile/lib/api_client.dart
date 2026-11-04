@@ -681,6 +681,138 @@ class ApiClient {
         : null;
   }
 
+  /// Registra o ato de vacinação contra brucelose das fêmeas informadas. O ato nasce
+  /// pendente no SDA: o AgroTop não registra nada lá.
+  Future<BruceloseRegistered> registerBruceloseVaccination({
+    required List<String> animalIds,
+    required String data,
+    required String produto,
+    required String veterinarioNome,
+    String? veterinarioCrmv,
+    String? veterinarioUf,
+    String? lote,
+    String? validade,
+    double dose = 2.0,
+    String unidade = 'ml',
+    String via = 'Subcutânea',
+    String? notas,
+    String? idempotencyKey,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        Uri.parse('$baseUrl/vacinacoes-brucelose'),
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+            'Idempotency-Key': idempotencyKey,
+        },
+        body: jsonEncode({
+          'animal_ids': animalIds,
+          'data': data,
+          'produto': produto,
+          'veterinario_nome': veterinarioNome,
+          'veterinario_crmv': ?veterinarioCrmv,
+          'veterinario_uf': ?veterinarioUf,
+          'lote': ?lote,
+          'validade': ?validade,
+          'dose': dose,
+          'unidade': unidade,
+          'via': via,
+          'notas': ?notas,
+        }),
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 201) {
+      throw ApiException(
+        _message(body, 'Não foi possível registrar a vacinação.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return BruceloseRegistered.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<List<BruceloseVaccination>> listBruceloseVaccinations() async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse('$baseUrl/vacinacoes-brucelose'),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar as vacinações.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return (body as List<dynamic>)
+        .map((e) => BruceloseVaccination.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Um ato com a ficha dos animais.
+  Future<BruceloseVaccination> getBruceloseVaccination(String id) async {
+    final response = await _authorized(
+      (headers) => _http.get(
+        Uri.parse('$baseUrl/vacinacoes-brucelose/${Uri.encodeComponent(id)}'),
+        headers: headers,
+      ),
+    );
+    final body = _decode(response);
+    if (response.statusCode != 200) {
+      throw ApiException(
+        _message(body, 'Não foi possível carregar a vacinação.'),
+        statusCode: response.statusCode,
+      );
+    }
+    return BruceloseVaccination.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// Marca o ato como registrado no SDA. Só por confirmação de uma pessoa, com a
+  /// referência do atestado emitido pelo SDA.
+  Future<void> confirmBruceloseSda(
+    String id, {
+    required String referencia,
+    String? idempotencyKey,
+  }) async {
+    await _revisar(
+      '/vacinacoes-brucelose/${Uri.encodeComponent(id)}/confirmar-sda',
+      {'referencia': referencia},
+      idempotencyKey,
+      'Não foi possível confirmar o registro no SDA.',
+    );
+  }
+
+  /// Fecha a pendência sem registro no SDA, com justificativa.
+  Future<void> bruceloseSdaException(
+    String id, {
+    required String justificativa,
+    String? idempotencyKey,
+  }) async {
+    await _revisar(
+      '/vacinacoes-brucelose/${Uri.encodeComponent(id)}/excecao-sda',
+      {'justificativa': justificativa},
+      idempotencyKey,
+      'Não foi possível registrar a exceção.',
+    );
+  }
+
+  /// Cancela o ato (e cada aplicação). Só antes do registro no SDA.
+  Future<void> cancelBruceloseVaccination(
+    String id, {
+    required String motivo,
+    String? idempotencyKey,
+  }) async {
+    await _revisar(
+      '/vacinacoes-brucelose/${Uri.encodeComponent(id)}/cancelar',
+      {'motivo': motivo},
+      idempotencyKey,
+      'Não foi possível cancelar a vacinação.',
+    );
+  }
+
   Future<List<WeighingRecord>> listAnimalWeighings(
     String animalId, {
     int limite = 10,

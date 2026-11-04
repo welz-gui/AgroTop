@@ -74,6 +74,10 @@ class QueueItem {
       final animals = (p['animal_ids'] as List<dynamic>?)?.length ?? 1;
       return 'Movimentação de $animals animal(is) para $lote';
     }
+    if (endpoint == '/vacinacoes-brucelose') {
+      final n = (p['animal_ids'] as List<dynamic>?)?.length ?? 0;
+      return 'Vacinação contra brucelose de $n animal(is)';
+    }
     return '$metodo $endpoint';
   }
 }
@@ -370,6 +374,49 @@ class OfflineQueue {
     return clientUuid;
   }
 
+  /// Enfileira o ato de vacinação contra brucelose. `clientUuid` é a chave de idempotência: quem
+  /// já tentou enviar pela rede passa a mesma chave, então o reenvio não duplica o ato.
+  Future<String> enqueueBruceloseVaccination({
+    required List<String> animalIds,
+    required String data,
+    required String produto,
+    required String veterinarioNome,
+    String? veterinarioCrmv,
+    String? veterinarioUf,
+    String? lote,
+    String? validade,
+    double dose = 2.0,
+    String unidade = 'ml',
+    String via = 'Subcutânea',
+    String? notas,
+    String? clientUuid,
+  }) async {
+    final chave = clientUuid ?? _uuid.v4();
+    final payload = {
+      'animal_ids': animalIds,
+      'data': data,
+      'produto': produto,
+      'veterinario_nome': veterinarioNome,
+      'veterinario_crmv': ?veterinarioCrmv,
+      'veterinario_uf': ?veterinarioUf,
+      'lote': ?lote,
+      'validade': ?validade,
+      'dose': dose,
+      'unidade': unidade,
+      'via': via,
+      'notas': ?notas,
+    };
+    final item = QueueItem(
+      clientUuid: chave,
+      endpoint: '/vacinacoes-brucelose',
+      metodo: 'POST',
+      payloadJson: jsonEncode(payload),
+      criadoEm: DateTime.now(),
+    );
+    await _storage.insert(item);
+    return chave;
+  }
+
   Future<int> countPending() => _storage.count();
 
   Future<List<QueueItem>> getPendingItems() => _storage.getAll();
@@ -458,6 +505,24 @@ class OfflineQueue {
               loteOrigemEsperado: p['lote_origem_esperado']?.toString(),
               origensEsperadas: (p['origens_esperadas'] as Map<String, dynamic>?)
                   ?.map((k, v) => MapEntry(k, v.toString())),
+            );
+          } else if (item.endpoint == '/vacinacoes-brucelose') {
+            await api.registerBruceloseVaccination(
+              animalIds: (p['animal_ids'] as List<dynamic>)
+                  .map((e) => e.toString())
+                  .toList(growable: false),
+              data: p['data'] as String,
+              produto: p['produto'] as String,
+              veterinarioNome: p['veterinario_nome'] as String,
+              veterinarioCrmv: p['veterinario_crmv'] as String?,
+              veterinarioUf: p['veterinario_uf'] as String?,
+              lote: p['lote'] as String?,
+              validade: p['validade'] as String?,
+              dose: (p['dose'] as num).toDouble(),
+              unidade: p['unidade'] as String,
+              via: p['via'] as String,
+              notas: p['notas'] as String?,
+              idempotencyKey: item.clientUuid,
             );
           }
 

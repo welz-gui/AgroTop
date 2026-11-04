@@ -17,6 +17,7 @@ import 'dashboard_resumo_page.dart';
 import 'devices_page.dart';
 import 'feeding_page.dart';
 import 'animal_revision_cards.dart';
+import 'brucelose_pages.dart';
 import 'medication_page.dart';
 import 'movement_page.dart';
 import 'offline_cache_banner.dart';
@@ -407,6 +408,49 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     ),
   );
 
+  Future<void> _openBrucelose() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) =>
+          BrucelosePage(api: widget.api, onUnauthorized: widget.onUnauthorized),
+    ),
+  );
+
+  /// A vacinação é só de fêmeas: da seleção seguem as fêmeas, e o formulário diz quantos
+  /// animais ficaram de fora.
+  Future<void> _openBruceloseVaccination() async {
+    final femeas = [
+      for (final a in _animals)
+        if (_selectedIds.contains(a.id) && a.sex == 'F') a.id,
+    ];
+    if (femeas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A vacinação contra brucelose é só de fêmeas. '
+            'Nenhuma fêmea na seleção.',
+          ),
+        ),
+      );
+      return;
+    }
+    final registrada = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BruceloseVaccinationPage(
+          api: widget.api,
+          animalIds: femeas,
+          excluidos: _selectedIds.length - femeas.length,
+          onUnauthorized: widget.onUnauthorized,
+          offlineQueue: _offlineQueue,
+        ),
+      ),
+    );
+    if (registrada == true && mounted) {
+      _stopSelecting();
+      await _loadPendingQueueCount();
+      await _load(reset: true);
+    }
+  }
+
   void _closeDrawerAnd(Future<void> Function() action) {
     Navigator.of(context).pop();
     action();
@@ -492,6 +536,12 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
             onTap: () => _closeDrawerAnd(_openStock),
           ),
           ListTile(
+            key: const ValueKey('open-brucelose'),
+            leading: const Icon(Icons.medical_services_outlined),
+            title: const Text('Brucelose (SDA)'),
+            onTap: () => _closeDrawerAnd(_openBrucelose),
+          ),
+          ListTile(
             key: const ValueKey('open-reports'),
             leading: const Icon(Icons.description_outlined),
             title: const Text('Relatórios'),
@@ -567,13 +617,29 @@ class _AnimalsPageState extends State<AnimalsPage> with WidgetsBindingObserver {
     bottomNavigationBar: _selecting
         ? SafeArea(
             minimum: const EdgeInsets.all(16),
-            child: FilledButton.icon(
-              key: const ValueKey('move-selected-animals'),
-              onPressed: _selectedIds.isEmpty
-                  ? null
-                  : () => _openMovement(_selectedIds.toList(growable: false)),
-              icon: const Icon(Icons.swap_horiz),
-              label: Text('Mover ${_selectedIds.length} selecionado(s)'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton.icon(
+                  key: const ValueKey('move-selected-animals'),
+                  onPressed: _selectedIds.isEmpty
+                      ? null
+                      : () =>
+                            _openMovement(_selectedIds.toList(growable: false)),
+                  icon: const Icon(Icons.swap_horiz),
+                  label: Text('Mover ${_selectedIds.length} selecionado(s)'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('vaccinate-selected-animals'),
+                  onPressed: _selectedIds.isEmpty
+                      ? null
+                      : _openBruceloseVaccination,
+                  icon: const Icon(Icons.medical_services_outlined),
+                  label: const Text('Vacinar contra brucelose'),
+                ),
+              ],
             ),
           )
         : null,
