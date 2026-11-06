@@ -36,6 +36,7 @@ from backend_api.schemas import (
     CancelarAplicacaoInput,
     CancelarRegistroInput,
     CarenciaOutput,
+    ConfirmarRegistroSdaInput,
     ConfirmarTratoInput,
     CorrigirAplicacaoInput,
     CorrigirMovimentacaoInput,
@@ -43,6 +44,7 @@ from backend_api.schemas import (
     CriarLoteInput,
     DashboardResumoOutput,
     DispositivoOutput,
+    ExcecaoSdaInput,
     ImportarPesagensOutput,
     InsumoInventarioOutput,
     LoginInput,
@@ -55,6 +57,7 @@ from backend_api.schemas import (
     MovimentarOutput,
     MudarStatusDispositivoInput,
     MudarStatusDispositivoOutput,
+    OkOutput,
     PesagemInput,
     PesagemOutput,
     PesagemRegistroOutput,
@@ -73,9 +76,14 @@ from backend_api.schemas import (
     RevisaoMovimentacaoOutput,
     RevisaoPesagemOutput,
     SalvarPerimetroInput,
+    StatusOficialOutput,
     TokenOutput,
     TratoPendenteOutput,
     UserSummary,
+    VacinacaoBruceloseDetalheOutput,
+    VacinacaoBruceloseInput,
+    VacinacaoBruceloseOutput,
+    VacinacaoRegistradaOutput,
 )
 from database import (
     AGE_SOURCES,
@@ -116,6 +124,7 @@ from repositories.pesagens import (
     get_all_weighings,
     get_weighings_batch,
 )
+from repositories import vacinacao_brucelose
 from repositories.revisao import RegistroJaCancelado, RegistroNaoEncontrado, RevisaoNaoPermitida
 from repositories.sanidade import (
     AplicacaoJaCancelada,
@@ -129,6 +138,9 @@ from repositories.sanidade import (
     get_protocols,
     get_withdrawal_end,
     get_withdrawal_end_batch,
+)
+from repositories.vacinacao_brucelose import (
+    EstadoDaVacinacao, NovaVacinacao, VacinacaoInvalida, VacinacaoNaoEncontrada,
 )
 from services.estados_dispositivo import estados, transicao_permitida
 from services.importacao import parse_pesagens
@@ -1188,6 +1200,202 @@ def corrigir_aplicacao(
     return executar_idempotente(
         idempotency_key, f"/animais/{animal_id}/medicamentos/{aplicacao_id}/corrigir",
         data.model_dump(), response, status.HTTP_200_OK, executar,
+    )
+
+
+def _erro_da_vacinacao(exc: Exception) -> HTTPException:
+    """Traduz os erros da vacinação contra brucelose. Em todos, nada foi gravado."""
+    if isinstance(exc, VacinacaoNaoEncontrada):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, EstadoDaVacinacao):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"codigo": "estado_da_vacinacao", "mensagem": str(exc)})
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+
+def _propriedade_dos_animais(animal_ids: list[str]) -> str:
+    """A propriedade do primeiro animal; vazio se não houver animal (o repositório recusa)."""
+    if not animal_ids:
+        return ""
+    animal = get_animal(animal_ids[0])
+    if animal is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Animal não encontrado: {animal_ids[0]}.")
+    if not animal.get("property_id"):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"O animal {animal_ids[0]} não tem propriedade.")
+    return str(animal["property_id"])
+
+
+def _vacinacao_para_saida(v: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(v["id"]),
+        "property_id": str(v["property_id"]),
+        "propriedade": v["property_nome"],
+        "data": str(v["vacinado_em"]),
+        "produto": v["produto"],
+        "lote": v.get("lote_produto") or None,
+        "validade": str(v["validade_produto"]) if v.get("validade_produto") else None,
+        "dose": float(v.get("dose") or 0),
+        "unidade": v.get("unidade") or "",
+        "via": v.get("via") or "",
+        "veterinario_nome": v["veterinario_nome"],
+        "veterinario_crmv": v.get("veterinario_crmv") or None,
+        "veterinario_uf": v.get("veterinario_uf") or None,
+        "n_animais": int(v.get("n_animais") or 0),
+        "status_oficial": v["status_oficial"],
+        "referencia_atestado": v.get("referencia_atestado") or None,
+        "justificativa_excecao": v.get("justificativa_excecao") or None,
+        "prazo_sda": str(v["prazo_sda"]) if v.get("prazo_sda") else None,
+        "situacao_prazo": v["situacao_prazo"],
+        "cancelada": bool(v.get("cancelada_em")),
+        "motivo_cancelamento": v.get("motivo_cancelamento") or None,
+    }
+
+
+@app.post(
+    "/vacinacoes-brucelose",
+    response_model=VacinacaoRegistradaOutput,
+    status_code=status.HTTP_201_CREATED,
+)
+def registrar_vacinacao_brucelose(
+    data: VacinacaoBruceloseInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Registra o ato de vacinação e a aplicação de cada animal, na mesma transação.
+
+    O AgroTop não registra nada no SDA: o ato nasce `pendente_sda`, e só uma pessoa o confirma.
+    """
+    def executar() -> dict[str, Any]:
+        property_id = data.property_id or _propriedade_dos_animais(data.animal_ids)
+        try:
+            r = vacinacao_brucelose.registrar(NovaVacinacao(
+                property_id=property_id,
+                vacinado_em=data.data,
+                animal_ids=data.animal_ids,
+                produto=data.produto,
+                veterinario_nome=data.veterinario_nome,
+                veterinario_crmv=data.veterinario_crmv or "",
+                veterinario_uf=data.veterinario_uf or "",
+                lote_produto=data.lote or "",
+                validade_produto=data.validade or "",
+                dose=data.dose,
+                unidade=data.unidade,
+                via=data.via,
+                insumo_id=data.insumo_id,
+                operator=user.get("username", ""),
+                notes=data.notas or "",
+            ))
+        except (VacinacaoInvalida, TratamentoInvalido) as exc:
+            raise _erro_da_vacinacao(exc)
+        return {"id": r["id"], "n": r["n"], "prazo_sda": r["prazo_sda"], "avisos": r["avisos"]}
+
+    return executar_idempotente(
+        idempotency_key, "/vacinacoes-brucelose", data.model_dump(),
+        response, status.HTTP_201_CREATED, executar,
+    )
+
+
+@app.get("/vacinacoes-brucelose", response_model=list[VacinacaoBruceloseOutput])
+def list_vacinacoes_brucelose(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+    incluir_canceladas: bool = Query(False, description="Inclui os atos cancelados"),
+) -> list[dict[str, Any]]:
+    """Os atos de vacinação, do mais recente ao mais antigo, com o estado do registro no SDA."""
+    return [_vacinacao_para_saida(v) for v in vacinacao_brucelose.listar(incluir_canceladas)]
+
+
+@app.get("/vacinacoes-brucelose/{vacinacao_id}", response_model=VacinacaoBruceloseDetalheOutput)
+def get_vacinacao_brucelose(
+    vacinacao_id: str,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Um ato com a ficha dos animais (brinco, identificador oficial, registro genealógico)."""
+    try:
+        ato = vacinacao_brucelose.obter(vacinacao_id)
+    except VacinacaoNaoEncontrada as exc:
+        raise _erro_da_vacinacao(exc)
+    return {
+        **_vacinacao_para_saida(ato),
+        "animais": [
+            {"brinco": str(a["brinco"]),
+             "identificador_oficial": a.get("identificador_oficial") or None,
+             "registro_genealogico": a.get("registro_genealogico") or None}
+            for a in vacinacao_brucelose.animais_da_vacinacao(vacinacao_id)
+        ],
+    }
+
+
+@app.post("/vacinacoes-brucelose/{vacinacao_id}/confirmar-sda", response_model=StatusOficialOutput)
+def confirmar_vacinacao_sda(
+    vacinacao_id: str,
+    data: ConfirmarRegistroSdaInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Marca o ato como registrado no SDA. Só por confirmação de uma pessoa, com a referência do
+    atestado emitido pelo SDA; o AgroTop nunca infere isso."""
+    def executar() -> dict[str, Any]:
+        try:
+            return vacinacao_brucelose.confirmar_registro_sda(
+                vacinacao_id, data.referencia, user.get("username", ""))
+        except VacinacaoInvalida as exc:
+            raise _erro_da_vacinacao(exc)
+
+    resultado = executar_idempotente(
+        idempotency_key, f"/vacinacoes-brucelose/{vacinacao_id}/confirmar-sda", data.model_dump(),
+        response, status.HTTP_200_OK, executar,
+    )
+    return {"status_oficial": resultado["status_oficial"]}
+
+
+@app.post("/vacinacoes-brucelose/{vacinacao_id}/excecao-sda", response_model=StatusOficialOutput)
+def excecao_vacinacao_sda(
+    vacinacao_id: str,
+    data: ExcecaoSdaInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Fecha a pendência sem registro no SDA, com justificativa escrita."""
+    def executar() -> dict[str, Any]:
+        try:
+            return vacinacao_brucelose.registrar_excecao(
+                vacinacao_id, data.justificativa, user.get("username", ""))
+        except VacinacaoInvalida as exc:
+            raise _erro_da_vacinacao(exc)
+
+    resultado = executar_idempotente(
+        idempotency_key, f"/vacinacoes-brucelose/{vacinacao_id}/excecao-sda", data.model_dump(),
+        response, status.HTTP_200_OK, executar,
+    )
+    return {"status_oficial": resultado["status_oficial"]}
+
+
+@app.post("/vacinacoes-brucelose/{vacinacao_id}/cancelar", response_model=OkOutput)
+def cancelar_vacinacao_brucelose(
+    vacinacao_id: str,
+    data: CancelarRegistroInput,
+    user: Annotated[dict[str, Any], Depends(get_current_user)],
+    response: Response,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> dict[str, Any]:
+    """Cancela o ato e cada aplicação (o registro fica, com motivo e autor). Só antes do registro
+    no SDA: depois, o cancelamento é feito no próprio SDA (409)."""
+    def executar() -> dict[str, Any]:
+        try:
+            vacinacao_brucelose.cancelar(vacinacao_id, data.motivo, user.get("username", ""))
+        except (VacinacaoInvalida, RevisaoNaoPermitida) as exc:
+            raise _erro_da_vacinacao(exc)
+        return {"ok": True}
+
+    return executar_idempotente(
+        idempotency_key, f"/vacinacoes-brucelose/{vacinacao_id}/cancelar", data.model_dump(),
+        response, status.HTTP_200_OK, executar,
     )
 
 

@@ -299,6 +299,94 @@ class CarenciaOutput(BaseModel):
     carencia_ate: Optional[str] = None
 
 
+class VacinacaoBruceloseInput(BaseModel):
+    """O ato de vacinação contra brucelose: um grupo de fêmeas, uma vacina, um veterinário."""
+
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    animal_ids: list[str]
+    # AAAA-MM-DD. É a data do ato no curral: a de sincronização nunca a substitui.
+    data: str
+    produto: str
+    veterinario_nome: str
+    veterinario_crmv: Optional[str] = None
+    veterinario_uf: Optional[str] = None
+    lote: Optional[str] = None
+    validade: Optional[str] = None
+    dose: float = 2.0
+    unidade: str = "ml"
+    via: str = "Subcutânea"
+    # Sem ela, vale a propriedade do primeiro animal; animal de outra propriedade é recusado (422).
+    property_id: Optional[str] = None
+    # Com ele, baixa do estoque (como na web). O app não envia.
+    insumo_id: Optional[int] = None
+    notas: Optional[str] = None
+
+
+class VacinacaoRegistradaOutput(BaseModel):
+    id: str
+    n: int
+    # Quinto dia do mês seguinte; nulo para vacinação anterior a 01/01/2027 (sem prazo exigido).
+    prazo_sda: Optional[str] = None
+    avisos: list[str] = []
+
+
+class VacinacaoAnimalOutput(BaseModel):
+    brinco: str
+    identificador_oficial: Optional[str] = None
+    registro_genealogico: Optional[str] = None
+
+
+class VacinacaoBruceloseOutput(BaseModel):
+    id: str
+    property_id: str
+    propriedade: str
+    data: str
+    produto: str
+    lote: Optional[str] = None
+    validade: Optional[str] = None
+    dose: float
+    unidade: str
+    via: str
+    veterinario_nome: str
+    veterinario_crmv: Optional[str] = None
+    veterinario_uf: Optional[str] = None
+    n_animais: int
+    # pendente_sda | registrado_sda | excecao. "registrado_sda" só por confirmação humana.
+    status_oficial: str
+    referencia_atestado: Optional[str] = None
+    justificativa_excecao: Optional[str] = None
+    prazo_sda: Optional[str] = None
+    # no_prazo | vencendo | atrasado | sem_prazo | cumprido | cancelada
+    situacao_prazo: str
+    cancelada: bool = False
+    motivo_cancelamento: Optional[str] = None
+
+
+class VacinacaoBruceloseDetalheOutput(VacinacaoBruceloseOutput):
+    animais: list[VacinacaoAnimalOutput]
+
+
+class ConfirmarRegistroSdaInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    referencia: str
+
+
+class ExcecaoSdaInput(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    justificativa: str
+
+
+class StatusOficialOutput(BaseModel):
+    status_oficial: str
+
+
+class OkOutput(BaseModel):
+    ok: bool = True
+
+
 class TratoPendenteOutput(BaseModel):
     plano_id: int
     lote_id: str

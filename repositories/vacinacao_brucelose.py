@@ -38,6 +38,14 @@ class VacinacaoInvalida(ValueError):
     Nada é gravado."""
 
 
+class VacinacaoNaoEncontrada(VacinacaoInvalida):
+    """O id não existe."""
+
+
+class EstadoDaVacinacao(VacinacaoInvalida):
+    """A ação não cabe no estado atual do ato: cancelado, já registrado no SDA ou com exceção."""
+
+
 @dataclass
 class NovaVacinacao:
     property_id: str
@@ -188,7 +196,7 @@ def registrar(dados: NovaVacinacao) -> dict:
 def _carregar(con, vacinacao_id: str) -> dict:
     v = con.execute("SELECT * FROM vacinacoes_brucelose WHERE id=?", (vacinacao_id,)).fetchone()
     if v is None:
-        raise VacinacaoInvalida("Vacinação não encontrada.")
+        raise VacinacaoNaoEncontrada("Vacinação não encontrada.")
     return dict(v)
 
 
@@ -200,9 +208,9 @@ def confirmar_registro_sda(vacinacao_id: str, referencia: str, usuario: str) -> 
     with _conn() as con:
         v = _carregar(con, vacinacao_id)
         if v["cancelada_em"]:
-            raise VacinacaoInvalida("Esta vacinação foi cancelada.")
+            raise EstadoDaVacinacao("Esta vacinação foi cancelada.")
         if v["status_oficial"] != PENDENTE:
-            raise VacinacaoInvalida(f"A vacinação já está '{v['status_oficial']}'.")
+            raise EstadoDaVacinacao(f"A vacinação já está '{v['status_oficial']}'.")
         con.execute(
             """UPDATE vacinacoes_brucelose SET status_oficial=?, referencia_atestado=?,
                confirmado_por=?, confirmado_em=? WHERE id=? AND status_oficial=?""",
@@ -222,9 +230,9 @@ def registrar_excecao(vacinacao_id: str, justificativa: str, usuario: str) -> di
     with _conn() as con:
         v = _carregar(con, vacinacao_id)
         if v["cancelada_em"]:
-            raise VacinacaoInvalida("Esta vacinação foi cancelada.")
+            raise EstadoDaVacinacao("Esta vacinação foi cancelada.")
         if v["status_oficial"] != PENDENTE:
-            raise VacinacaoInvalida(f"A vacinação já está '{v['status_oficial']}'.")
+            raise EstadoDaVacinacao(f"A vacinação já está '{v['status_oficial']}'.")
         con.execute(
             """UPDATE vacinacoes_brucelose SET status_oficial=?, justificativa_excecao=?,
                confirmado_por=?, confirmado_em=? WHERE id=? AND status_oficial=?""",
@@ -244,9 +252,9 @@ def cancelar(vacinacao_id: str, motivo: str, usuario: str) -> dict:
     with _conn() as con:
         v = _carregar(con, vacinacao_id)
         if v["cancelada_em"]:
-            raise VacinacaoInvalida("Esta vacinação já foi cancelada.")
+            raise EstadoDaVacinacao("Esta vacinação já foi cancelada.")
         if v["status_oficial"] == REGISTRADO:
-            raise VacinacaoInvalida(
+            raise EstadoDaVacinacao(
                 "Vacinação já registrada no SDA: o cancelamento precisa ser feito no SDA.")
         itens = con.execute(
             "SELECT medication_id FROM vacinacao_brucelose_animais WHERE vacinacao_id=?",
@@ -269,22 +277,39 @@ def cancelar(vacinacao_id: str, motivo: str, usuario: str) -> dict:
     return {"ok": True}
 
 
+_SELECT_ATO = """SELECT v.*, p.nome AS property_nome,
+                        (SELECT COUNT(*) FROM vacinacao_brucelose_animais a WHERE a.vacinacao_id=v.id) AS n_animais
+                 FROM vacinacoes_brucelose v JOIN properties p ON p.id=v.property_id"""
+
+
+def _com_situacao(rows) -> list[dict]:
+    hoje = date.today()
+    out = [dict(r) for r in rows]
+    for r in out:
+        r["situacao_prazo"] = ("cancelada" if r["cancelada_em"]
+                               else situacao_do_prazo(r["status_oficial"], r["prazo_sda"], hoje))
+    return out
+
+
 def listar(incluir_canceladas: bool = False) -> list[dict]:
     """Os atos de vacinação, do mais recente ao mais antigo, com a propriedade, o total de
     animais e a situação do prazo."""
-    sql = """SELECT v.*, p.nome AS property_nome,
-                    (SELECT COUNT(*) FROM vacinacao_brucelose_animais a WHERE a.vacinacao_id=v.id) AS n_animais
-             FROM vacinacoes_brucelose v JOIN properties p ON p.id=v.property_id"""
+    sql = _SELECT_ATO
     if not incluir_canceladas:
         sql += " WHERE v.cancelada_em IS NULL"
     sql += " ORDER BY v.vacinado_em DESC, v.created_at DESC"
-    hoje = date.today()
     with _conn() as con:
-        rows = [dict(r) for r in con.execute(sql).fetchall()]
-    for r in rows:
-        r["situacao_prazo"] = ("cancelada" if r["cancelada_em"]
-                               else situacao_do_prazo(r["status_oficial"], r["prazo_sda"], hoje))
-    return rows
+        return _com_situacao(con.execute(sql).fetchall())
+
+
+def obter(vacinacao_id: str) -> dict:
+    """Um ato (mesmo cancelado), com a propriedade, o total de animais e a situação do prazo.
+    Levanta `VacinacaoNaoEncontrada`."""
+    with _conn() as con:
+        rows = con.execute(_SELECT_ATO + " WHERE v.id=?", (vacinacao_id,)).fetchall()
+    if not rows:
+        raise VacinacaoNaoEncontrada("Vacinação não encontrada.")
+    return _com_situacao(rows)[0]
 
 
 def animais_da_vacinacao(vacinacao_id: str) -> list[dict]:
