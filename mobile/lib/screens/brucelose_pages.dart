@@ -531,8 +531,11 @@ class _BrucelosePageState extends State<BrucelosePage> {
     _future = widget.api.listBruceloseVaccinations();
   }
 
-  void _reload() =>
-      setState(() => _future = widget.api.listBruceloseVaccinations());
+  void _reload() {
+    setState(() {
+      _future = widget.api.listBruceloseVaccinations();
+    });
+  }
 
   Future<void> _open(BruceloseVaccination v) async {
     final mudou = await Navigator.of(context).push<bool>(

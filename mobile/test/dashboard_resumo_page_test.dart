@@ -47,6 +47,8 @@ Future<void> _openDrawer(WidgetTester tester) async {
 Future<void> _tapDrawerItem(WidgetTester tester, String key) async {
   final item = find.byKey(ValueKey<String>(key));
   await tester.ensureVisible(item);
+  // O scroll só vale para o toque depois de um frame.
+  await tester.pumpAndSettle();
   await tester.tap(item);
   await tester.pumpAndSettle();
 }
