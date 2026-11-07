@@ -288,6 +288,9 @@ class AplicacaoMedicamentoOutput(BaseModel):
     principio_ativo: Optional[str] = None
     lote: Optional[str] = None
     validade: Optional[str] = None
+    # Piquete do animal na data da aplicação. Nulo nas aplicações anteriores à migration 0039.
+    piquete_id: Optional[str] = None
+    piquete: Optional[str] = None
 
 
 class MedicamentosOutput(BaseModel):

@@ -551,6 +551,7 @@ _SCHEMA_SQL = """
                 cancelada_por       TEXT,
                 motivo_cancelamento TEXT,
                 corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
+                lote_id             TEXT,      -- piquete do animal na data da aplicação (0039)
                 FOREIGN KEY (insumo_id) REFERENCES insumos(id),
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid),
                 FOREIGN KEY (protocol_id) REFERENCES health_protocols(id)
@@ -1203,6 +1204,9 @@ def _migrate(con) -> None:
                       ("motivo_cancelamento", "TEXT"), ("corrige_id", "INTEGER")):
         if _c not in _mc:
             con.execute(f"ALTER TABLE medications ADD COLUMN {_c} {_tipo}")
+    # Piquete do animal na data da aplicação (migration 0039).
+    if "lote_id" not in _mc:
+        con.execute("ALTER TABLE medications ADD COLUMN lote_id TEXT")
     # Lote e validade por entrada de estoque (migration 0037).
     _tc = {r["name"] for r in con.execute("PRAGMA table_info(insumo_transactions)").fetchall()}
     for _c in ("lote_produto", "validade_produto"):

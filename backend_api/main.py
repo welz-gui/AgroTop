@@ -899,6 +899,8 @@ def list_medicamentos(
                 "principio_ativo": aplicacao.get("principio_ativo") or None,
                 "lote": aplicacao.get("lote_produto") or None,
                 "validade": aplicacao.get("validade_produto") or None,
+                "piquete_id": aplicacao.get("lote_id") or None,
+                "piquete": aplicacao.get("piquete_nome") or None,
             }
             for aplicacao in aplicacoes
         ],

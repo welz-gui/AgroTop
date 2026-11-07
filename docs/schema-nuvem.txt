@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-10-28 por tools/dump_schema_nuvem.py
+# Extraído em 2026-11-07 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -330,6 +330,7 @@ medications.cancelada_em
 medications.cancelada_por
 medications.motivo_cancelamento
 medications.corrige_id
+medications.lote_id
 movimentacao_animais.id
 movimentacao_animais.movimentacao_id
 movimentacao_animais.animal_uuid

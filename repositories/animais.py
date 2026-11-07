@@ -186,6 +186,24 @@ def count_animals(status: Optional[str] = "ativo",
         return con.execute(sql, args).fetchone()[0]
 
 
+def lote_na_data(con, animal_uuid: str, data: str) -> Optional[str]:
+    """Piquete em que o animal estava em `data` (AAAA-MM-DD), na conexão do chamador.
+
+    Se houve movimentação vigente depois da data, o animal estava no piquete de origem da primeira
+    delas; se não houve, está onde está hoje. Vale para aplicação feita offline ou retroativa: o
+    piquete é o da data, não o do momento do registro. Movimentação no próprio dia conta como já
+    feita. Sem piquete conhecido, devolve None.
+    """
+    m = con.execute(
+        """SELECT from_lote_id FROM animal_movements
+           WHERE animal_uuid=? AND cancelada_em IS NULL AND movement_date > ?
+           ORDER BY movement_date, id LIMIT 1""", (animal_uuid, data)).fetchone()
+    if m is not None:
+        return m["from_lote_id"]
+    r = con.execute("SELECT lote_id FROM animals WHERE uuid=?", (animal_uuid,)).fetchone()
+    return r["lote_id"] if r else None
+
+
 def get_animal(animal_id: str) -> Optional[dict]:
     with _conn() as con:
         row = con.execute(
