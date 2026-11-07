@@ -1071,3 +1071,132 @@ class RelatorioPesagemItem {
   };
 }
 
+/// Um animal da ficha da vacinação: o que estava ativo no dia, para o veterinário lançar no SDA.
+class BruceloseAnimal {
+  const BruceloseAnimal({
+    required this.brinco,
+    this.identificadorOficial,
+    this.registroGenealogico,
+  });
+
+  final String brinco;
+  final String? identificadorOficial;
+  final String? registroGenealogico;
+
+  factory BruceloseAnimal.fromJson(Map<String, dynamic> json) =>
+      BruceloseAnimal(
+        brinco: json['brinco'].toString(),
+        identificadorOficial: json['identificador_oficial'] as String?,
+        registroGenealogico: json['registro_genealogico'] as String?,
+      );
+}
+
+/// O ato de vacinação contra brucelose e o estado do registro oficial no SDA.
+/// `statusOficial` é `pendente_sda`, `registrado_sda` ou `excecao`; o AgroTop nunca marca
+/// "registrado" por conta própria. `animais` só vem no detalhe.
+class BruceloseVaccination {
+  const BruceloseVaccination({
+    required this.id,
+    required this.propriedade,
+    required this.data,
+    required this.produto,
+    this.lote,
+    this.validade,
+    required this.dose,
+    required this.unidade,
+    required this.via,
+    required this.veterinarioNome,
+    this.veterinarioCrmv,
+    this.veterinarioUf,
+    required this.nAnimais,
+    required this.statusOficial,
+    this.referenciaAtestado,
+    this.justificativaExcecao,
+    this.prazoSda,
+    required this.situacaoPrazo,
+    this.cancelada = false,
+    this.motivoCancelamento,
+    this.animais = const [],
+  });
+
+  final String id;
+  final String propriedade;
+  final String data;
+  final String produto;
+  final String? lote;
+  final String? validade;
+  final double dose;
+  final String unidade;
+  final String via;
+  final String veterinarioNome;
+  final String? veterinarioCrmv;
+  final String? veterinarioUf;
+  final int nAnimais;
+  final String statusOficial;
+  final String? referenciaAtestado;
+  final String? justificativaExcecao;
+
+  /// Quinto dia do mês seguinte; nulo para vacinação anterior a 01/01/2027.
+  final String? prazoSda;
+
+  /// no_prazo, vencendo, atrasado, sem_prazo, cumprido ou cancelada.
+  final String situacaoPrazo;
+  final bool cancelada;
+  final String? motivoCancelamento;
+  final List<BruceloseAnimal> animais;
+
+  /// Ainda sem registro no SDA e sem exceção: dá para confirmar, justificar ou cancelar.
+  bool get pendente => statusOficial == 'pendente_sda' && !cancelada;
+
+  factory BruceloseVaccination.fromJson(Map<String, dynamic> json) =>
+      BruceloseVaccination(
+        id: json['id'] as String,
+        propriedade: json['propriedade'] as String,
+        data: json['data'] as String,
+        produto: json['produto'] as String,
+        lote: json['lote'] as String?,
+        validade: json['validade'] as String?,
+        dose: (json['dose'] as num).toDouble(),
+        unidade: (json['unidade'] as String?) ?? '',
+        via: (json['via'] as String?) ?? '',
+        veterinarioNome: json['veterinario_nome'] as String,
+        veterinarioCrmv: json['veterinario_crmv'] as String?,
+        veterinarioUf: json['veterinario_uf'] as String?,
+        nAnimais: (json['n_animais'] as num?)?.toInt() ?? 0,
+        statusOficial: json['status_oficial'] as String,
+        referenciaAtestado: json['referencia_atestado'] as String?,
+        justificativaExcecao: json['justificativa_excecao'] as String?,
+        prazoSda: json['prazo_sda'] as String?,
+        situacaoPrazo: (json['situacao_prazo'] as String?) ?? 'sem_prazo',
+        cancelada: (json['cancelada'] as bool?) ?? false,
+        motivoCancelamento: json['motivo_cancelamento'] as String?,
+        animais: ((json['animais'] as List<dynamic>?) ?? const [])
+            .map((e) => BruceloseAnimal.fromJson(e as Map<String, dynamic>))
+            .toList(growable: false),
+      );
+}
+
+/// O que o servidor devolve ao registrar a vacinação.
+class BruceloseRegistered {
+  const BruceloseRegistered({
+    required this.id,
+    required this.n,
+    this.prazoSda,
+    this.avisos = const [],
+  });
+
+  final String id;
+  final int n;
+  final String? prazoSda;
+  final List<String> avisos;
+
+  factory BruceloseRegistered.fromJson(Map<String, dynamic> json) =>
+      BruceloseRegistered(
+        id: json['id'] as String,
+        n: (json['n'] as num).toInt(),
+        prazoSda: json['prazo_sda'] as String?,
+        avisos: List<String>.from(
+          (json['avisos'] as List<dynamic>?) ?? const [],
+        ),
+      );
+}
