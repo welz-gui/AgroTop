@@ -13,6 +13,7 @@ from .animais import get_all_animals
 from .animais import uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
+from .revisao import foto
 from services.tratamento import TratamentoInvalido, normalizar_produto
 from services.zootecnia import get_age_months
 
@@ -379,9 +380,16 @@ def set_protocol_active(pid: int, active: int) -> None:
 
 
 @_writes
-def delete_protocol(pid: int) -> None:
+def delete_protocol(pid: int, usuario: str = "") -> None:
+    """Apaga o protocolo e deixa a linha apagada na trilha de auditoria, na mesma transação.
+    Id inexistente não faz nada. As aplicações já feitas guardam o `protocol_id` e seguem."""
     with _conn() as con:
+        antes = con.execute("SELECT * FROM health_protocols WHERE id=?", (pid,)).fetchone()
+        if antes is None:
+            return
         con.execute("DELETE FROM health_protocols WHERE id=?", (pid,))
+        eventos.auditar_em(con, "excluir_protocolo", usuario=usuario, entidade="health_protocols",
+                           entidade_id=pid, registro_anterior=foto(dict(antes)))
 
 
 _FREQ_DAYS = {"anual": 365, "semestral": 182, "trimestral": 91, "mensal": 30}

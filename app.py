@@ -4035,7 +4035,7 @@ def _fin_custos_fixos(animals, lotes):
             opt={f"#{f['id']} · {f['cost_date']} · {f['category']} · R$ {f['amount']:,.2f}":f["id"] for f in fixed}
             sel_del=st.selectbox("Lançamento", list(opt.keys()), key="del_fix")
             if st.button("Excluir", type="secondary"):
-                db.delete_fixed_cost(opt[sel_del])
+                db.delete_fixed_cost(opt[sel_del], usuario=st.session_state.user["name"])
                 st.success("Lançamento excluído."); st.rerun()
     else:
         st.info("Nenhum custo fixo lançado no período selecionado.")
@@ -5771,7 +5771,7 @@ def _render_tab_gestao_protocolos(insumos):
                 db.set_protocol_active(p["id"], 0 if p["active"] else 1); st.rerun()
         with c3:
             if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
-                db.delete_protocol(p["id"]); st.rerun()
+                db.delete_protocol(p["id"], usuario=st.session_state.user["name"]); st.rerun()
 
     st.markdown("---")
     st.markdown("**➕ Novo Protocolo**")
