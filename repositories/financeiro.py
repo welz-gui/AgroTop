@@ -13,6 +13,7 @@ from . import conexao as _conexao
 from .animais import get_animal, uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
+from .revisao import foto
 
 # Regras puras importadas em vez de reimplementadas (ROADMAP R8).
 from services.zootecnia import get_age_category
@@ -144,9 +145,16 @@ def get_total_fixed_costs(start_date: Optional[str] = None,
 
 
 @_writes
-def delete_fixed_cost(cost_id: int) -> None:
+def delete_fixed_cost(cost_id: int, usuario: str = "") -> None:
+    """Apaga o custo fixo e deixa a linha apagada na trilha de auditoria, na mesma transação.
+    Id inexistente não faz nada."""
     with _conn() as con:
+        antes = con.execute("SELECT * FROM fixed_costs WHERE id=?", (cost_id,)).fetchone()
+        if antes is None:
+            return
         con.execute("DELETE FROM fixed_costs WHERE id=?", (cost_id,))
+        eventos.auditar_em(con, "excluir_custo_fixo", usuario=usuario, entidade="fixed_costs",
+                           entidade_id=cost_id, registro_anterior=foto(dict(antes)))
 
 
 def get_fixed_costs_by_category(start_date: Optional[str] = None,
