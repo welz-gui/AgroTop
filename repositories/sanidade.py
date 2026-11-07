@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from .animais import get_all_animals
-from .animais import uuid_de
+from .animais import lote_na_data, uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
 from .revisao import foto
@@ -59,8 +59,9 @@ def _medications_by_animal() -> dict:
     """Todos os medicamentos agrupados por animal (mais recente primeiro). 1 consulta."""
     with _conn() as con:
         rows = con.execute(
-            """SELECT m.*, a.id AS animal_id
+            """SELECT m.*, a.id AS animal_id, l.name AS piquete_nome
                FROM medications m JOIN animals a ON a.uuid=m.animal_uuid
+               LEFT JOIN lotes l ON l.id=m.lote_id
                WHERE m.cancelada_em IS NULL
                ORDER BY m.med_date DESC, m.id DESC"""
         ).fetchall()
@@ -81,8 +82,9 @@ def get_medication_history(animal_id: str) -> list[dict]:
     que a ficha mostra para a correção ficar visível ao lado do original."""
     with _conn() as con:
         rows = con.execute(
-            """SELECT m.*, a.id AS animal_id
+            """SELECT m.*, a.id AS animal_id, l.name AS piquete_nome
                FROM medications m JOIN animals a ON a.uuid=m.animal_uuid
+               LEFT JOIN lotes l ON l.id=m.lote_id
                WHERE a.id=?
                ORDER BY m.med_date DESC, m.id DESC""", (animal_id,)).fetchall()
     return [dict(r) for r in rows]
@@ -128,15 +130,16 @@ def _inserir_aplicacao(con, data: MedicationData, *, corrige_id: Optional[int] =
         """INSERT INTO medications
            (animal_uuid,medication_name,dose,unit,application_route,
             withdrawal_days,med_date,applied_by,insumo_id,notes,protocol_id,
-            principio_ativo,lote_produto,validade_produto,evento_id,corrige_id)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            principio_ativo,lote_produto,validade_produto,evento_id,corrige_id,lote_id)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            RETURNING id""",
         (_uuid, data.medication_name, data.dose, data.unit,
          data.application_route,
          data.withdrawal_days, data.med_date, data.applied_by, data.insumo_id or None, data.notes,
          data.protocol_id or None,
          produto["principio_ativo"] or None, produto["lote_produto"] or None,
-         produto["validade_produto"] or None, evento.get("id"), corrige_id),
+         produto["validade_produto"] or None, evento.get("id"), corrige_id,
+         lote_na_data(con, _uuid, data.med_date)),
     ).fetchone()["id"]
     # Baixa automática no estoque
     if data.insumo_id and data.dose > 0:
