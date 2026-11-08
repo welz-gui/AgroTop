@@ -13,7 +13,10 @@ from . import conexao as _conexao
 from .animais import get_animal, uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
-from .revisao import RegistroJaCancelado, RegistroNaoEncontrado, foto, motivo_obrigatorio, versao_do_evento
+from .revisao import (
+    RegistroJaCancelado, RegistroNaoEncontrado, RevisaoNaoPermitida, foto, motivo_obrigatorio,
+    versao_do_evento,
+)
 
 # Regras puras importadas em vez de reimplementadas (ROADMAP R8).
 from services.zootecnia import get_age_category
@@ -373,8 +376,9 @@ def _fetch_animal_costs(con, animais: list[dict]) -> dict[str, float]:
     return {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
 
 
-def _process_sale_items(con, animais: list[dict], params: SaleParams, costs_dict: dict[str, float], peso_total: float, lot_ref: Optional[str]) -> tuple[list[tuple], float, float]:
-    """Processa o valor, lucro e os eventos para os itens vendidos."""
+def _process_sale_items(con, animais: list[dict], params: SaleParams, costs_dict: dict[str, float], peso_total: float, lot_ref: Optional[str], cadeia: Optional[dict] = None) -> tuple[list[tuple], float, float]:
+    """Processa o valor, lucro e os eventos para os itens vendidos. `cadeia` (só numa correção) liga
+    o evento e a linha de cada animal ao que eles substituem."""
     tot_receita = tot_custo = 0.0
     sales_data = []
 
@@ -394,19 +398,22 @@ def _process_sale_items(con, animais: list[dict], params: SaleParams, costs_dict
         tot_receita += val
         tot_custo += custo
 
+        # Venda e obito mudam status por SQL direto, sem passar por
+        # update_animal_status -- entao o evento precisa ser registrado aqui.
+        elo = (cadeia or {}).get(a["uuid"], {})
+        evento = eventos.registrar_em(
+            con, a["uuid"], "venda", ocorrido_em=params.sale_date,
+            usuario_registro=params.operator, documento=lot_ref,
+            justificativa=elo.get("justificativa", ""), evento_anterior_id=elo.get("evento_anterior_id"),
+            versao=elo.get("versao", 1),
+            observacoes=f"R$ {val:.2f} para {params.buyer or 'comprador nao informado'}")
+
         sales_data.append((
             a["uuid"], params.sale_date, params.sale_type, params.pricing_mode,
             a["current_weight"], ppk,
             val, params.buyer or None, lot_ref, custo, lucro, params.operator, params.notes,
-            1 if params.a_prazo else 0
+            1 if params.a_prazo else 0, evento.get("id"), elo.get("corrige_id")
         ))
-
-        # Venda e obito mudam status por SQL direto, sem passar por
-        # update_animal_status -- entao o evento precisa ser registrado aqui.
-        eventos.registrar_em(
-            con, a["uuid"], "venda", ocorrido_em=params.sale_date,
-            usuario_registro=params.operator, documento=lot_ref,
-            observacoes=f"R$ {val:.2f} para {params.buyer or 'comprador nao informado'}")
 
     return sales_data, tot_receita, tot_custo
 
@@ -430,6 +437,46 @@ def _gerar_contas_receber_venda(con, params: SaleParams, tot_receita: float, lot
             (lot_ref, params.buyer, rotulo, p["valor"], p["vencimento"],
              p["numero"], p["total"], "aberto", params.operator))
     return params.num_parcelas
+
+
+def _novo_lot_ref(params: SaleParams, n_animais: int) -> Optional[str]:
+    """Referência do lote de venda. Vem com mais de um animal, com preço de lote e em venda a prazo
+    (as parcelas de `contas_receber` se ligam à venda por ela); venda avulsa à vista não tem."""
+    if params.pricing_mode == "lote" or n_animais > 1 or params.a_prazo:
+        return f"V{params.sale_date.replace('-', '')}-{int(datetime.now().timestamp()) % 100000}"
+    return None
+
+
+def _registrar_venda_em(con, animais: list[dict], params: SaleParams, lot_ref: Optional[str], *,
+                        cadeia: Optional[dict] = None) -> dict:
+    """Grava a venda na conexão do chamador (a de `register_sale` e a de `corrigir_venda`).
+    `cadeia` liga cada linha nova à que ela substitui, por `animal_uuid`: `corrige_id`,
+    `evento_anterior_id`, `versao` e `justificativa`."""
+    peso_total = sum(a["current_weight"] for a in animais) or 1
+    if params.sale_type == "abate":
+        _recusar_abate_em_carencia(con, tuple(a["id"] for a in animais), params.sale_date)
+
+    costs_dict = _fetch_animal_costs(con, animais)
+    sales_data, tot_receita, tot_custo = _process_sale_items(
+        con, animais, params, costs_dict, peso_total, lot_ref, cadeia)
+
+    con.executemany(
+        """INSERT INTO sales
+           (animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
+            price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
+            operator,notes,a_prazo,evento_id,corrige_id)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        sales_data,
+    )
+
+    qmarks = ",".join("?" for _ in animais)
+    animal_ids_tuple = tuple(a["id"] for a in animais)
+    con.execute(f"UPDATE animals SET status='vendido' WHERE id IN ({qmarks})", animal_ids_tuple)
+
+    n_parcelas_receber = _gerar_contas_receber_venda(con, params, tot_receita, lot_ref)
+    return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
+            "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
+            "lot_ref": lot_ref, "parcelas_a_receber": n_parcelas_receber}
 
 
 @_writes
@@ -459,43 +506,141 @@ def register_sale(params: SaleParams) -> dict:
     if not animais:
         return {"receita": 0, "custo": 0, "lucro": 0, "n": 0}
 
-    peso_total = sum(a["current_weight"] for a in animais) or 1
-    lot_ref = f"V{params.sale_date.replace('-','')}-{int(datetime.now().timestamp())%100000}" \
-              if (params.pricing_mode == "lote" or len(animais) > 1) else None
-
+    lot_ref = _novo_lot_ref(params, len(animais))
     with _conn() as con:
-        if params.sale_type == "abate":
-            _recusar_abate_em_carencia(con, tuple(a["id"] for a in animais), params.sale_date)
+        return _registrar_venda_em(con, animais, params, lot_ref)
 
-        costs_dict = _fetch_animal_costs(con, animais)
-        sales_data, tot_receita, tot_custo = _process_sale_items(
-            con, animais, params, costs_dict, peso_total, lot_ref
-        )
 
-        con.executemany(
-            """INSERT INTO sales
-               (animal_uuid,sale_date,sale_type,pricing_mode,weight_kg,
-                price_per_kg,total_value,buyer,lot_ref,cost_at_sale,profit,
-                operator,notes,a_prazo)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            sales_data,
-        )
+def _grupo_da_venda(con, sale_id: int) -> list[dict]:
+    """As linhas vigentes da venda a que `sale_id` pertence: o lote inteiro (`lot_ref`), ou só a
+    linha, se ela não tem lote. Cancelar ou corrigir vale para o grupo: as parcelas a receber
+    nascem do total do lote, e não de cada animal."""
+    s = con.execute(
+        """SELECT s.*, a.id AS animal_id FROM sales s
+           JOIN animals a ON a.uuid=s.animal_uuid WHERE s.id=?""", (sale_id,)).fetchone()
+    if s is None:
+        raise RegistroNaoEncontrado(f"Venda {sale_id} não encontrada.")
+    s = dict(s)
+    if s["cancelada_em"]:
+        raise RegistroJaCancelado(f"A venda {sale_id} já foi cancelada em {s['cancelada_em']}.")
+    if not s["lot_ref"]:
+        return [s]
+    rows = con.execute(
+        """SELECT s.*, a.id AS animal_id FROM sales s
+           JOIN animals a ON a.uuid=s.animal_uuid
+           WHERE s.lot_ref=? AND s.cancelada_em IS NULL ORDER BY s.id""", (s["lot_ref"],)).fetchall()
+    return [dict(r) for r in rows]
 
-        qmarks = ",".join("?" for _ in animais)
-        animal_ids_tuple = tuple(a["id"] for a in animais)
-        con.execute(f"UPDATE animals SET status='vendido' WHERE id IN ({qmarks})", animal_ids_tuple)
 
-        n_parcelas_receber = _gerar_contas_receber_venda(con, params, tot_receita, lot_ref)
+def _cancelar_parcelas_da_venda(con, grupo: list[dict]) -> int:
+    """Cancela as parcelas em aberto da venda a prazo. Recusa se alguma já foi recebida (não há
+    como desfazer o recebimento aqui) ou se a venda é anterior ao vínculo com as parcelas."""
+    if not grupo[0]["a_prazo"]:
+        return 0
+    ref = grupo[0]["lot_ref"]
+    if not ref:
+        raise RevisaoNaoPermitida(
+            "Esta venda a prazo é anterior ao vínculo com as parcelas a receber, que por isso não "
+            "podem ser localizadas. Cancele as parcelas em Contas a receber e trate a venda à parte.")
+    recebidas = con.execute(
+        "SELECT COUNT(*) AS n FROM contas_receber WHERE lot_ref=? AND status='recebido'", (ref,)).fetchone()["n"]
+    if recebidas:
+        raise RevisaoNaoPermitida(
+            f"A venda tem {recebidas} parcela(s) já recebida(s) em Contas a receber: o recebimento "
+            "precisa ser tratado antes de cancelar ou corrigir a venda.")
+    return con.execute(
+        "UPDATE contas_receber SET status='cancelado' WHERE lot_ref=? AND status='aberto'", (ref,)).rowcount
 
-    return {"receita": round(tot_receita, 2), "custo": round(tot_custo, 2),
-            "lucro": round(tot_receita - tot_custo, 2), "n": len(animais),
-            "lot_ref": lot_ref, "parcelas_a_receber": n_parcelas_receber}
+
+def _cancelar_venda_em(con, sale_id: int, motivo: str, usuario: str, *, registrar_estorno: bool) -> dict:
+    """Cancela a venda (o grupo todo), devolve os animais ao rebanho e cancela as parcelas em
+    aberto, na conexão do chamador."""
+    grupo = _grupo_da_venda(con, sale_id)
+    parcelas = _cancelar_parcelas_da_venda(con, grupo)
+    versoes = {}
+    for linha in grupo:
+        cur = con.execute(
+            """UPDATE sales SET cancelada_em=?, cancelada_por=?, motivo_cancelamento=?
+               WHERE id=? AND cancelada_em IS NULL""", (eventos._agora(), usuario or None, motivo, linha["id"]))
+        if cur.rowcount == 0:      # outro pedido cancelou entre a leitura e a escrita
+            raise RegistroJaCancelado(f"A venda {linha['id']} já foi cancelada.")
+        versoes[linha["id"]] = versao_do_evento(con, linha["evento_id"])
+        if registrar_estorno:
+            eventos.registrar_em(
+                con, linha["animal_uuid"], "estorno", usuario_registro=usuario, justificativa=motivo,
+                evento_anterior_id=linha["evento_id"], versao=versoes[linha["id"]] + 1,
+                observacoes=f"Cancelamento da venda de {linha['sale_date']} (R$ {linha['total_value']:.2f})")
+        _devolver_ao_rebanho(con, linha["animal_uuid"], "vendido")
+    return {"grupo": grupo, "parcelas": parcelas, "versoes": versoes}
+
+
+@_writes
+def cancelar_venda(sale_id: int, motivo: str, usuario: str, *, origem: str = "web") -> dict:
+    """Cancela uma venda lançada por engano: o lote inteiro (`lot_ref`) ou a venda avulsa. As linhas
+    ficam, com motivo e autor, e saem de receita, custo e lucro; os animais voltam ao rebanho
+    (`ativo`, ou `carencia`); as parcelas a receber em aberto são canceladas.
+
+    Levanta `RevisaoNaoPermitida` (sem motivo, parcela já recebida, venda a prazo anterior ao
+    vínculo com as parcelas), `RegistroNaoEncontrado` ou `RegistroJaCancelado`; em qualquer uma
+    nada é gravado."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        r = _cancelar_venda_em(con, sale_id, motivo, usuario, registrar_estorno=True)
+        for linha in r["grupo"]:
+            eventos.auditar_em(
+                con, "cancelar_venda", usuario=usuario, entidade="sales", entidade_id=linha["id"],
+                registro_anterior=foto(linha), motivo=motivo, origem=origem)
+    return {"cancelada": [l["id"] for l in r["grupo"]], "animais": [l["animal_id"] for l in r["grupo"]],
+            "parcelas_canceladas": r["parcelas"]}
+
+
+@_writes
+def corrigir_venda(sale_id: int, params: SaleParams, motivo: str, usuario: str, *,
+                   origem: str = "web") -> dict:
+    """Corrige uma venda: cancela o grupo (o lote inteiro, ou a venda avulsa) e grava a certa,
+    ligada a ele, na mesma transação. Vale tudo o que `register_sale` aceita (animais, preço,
+    data, comprador, a prazo): a venda nova mantém o `lot_ref` quando o grupo tinha um.
+
+    O peso na venda dos animais que já estavam nela é o do registro original, e não o peso de hoje.
+    Recusas (motivo, parcela recebida, abate em carência) não gravam nada: a original continua valendo."""
+    motivo = motivo_obrigatorio(motivo)
+    animais = [a for a in (get_animal(i) for i in params.animal_ids) if a]
+    if not animais:
+        raise RevisaoNaoPermitida("Escolha ao menos um animal para a venda corrigida.")
+    with _conn() as con:
+        r = _cancelar_venda_em(con, sale_id, motivo, usuario, registrar_estorno=False)
+        grupo = r["grupo"]
+        antiga = {l["animal_uuid"]: l for l in grupo}
+        animais = [{**a, "current_weight": antiga[a["uuid"]]["weight_kg"]}
+                   if a["uuid"] in antiga and antiga[a["uuid"]]["weight_kg"] is not None else a
+                   for a in animais]
+        cadeia = {}
+        for a in animais:
+            ant = antiga.get(a["uuid"])
+            cadeia[a["uuid"]] = {
+                "corrige_id": (ant or grupo[0])["id"], "justificativa": motivo,
+                "evento_anterior_id": ant["evento_id"] if ant else None,
+                "versao": r["versoes"][ant["id"]] + 1 if ant else 1}
+        lot_ref = grupo[0]["lot_ref"] or _novo_lot_ref(params, len(animais))
+        nova = _registrar_venda_em(con, animais, params, lot_ref, cadeia=cadeia)
+        for linha in grupo:
+            eventos.auditar_em(
+                con, "corrigir_venda", usuario=usuario, entidade="sales", entidade_id=linha["id"],
+                registro_anterior=foto(linha),
+                registro_posterior={"lot_ref": lot_ref, "animais": len(animais), "receita": nova["receita"],
+                                    "data": params.sale_date, "comprador": params.buyer},
+                motivo=motivo, origem=origem)
+    return {"cancelada": [l["id"] for l in grupo], "lot_ref": lot_ref, "receita": nova["receita"],
+            "n": nova["n"], "parcelas_canceladas": r["parcelas"],
+            "parcelas_a_receber": nova["parcelas_a_receber"]}
 
 
 def get_sales(start_date: Optional[str] = None,
-              end_date: Optional[str] = None) -> list[dict]:
+              end_date: Optional[str] = None, incluir_canceladas: bool = False) -> list[dict]:
     sql = ("SELECT s.*, a.id AS animal_id, a.breed, a.sex, a.carcass_yield "
            "FROM sales s LEFT JOIN animals a ON a.uuid=s.animal_uuid WHERE 1=1")
+    if not incluir_canceladas:
+        sql += " AND s.cancelada_em IS NULL"
     args: list = []
     if start_date:
         sql += " AND s.sale_date >= ?"; args.append(start_date)
@@ -621,7 +766,7 @@ def get_financial_summary(start_date: Optional[str] = None,
         ss, sa = _period("sale_date")
         rows_v = con.execute(
             "SELECT sale_type, COALESCE(SUM(total_value),0) receita, COALESCE(SUM(profit),0) lucro, COUNT(*) n "
-            "FROM sales WHERE 1=1"+ss+" GROUP BY sale_type", sa
+            "FROM sales WHERE cancelada_em IS NULL"+ss+" GROUP BY sale_type", sa
         ).fetchall()
 
     vendas = {r["sale_type"]: {"receita": round(float(r["receita"]),2),
@@ -667,6 +812,18 @@ def register_death(animal_id: str, death_date: str, cause: str,
         )
         con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
     return {"ok": True, "perda": round(custo, 2)}
+
+
+def _devolver_ao_rebanho(con, animal_uuid: str, de: str) -> str:
+    """Tira o animal de `morto` ou `vendido` ao cancelar o registro: volta `ativo`, ou `carencia`
+    se ainda houver carência vigente. Só muda quem está mesmo em `de`. Devolve o novo status."""
+    aplicacoes = [dict(m) for m in con.execute(
+        """SELECT med_date, withdrawal_days FROM medications
+           WHERE animal_uuid=? AND withdrawal_days > 0 AND cancelada_em IS NULL""",
+        (animal_uuid,)).fetchall()]
+    status = "carencia" if fim_da_carencia(aplicacoes, date.today()) else "ativo"
+    con.execute("UPDATE animals SET status=? WHERE uuid=? AND status=?", (status, animal_uuid, de))
+    return status
 
 
 def get_morte_vigente(animal_id: str) -> Optional[dict]:
@@ -716,12 +873,7 @@ def cancelar_morte(death_id: int, motivo: str, usuario: str, *, origem: str = "w
     with _conn() as con:
         r = _cancelar_morte_em(con, death_id, motivo, usuario, registrar_estorno=True, animal_id=animal_id)
         d = r["morte"]
-        aplicacoes = [dict(m) for m in con.execute(
-            """SELECT med_date, withdrawal_days FROM medications
-               WHERE animal_uuid=? AND withdrawal_days > 0 AND cancelada_em IS NULL""",
-            (d["animal_uuid"],)).fetchall()]
-        status = "carencia" if fim_da_carencia(aplicacoes, date.today()) else "ativo"
-        con.execute("UPDATE animals SET status=? WHERE uuid=? AND status='morto'", (status, d["animal_uuid"]))
+        status = _devolver_ao_rebanho(con, d["animal_uuid"], "morto")
         eventos.auditar_em(
             con, "cancelar_obito", usuario=usuario, entidade="deaths", entidade_id=death_id,
             registro_anterior=r["foto"], registro_posterior={"status": status}, motivo=motivo, origem=origem)
