@@ -129,6 +129,8 @@ from repositories.financeiro import (  # noqa: F401
     _costs_by_animal, get_total_cost, get_animal_costs, get_all_animal_costs,
     AnimalCostData, FixedCostData, add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
     delete_fixed_cost, get_fixed_costs_by_category, register_sale, get_sales, SaleParams,
+    cancelar_custo_animal, corrigir_custo_animal, cancelar_custo_fixo, corrigir_custo_fixo,
+    cancelar_morte, corrigir_morte, get_morte_vigente,
     VendaBloqueadaPorCarencia,
     get_financial_summary, get_insumo_compras, register_death, get_deaths,
     get_mortality_stats, get_category_prices, set_category_price,
@@ -702,6 +704,10 @@ _SCHEMA_SQL = """
                 cost_date   TEXT NOT NULL,
                 notes       TEXT,
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
+                cancelada_em        TEXT,      -- nulo = vigente (0040)
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -716,6 +722,10 @@ _SCHEMA_SQL = """
                 notes       TEXT,
                 lote_id     TEXT,  -- centro de custo (piquete); NULL = geral da fazenda
                 created_at  TEXT DEFAULT (datetime('now','localtime')),
+                cancelada_em        TEXT,      -- nulo = vigente (0040)
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
                 FOREIGN KEY (lote_id) REFERENCES lotes(id)
             );
 
@@ -786,6 +796,11 @@ _SCHEMA_SQL = """
                 notes        TEXT,
                 a_prazo      INTEGER NOT NULL DEFAULT 0,  -- 1 = receita rastreada via contas_receber, não aqui
                 created_at   TEXT DEFAULT (datetime('now','localtime')),
+                evento_id           INTEGER,   -- evento do animal gravado junto (0040)
+                cancelada_em        TEXT,      -- nulo = vigente (0040)
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -822,6 +837,11 @@ _SCHEMA_SQL = """
                 operator        TEXT,
                 notes           TEXT,
                 created_at      TEXT DEFAULT (datetime('now','localtime')),
+                evento_id           INTEGER,   -- evento do animal gravado junto (0040)
+                cancelada_em        TEXT,      -- nulo = vigente (0040)
+                cancelada_por       TEXT,
+                motivo_cancelamento TEXT,
+                corrige_id          INTEGER,   -- na linha nova de uma correção: a que ela substitui
                 FOREIGN KEY (animal_uuid)   REFERENCES animals(uuid)
             );
 
@@ -1207,6 +1227,17 @@ def _migrate(con) -> None:
     # Piquete do animal na data da aplicação (migration 0039).
     if "lote_id" not in _mc:
         con.execute("ALTER TABLE medications ADD COLUMN lote_id TEXT")
+    # Revisão de custo, óbito e venda (migration 0040): as colunas de cancelamento da 0035/0036;
+    # `evento_id` só onde há evento do animal (óbito e venda).
+    for _t in ("animal_costs", "fixed_costs", "deaths", "sales"):
+        _rc = {r["name"] for r in con.execute(f"PRAGMA table_info({_t})").fetchall()}
+        _novas = [("cancelada_em", "TEXT"), ("cancelada_por", "TEXT"),
+                  ("motivo_cancelamento", "TEXT"), ("corrige_id", "INTEGER")]
+        if _t in ("deaths", "sales"):
+            _novas.insert(0, ("evento_id", "INTEGER"))
+        for _c, _tipo in _novas:
+            if _c not in _rc:
+                con.execute(f"ALTER TABLE {_t} ADD COLUMN {_c} {_tipo}")
     # Lote e validade por entrada de estoque (migration 0037).
     _tc = {r["name"] for r in con.execute("PRAGMA table_info(insumo_transactions)").fetchall()}
     for _c in ("lote_produto", "validade_produto"):
@@ -2523,7 +2554,7 @@ def get_fornecedor_ranking() -> list[dict]:
     with _conn() as con:
         drows = con.execute(
             "SELECT a.id AS animal_id, d.weight_at_death FROM deaths d "
-            "JOIN animals a ON a.uuid=d.animal_uuid").fetchall()
+            "JOIN animals a ON a.uuid=d.animal_uuid WHERE d.cancelada_em IS NULL").fetchall()
     death_w = {r["animal_id"]: r["weight_at_death"] for r in drows}
 
     agg: dict[str, dict] = {}

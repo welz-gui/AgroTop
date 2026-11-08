@@ -1529,8 +1529,10 @@ def _tab_movimentacao(animal):
 def _tab_obito(animal):
     if animal["status"] == "morto":
         st.info("Este animal já está registrado como morto.")
+        _revisao_obito(animal)
     else:
-        st.warning("Registrar óbito é **irreversível** e muda o status do animal para 'morto'.")
+        st.warning("Registrar óbito muda o status do animal para 'morto'. Se foi engano, o óbito pode "
+                   "ser corrigido ou cancelado na ficha do animal, com motivo.")
         with st.form("f_obito", clear_on_submit=True):
             causa = st.selectbox("Causa do óbito *", db.DEATH_CAUSES)
             od1, od2 = st.columns(2)
@@ -2443,6 +2445,140 @@ def _revisar_movimentacao(aid: str):
             st.success("✅ Movimentação cancelada." if cancelar else "✅ Movimentação corrigida.")
             st.rerun()
 
+def _data_do_registro(valor) -> date:
+    """AAAA-MM-DD (texto ou data do banco) como `date`, para preencher o campo de data."""
+    return date.fromisoformat(str(valor)[:10])
+
+
+def _usuario_atual() -> str:
+    """O login de quem está na sessão: é o que a auditoria usa para achar o vínculo (organização
+    e propriedade) do autor. O nome de exibição só entra se não houver login."""
+    u = st.session_state.get("user") or {}
+    return u.get("username") or u.get("name") or ""
+
+
+def _revisao_custo_animal(aid, costs):
+    """Corrige ou cancela um custo do animal. O original nunca é apagado: fica com o motivo."""
+    if not costs:
+        return
+    with st.expander("✏️ Corrigir ou cancelar um custo"):
+        opt = {f"#{x['id']} · {_data_br(str(x['cost_date'])[:10])} · {x['cost_type']} · R$ {x['amount']:,.2f}": x
+               for x in costs}
+        cst = opt[st.selectbox("Custo", list(opt.keys()), key=f"rev_cost_{aid}")]
+        k = f"{aid}_{cst['id']}"
+        with st.form(f"f_rev_cost_{k}", clear_on_submit=True):
+            r1, r2, r3 = st.columns(3)
+            with r1: tipo = st.selectbox("Tipo", COST_TYPES, key=f"rc_t_{k}",
+                index=COST_TYPES.index(cst["cost_type"]) if cst["cost_type"] in COST_TYPES else 0)
+            with r2: valor = st.number_input("Valor (R$)", min_value=0.0, step=0.01, format="%.2f",
+                value=float(cst["amount"]), key=f"rc_v_{k}")
+            with r3: data_c = st.date_input("Data", value=_data_do_registro(cst["cost_date"]), key=f"rc_d_{k}")
+            desc = st.text_input("Descrição", value=cst.get("description") or "", key=f"rc_desc_{k}")
+            motivo = st.text_input("Motivo *", key=f"rc_m_{k}",
+                help="Fica gravado com o seu nome. O custo original continua no histórico.")
+            b1, b2 = st.columns(2)
+            corrigir = b1.form_submit_button("Salvar correção", type="primary", use_container_width=True)
+            cancelar = b2.form_submit_button("Cancelar custo", use_container_width=True)
+            if corrigir or cancelar:
+                usuario = _usuario_atual()
+                try:
+                    if cancelar:
+                        db.cancelar_custo_animal(cst["id"], motivo, usuario, animal_id=aid)
+                    else:
+                        db.corrigir_custo_animal(cst["id"], db.AnimalCostData(
+                            aid, tipo, desc, valor, data_c.strftime("%Y-%m-%d"), cst.get("notes") or ""),
+                            motivo, usuario)
+                except (db.RevisaoNaoPermitida, db.RegistroNaoEncontrado, db.RegistroJaCancelado) as e:
+                    st.error(f"🚫 {e}")
+                else:
+                    st.success("✅ Custo cancelado." if cancelar else "✅ Custo corrigido.")
+                    st.rerun()
+
+
+def _revisao_custo_fixo(fixed, canceladas):
+    """Corrige ou cancela um custo fixo e lista os cancelados. O original nunca é apagado."""
+    with st.expander("✏️ Corrigir ou cancelar um lançamento"):
+        opt = {f"#{f['id']} · {_data_br(str(f['cost_date'])[:10])} · {f['category']} · R$ {f['amount']:,.2f}": f
+               for f in fixed}
+        cst = opt[st.selectbox("Lançamento", list(opt.keys()), key="rev_fix")]
+        k = str(cst["id"])
+        with st.form(f"f_rev_fix_{k}", clear_on_submit=True):
+            r1, r2 = st.columns(2)
+            with r1:
+                cats = db.FIXED_COST_CATEGORIES
+                cat = st.selectbox("Categoria", cats, key=f"rf_c_{k}",
+                    index=cats.index(cst["category"]) if cst["category"] in cats else 0)
+                valor = st.number_input("Valor (R$)", min_value=0.0, step=50.0, format="%.2f",
+                    value=float(cst["amount"]), key=f"rf_v_{k}")
+            with r2:
+                data_c = st.date_input("Data", value=_data_do_registro(cst["cost_date"]), key=f"rf_d_{k}")
+                mensal = st.checkbox("Mensal (recorrente)", value=bool(cst["recurring"]), key=f"rf_r_{k}")
+            desc = st.text_input("Descrição", value=cst.get("description") or "", key=f"rf_desc_{k}")
+            motivo = st.text_input("Motivo *", key=f"rf_m_{k}",
+                help="Fica gravado com o seu nome. O lançamento original continua no histórico.")
+            b1, b2 = st.columns(2)
+            corrigir = b1.form_submit_button("Salvar correção", type="primary", use_container_width=True)
+            cancelar = b2.form_submit_button("Cancelar lançamento", use_container_width=True)
+            if corrigir or cancelar:
+                usuario = _usuario_atual()
+                try:
+                    if cancelar:
+                        db.cancelar_custo_fixo(cst["id"], motivo, usuario)
+                    else:
+                        db.corrigir_custo_fixo(cst["id"], db.FixedCostData(
+                            cat, desc, valor, data_c.strftime("%Y-%m-%d"), int(mensal), cst.get("notes") or "",
+                            cst.get("lote_id")), motivo, usuario)
+                except (db.RevisaoNaoPermitida, db.RegistroNaoEncontrado, db.RegistroJaCancelado) as e:
+                    st.error(f"🚫 {e}")
+                else:
+                    st.success("✅ Lançamento cancelado." if cancelar else "✅ Lançamento corrigido.")
+                    st.rerun()
+    if canceladas:
+        with st.expander(f"Cancelados ({len(canceladas)})"):
+            st.dataframe(pd.DataFrame([{
+                "Data": _data_br(str(f["cost_date"])[:10]), "Categoria": f["category"],
+                "Descrição": f.get("description") or "", "Valor (R$)": f["amount"],
+                "Motivo": f.get("motivo_cancelamento") or "—", "Por": f.get("cancelada_por") or "—"}
+                for f in canceladas]), use_container_width=True, hide_index=True,
+                column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+
+def _revisao_obito(animal):
+    """Corrige ou cancela o óbito do animal. Cancelar devolve o animal ao rebanho; o registro
+    original fica com o motivo."""
+    morte = db.get_morte_vigente(animal["id"])
+    if not morte:
+        return
+    with st.expander("✏️ Corrigir ou cancelar o óbito"):
+        with st.form(f"f_rev_obito_{morte['id']}", clear_on_submit=True):
+            causas = list(db.DEATH_CAUSES)
+            causa = st.selectbox("Causa do óbito", causas, key=f"ro_c_{morte['id']}",
+                index=causas.index(morte["cause"]) if morte["cause"] in causas else 0)
+            data_o = st.date_input("Data do óbito", value=_data_do_registro(morte["death_date"]),
+                max_value=date.today(), key=f"ro_d_{morte['id']}")
+            obs = st.text_area("Observações", value=morte.get("notes") or "", height=60, key=f"ro_n_{morte['id']}")
+            motivo = st.text_input("Motivo *", key=f"ro_m_{morte['id']}",
+                help="Fica gravado com o seu nome. O registro original continua no histórico.")
+            b1, b2 = st.columns(2)
+            corrigir = b1.form_submit_button("Salvar correção", type="primary", use_container_width=True)
+            cancelar = b2.form_submit_button("Cancelar óbito (devolve o animal ao rebanho)",
+                                             use_container_width=True)
+            if corrigir or cancelar:
+                usuario = _usuario_atual()
+                try:
+                    if cancelar:
+                        db.cancelar_morte(morte["id"], motivo, usuario, animal_id=animal["id"])
+                    else:
+                        db.corrigir_morte(morte["id"], data_o.strftime("%Y-%m-%d"), causa, motivo, usuario,
+                                          notes=obs, animal_id=animal["id"])
+                except (db.RevisaoNaoPermitida, db.RegistroNaoEncontrado, db.RegistroJaCancelado) as e:
+                    st.error(f"🚫 {e}")
+                else:
+                    st.success("✅ Óbito cancelado: o animal voltou ao rebanho." if cancelar
+                               else "✅ Óbito corrigido.")
+                    st.rerun()
+
+
 def _render_tab_fin(animal):
     aid = animal["id"]
     cost_total = db.get_total_cost(aid)
@@ -2450,7 +2586,8 @@ def _render_tab_fin(animal):
     gain = round(animal["current_weight"] - animal["entry_weight"], 1)
     ul = _unit_label()
 
-    costs=db.get_animal_costs(aid)
+    costs_todos=db.get_animal_costs(aid, incluir_canceladas=True)
+    costs=[x for x in costs_todos if not x.get("cancelada_em")]
     prod_gain   = _prod_weight(gain, yield_) if gain > 0 else 0
     cpu_val     = _cost_per_unit(cost_total, animal["current_weight"], yield_)
     cpu_gain = round(cost_total / prod_gain, 2) if prod_gain > 0 else 0
@@ -2462,11 +2599,15 @@ def _render_tab_fin(animal):
     cp3.metric(f"Custo da Produção (R$/{ul})",
                f"R$ {cpu_gain:,.2f}" if cpu_gain else "—",
                help=f"Custo total ÷ {ul} ganhos (produzidos) desde a entrada")
-    if costs:
-        df_c=pd.DataFrame(costs)[["cost_date","cost_type","description","amount"]]
-        df_c.columns=["Data","Tipo","Descrição","Valor (R$)"]
+    if costs_todos:
+        df_c=pd.DataFrame([{
+            "Data":x["cost_date"],"Tipo":x["cost_type"],"Descrição":x["description"],"Valor (R$)":x["amount"],
+            "Situação":(f"cancelado: {x['motivo_cancelamento']}" if x.get("cancelada_em")
+                        else f"corrige o custo nº {x['corrige_id']}" if x.get("corrige_id") else "")}
+            for x in costs_todos])
         st.dataframe(df_c,use_container_width=True,hide_index=True,
             column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
+    _revisao_custo_animal(aid, costs)
     # Adicionar custo
     with st.expander("➕ Adicionar Custo"):
         with st.form("f_cost",clear_on_submit=True):
@@ -4034,13 +4175,9 @@ def _fin_custos_fixos(animals, lotes):
             st.dataframe(df_fx,use_container_width=True,hide_index=True,height=260,
                 column_config={"Valor (R$)":st.column_config.NumberColumn(format="R$ %.2f")})
 
-        # Excluir lançamento
-        with st.expander("🗑️ Excluir um lançamento"):
-            opt={f"#{f['id']} · {f['cost_date']} · {f['category']} · R$ {f['amount']:,.2f}":f["id"] for f in fixed}
-            sel_del=st.selectbox("Lançamento", list(opt.keys()), key="del_fix")
-            if st.button("Excluir", type="secondary"):
-                db.delete_fixed_cost(opt[sel_del], usuario=st.session_state.user["name"])
-                st.success("Lançamento excluído."); st.rerun()
+        # Corrigir ou cancelar lançamento (o original fica no histórico, com o motivo)
+        _revisao_custo_fixo(fixed, [f for f in db.get_fixed_costs(s_iso, e_iso, incluir_canceladas=True)
+                                    if f.get("cancelada_em")])
     else:
         st.info("Nenhum custo fixo lançado no período selecionado.")
 
@@ -5775,7 +5912,7 @@ def _render_tab_gestao_protocolos(insumos):
                 db.set_protocol_active(p["id"], 0 if p["active"] else 1); st.rerun()
         with c3:
             if st.button("🗑️", key=f"delp_{p['id']}", use_container_width=True):
-                db.delete_protocol(p["id"], usuario=st.session_state.user["name"]); st.rerun()
+                db.delete_protocol(p["id"], usuario=_usuario_atual()); st.rerun()
 
     st.markdown("---")
     st.markdown("**➕ Novo Protocolo**")

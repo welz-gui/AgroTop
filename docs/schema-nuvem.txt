@@ -1,5 +1,5 @@
 # Snapshot do schema de PRODUÇÃO (Supabase/Postgres, schema `public`)
-# Extraído em 2026-11-07 por tools/dump_schema_nuvem.py
+# Extraído em 2026-11-08 por tools/dump_schema_nuvem.py
 #
 # Propósito: tornar a divergência entre nuvem e DDL local VISÍVEL em
 # diff de git, e servir de referência para tests/test_schema.py.
@@ -15,6 +15,10 @@ animal_costs.cost_date
 animal_costs.notes
 animal_costs.created_at
 animal_costs.animal_uuid
+animal_costs.cancelada_em
+animal_costs.cancelada_por
+animal_costs.motivo_cancelamento
+animal_costs.corrige_id
 animal_events.id
 animal_events.animal_uuid
 animal_events.tipo
@@ -185,6 +189,11 @@ deaths.operator
 deaths.notes
 deaths.created_at
 deaths.animal_uuid
+deaths.evento_id
+deaths.cancelada_em
+deaths.cancelada_por
+deaths.motivo_cancelamento
+deaths.corrige_id
 dispositivos.id
 dispositivos.codigo_visual
 dispositivos.codigo_eletronico
@@ -250,6 +259,10 @@ fixed_costs.recurring
 fixed_costs.notes
 fixed_costs.created_at
 fixed_costs.lote_id
+fixed_costs.cancelada_em
+fixed_costs.cancelada_por
+fixed_costs.motivo_cancelamento
+fixed_costs.corrige_id
 fornecedores.id
 fornecedores.name
 fornecedores.city
@@ -448,6 +461,11 @@ sales.notes
 sales.created_at
 sales.animal_uuid
 sales.a_prazo
+sales.evento_id
+sales.cancelada_em
+sales.cancelada_por
+sales.motivo_cancelamento
+sales.corrige_id
 sessions.token
 sessions.user_id
 sessions.expires_at

@@ -69,7 +69,8 @@ def _dados_da_mae(con, mae_uuid: str) -> Optional[dict]:
         return None
     # A data de morte vive em `deaths`; o §7.2 exige a mãe ATIVA na data do parto.
     morte = con.execute(
-        "SELECT death_date FROM deaths WHERE animal_uuid=? ORDER BY death_date LIMIT 1",
+        "SELECT death_date FROM deaths WHERE animal_uuid=? AND cancelada_em IS NULL "
+        "ORDER BY death_date LIMIT 1",
         (mae_uuid,)).fetchone()
     return {
         "id": row["id"],
