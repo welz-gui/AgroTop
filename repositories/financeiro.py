@@ -13,7 +13,7 @@ from . import conexao as _conexao
 from .animais import get_animal, uuid_de
 from . import eventos
 from .conexao import _cache, _conn, _writes
-from .revisao import foto
+from .revisao import RegistroJaCancelado, RegistroNaoEncontrado, foto, motivo_obrigatorio, versao_do_evento
 
 # Regras puras importadas em vez de reimplementadas (ROADMAP R8).
 from services.zootecnia import get_age_category
@@ -53,6 +53,7 @@ def _costs_by_animal() -> dict:
         rows = con.execute(
             """SELECT a.id AS animal_id, COALESCE(SUM(c.amount),0) AS total
                FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
+               WHERE c.cancelada_em IS NULL
                GROUP BY a.id"""
         ).fetchall()
     return {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
@@ -62,12 +63,15 @@ def get_total_cost(animal_id: str) -> float:
     return _costs_by_animal().get(animal_id, 0.0)
 
 
-def get_animal_costs(animal_id: str) -> list[dict]:
+def get_animal_costs(animal_id: str, incluir_canceladas: bool = False) -> list[dict]:
+    """Custos vigentes do animal; com `incluir_canceladas`, também os cancelados (a ficha mostra
+    a correção ao lado do original)."""
     with _conn() as con:
         rows = con.execute(
             """SELECT c.*, a.id AS animal_id
                FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
-               WHERE a.id=? ORDER BY c.cost_date DESC""",
+               WHERE a.id=?""" + ("" if incluir_canceladas else " AND c.cancelada_em IS NULL")
+            + " ORDER BY c.cost_date DESC, c.id DESC",
             (animal_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -82,7 +86,7 @@ def get_all_animal_costs(start_date: Optional[str] = None,
     a mesma fonte que `get_financial_summary` já soma por `cost_type`, aqui
     linha a linha.
     """
-    sql = "SELECT c.* FROM animal_costs c WHERE 1=1"
+    sql = "SELECT c.* FROM animal_costs c WHERE c.cancelada_em IS NULL"
     args: list = []
     if start_date:
         sql += " AND c.cost_date >= ?"; args.append(start_date)
@@ -121,8 +125,10 @@ def add_fixed_cost(data: FixedCostData) -> None:
 
 
 def get_fixed_costs(start_date: Optional[str] = None,
-                    end_date: Optional[str] = None) -> list[dict]:
+                    end_date: Optional[str] = None, incluir_canceladas: bool = False) -> list[dict]:
     sql, args = "SELECT * FROM fixed_costs WHERE 1=1", []
+    if not incluir_canceladas:
+        sql += " AND cancelada_em IS NULL"
     if start_date:
         sql += " AND cost_date >= ?"; args.append(start_date)
     if end_date:
@@ -134,7 +140,8 @@ def get_fixed_costs(start_date: Optional[str] = None,
 
 def get_total_fixed_costs(start_date: Optional[str] = None,
                           end_date: Optional[str] = None) -> float:
-    sql, args = "SELECT COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE 1=1", []
+    sql, args = ("SELECT COALESCE(SUM(amount),0) as total FROM fixed_costs "
+                 "WHERE cancelada_em IS NULL"), []
     if start_date:
         sql += " AND cost_date >= ?"; args.append(start_date)
     if end_date:
@@ -157,9 +164,103 @@ def delete_fixed_cost(cost_id: int, usuario: str = "") -> None:
                            entidade_id=cost_id, registro_anterior=foto(dict(antes)))
 
 
+_TABELAS_DE_CUSTO = ("animal_costs", "fixed_costs")
+
+
+def _cancelar_custo_em(con, tabela: str, cost_id: int, motivo: str, usuario: str, *,
+                       animal_id: Optional[str] = None) -> dict:
+    """Marca o custo como cancelado, na conexão do chamador. `tabela` é uma das duas fixas.
+    Com `animal_id`, o custo precisa ser desse animal (senão "não existe" para ele)."""
+    assert tabela in _TABELAS_DE_CUSTO
+    c = con.execute(f"SELECT * FROM {tabela} WHERE id=?", (cost_id,)).fetchone()
+    if c is None or (animal_id is not None and c["animal_uuid"] != uuid_de(con, animal_id)):
+        raise RegistroNaoEncontrado(f"Custo {cost_id} não encontrado.")
+    c = dict(c)
+    if c["cancelada_em"]:
+        raise RegistroJaCancelado(f"O custo {cost_id} já foi cancelado em {c['cancelada_em']}.")
+    cur = con.execute(
+        f"""UPDATE {tabela} SET cancelada_em=?, cancelada_por=?, motivo_cancelamento=?
+            WHERE id=? AND cancelada_em IS NULL""", (eventos._agora(), usuario or None, motivo, cost_id))
+    if cur.rowcount == 0:      # outro pedido cancelou entre a leitura e a escrita
+        raise RegistroJaCancelado(f"O custo {cost_id} já foi cancelado.")
+    return c
+
+
+@_writes
+def cancelar_custo_animal(cost_id: int, motivo: str, usuario: str, *, animal_id: Optional[str] = None,
+                          origem: str = "web") -> dict:
+    """Cancela um custo de animal lançado por engano. A linha fica, com motivo e autor, e sai de
+    todas as somas. Levanta `RevisaoNaoPermitida` (sem motivo), `RegistroNaoEncontrado` ou
+    `RegistroJaCancelado`; em qualquer uma nada é gravado."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        c = _cancelar_custo_em(con, "animal_costs", cost_id, motivo, usuario, animal_id=animal_id)
+        eventos.auditar_em(con, "cancelar_custo_animal", usuario=usuario, entidade="animal_costs",
+                           entidade_id=cost_id, registro_anterior=foto(c), motivo=motivo, origem=origem)
+    return {"cancelada": cost_id}
+
+
+@_writes
+def corrigir_custo_animal(cost_id: int, data: AnimalCostData, motivo: str, usuario: str, *,
+                          origem: str = "web") -> dict:
+    """Corrige um custo de animal: cancela o original e grava o certo, ligado a ele, na mesma
+    transação. O animal não muda: `data.animal_id` precisa ser o do custo."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        c = _cancelar_custo_em(con, "animal_costs", cost_id, motivo, usuario, animal_id=data.animal_id)
+        nova = con.execute(
+            """INSERT INTO animal_costs
+               (animal_uuid,cost_type,description,amount,cost_date,notes,corrige_id)
+               VALUES(?,?,?,?,?,?,?) RETURNING id""",
+            (c["animal_uuid"], data.cost_type, data.description, data.amount, data.cost_date,
+             data.notes, cost_id)).fetchone()["id"]
+        eventos.auditar_em(
+            con, "corrigir_custo_animal", usuario=usuario, entidade="animal_costs", entidade_id=cost_id,
+            registro_anterior=foto(c),
+            registro_posterior={"novo_custo": nova, "tipo": data.cost_type, "valor": data.amount,
+                                "data": data.cost_date, "descricao": data.description},
+            motivo=motivo, origem=origem)
+    return {"cancelada": cost_id, "nova": nova}
+
+
+@_writes
+def cancelar_custo_fixo(cost_id: int, motivo: str, usuario: str, *, origem: str = "web") -> dict:
+    """Cancela um custo fixo lançado por engano. A linha fica, com motivo e autor, e sai de todas
+    as somas. Mesmos erros de `cancelar_custo_animal`."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        c = _cancelar_custo_em(con, "fixed_costs", cost_id, motivo, usuario)
+        eventos.auditar_em(con, "cancelar_custo_fixo", usuario=usuario, entidade="fixed_costs",
+                           entidade_id=cost_id, registro_anterior=foto(c), motivo=motivo, origem=origem)
+    return {"cancelada": cost_id}
+
+
+@_writes
+def corrigir_custo_fixo(cost_id: int, data: FixedCostData, motivo: str, usuario: str, *,
+                        origem: str = "web") -> dict:
+    """Corrige um custo fixo: cancela o original e grava o certo, ligado a ele, na mesma
+    transação."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        c = _cancelar_custo_em(con, "fixed_costs", cost_id, motivo, usuario)
+        nova = con.execute(
+            """INSERT INTO fixed_costs
+               (category,description,amount,cost_date,recurring,notes,lote_id,corrige_id)
+               VALUES(?,?,?,?,?,?,?,?) RETURNING id""",
+            (data.category, data.description, data.amount, data.cost_date, int(data.recurring),
+             data.notes, data.lote_id, cost_id)).fetchone()["id"]
+        eventos.auditar_em(
+            con, "corrigir_custo_fixo", usuario=usuario, entidade="fixed_costs", entidade_id=cost_id,
+            registro_anterior=foto(c),
+            registro_posterior={"novo_custo": nova, "categoria": data.category, "valor": data.amount,
+                                "data": data.cost_date, "descricao": data.description},
+            motivo=motivo, origem=origem)
+    return {"cancelada": cost_id, "nova": nova}
+
+
 def get_fixed_costs_by_category(start_date: Optional[str] = None,
                                 end_date: Optional[str] = None) -> list[dict]:
-    sql = "SELECT category, COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE 1=1"
+    sql = "SELECT category, COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE cancelada_em IS NULL"
     args: list = []
     if start_date:
         sql += " AND cost_date >= ?"; args.append(start_date)
@@ -174,7 +275,7 @@ def get_fixed_costs_by_lote(start_date: Optional[str] = None,
                             end_date: Optional[str] = None) -> dict:
     """Custo fixo por centro de custo (piquete). Chave `None` = geral da
     fazenda (custo fixo sem `lote_id`)."""
-    sql = "SELECT lote_id, COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE 1=1"
+    sql = "SELECT lote_id, COALESCE(SUM(amount),0) as total FROM fixed_costs WHERE cancelada_em IS NULL"
     args: list = []
     if start_date:
         sql += " AND cost_date >= ?"; args.append(start_date)
@@ -199,7 +300,7 @@ def get_animal_costs_by_lote(start_date: Optional[str] = None,
     """
     sql = ("SELECT a.lote_id, COALESCE(SUM(c.amount),0) as total "
            "FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid "
-           "WHERE a.lote_id IS NOT NULL")
+           "WHERE a.lote_id IS NOT NULL AND c.cancelada_em IS NULL")
     args: list = []
     if start_date:
         sql += " AND c.cost_date >= ?"; args.append(start_date)
@@ -266,7 +367,7 @@ def _fetch_animal_costs(con, animais: list[dict]) -> dict[str, float]:
     rows = con.execute(
         f"""SELECT a.id AS animal_id, COALESCE(SUM(c.amount),0) AS total
            FROM animal_costs c JOIN animals a ON a.uuid=c.animal_uuid
-           WHERE a.id IN ({qmarks})
+           WHERE a.id IN ({qmarks}) AND c.cancelada_em IS NULL
            GROUP BY a.id""", animal_ids_tuple
     ).fetchall()
     return {r["animal_id"]: round(float(r["total"]), 2) for r in rows}
@@ -504,18 +605,18 @@ def get_financial_summary(start_date: Optional[str] = None,
         # Saídas
         ps, pa = _period("cost_date")
         compra = _scalar(con,
-            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='compra'"+ps, pa)
+            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='compra' AND cancelada_em IS NULL"+ps, pa)
         operacional = _scalar(con,
-            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='operacional'"+ps, pa)
+            "SELECT COALESCE(SUM(amount),0) t FROM animal_costs WHERE cost_type='operacional' AND cancelada_em IS NULL"+ps, pa)
         fs, fa = _period("cost_date")
         fixos = _scalar(con,
-            "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE 1=1"+fs, fa)
+            "SELECT COALESCE(SUM(amount),0) t FROM fixed_costs WHERE cancelada_em IS NULL"+fs, fa)
         medicamentos = _insumo_cost_by_reason(con, ("uso_animal",), start_date, end_date)
         nutricao     = _insumo_cost_by_reason(con, ("trato_lote",), start_date, end_date)
         # Perda por mortalidade (informativa — o custo já está nas saídas acima)
         ds, dd = _period("death_date")
         perda_mort = _scalar(con,
-            "SELECT COALESCE(SUM(cost_at_death),0) t FROM deaths WHERE 1=1"+ds, dd)
+            "SELECT COALESCE(SUM(cost_at_death),0) t FROM deaths WHERE cancelada_em IS NULL"+ds, dd)
         # Entradas
         ss, sa = _period("sale_date")
         rows_v = con.execute(
@@ -552,27 +653,117 @@ def register_death(animal_id: str, death_date: str, cause: str,
         return {"ok": False}
     custo = get_total_cost(animal_id)
     with _conn() as con:
-        con.execute(
-            """INSERT INTO deaths
-               (animal_uuid,death_date,cause,lote_id,weight_at_death,
-                cost_at_death,operator,notes)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (a["uuid"], death_date, cause, a.get("lote_id"),
-             a["current_weight"], custo, operator, notes),
-        )
-        con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
-        eventos.registrar_em(
+        evento = eventos.registrar_em(
             con, a["uuid"], "morte", ocorrido_em=death_date,
             usuario_registro=operator,
             observacoes=f"causa: {cause}; perda de R$ {custo:.2f}")
+        con.execute(
+            """INSERT INTO deaths
+               (animal_uuid,death_date,cause,lote_id,weight_at_death,
+                cost_at_death,operator,notes,evento_id)
+               VALUES(?,?,?,?,?,?,?,?,?)""",
+            (a["uuid"], death_date, cause, a.get("lote_id"),
+             a["current_weight"], custo, operator, notes, evento.get("id")),
+        )
+        con.execute("UPDATE animals SET status='morto' WHERE id=?", (animal_id,))
     return {"ok": True, "perda": round(custo, 2)}
 
 
+def get_morte_vigente(animal_id: str) -> Optional[dict]:
+    """O óbito vigente (não cancelado) do animal, ou None."""
+    with _conn() as con:
+        r = con.execute(
+            """SELECT d.*, a.id AS animal_id FROM deaths d JOIN animals a ON a.uuid=d.animal_uuid
+               WHERE a.id=? AND d.cancelada_em IS NULL ORDER BY d.death_date DESC, d.id DESC LIMIT 1""",
+            (animal_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def _cancelar_morte_em(con, death_id: int, motivo: str, usuario: str, *, registrar_estorno: bool,
+                       animal_id: Optional[str] = None) -> dict:
+    """Marca o óbito como cancelado, na conexão do chamador."""
+    d = con.execute(
+        """SELECT d.*, a.id AS animal_id FROM deaths d
+           JOIN animals a ON a.uuid=d.animal_uuid WHERE d.id=?""", (death_id,)).fetchone()
+    if d is None or (animal_id is not None and d["animal_id"] != animal_id):
+        raise RegistroNaoEncontrado(f"Óbito {death_id} não encontrado.")
+    d = dict(d)
+    if d["cancelada_em"]:
+        raise RegistroJaCancelado(f"O óbito {death_id} já foi cancelado em {d['cancelada_em']}.")
+    cur = con.execute(
+        """UPDATE deaths SET cancelada_em=?, cancelada_por=?, motivo_cancelamento=?
+           WHERE id=? AND cancelada_em IS NULL""", (eventos._agora(), usuario or None, motivo, death_id))
+    if cur.rowcount == 0:      # outro pedido cancelou entre a leitura e a escrita
+        raise RegistroJaCancelado(f"O óbito {death_id} já foi cancelado.")
+    versao = versao_do_evento(con, d["evento_id"])
+    if registrar_estorno:
+        eventos.registrar_em(
+            con, d["animal_uuid"], "estorno", usuario_registro=usuario, justificativa=motivo,
+            evento_anterior_id=d["evento_id"], versao=versao + 1,
+            observacoes=f"Cancelamento do óbito de {d['death_date']} (causa: {d['cause']})")
+    return {"morte": d, "foto": foto(d), "versao_evento": versao}
+
+
+@_writes
+def cancelar_morte(death_id: int, motivo: str, usuario: str, *, origem: str = "web",
+                   animal_id: Optional[str] = None) -> dict:
+    """Cancela um óbito registrado por engano. A linha fica, com motivo e autor, e o animal volta
+    ao rebanho: `ativo`, ou `carencia` se ainda houver carência vigente.
+
+    Levanta `RevisaoNaoPermitida` (sem motivo), `RegistroNaoEncontrado` ou `RegistroJaCancelado`;
+    em qualquer uma nada é gravado."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        r = _cancelar_morte_em(con, death_id, motivo, usuario, registrar_estorno=True, animal_id=animal_id)
+        d = r["morte"]
+        aplicacoes = [dict(m) for m in con.execute(
+            """SELECT med_date, withdrawal_days FROM medications
+               WHERE animal_uuid=? AND withdrawal_days > 0 AND cancelada_em IS NULL""",
+            (d["animal_uuid"],)).fetchall()]
+        status = "carencia" if fim_da_carencia(aplicacoes, date.today()) else "ativo"
+        con.execute("UPDATE animals SET status=? WHERE uuid=? AND status='morto'", (status, d["animal_uuid"]))
+        eventos.auditar_em(
+            con, "cancelar_obito", usuario=usuario, entidade="deaths", entidade_id=death_id,
+            registro_anterior=r["foto"], registro_posterior={"status": status}, motivo=motivo, origem=origem)
+    return {"cancelada": death_id, "animal_id": d["animal_id"], "status": status}
+
+
+@_writes
+def corrigir_morte(death_id: int, death_date: str, cause: str, motivo: str, usuario: str, *,
+                   notes: str = "", origem: str = "web", animal_id: Optional[str] = None) -> dict:
+    """Corrige data, causa ou observação de um óbito: cancela o original e grava o certo, ligado a
+    ele (evento novo na cadeia), na mesma transação. O animal continua `morto`; peso e custo no
+    óbito são os do registro original."""
+    motivo = motivo_obrigatorio(motivo)
+    with _conn() as con:
+        r = _cancelar_morte_em(con, death_id, motivo, usuario, registrar_estorno=False, animal_id=animal_id)
+        d = r["morte"]
+        evento = eventos.registrar_em(
+            con, d["animal_uuid"], "morte", ocorrido_em=death_date, usuario_registro=usuario,
+            justificativa=motivo, evento_anterior_id=d["evento_id"], versao=r["versao_evento"] + 1,
+            observacoes=f"causa: {cause}; perda de R$ {float(d['cost_at_death'] or 0):.2f}")
+        nova = con.execute(
+            """INSERT INTO deaths
+               (animal_uuid,death_date,cause,lote_id,weight_at_death,cost_at_death,operator,notes,
+                evento_id,corrige_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id""",
+            (d["animal_uuid"], death_date, cause, d["lote_id"], d["weight_at_death"], d["cost_at_death"],
+             usuario or d["operator"], notes, evento.get("id"), death_id)).fetchone()["id"]
+        eventos.auditar_em(
+            con, "corrigir_obito", usuario=usuario, entidade="deaths", entidade_id=death_id,
+            registro_anterior=r["foto"],
+            registro_posterior={"novo_obito": nova, "data": death_date, "causa": cause},
+            motivo=motivo, origem=origem)
+    return {"cancelada": death_id, "nova": nova, "animal_id": d["animal_id"]}
+
+
 def get_deaths(start_date: Optional[str] = None,
-               end_date: Optional[str] = None) -> list[dict]:
+               end_date: Optional[str] = None, incluir_canceladas: bool = False) -> list[dict]:
     sql = ("SELECT d.*, a.id AS animal_id, a.breed, a.sex, l.name AS lote_name "
            "FROM deaths d LEFT JOIN animals a ON a.uuid=d.animal_uuid "
            "LEFT JOIN lotes l ON l.id=d.lote_id WHERE 1=1")
+    if not incluir_canceladas:
+        sql += " AND d.cancelada_em IS NULL"
     args: list = []
     if start_date:
         sql += " AND d.death_date >= ?"; args.append(start_date)
