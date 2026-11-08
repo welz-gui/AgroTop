@@ -655,12 +655,14 @@ def _adicionar_pagina_animal(pdf, venda: dict, texto, tabela) -> None:
 
     medicamentos = db.get_medications(animal_id) or []
     tabela("Sanidade / Medicamentos",
-           ["Data", "Medicamento", "Princípio ativo", "Lote", "Validade", "Dose", "Carência (dias)", "Aplicado por"], [
+           ["Data", "Medicamento", "Princípio ativo", "Lote", "Validade", "Dose", "Carência (dias)", "Aplicado por",
+            "Piquete"], [
         (_evidencias_data(item.get("med_date")), item.get("medication_name") or "—",
          item.get("principio_ativo") or "—", item.get("lote_produto") or "—",
          _evidencias_data(item.get("validade_produto")) if item.get("validade_produto") else "—",
          f"{item.get('dose') or '—'} {item.get('unit') or ''}".strip(),
-         item.get("withdrawal_days") or 0, item.get("applied_by") or "—")
+         item.get("withdrawal_days") or 0, item.get("applied_by") or "—",
+         str(item.get("piquete_nome") or item.get("lote_id") or "—")[:12])
         for item in medicamentos
     ])
     fim_carencia = db.get_withdrawal_end(animal_id)
@@ -1584,6 +1586,7 @@ def _tab_historico(animal):
                 f'{_fmt_dose(m["dose"], m["unit"])} · {html.escape(str(m["application_route"]))} · {m["med_date"]}'
                 f'{"  ·  carência "+str(m["withdrawal_days"])+"d" if m["withdrawal_days"] else ""}'
                 f'{"  ·  "+_produto_aplicado_txt(m) if _produto_aplicado_txt(m) else ""}'
+                f'{"  ·  piquete "+html.escape(str(m["piquete_nome"] or m["lote_id"])) if m.get("lote_id") else ""}'
                 f'</span></div>',unsafe_allow_html=True)
         st.markdown("**🚚 Movimentações**")
         for mv in db.get_movements(animal["id"], limit=4):
@@ -2304,6 +2307,7 @@ def _render_tab_med(meds):
                 f'{"  ·  carência "+str(m_["withdrawal_days"])+" dias (até "+_data_br(end_)+")" if m_["withdrawal_days"] else ""}'
                 f'{"  ·  por: "+html.escape(str(m_["applied_by"])) if m_["applied_by"] else ""}'
                 f'{"  ·  "+_produto_aplicado_txt(m_) if _produto_aplicado_txt(m_) else ""}'
+                f'{"  ·  piquete "+html.escape(str(m_["piquete_nome"] or m_["lote_id"])) if m_.get("lote_id") else ""}'
                 f'</span>{rodape}</div>',unsafe_allow_html=True)
             if not cancelada:
                 _revisar_aplicacao(m_)
