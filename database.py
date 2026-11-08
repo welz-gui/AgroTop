@@ -130,7 +130,7 @@ from repositories.financeiro import (  # noqa: F401
     AnimalCostData, FixedCostData, add_animal_cost, add_fixed_cost, get_fixed_costs, get_total_fixed_costs,
     delete_fixed_cost, get_fixed_costs_by_category, register_sale, get_sales, SaleParams,
     cancelar_custo_animal, corrigir_custo_animal, cancelar_custo_fixo, corrigir_custo_fixo,
-    cancelar_morte, corrigir_morte, get_morte_vigente,
+    cancelar_morte, corrigir_morte, get_morte_vigente, cancelar_venda, corrigir_venda,
     VendaBloqueadaPorCarencia,
     get_financial_summary, get_insumo_compras, register_death, get_deaths,
     get_mortality_stats, get_category_prices, set_category_price,

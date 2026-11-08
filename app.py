@@ -3347,6 +3347,101 @@ def _fin_venda_registro(animals):
                                   "Contas a Receber (aba em Financeiro).")
                     st.rerun()
 
+def _grupos_de_venda(vendas):
+    """As vendas vigentes agrupadas como o cancelamento as enxerga: o lote (`lot_ref`) inteiro, ou a
+    venda avulsa. Devolve `{chave: [linhas]}`, da mais recente para a mais antiga."""
+    grupos = {}
+    for v in vendas:
+        grupos.setdefault(v.get("lot_ref") or f"venda-{v['id']}", []).append(v)
+    return grupos
+
+
+def _revisao_venda(vendas):
+    """Corrige ou cancela uma venda (o lote inteiro ou a venda avulsa) e lista as canceladas. O
+    original nunca é apagado: fica com o motivo. Cancelar devolve os animais ao rebanho e cancela
+    as parcelas a receber em aberto; a venda a prazo só se cancela (para corrigir, registre de novo)."""
+    grupos = _grupos_de_venda(vendas)
+    if grupos:
+        with st.expander("✏️ Corrigir ou cancelar uma venda"):
+            def _rotulo(chave):
+                g = grupos[chave]
+                n = len(g)
+                return (f"{_data_br(str(g[0]['sale_date'])[:10])} · {n} animal(is) · "
+                        f"R$ {sum(x['total_value'] for x in g):,.2f} · {g[0].get('buyer') or 'sem comprador'}"
+                        + (" · a prazo" if g[0].get("a_prazo") else ""))
+            chave = st.selectbox("Venda", list(grupos.keys()), format_func=_rotulo, key="rev_venda")
+            g = grupos[chave]
+            ref = g[0]
+            a_prazo = bool(ref.get("a_prazo"))
+            k = str(ref["id"])
+            with st.form(f"f_rev_venda_{k}", clear_on_submit=True):
+                st.caption("Animais: " + ", ".join(str(x["animal_id"]) for x in g))
+                if a_prazo:
+                    st.caption("Venda a prazo: só dá para cancelar (as parcelas em aberto são canceladas "
+                               "junto). Para corrigir, cancele e registre a venda de novo.")
+                modo = ref.get("pricing_mode") or "kg"
+                if modo == "kg":
+                    valor0, rotulo_valor = float(ref.get("price_per_kg") or 0), "Preço por kg (R$)"
+                elif modo == "cabeca":
+                    valor0, rotulo_valor = float(ref["total_value"]), "Valor por cabeça (R$)"
+                else:
+                    valor0, rotulo_valor = float(sum(x["total_value"] for x in g)), "Valor TOTAL do lote (R$)"
+                r1, r2 = st.columns(2)
+                with r1:
+                    valor = st.number_input(rotulo_valor, min_value=0.0, step=0.10, format="%.2f",
+                        value=valor0, key=f"rv_v_{k}", disabled=a_prazo)
+                    data_v = st.date_input("Data da venda", value=_data_do_registro(ref["sale_date"]),
+                        key=f"rv_d_{k}", disabled=a_prazo)
+                with r2:
+                    tipos = list(db.SALE_TYPES.keys())
+                    tipo = st.selectbox("Tipo de venda", tipos, key=f"rv_t_{k}", disabled=a_prazo,
+                        format_func=lambda t: db.SALE_TYPES[t],
+                        index=tipos.index(ref["sale_type"]) if ref["sale_type"] in tipos else 0)
+                    comprador = st.text_input("Comprador", value=ref.get("buyer") or "", key=f"rv_c_{k}",
+                        disabled=a_prazo)
+                motivo = st.text_input("Motivo *", key=f"rv_m_{k}",
+                    help="Fica gravado com o seu nome. A venda original continua no histórico.")
+                b1, b2 = st.columns(2)
+                corrigir = b1.form_submit_button("Salvar correção", type="primary",
+                                                 use_container_width=True, disabled=a_prazo)
+                cancelar = b2.form_submit_button("Cancelar venda (devolve os animais ao rebanho)",
+                                                 use_container_width=True)
+                if corrigir or cancelar:
+                    usuario = _usuario_atual()
+                    try:
+                        if cancelar:
+                            r = db.cancelar_venda(ref["id"], motivo, usuario)
+                        else:
+                            r = db.corrigir_venda(ref["id"], db.SaleParams(
+                                animal_ids=[x["animal_id"] for x in g], sale_date=data_v.strftime("%Y-%m-%d"),
+                                sale_type=tipo, pricing_mode=modo, value=valor, buyer=comprador,
+                                operator=ref.get("operator") or usuario, notes=ref.get("notes") or ""),
+                                motivo, usuario)
+                    except db.VendaBloqueadaPorCarencia as exc:
+                        detalhe = ", ".join(f"{aid} (até {_data_br(fim)})"
+                                            for aid, fim in sorted(exc.bloqueados.items()))
+                        st.error(f"🚫 Venda para abate bloqueada: animal em carência: {detalhe}.")
+                    except (db.RevisaoNaoPermitida, db.RegistroNaoEncontrado, db.RegistroJaCancelado) as e:
+                        st.error(f"🚫 {e}")
+                    else:
+                        if cancelar:
+                            st.success(f"✅ Venda cancelada: {len(r['animais'])} animal(is) de volta ao rebanho"
+                                       + (f"; {r['parcelas_canceladas']} parcela(s) a receber cancelada(s)."
+                                          if r["parcelas_canceladas"] else "."))
+                        else:
+                            st.success("✅ Venda corrigida.")
+                        st.rerun()
+    canceladas = [v for v in db.get_sales(incluir_canceladas=True) if v.get("cancelada_em")]
+    if canceladas:
+        with st.expander(f"Vendas canceladas ({len(canceladas)})"):
+            st.dataframe(pd.DataFrame([{
+                "Data": _data_br(str(v["sale_date"])[:10]), "Animal": v["animal_id"],
+                "Receita (R$)": v["total_value"], "Comprador": v.get("buyer") or "—",
+                "Motivo": v.get("motivo_cancelamento") or "—", "Por": v.get("cancelada_por") or "—"}
+                for v in canceladas]), use_container_width=True, hide_index=True,
+                column_config={"Receita (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
+
+
 def _fin_venda_historico(vendas):
     # Histórico de vendas
     st.markdown("---")
@@ -3364,6 +3459,7 @@ def _fin_venda_historico(vendas):
         st.metric("Lucro/Prejuízo acumulado nas vendas", f"R$ {tot_luc:,.2f}")
     else:
         st.info("Nenhuma venda registrada ainda.")
+    _revisao_venda(vendas)
 
 
 def _fin_venda_custo_lote(vendas):
