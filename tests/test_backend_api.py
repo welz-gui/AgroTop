@@ -835,7 +835,10 @@ class TestSanidadeEndpoint(BackendApiTestCase):
 
     def test_get_medicamentos_usa_carencia_calculada_pelo_repositorio(self):
         """Critério 3 (Spec 0050): a API expõe a carência calculada pelo repositório."""
-        animal_id = get_all_animals()[0]["id"]
+        animal = get_all_animals()[0]
+        animal_id = animal["id"]
+        piquete_nome = next(
+            l["name"] for l in db.get_all_lotes() if str(l["id"]) == str(animal["lote_id"]))
         hoje = datetime.now().date().isoformat()
         add_medication(MedicationData(
             animal_id=animal_id,
@@ -875,6 +878,9 @@ class TestSanidadeEndpoint(BackendApiTestCase):
                 "principio_ativo": None,
                 "lote": None,
                 "validade": None,
+                # Piquete do animal na data da aplicação (migration 0039).
+                "piquete_id": str(animal["lote_id"]),
+                "piquete": piquete_nome,
             },
             [{k: v for k, v in a.items() if k != "id"} for a in data["aplicacoes"]],
         )
