@@ -108,5 +108,41 @@ class TestVendaEmCarencia(BaseRegras):
         self.assertIn(fim.isoformat(), str(ctx.exception))
 
 
+class TestFimDeCarenciaEmLote(BaseRegras):
+    """`get_withdrawal_end_batch` segue o critério de `get_withdrawal_end`: só conta
+    a carência cujo fim é depois de hoje (no dia do fim, e depois, é None)."""
+
+    def _batch(self, aid):
+        db.clear_cache()
+        return db.get_withdrawal_end_batch([aid])[aid]
+
+    def test_carencia_vigente_devolve_o_fim(self):
+        a = self.animal("L1")
+        self.medicacao(a, (HOJE - timedelta(days=2)).isoformat(), 10)
+
+        self.assertEqual(self._batch(a), HOJE + timedelta(days=8))
+
+    def test_carencia_que_termina_hoje_ja_esta_liberada(self):
+        a = self.animal("L2")
+        self.medicacao(a, (HOJE - timedelta(days=10)).isoformat(), 10)
+
+        self.assertIsNone(self._batch(a))
+        db.clear_cache()
+        self.assertIsNone(db.get_withdrawal_end(a))
+
+    def test_carencia_vencida_nao_aparece(self):
+        a = self.animal("L3")
+        self.medicacao(a, (HOJE - timedelta(days=30)).isoformat(), 10)
+
+        self.assertIsNone(self._batch(a))
+
+    def test_entre_uma_vencida_e_uma_vigente_vale_a_vigente(self):
+        a = self.animal("L4")
+        self.medicacao(a, (HOJE - timedelta(days=30)).isoformat(), 10)
+        self.medicacao(a, (HOJE - timedelta(days=1)).isoformat(), 5)
+
+        self.assertEqual(self._batch(a), HOJE + timedelta(days=4))
+
+
 if __name__ == "__main__":
     unittest.main()
