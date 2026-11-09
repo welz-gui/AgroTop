@@ -140,6 +140,17 @@ class TestMovimentacaoService(unittest.TestCase):
         problemas3 = pre_validar_saida(mov, [animal], self.contexto_valido)
         self.assertIn("animal_em_carencia", self._extract_codes(problemas3))
 
+    def test_carencia_que_termina_hoje_nao_bloqueia_o_abate(self):
+        """No dia do fim a carência já acabou (igual a venda e a `get_withdrawal_end`)."""
+        animal = self.animal_valido.copy()
+        animal["carencia_ate"] = self.hoje_str
+        mov = self.mov_valida.copy()
+        mov["finalidade"] = "abate"
+        problemas = pre_validar_saida(mov, [animal], self.contexto_valido)
+        codigos = self._extract_codes(problemas)
+        self.assertNotIn("animal_em_carencia", codigos)
+        self.assertNotIn("animal_em_carencia_sem_abate", codigos)
+
     def test_animal_em_carencia_sem_abate(self):
         animal = self.animal_valido.copy()
         animal["carencia_ate"] = self.amanha_str

@@ -104,7 +104,9 @@ def _validar_animais(animais: list[dict], movimentacao: dict, contexto: dict, ho
                                 f"Animal {rot} sem identificação oficial."))
 
         carencia = _data(a.get("carencia_ate"))
-        if carencia and carencia >= hoje:
+        # No dia do fim a carência já acabou (mesmo critério de `get_withdrawal_end`
+        # e de `services/carencia.py`): só vale enquanto o fim é depois de hoje.
+        if carencia and carencia > hoje:
             # Carência impede ABATE, não movimentação. Bloquear transferência
             # entre pastos por causa dela é excesso que atrapalha o manejo.
             if abate:

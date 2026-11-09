@@ -341,6 +341,9 @@ def get_withdrawal_end_batch(animal_ids: list[str]) -> dict[str, Optional[date]]
     df = pd.DataFrame(wd_records)
     df["med_date"] = pd.to_datetime(df["med_date"])
     df["end_date"] = df["med_date"] + pd.to_timedelta(df["wd_days"], unit="D")
+    # Só a carência ainda vigente (fim depois de hoje), como em `get_withdrawal_end`:
+    # sem isto, a tela e a API mostravam "Carência até" uma data que já passou.
+    df = df[df["end_date"] > pd.Timestamp(date.today())]
 
     if df.empty:
         return {aid: None for aid in animal_ids}
