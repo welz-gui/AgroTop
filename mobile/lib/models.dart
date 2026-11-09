@@ -239,6 +239,8 @@ class MedicationApplication {
     this.principioAtivo,
     this.lote,
     this.validade,
+    this.piqueteId,
+    this.piquete,
   });
 
   /// Id da aplicação no servidor. Nulo em servidor anterior à correção de tratamento:
@@ -255,6 +257,14 @@ class MedicationApplication {
   final String? principioAtivo;
   final String? lote;
   final String? validade;
+  // Piquete do animal na data da aplicação (o servidor o decide pela data, não pelo
+  // momento do registro). Nulo nas aplicações anteriores à migration 0039. Atenção:
+  // `lote` acima é o lote do PRODUTO, não o piquete.
+  final String? piqueteId;
+  final String? piquete;
+
+  /// Nome do piquete (ou o id, se o nome não veio); nulo quando a aplicação não guarda piquete.
+  String? get piqueteExibido => piqueteId == null ? null : (piquete ?? piqueteId);
 
   /// 'princípio ativo X · lote Y · val. AAAA-MM-DD' (só o que foi informado).
   String get produtoAplicado => [
@@ -276,6 +286,8 @@ class MedicationApplication {
         principioAtivo: json['principio_ativo'] as String?,
         lote: json['lote'] as String?,
         validade: json['validade'] as String?,
+        piqueteId: json['piquete_id'] as String?,
+        piquete: json['piquete'] as String?,
       );
 }
 
