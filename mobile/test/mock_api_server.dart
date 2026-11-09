@@ -42,6 +42,10 @@ class MockApiServer {
   int correctionRequests = 0;
   Map<String, dynamic>? lastMovementBody;
   Map<String, dynamic>? lastMedicationBody;
+
+  /// Piquete que o mock carimba nas aplicações novas e corrigidas (id, nome). O servidor
+  /// real o decide pela data da aplicação; aqui o teste escolhe. Nulo = sem piquete.
+  ({String id, String nome})? piqueteDaAplicacao;
   // Quantas próximas pesagens respondem 409 "em processamento" antes de aceitar.
   int pesagensEmProcessamento = 0;
   int photoUploadRequests = 0;
@@ -626,6 +630,8 @@ class MockApiServer {
           'principio_ativo': body['principio_ativo'],
           'lote': body['lote'],
           'validade': validade,
+          'piquete_id': piqueteDaAplicacao?.id,
+          'piquete': piqueteDaAplicacao?.nome,
         });
         await _json(request, 201, {'carencia_ate': carenciaAte});
         return;
@@ -679,6 +685,8 @@ class MockApiServer {
             'principio_ativo': body['principio_ativo'],
             'lote': body['lote'],
             'validade': body['validade'],
+            'piquete_id': piqueteDaAplicacao?.id,
+            'piquete': piqueteDaAplicacao?.nome,
           };
         }
         // Carência vigente = a maior entre as aplicações que sobraram.

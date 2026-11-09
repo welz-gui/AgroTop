@@ -1215,6 +1215,7 @@ class _AnimalDetailPageState extends State<AnimalDetailPage> {
                           subtitle: Text(
                             '${app.data} · Via ${app.via}'
                             '${app.carenciaDias > 0 ? ' · Carência: ${app.carenciaDias}d' : ''}'
+                            '${app.piqueteExibido == null ? '' : ' · Piquete: ${app.piqueteExibido}'}'
                             '${app.produtoAplicado.isEmpty ? '' : '\n${app.produtoAplicado}'}',
                           ),
                           // Sem id (servidor antigo) não há como corrigir.

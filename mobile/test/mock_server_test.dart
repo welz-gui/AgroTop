@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:agrotop_mobile/api_client.dart';
+import 'package:agrotop_mobile/models.dart';
 import 'package:agrotop_mobile/screens/animal_photo_section.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/io_client.dart';
@@ -645,6 +646,64 @@ void main() {
         ),
       );
     }, PassthroughHttpOverrides());
+  });
+
+  test('aplicação traz o piquete em que o animal estava; sem piquete fica nulo', () async {
+    final server = await MockApiServer.start();
+    addTearDown(server.close);
+
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final networkClient = IOClient(HttpClient());
+      addTearDown(networkClient.close);
+      final api = ApiClient(
+        tokenStore: ServerTokenStore(),
+        httpClient: networkClient,
+        baseUrl: server.baseUrl,
+      );
+      await api.login('admin', 'senha-segura');
+
+      Future<MedicationApplication> aplicar(String data) async {
+        await api.registerMedication(
+          'BR0001',
+          medicamento: 'Ivermectina 1%',
+          dose: 8.0,
+          unidade: 'ml',
+          via: 'Subcutânea',
+          carenciaDias: 0,
+          data: data,
+        );
+        return (await api.getAnimalMedications('BR0001')).aplicacoes.first;
+      }
+
+      // Aplicação anterior à migration 0039: o servidor devolve os dois campos nulos.
+      final antiga = await aplicar('2026-08-20');
+      expect(antiga.piqueteId, isNull);
+      expect(antiga.piquete, isNull);
+      expect(antiga.piqueteExibido, isNull);
+
+      server.piqueteDaAplicacao = (id: 'P07', nome: 'Piquete Norte');
+      final nova = await aplicar('2026-08-22');
+      expect(nova.piqueteId, 'P07');
+      expect(nova.piquete, 'Piquete Norte');
+      expect(nova.piqueteExibido, 'Piquete Norte');
+      // `lote` é o lote do produto: o piquete não pode vazar para ele.
+      expect(nova.lote, isNull);
+    }, PassthroughHttpOverrides());
+  });
+
+  test('piquete sem nome cai para o id', () {
+    final aplicacao = MedicationApplication.fromJson({
+      'id': 1,
+      'medicamento': 'Aftosa',
+      'dose': 2.0,
+      'unidade': 'dose',
+      'via': 'Subcutânea',
+      'carencia_dias': 0,
+      'data': '2026-08-22',
+      'piquete_id': 'P09',
+      'piquete': null,
+    });
+    expect(aplicacao.piqueteExibido, 'P09');
   });
 }
 

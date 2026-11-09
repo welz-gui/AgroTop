@@ -289,6 +289,9 @@ void main() {
             'carencia_dias': body['carencia_dias'],
             'data': body['data'],
             'protocolo_id': body['protocolo_id'],
+            // O servidor guarda o piquete do animal na data da aplicação.
+            'piquete_id': animal['lote_id'],
+            'piquete': animal['lot_name'],
           });
           return _json({'carencia_ate': carenciaAte}, status: 201);
         }
@@ -498,6 +501,11 @@ void main() {
       );
       expect(find.text('Histórico de aplicações (1)'), findsOneWidget);
       expect(find.textContaining('Ivermectina 1% · 8.0 ml'), findsOneWidget);
+      // O histórico diz em que piquete o animal estava quando foi tratado.
+      expect(
+        find.textContaining('Piquete: Piquete Central'),
+        findsOneWidget,
+      );
 
       final weighingButton = find.byKey(const ValueKey('open-weighing'));
       await tester.drag(find.byType(Scrollable).last, const Offset(0, 1000));
