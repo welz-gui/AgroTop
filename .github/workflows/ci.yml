@@ -18,7 +18,7 @@ jobs:
     # travado (ex.: chamada de rede sem timeout), não de asserção quebrada. Um
     # run saudável completo fica em ~6min; 20min já é folga generosa e evita
     # consumir minutos de CI por quase uma hora num travamento silencioso.
-    timeout-minutes: 20
+    timeout-minutes: 30      # inclui a espera da meia-noite (conftest.py)
     services:
       postgres:
         image: postgres:16
@@ -63,7 +63,7 @@ jobs:
         run: python -m compileall app.py database.py repositories services ui tests tools
 
       - name: Testes — SQLite
-        timeout-minutes: 10
+        timeout-minutes: 20
         env:
           AGROTOP_FORCE_SQLITE: "1"
         run: pytest tests -v
@@ -100,7 +100,7 @@ jobs:
       # testes de integração abrem subprocessos e removem essa trava somente
       # para este Postgres efêmero, sem expor nem alcançar credencial real.
       - name: Testes — PostgreSQL
-        timeout-minutes: 10
+        timeout-minutes: 20
         env:
           AGROTOP_TEST_POSTGRES: "1"
           DATABASE_URL: postgresql://agrotop_test:agrotop_test@localhost:5432/agrotop_test
