@@ -602,7 +602,10 @@ def corrigir_venda(sale_id: int, params: SaleParams, motivo: str, usuario: str, 
     data, comprador, a prazo): a venda nova mantém o `lot_ref` quando o grupo tinha um.
 
     O peso na venda dos animais que já estavam nela é o do registro original, e não o peso de hoje.
-    Recusas (motivo, parcela recebida, abate em carência) não gravam nada: a original continua valendo."""
+    Quem sai da venda volta ao rebanho e ganha o evento de estorno (a trilha dele fecha, como no
+    cancelamento); quem entra tem de poder ser vendido (`ativo` ou `carencia`).
+    Recusas (motivo, parcela recebida, abate em carência, animal que não pode ser vendido) não
+    gravam nada: a original continua valendo."""
     motivo = motivo_obrigatorio(motivo)
     animais = [a for a in (get_animal(i) for i in params.animal_ids) if a]
     if not animais:
@@ -611,6 +614,14 @@ def corrigir_venda(sale_id: int, params: SaleParams, motivo: str, usuario: str, 
         r = _cancelar_venda_em(con, sale_id, motivo, usuario, registrar_estorno=False)
         grupo = r["grupo"]
         antiga = {l["animal_uuid"]: l for l in grupo}
+        for a in animais:
+            if a["uuid"] in antiga:
+                continue
+            # Lido aqui, dentro da transação: um animal vendido em outra venda ou morto não entra.
+            situacao = con.execute("SELECT status FROM animals WHERE uuid=?", (a["uuid"],)).fetchone()["status"]
+            if situacao not in ("ativo", "carencia"):
+                raise RevisaoNaoPermitida(
+                    f"O animal {a['id']} está '{situacao}' e não pode entrar na venda.")
         animais = [{**a, "current_weight": antiga[a["uuid"]]["weight_kg"]}
                    if a["uuid"] in antiga and antiga[a["uuid"]]["weight_kg"] is not None else a
                    for a in animais]
@@ -623,16 +634,27 @@ def corrigir_venda(sale_id: int, params: SaleParams, motivo: str, usuario: str, 
                 "versao": r["versoes"][ant["id"]] + 1 if ant else 1}
         lot_ref = grupo[0]["lot_ref"] or _novo_lot_ref(params, len(animais))
         nova = _registrar_venda_em(con, animais, params, lot_ref, cadeia=cadeia)
+        ficam = {a["uuid"] for a in animais}
+        retirados = [l for l in grupo if l["animal_uuid"] not in ficam]
+        for linha in retirados:
+            eventos.registrar_em(
+                con, linha["animal_uuid"], "estorno", usuario_registro=usuario, justificativa=motivo,
+                evento_anterior_id=linha["evento_id"], versao=r["versoes"][linha["id"]] + 1,
+                observacoes=f"Retirado da venda de {linha['sale_date']} na correção (R$ {linha['total_value']:.2f})")
+        acrescentados = [a["id"] for a in animais if a["uuid"] not in antiga]
         for linha in grupo:
             eventos.auditar_em(
                 con, "corrigir_venda", usuario=usuario, entidade="sales", entidade_id=linha["id"],
                 registro_anterior=foto(linha),
                 registro_posterior={"lot_ref": lot_ref, "animais": len(animais), "receita": nova["receita"],
-                                    "data": params.sale_date, "comprador": params.buyer},
+                                    "data": params.sale_date, "comprador": params.buyer,
+                                    "retirados": [l["animal_id"] for l in retirados],
+                                    "acrescentados": acrescentados},
                 motivo=motivo, origem=origem)
     return {"cancelada": [l["id"] for l in grupo], "lot_ref": lot_ref, "receita": nova["receita"],
             "n": nova["n"], "parcelas_canceladas": r["parcelas"],
-            "parcelas_a_receber": nova["parcelas_a_receber"]}
+            "parcelas_a_receber": nova["parcelas_a_receber"],
+            "retirados": [l["animal_id"] for l in retirados], "acrescentados": acrescentados}
 
 
 def get_sales(start_date: Optional[str] = None,

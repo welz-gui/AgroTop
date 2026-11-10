@@ -3374,8 +3374,22 @@ def _revisao_venda(vendas):
             ref = g[0]
             a_prazo = bool(ref.get("a_prazo"))
             k = str(ref["id"])
+            no_grupo = {x["animal_id"]: x for x in g}
+            candidatos = {a["id"]: a for a in db.get_all_animals(status="ativo") if a["id"] not in no_grupo}
+
+            def _rotulo_animal(aid):
+                if aid in no_grupo:
+                    x = no_grupo[aid]
+                    return f"{aid} · {x.get('breed') or '—'} · {_num_br(x.get('weight_kg') or 0, 0)}kg (na venda)"
+                return f"{aid} · {candidatos[aid]['breed']} · {_num_br(candidatos[aid]['current_weight'], 0)}kg"
             with st.form(f"f_rev_venda_{k}", clear_on_submit=True):
-                st.caption("Animais: " + ", ".join(str(x["animal_id"]) for x in g))
+                escolhidos = st.multiselect(
+                    "Animais da venda", list(no_grupo) + list(candidatos), default=list(no_grupo),
+                    format_func=_rotulo_animal, key=f"rv_a_{k}", disabled=a_prazo,
+                    help="Quem sai da venda volta ao rebanho; quem entra vai com o peso de hoje. Os que "
+                         "já estavam na venda mantêm o peso do registro original."
+                         + (" No preço por lote o valor TOTAL abaixo não muda sozinho: confira-o."
+                            if (ref.get("pricing_mode") or "kg") == "lote" else ""))
                 if a_prazo:
                     st.caption("Venda a prazo: só dá para cancelar (as parcelas em aberto são canceladas "
                                "junto). Para corrigir, cancele e registre a venda de novo.")
@@ -3413,7 +3427,7 @@ def _revisao_venda(vendas):
                             r = db.cancelar_venda(ref["id"], motivo, usuario)
                         else:
                             r = db.corrigir_venda(ref["id"], db.SaleParams(
-                                animal_ids=[x["animal_id"] for x in g], sale_date=data_v.strftime("%Y-%m-%d"),
+                                animal_ids=escolhidos, sale_date=data_v.strftime("%Y-%m-%d"),
                                 sale_type=tipo, pricing_mode=modo, value=valor, buyer=comprador,
                                 operator=ref.get("operator") or usuario, notes=ref.get("notes") or ""),
                                 motivo, usuario)

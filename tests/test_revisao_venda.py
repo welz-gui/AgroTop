@@ -254,3 +254,64 @@ class TestCorrigirVenda(BaseVenda):
             db.corrigir_venda(sid, _venda(["NAO_EXISTE"]), "engano", "Maria")
         self.assertEqual(self._receita(), 4000.0)
         self.assertEqual(self._status("A1"), "vendido")
+
+
+class TestCorrigirVendaTrocandoAnimais(BaseVenda):
+    """A correção pode mudar QUEM está na venda. A tela de correção passa a permitir isso, então o
+    repositório precisa sustentar: o retirado fica com a trilha fechada e só entra quem pode ser vendido."""
+
+    def setUp(self):
+        super().setUp()
+        self.animal("A3", peso=350.0)
+
+    def test_animal_retirado_da_venda_ganha_o_estorno_encadeado(self):
+        db.register_sale(_venda(["A1", "A2"]))
+        original = self._linhas()[0]
+        venda_a2 = self._eventos("A2", "venda")[0]
+
+        db.corrigir_venda(original["id"], _venda(["A1"]), "A2 não foi vendido", "Maria")
+
+        (estorno,) = self._eventos("A2", "estorno")
+        self.assertEqual((estorno["evento_anterior_id"], estorno["versao"]),
+                         (venda_a2["id"], venda_a2["versao"] + 1))
+        self.assertEqual((estorno["justificativa"], estorno["usuario_registro"]), ("A2 não foi vendido", "Maria"))
+        self.assertEqual(self._status("A2"), "ativo")
+        self.assertEqual(self._eventos("A1", "estorno"), [], "quem continua na venda não é estornado")
+
+    def test_animal_acrescentado_que_ja_foi_vendido_em_outra_venda_e_recusado(self):
+        db.register_sale(_venda(["A1"]))
+        db.register_sale(_venda(["A2"]))
+        sid = [l for l in self._linhas() if l["animal_id"] == "A1"][0]["id"]
+
+        with self.assertRaises(RevisaoNaoPermitida) as ctx:
+            db.corrigir_venda(sid, _venda(["A1", "A2"]), "faltou um", "Maria")
+
+        self.assertIn("A2", str(ctx.exception))
+        self.assertEqual(sorted(l["animal_id"] for l in self._linhas(incluir_canceladas=False)), ["A1", "A2"])
+        self.assertTrue(all(not l["cancelada_em"] for l in self._linhas()), "a transação inteira volta atrás")
+        self.assertEqual(self._receita(), 4000.0 + 3000.0)
+
+    def test_animal_morto_nao_entra_na_venda(self):
+        self._sql("UPDATE animals SET status='morto' WHERE id='A3'")
+        db.register_sale(_venda(["A1"]))
+        sid = self._linhas()[0]["id"]
+
+        with self.assertRaises(RevisaoNaoPermitida):
+            db.corrigir_venda(sid, _venda(["A1", "A3"]), "faltou um", "Maria")
+
+        self.assertEqual(self._status("A3"), "morto")
+        self.assertEqual([l["animal_id"] for l in self._linhas(incluir_canceladas=False)], ["A1"])
+
+    def test_trocar_um_animal_por_outro_numa_so_correcao(self):
+        db.register_sale(_venda(["A1", "A2"]))
+        original = self._linhas()[0]
+
+        db.corrigir_venda(original["id"], _venda(["A1", "A3"]), "foi o A3, não o A2", "Maria")
+
+        novas = self._linhas(incluir_canceladas=False)
+        self.assertEqual(sorted(l["animal_id"] for l in novas), ["A1", "A3"])
+        self.assertEqual({l["lot_ref"] for l in novas}, {original["lot_ref"]})
+        self.assertEqual((self._status("A1"), self._status("A2"), self._status("A3")),
+                         ("vendido", "ativo", "vendido"))
+        self.assertEqual(len(self._eventos("A2", "estorno")), 1)
+        self.assertEqual(self._eventos("A3", "estorno"), [])
