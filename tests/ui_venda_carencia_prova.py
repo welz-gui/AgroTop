@@ -114,5 +114,36 @@ class TestListaDeVendaComCarencia(unittest.TestCase):
         self.assertFalse(self._tem(self._opcoes(at), self.preso))
 
 
+    def test_tela_velha_com_animal_ja_vendido_mostra_a_recusa_e_nao_grava(self):
+        """Duas abas: a tela ainda oferece o animal, mas outra já o vendeu. O cache da lista ainda
+        diz 'ativo'; quem decide é o status lido na transação, e a tela explica em vez de quebrar."""
+        def _restaurar():
+            with db._conn() as con:
+                con.execute("DELETE FROM sales")
+                con.execute("UPDATE animals SET status='ativo' WHERE id=?", (self.livre,))
+            db.clear_cache()
+        self.addCleanup(_restaurar)
+
+        at = self._tela()
+        [w for w in at.radio if w.key == "venda_modo"][0].set_value("cabeca")
+        at.run()
+        multi = [w for w in at.multiselect if w.label == "Animais a vender"][0]
+        multi.set_value([o for o in multi.options if o.startswith(f"{self.livre} ·")])
+        at.run()
+        [w for w in at.number_input if w.label == "Valor por cabeça (R$)"][0].set_value(5000.0)
+        with db._conn() as con:                  # outra aba vendeu; o cache não foi limpo
+            con.execute("UPDATE animals SET status='vendido' WHERE id=?", (self.livre,))
+
+        [b for b in at.button if b.label == "✅ Confirmar Venda"][0].click()
+        at.run()
+
+        self.assertEqual(list(at.exception), [], [e.value for e in at.exception])
+        erros = [e.value for e in at.error]
+        self.assertTrue(any(self.livre in e and "não pode entrar na venda" in e for e in erros), erros)
+        self.assertFalse([s for s in at.success if "vendido(s)" in s.value], "mostrou sucesso")
+        with db._conn() as con:
+            self.assertEqual(con.execute("SELECT COUNT(*) AS n FROM sales").fetchone()["n"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
