@@ -10,6 +10,7 @@ from collections import Counter
 from datetime import date
 import hashlib
 import json
+import re
 from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
@@ -107,6 +108,7 @@ from database import (
     previsao_estoque,
     set_lote_poligono,
 )
+from repositories import contexto
 from repositories.animais import (
     cancelar_movimentacao, corrigir_movimentacao, get_all_animals, get_all_animal_ids, get_animal,
     get_movements, move_animals_bulk, movimentacao_revisavel, MovementParams, OrigemDivergente,
@@ -161,10 +163,29 @@ MAX_CSV_SIZE = 1 * 1024 * 1024  # 1 MB
 
 limiter = Limiter(key_func=get_remote_address)
 
+# Aparelho que envia a escrita: o UUID aleatório que o app gera na instalação (`X-Device-Id`). Fora
+# deste formato o valor é ignorado e a escrita segue, sem aparelho: ele vai para o banco e para a trilha.
+_APARELHO_VALIDO = re.compile(r"[A-Za-z0-9._-]{8,64}")
+
+
+async def _contexto_da_requisicao(request: Request):
+    """Toda escrita que passa pela API é do app: grava origem `app` e o aparelho declarado
+    (`repositories/contexto.py`, PNIB §6.2 e §14.1). É assíncrona de propósito: roda no mesmo contexto
+    em que o endpoint (síncrono, numa thread) é despachado, então o valor chega a ele; ao fim da
+    requisição o contexto volta ao que era."""
+    bruto = request.headers.get("X-Device-Id", "")
+    tokens = contexto.definir("app", bruto if _APARELHO_VALIDO.fullmatch(bruto) else None)
+    try:
+        yield
+    finally:
+        contexto.restaurar(tokens)
+
+
 app = FastAPI(
     title="AgroTop API de Produção",
     version="1.0.0",
     description="API RESTful para integração com aplicativos mobile e serviços externos.",
+    dependencies=[Depends(_contexto_da_requisicao)],
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

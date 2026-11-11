@@ -7,13 +7,12 @@ recebe dez eventos nessas condições e o estado final é conferido linha a linh
 
 - cada evento existe uma vez, com o seu evento de rastreabilidade (`evento_id` 1 para 1);
 - a data de OCORRÊNCIA é a que o operador informou no curral, não a do reenvio;
-- o usuário é o de quem sincronizou;
+- o usuário é o de quem sincronizou, a origem é `app` e o aparelho é o que o app declarou;
 - a aplicação retroativa guarda o piquete da DATA dela, mesmo com o animal já movido;
 - a repetição devolve a mesma resposta e nenhuma chave fica presa em andamento.
 
-O que este teste NÃO prova (lacunas conhecidas, registradas no plano): o dispositivo de origem
-não é gravado por escrita nenhuma, e `origem_informacao` do evento é sempre `web`, também
-quando o pedido veio do app.
+O que este teste NÃO prova: a propriedade (os lotes do seed são todos da mesma), e que o autor é
+quem registrou no curral e não quem sincronizou (é o dono do token da sincronização).
 """
 
 import database as db
@@ -21,6 +20,7 @@ from repositories.conexao import _conn
 from tests.test_backend_api import BackendApiTestCase
 
 USUARIO = "testuser"
+APARELHO = "a3f1c2d4-5b6e-4f70-8a9b-0c1d2e3f4a5b"
 MARCA = "aceite-offline"
 # Ocorreram em outubro; a sincronização é "agora". Se confundir as duas, o teste pega.
 DATAS = {
@@ -81,7 +81,7 @@ class TestAceiteOffline(BackendApiTestCase):
         return fila
 
     def _enviar(self, it):
-        h = {"Authorization": f"Bearer {self.token}", "Idempotency-Key": it["chave"]}
+        h = {"Authorization": f"Bearer {self.token}", "Idempotency-Key": it["chave"], "X-Device-Id": APARELHO}
         r = self.client.post(it["url"], json=it["corpo"], headers=h)
         self.assertIn(r.status_code, (200, 201), f"{it['chave']}: {r.status_code} {r.text}")
         return r.status_code, r.json()
@@ -157,6 +157,7 @@ class TestAceiteOffline(BackendApiTestCase):
             self.assertTrue(ev["ocorrido_em"].startswith(data), f"{ev['ocorrido_em']} != {data}")
             self.assertGreater(ev["registrado_em"][:10], data, "registrado_em deve ser o da sincronização")
             self.assertEqual(ev["usuario_registro"], USUARIO)
+            self.assertEqual((ev["origem_informacao"], ev["dispositivo"]), ("app", APARELHO))
             if tipo_evento:
                 self.assertEqual(ev["tipo"], tipo_evento)
             return ev

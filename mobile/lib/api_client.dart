@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import 'device_id.dart';
 import 'models.dart';
 
 class StoredTokens {
@@ -47,6 +48,7 @@ class LoginResult {
 class ApiClient {
   ApiClient({
     required this.tokenStore,
+    this.deviceIdStore,
     http.Client? httpClient,
     String? baseUrl,
   }) : _http = httpClient ?? http.Client(),
@@ -58,8 +60,12 @@ class ApiClient {
            );
 
   final TokenStore tokenStore;
+
+  /// Onde fica o id deste aparelho. Sem ele (testes), nenhuma chamada leva `X-Device-Id`.
+  final DeviceIdStore? deviceIdStore;
   final http.Client _http;
   final String baseUrl;
+  Future<String?>? _idDoAparelho;
   StoredTokens? _tokens;
 
   Future<bool> restoreSession() async {
@@ -1128,13 +1134,20 @@ class ApiClient {
     Future<http.Response> Function(Map<String, String> headers) send,
   ) async {
     var tokens = await _requireTokens();
-    var response = await send({
-      'Authorization': 'Bearer ${tokens.accessToken}',
-    });
+    // O servidor grava o aparelho em cada evento e na trilha (PNIB §14.1); lido uma vez por execução.
+    final store = deviceIdStore;
+    final aparelho = await (_idDoAparelho ??= store == null
+        ? Future<String?>.value(null)
+        : obterIdDoAparelho(store));
+    Map<String, String> cabecalhos(StoredTokens t) => {
+      'Authorization': 'Bearer ${t.accessToken}',
+      'X-Device-Id': ?aparelho,
+    };
+    var response = await send(cabecalhos(tokens));
     if (response.statusCode != 401) return response;
 
     tokens = await _refresh(tokens.refreshToken);
-    response = await send({'Authorization': 'Bearer ${tokens.accessToken}'});
+    response = await send(cabecalhos(tokens));
     if (response.statusCode == 401) {
       _tokens = null;
       await tokenStore.clear();

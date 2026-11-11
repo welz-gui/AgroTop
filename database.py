@@ -974,6 +974,7 @@ _SCHEMA_SQL = """
                 evento_anterior_id  INTEGER,  -- correção/estorno aponta para o original
                 justificativa       TEXT,
                 created_at          TEXT DEFAULT (datetime('now','localtime')),
+                dispositivo         TEXT,     -- aparelho de origem, o X-Device-Id do app (0041)
                 FOREIGN KEY (animal_uuid)        REFERENCES animals(uuid),
                 FOREIGN KEY (evento_anterior_id) REFERENCES animal_events(id)
             );
@@ -1227,6 +1228,10 @@ def _migrate(con) -> None:
     # Piquete do animal na data da aplicação (migration 0039).
     if "lote_id" not in _mc:
         con.execute("ALTER TABLE medications ADD COLUMN lote_id TEXT")
+    # Aparelho de origem do evento (migration 0041).
+    _ec = {r["name"] for r in con.execute("PRAGMA table_info(animal_events)").fetchall()}
+    if "dispositivo" not in _ec:
+        con.execute("ALTER TABLE animal_events ADD COLUMN dispositivo TEXT")
     # Revisão de custo, óbito e venda (migration 0040): as colunas de cancelamento da 0035/0036;
     # `evento_id` só onde há evento do animal (óbito e venda).
     for _t in ("animal_costs", "fixed_costs", "deaths", "sales"):

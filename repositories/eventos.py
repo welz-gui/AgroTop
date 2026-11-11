@@ -29,6 +29,7 @@ from typing import Optional
 
 from services import sincronizacao as sinc
 
+from . import contexto
 from .conexao import _conn, _writes
 
 # §6.1 — eventos mínimos. A lista é vocabulário, não restrição do banco: um tipo
@@ -119,7 +120,8 @@ def _gravar(con, animal_uuid: str, tipo: str, *,
             ocorrido_em: Optional[str] = None,
             usuario_registro: str = "",
             responsavel: str = "",
-            origem_informacao: str = "web",
+            origem_informacao: Optional[str] = None,
+            dispositivo: Optional[str] = None,
             propriedade_id: Optional[str] = None,
             local_interno: Optional[str] = None,
             latitude: Optional[float] = None,
@@ -135,11 +137,18 @@ def _gravar(con, animal_uuid: str, tipo: str, *,
     `ocorrido_em` é quando o fato aconteceu; se omitido, assume agora. O
     `registrado_em` é sempre agora — os dois são gravados separados de propósito
     (§6.2), e é o atraso entre eles que uma auditoria consegue enxergar.
+
+    `origem_informacao` e `dispositivo`, quando o chamador não os passa, vêm do contexto da
+    requisição (`repositories/contexto.py`): `app` e o aparelho declarado, se a escrita veio da
+    API; `web` e sem aparelho, se não.
     """
     if tipo not in TIPOS:
         return {"ok": False, "erro": f"Tipo de evento desconhecido: '{tipo}'."}
 
     agora = _agora()
+    origem_informacao = origem_informacao or contexto.origem_atual()
+    if dispositivo is None:
+        dispositivo = contexto.dispositivo_atual()
     existe = con.execute(
         "SELECT 1 FROM animals WHERE uuid=?", (animal_uuid,)).fetchone()
     if existe is None:
@@ -150,14 +159,14 @@ def _gravar(con, animal_uuid: str, tipo: str, *,
            (animal_uuid,tipo,ocorrido_em,registrado_em,propriedade_id,
             local_interno,responsavel,usuario_registro,origem_informacao,
             latitude,longitude,observacoes,documento,anexos,
-            justificativa,evento_anterior_id,versao)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            justificativa,evento_anterior_id,versao,dispositivo)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            RETURNING id""",
         (animal_uuid, tipo, ocorrido_em or agora, agora, propriedade_id,
          local_interno, responsavel or None, usuario_registro or None,
          origem_informacao, latitude, longitude, observacoes or None,
          documento, _json(anexos), justificativa or None,
-         evento_anterior_id, versao),
+         evento_anterior_id, versao, dispositivo),
     ).fetchone()
     return {"ok": True, "id": novo["id"]}
 
@@ -401,7 +410,7 @@ def auditar(acao: str, *,
             registro_posterior=None,
             motivo: str = "",
             autorizacao: str = "",
-            origem: str = "web",
+            origem: Optional[str] = None,
             dispositivo: Optional[str] = None,
             ip: Optional[str] = None,
             protocolo_externo: Optional[str] = None,
@@ -430,7 +439,7 @@ def auditar_em(con, acao: str, *,
                registro_posterior=None,
                motivo: str = "",
                autorizacao: str = "",
-               origem: str = "web",
+               origem: Optional[str] = None,
                dispositivo: Optional[str] = None,
                ip: Optional[str] = None,
                protocolo_externo: Optional[str] = None,
@@ -442,10 +451,16 @@ def auditar_em(con, acao: str, *,
     dizer de quem era quem no momento da ação. Se não vier explícito, busca pelo
     login em `usuario`; quando `usuario` não é um login (nome livre), fica vazio.
 
+    `origem` e `dispositivo`, quando não vêm do chamador, são os do contexto da requisição
+    (`repositories/contexto.py`): `app` e o aparelho declarado, se veio da API; `web`, se não.
+
     Mesma razão de `registrar_em`: `_conn()` abre conexão nova, e auditar de dentro
     de um bloco de escrita travaria no SQLite. Além disso a alteração e a trilha
     entram juntas ou não entram.
     """
+    origem = origem or contexto.origem_atual()
+    if dispositivo is None:
+        dispositivo = contexto.dispositivo_atual()
     if usuario and organizacao_id is None and property_id is None:
         v = con.execute("SELECT organizacao_id, property_id FROM users WHERE username=?",
                         (usuario,)).fetchone()
