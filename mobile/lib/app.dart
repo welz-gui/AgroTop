@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'app_colors.dart';
+import 'device_id.dart';
 import 'offline_queue.dart';
 import 'screens/animals_page.dart';
 import 'screens/login_page.dart';
@@ -39,7 +40,12 @@ class _AgroTopAppState extends State<AgroTopApp> {
   @override
   void initState() {
     super.initState();
-    _api = widget.apiClient ?? ApiClient(tokenStore: const SecureTokenStore());
+    _api =
+        widget.apiClient ??
+        ApiClient(
+          tokenStore: const SecureTokenStore(),
+          deviceIdStore: const SecureDeviceIdStore(),
+        );
     _offlineQueue = widget.offlineQueue ?? OfflineQueue();
     _shallowCache = widget.shallowCache ?? ShallowCache(widget.preferences);
     _themeMode = switch (widget.preferences.getString(_themeKey)) {
