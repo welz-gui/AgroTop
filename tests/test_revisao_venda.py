@@ -315,3 +315,68 @@ class TestCorrigirVendaTrocandoAnimais(BaseVenda):
                          ("vendido", "ativo", "vendido"))
         self.assertEqual(len(self._eventos("A2", "estorno")), 1)
         self.assertEqual(self._eventos("A3", "estorno"), [])
+
+
+class TestRegistrarVendaRecusaAnimalQueNaoPodeSerVendido(BaseVenda):
+    """`register_sale` lia só o animal do cache e gravava a venda por cima do que estivesse lá: um
+    animal já vendido (outra aba, tela velha) ou morto entrava na venda de novo, com receita em
+    dobro e um segundo evento de venda. O status é lido na transação, como na correção."""
+
+    def _vendas_e_eventos(self, aid):
+        return len(self._linhas()), len(self._eventos(aid, "venda"))
+
+    def test_animal_ja_vendido_nao_e_vendido_de_novo(self):
+        db.register_sale(_venda(["A1"]))
+        antes = self._vendas_e_eventos("A1")
+
+        with self.assertRaises(RevisaoNaoPermitida) as ctx:
+            db.register_sale(_venda(["A1"], valor=20.0))
+
+        self.assertIn("A1", str(ctx.exception))
+        self.assertEqual(self._vendas_e_eventos("A1"), antes)
+        self.assertEqual(self._receita(), 4000.0, "a receita não dobra")
+
+    def test_animal_morto_nao_e_vendido(self):
+        self._sql("UPDATE animals SET status='morto' WHERE id='A1'")
+
+        with self.assertRaises(RevisaoNaoPermitida):
+            db.register_sale(_venda(["A1"]))
+
+        self.assertEqual(self._linhas(), [])
+        self.assertEqual(self._status("A1"), "morto")
+
+    def test_um_animal_que_nao_pode_derruba_a_venda_inteira(self):
+        self._sql("UPDATE animals SET status='morto' WHERE id='A2'")
+
+        with self.assertRaises(RevisaoNaoPermitida) as ctx:
+            db.register_sale(_venda(["A1", "A2"]))
+
+        self.assertIn("A2", str(ctx.exception))
+        self.assertNotIn("A1", str(ctx.exception), "só o animal com problema é citado")
+        self.assertEqual(self._linhas(), [])
+        self.assertEqual(self._status("A1"), "ativo", "o animal bom não é vendido pela metade")
+        self.assertEqual(self._eventos("A1", "venda"), [])
+
+    def test_a_decisao_vale_mesmo_com_o_cache_velho(self):
+        # O cache de get_animal (120 s) ainda diz 'ativo' depois que outro processo vendeu.
+        get_animal("A1")
+        self._sql("UPDATE animals SET status='vendido' WHERE id='A1'")
+
+        with self.assertRaises(RevisaoNaoPermitida):
+            db.register_sale(_venda(["A1"]))
+
+        self.assertEqual(self._linhas(), [])
+
+    def test_animal_em_carencia_continua_podendo_ser_vendido_para_criacao(self):
+        self._sql("UPDATE animals SET status='carencia' WHERE id='A1'")
+
+        r = db.register_sale(_venda(["A1"], tipo="criacao"))
+
+        self.assertEqual(r["n"], 1)
+        self.assertEqual(self._status("A1"), "vendido")
+
+    def test_venda_normal_continua_igual(self):
+        r = db.register_sale(_venda(["A1", "A2"]))
+
+        self.assertEqual((r["n"], r["receita"]), (2, 7000.0))
+        self.assertEqual((self._status("A1"), self._status("A2")), ("vendido", "vendido"))

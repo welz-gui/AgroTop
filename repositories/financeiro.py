@@ -447,6 +447,22 @@ def _novo_lot_ref(params: SaleParams, n_animais: int) -> Optional[str]:
     return None
 
 
+def _recusar_animal_que_nao_pode_ser_vendido(con, animais: list[dict]) -> None:
+    """Só `ativo` e `carencia` podem ser vendidos. O status é lido aqui, na transação da venda: o
+    cache de `get_animal` (120 s) pode ainda dizer `ativo` para quem outra aba ou outro processo
+    acabou de vender ou de dar como morto, e a venda entraria em dobro (receita e evento repetidos).
+    Recusa a venda inteira, citando só os animais com problema."""
+    if not animais:
+        return
+    qmarks = ",".join("?" for _ in animais)
+    rows = con.execute(f"SELECT id, status FROM animals WHERE uuid IN ({qmarks}) ORDER BY id",
+                       tuple(a["uuid"] for a in animais)).fetchall()
+    ruins = [(r["id"], r["status"]) for r in rows if r["status"] not in ("ativo", "carencia")]
+    if ruins:
+        raise RevisaoNaoPermitida("; ".join(
+            f"O animal {aid} está '{status}' e não pode entrar na venda." for aid, status in ruins))
+
+
 def _registrar_venda_em(con, animais: list[dict], params: SaleParams, lot_ref: Optional[str], *,
                         cadeia: Optional[dict] = None) -> dict:
     """Grava a venda na conexão do chamador (a de `register_sale` e a de `corrigir_venda`).
@@ -500,6 +516,9 @@ def register_sale(params: SaleParams) -> dict:
     levanta `VendaBloqueadaPorCarencia` e não grava nada (a venda inteira é
     recusada). Venda de criação não é afetada: a carência impede o abate.
 
+    Animal que não está `ativo` nem `carencia` (já vendido, morto) levanta `RevisaoNaoPermitida`
+    e também não grava nada.
+
     Retorna {'receita':..., 'custo':..., 'lucro':..., 'n':...}."""
     animais = [get_animal(a) for a in params.animal_ids]
     animais = [a for a in animais if a]
@@ -508,6 +527,7 @@ def register_sale(params: SaleParams) -> dict:
 
     lot_ref = _novo_lot_ref(params, len(animais))
     with _conn() as con:
+        _recusar_animal_que_nao_pode_ser_vendido(con, animais)
         return _registrar_venda_em(con, animais, params, lot_ref)
 
 
@@ -614,14 +634,8 @@ def corrigir_venda(sale_id: int, params: SaleParams, motivo: str, usuario: str, 
         r = _cancelar_venda_em(con, sale_id, motivo, usuario, registrar_estorno=False)
         grupo = r["grupo"]
         antiga = {l["animal_uuid"]: l for l in grupo}
-        for a in animais:
-            if a["uuid"] in antiga:
-                continue
-            # Lido aqui, dentro da transação: um animal vendido em outra venda ou morto não entra.
-            situacao = con.execute("SELECT status FROM animals WHERE uuid=?", (a["uuid"],)).fetchone()["status"]
-            if situacao not in ("ativo", "carencia"):
-                raise RevisaoNaoPermitida(
-                    f"O animal {a['id']} está '{situacao}' e não pode entrar na venda.")
+        # Quem já estava na venda voltou ao rebanho no cancelamento acima; só quem entra é conferido.
+        _recusar_animal_que_nao_pode_ser_vendido(con, [a for a in animais if a["uuid"] not in antiga])
         animais = [{**a, "current_weight": antiga[a["uuid"]]["weight_kg"]}
                    if a["uuid"] in antiga and antiga[a["uuid"]]["weight_kg"] is not None else a
                    for a in animais]

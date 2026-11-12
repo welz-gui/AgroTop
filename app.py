@@ -3335,6 +3335,9 @@ def _fin_venda_registro(animals):
                         st.error(f"🚫 Venda para abate bloqueada — animal em carência: {detalhe}. "
                                  "Retire esses animais da venda ou aguarde o fim da carência.")
                         return
+                    except db.RevisaoNaoPermitida as exc:
+                        st.error(f"🚫 {exc} Atualize a página e escolha de novo.")
+                        return
                     cor = c["primaria"] if r["lucro"] >= 0 else c["perigo"]
                     st.success(f"✅ {r['n']} animal(is) vendido(s)!")
                     st.markdown(
