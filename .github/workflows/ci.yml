@@ -99,9 +99,13 @@ jobs:
       # tests/__init__.py continua forçando SQLite no processo principal. Os
       # testes de integração abrem subprocessos e removem essa trava somente
       # para este Postgres efêmero, sem expor nem alcançar credencial real.
+      # Só tests/test_dialeto_postgres.py usa o Postgres (AGROTOP_TEST_POSTGRES); o resto da
+      # suíte já rodou no passo SQLite acima e não depende destas variáveis, então repeti-la
+      # aqui só gastava ~5 min por execução. Outro teste que passe a precisar do Postgres
+      # deve entrar nesta linha.
       - name: Testes — PostgreSQL
         timeout-minutes: 20
         env:
           AGROTOP_TEST_POSTGRES: "1"
           DATABASE_URL: postgresql://agrotop_test:agrotop_test@localhost:5432/agrotop_test
-        run: pytest tests -v
+        run: pytest tests/test_dialeto_postgres.py -v
