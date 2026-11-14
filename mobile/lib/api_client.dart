@@ -38,9 +38,13 @@ class ApiException implements Exception {
   /// O pedido pode dar certo mais tarde sem o usuário mudar nada: o servidor tropeçou (5xx, 408, 429),
   /// ainda conclui este mesmo pedido, ou a sessão venceu (401: resolve entrando de novo). A fila
   /// offline guarda o item e reenvia, e nunca o descarta por isso. Recusa de negócio (4xx) é definitiva.
-  bool get reenviavel {
+  bool get reenviavel => emProcessamento || statusCode == 401 || servidorTropecou;
+
+  /// O servidor tropeçou (5xx, 408, 429): o pedido pode dar certo daqui a pouco sem o usuário mudar
+  /// nada. No registro direto, a tela guarda o registro na fila em vez de mostrar erro.
+  bool get servidorTropecou {
     final s = statusCode;
-    return emProcessamento || s == 401 || s == 408 || s == 429 || (s != null && s >= 500);
+    return s == 408 || s == 429 || (s != null && s >= 500);
   }
 
   @override

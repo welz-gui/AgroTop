@@ -172,30 +172,7 @@ class _BruceloseVaccinationPageState extends State<BruceloseVaccinationPage> {
     final lote = _opcional(_lote);
     final validade = _opcional(_validade);
     final notas = _opcional(_notas);
-    try {
-      final result = await widget.api.registerBruceloseVaccination(
-        animalIds: widget.animalIds,
-        data: data,
-        produto: produto,
-        veterinarioNome: vet,
-        veterinarioCrmv: crmv,
-        veterinarioUf: uf,
-        lote: lote,
-        validade: validade,
-        dose: dose,
-        notas: notas,
-        idempotencyKey: chave,
-      );
-      if (mounted) setState(() => _result = result);
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      if (error.statusCode == 401) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        widget.onUnauthorized();
-      } else {
-        setState(() => _error = error.message);
-      }
-    } catch (_) {
+    Future<void> guardarNaFila() async {
       await _offlineQueue.enqueueBruceloseVaccination(
         animalIds: widget.animalIds,
         data: data,
@@ -215,6 +192,38 @@ class _BruceloseVaccinationPageState extends State<BruceloseVaccinationPage> {
         ).showSnackBar(SnackBar(content: Text(kOfflineEnfileirado)));
         Navigator.of(context).pop(true);
       }
+    }
+
+    try {
+      final result = await widget.api.registerBruceloseVaccination(
+        animalIds: widget.animalIds,
+        data: data,
+        produto: produto,
+        veterinarioNome: vet,
+        veterinarioCrmv: crmv,
+        veterinarioUf: uf,
+        lote: lote,
+        validade: validade,
+        dose: dose,
+        notas: notas,
+        idempotencyKey: chave,
+      );
+      if (mounted) setState(() => _result = result);
+    } on ApiException catch (error) {
+      // Servidor com problema (5xx, 429, 408): o ato não se perde, vai para a fila.
+      if (error.servidorTropecou) {
+        await guardarNaFila();
+        return;
+      }
+      if (!mounted) return;
+      if (error.statusCode == 401) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        widget.onUnauthorized();
+      } else {
+        setState(() => _error = error.message);
+      }
+    } catch (_) {
+      await guardarNaFila();
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -295,8 +295,9 @@ class OfflineQueue {
     required String data,
     String method = 'pesado',
     String notes = '',
+    String? clientUuid,
   }) async {
-    final clientUuid = _uuid.v4();
+    clientUuid ??= _uuid.v4();
     final payload = {
       'animal_id': animalId,
       'peso': peso,
@@ -328,8 +329,9 @@ class OfflineQueue {
     String? principioAtivo,
     String? lote,
     String? validade,
+    String? clientUuid,
   }) async {
-    final clientUuid = _uuid.v4();
+    clientUuid ??= _uuid.v4();
     final payload = {
       'animal_id': animalId,
       'medicamento': medicamento,
@@ -363,8 +365,9 @@ class OfflineQueue {
     String? notes,
     String? loteOrigemEsperado,
     Map<String, String>? origensEsperadas,
+    String? clientUuid,
   }) async {
-    final clientUuid = _uuid.v4();
+    clientUuid ??= _uuid.v4();
     final payload = {
       'animal_ids': animalIds,
       'to_lote_id': toLoteId,

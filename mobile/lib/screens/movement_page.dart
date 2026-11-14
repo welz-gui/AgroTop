@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../api_client.dart';
 import '../copy.dart';
@@ -154,17 +155,45 @@ class _MovementPageState extends State<MovementPage> {
     final toLote = _selectedLoteId!;
     final dateVal = _date.text;
     final notesVal = _notes.text.trim().isEmpty ? null : _notes.text.trim();
-    try {
-      final result = await widget.api.moveAnimals(
+    // A mesma chave vai na tentativa pela rede e, se ela falhar, na fila: se a tentativa tinha
+    // chegado e só a resposta se perdeu, o reenvio não repete a movimentação.
+    final chave = const Uuid().v4();
+    Future<void> guardarNaFila() async {
+      await _offlineQueue.enqueueMovement(
         animalIds: widget.animalIds,
         toLoteId: toLote,
         movementDate: dateVal,
         notes: notesVal,
         loteOrigemEsperado: widget.loteOrigemEsperado,
         origensEsperadas: widget.origensEsperadas,
+        clientUuid: chave,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(kOfflineEnfileirado)),
+        );
+        Navigator.of(context).pop(true);
+      }
+    }
+
+    try {
+      final result = await widget.api.moveAnimals(
+        animalIds: widget.animalIds,
+        toLoteId: toLote,
+        movementDate: dateVal,
+        notes: notesVal,
+        idempotencyKey: chave,
+        loteOrigemEsperado: widget.loteOrigemEsperado,
+        origensEsperadas: widget.origensEsperadas,
       );
       if (mounted) setState(() => _result = result);
     } on ApiException catch (error) {
+      // Servidor com problema (5xx, 429, 408): a movimentação não se perde, vai para a fila.
+      // O 409 de conflito de verdade (origem divergente) segue aparecendo na tela.
+      if (error.servidorTropecou) {
+        await guardarNaFila();
+        return;
+      }
       if (!mounted) return;
       if (error.statusCode == 401) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -173,20 +202,7 @@ class _MovementPageState extends State<MovementPage> {
         setState(() => _error = error.message);
       }
     } catch (_) {
-      await _offlineQueue.enqueueMovement(
-        animalIds: widget.animalIds,
-        toLoteId: toLote,
-        movementDate: dateVal,
-        notes: notesVal,
-        loteOrigemEsperado: widget.loteOrigemEsperado,
-        origensEsperadas: widget.origensEsperadas,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(kOfflineEnfileirado)),
-        );
-        Navigator.of(context).pop(true);
-      }
+      await guardarNaFila();
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../api_client.dart';
 import '../copy.dart';
@@ -31,6 +32,7 @@ class _WeighingPageState extends State<WeighingPage> {
   String _method = 'pesado';
   late final TextEditingController _date;
   late final OfflineQueue _offlineQueue;
+  final _uuid = const Uuid();
   bool _saving = false;
   String? _error;
 
@@ -86,15 +88,40 @@ class _WeighingPageState extends State<WeighingPage> {
     final pesoVal = double.parse(_weight.text.replaceFirst(',', '.'));
     final dataVal = _date.text.trim();
     final methodVal = _method;
+    // A mesma chave vai na tentativa pela rede e, se ela falhar, na fila: se a tentativa tinha
+    // chegado e só a resposta se perdeu, o reenvio não grava a pesagem em dobro.
+    final chave = _uuid.v4();
+    Future<void> guardarNaFila() async {
+      await _offlineQueue.enqueueWeighing(
+        animalId: widget.animalId,
+        peso: pesoVal,
+        data: dataVal,
+        method: methodVal,
+        clientUuid: chave,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(kOfflineEnfileirado)),
+        );
+        Navigator.of(context).pop(true);
+      }
+    }
+
     try {
       final result = await widget.api.registerWeighing(
         widget.animalId,
         peso: pesoVal,
         data: dataVal,
         method: methodVal,
+        idempotencyKey: chave,
       );
       if (mounted) Navigator.of(context).pop<WeighingResult>(result);
     } on ApiException catch (error) {
+      // Servidor com problema (5xx, 429, 408): o registro não se perde, vai para a fila.
+      if (error.servidorTropecou) {
+        await guardarNaFila();
+        return;
+      }
       if (!mounted) return;
       if (error.statusCode == 401) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -103,18 +130,7 @@ class _WeighingPageState extends State<WeighingPage> {
         setState(() => _error = error.message);
       }
     } catch (_) {
-      await _offlineQueue.enqueueWeighing(
-        animalId: widget.animalId,
-        peso: pesoVal,
-        data: dataVal,
-        method: methodVal,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(kOfflineEnfileirado)),
-        );
-        Navigator.of(context).pop(true);
-      }
+      await guardarNaFila();
     } finally {
       if (mounted) setState(() => _saving = false);
     }

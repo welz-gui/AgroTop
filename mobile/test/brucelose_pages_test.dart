@@ -411,6 +411,24 @@ void main() {
       );
     });
 
+    for (final status in [500, 502, 503, 504, 429, 408]) {
+      testWidgets('$status do servidor fica na fila com a mesma chave da tentativa', (
+        tester,
+      ) async {
+        api.erroNoRegistro = ApiException('Erro do servidor.', statusCode: status);
+        await abrirFormulario(tester);
+        await digitar(tester, 'brucelose-vet', 'Dra. Ana');
+
+        await tocar(tester, 'confirm-brucelose');
+
+        expect(resultado, true, reason: 'a tela fechou como no registro sem sinal');
+        final itens = await fila.getPendingItems();
+        expect(itens, hasLength(1), reason: 'o ato não se perde');
+        expect(itens.single.clientUuid, api.ultimaChave);
+        expect(itens.single.endpoint, '/vacinacoes-brucelose');
+      });
+    }
+
     testWidgets('recusa do servidor aparece na tela e não vai para a fila', (
       tester,
     ) async {
