@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 
 import 'device_id.dart';
 import 'models.dart';
+import 'tempo_limite.dart';
 
 class StoredTokens {
   const StoredTokens({required this.accessToken, required this.refreshToken});
@@ -63,7 +64,11 @@ class ApiClient {
     this.deviceIdStore,
     http.Client? httpClient,
     String? baseUrl,
-  }) : _http = httpClient ?? http.Client(),
+    Duration? tempoLimite,
+  }) : _http = ClienteComTempoLimite(
+         httpClient ?? http.Client(),
+         limite: tempoLimite ?? kTempoLimiteDeRede,
+       ),
        baseUrl =
            baseUrl ??
            const String.fromEnvironment(
