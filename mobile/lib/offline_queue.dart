@@ -267,6 +267,17 @@ class SyncReport {
   int get total => sincronizados.length + pendentes.length + rejeitados.length;
 }
 
+/// O que a tela de sincronização diz de um item que ficou na fila por erro passageiro.
+String _motivoPendente(ApiException e) {
+  if (e.emProcessamento) {
+    return 'O servidor ainda está processando este item; será reenviado na próxima sincronização.';
+  }
+  if (e.statusCode == 401) {
+    return 'Sessão vencida. Entre de novo para enviar; o registro está guardado.';
+  }
+  return 'O servidor não conseguiu atender agora (erro ${e.statusCode}); será reenviado na próxima sincronização.';
+}
+
 class OfflineQueue {
   OfflineQueue({
     OfflineQueueStorage? storage,
@@ -444,6 +455,7 @@ class OfflineQueue {
       final rejeitados = <SyncItemRejected>[];
 
       bool networkFailed = false;
+      var motivoDosDemais = 'Falha de rede na fila.';
 
       for (var i = 0; i < items.length; i++) {
         final item = items[i];
@@ -452,7 +464,7 @@ class OfflineQueue {
             SyncItemPending(
               item: item,
               description: item.description,
-              reason: 'Falha de rede na fila.',
+              reason: motivoDosDemais,
             ),
           );
           continue;
@@ -531,18 +543,24 @@ class OfflineQueue {
             SyncItemSuccess(item: item, description: item.description),
           );
         } on ApiException catch (e) {
-          if (e.emProcessamento) {
-            // O servidor ainda conclui este mesmo item (reenvio antes do fim): não é
-            // recusa. Fica na fila e segue com os demais, que são independentes.
+          if (e.reenviavel) {
+            // Não é recusa: o servidor ainda conclui este mesmo item, tropeçou (5xx, 429, 408) ou a
+            // sessão venceu. O registro fica guardado e é reenviado com a mesma chave.
             if (item.id != null) await recordAttempt(item.id!, e.message);
             pendentes.add(
               SyncItemPending(
                 item: item,
                 description: item.description,
-                reason:
-                    'O servidor ainda está processando este item; será reenviado na próxima sincronização.',
+                reason: _motivoPendente(e),
               ),
             );
+            // Servidor com problema (não sessão, não "ainda processando"): os demais falhariam do
+            // mesmo jeito, e insistir só agrava um 429. Os demais esperam a próxima sincronização.
+            if (!e.emProcessamento && e.statusCode != 401) {
+              networkFailed = true;
+              motivoDosDemais =
+                  'O servidor não respondeu a um item anterior; este será reenviado depois.';
+            }
             continue;
           }
           if (item.id != null) await deleteItem(item.id!);

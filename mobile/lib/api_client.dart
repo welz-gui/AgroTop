@@ -35,6 +35,14 @@ class ApiException implements Exception {
   /// recusa: o item deve ficar pendente e ser reenviado, nunca descartado.
   final bool emProcessamento;
 
+  /// O pedido pode dar certo mais tarde sem o usuário mudar nada: o servidor tropeçou (5xx, 408, 429),
+  /// ainda conclui este mesmo pedido, ou a sessão venceu (401: resolve entrando de novo). A fila
+  /// offline guarda o item e reenvia, e nunca o descarta por isso. Recusa de negócio (4xx) é definitiva.
+  bool get reenviavel {
+    final s = statusCode;
+    return emProcessamento || s == 401 || s == 408 || s == 429 || (s != null && s >= 500);
+  }
+
   @override
   String toString() => message;
 }
@@ -1174,10 +1182,20 @@ class ApiClient {
     );
     final body = _decode(response);
     if (response.statusCode != 200) {
-      _tokens = null;
-      await tokenStore.clear();
+      // Só um "não" do servidor ao token encerra a sessão. Servidor fora do ar (5xx, 429) não: o
+      // token ainda vale, e a fila offline ainda precisa dele quando o servidor voltar.
+      final tokenRecusado = const {400, 401, 403}.contains(response.statusCode);
+      if (tokenRecusado) {
+        _tokens = null;
+        await tokenStore.clear();
+      }
       throw ApiException(
-        _message(body, 'Sessão expirada. Entre novamente.'),
+        _message(
+          body,
+          tokenRecusado
+              ? 'Sessão expirada. Entre novamente.'
+              : 'O servidor não respondeu agora. Tente de novo em instantes.',
+        ),
         statusCode: response.statusCode,
       );
     }
