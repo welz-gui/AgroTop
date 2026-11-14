@@ -218,6 +218,33 @@ class _MedicationPageState extends State<MedicationPage> {
     final validadeVal = _validade.text.trim().isEmpty
         ? null
         : _validade.text.trim();
+    // A mesma chave vai na tentativa pela rede e, se ela falhar, na fila: se a tentativa tinha
+    // chegado e só a resposta se perdeu, o reenvio não grava a aplicação em dobro.
+    final chave = _uuid.v4();
+    Future<void> guardarNaFila() async {
+      await _offlineQueue.enqueueMedication(
+        animalId: widget.animalId,
+        medicamento: medVal,
+        dose: doseVal,
+        unidade: unidadeVal,
+        via: viaVal,
+        carenciaDias: carenciaVal,
+        data: dataVal,
+        protocoloId: protoVal,
+        notas: notasVal,
+        principioAtivo: principioVal,
+        lote: loteVal,
+        validade: validadeVal,
+        clientUuid: chave,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(kOfflineEnfileirado)),
+        );
+        Navigator.of(context).pop<String?>('');
+      }
+    }
+
     try {
       final original = widget.corrigir;
       final carenciaAte = original == null
@@ -231,6 +258,7 @@ class _MedicationPageState extends State<MedicationPage> {
               data: dataVal,
               protocoloId: protoVal,
               notas: notasVal,
+              idempotencyKey: chave,
               principioAtivo: principioVal,
               lote: loteVal,
               validade: validadeVal,
@@ -254,6 +282,12 @@ class _MedicationPageState extends State<MedicationPage> {
             );
       if (mounted) Navigator.of(context).pop<String?>(carenciaAte ?? '');
     } on ApiException catch (error) {
+      // Servidor com problema (5xx, 429, 408): o registro novo não se perde, vai para a fila. A
+      // correção de uma aplicação existente não é enfileirada (precisa do servidor): mostra o erro.
+      if (widget.corrigir == null && error.servidorTropecou) {
+        await guardarNaFila();
+        return;
+      }
       if (!mounted) return;
       if (error.statusCode == 401) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -267,26 +301,7 @@ class _MedicationPageState extends State<MedicationPage> {
         if (mounted) setState(() => _error = kCorrecaoSemConexao);
         return;
       }
-      await _offlineQueue.enqueueMedication(
-        animalId: widget.animalId,
-        medicamento: medVal,
-        dose: doseVal,
-        unidade: unidadeVal,
-        via: viaVal,
-        carenciaDias: carenciaVal,
-        data: dataVal,
-        protocoloId: protoVal,
-        notas: notasVal,
-        principioAtivo: principioVal,
-        lote: loteVal,
-        validade: validadeVal,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(kOfflineEnfileirado)),
-        );
-        Navigator.of(context).pop<String?>('');
-      }
+      await guardarNaFila();
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -229,8 +229,10 @@ void main() {
       expect(find.text('Rejeitados pelo servidor (0)'), findsOneWidget);
       expect(find.text('• Pesagem 420.5 kg (BR0001)'), findsOneWidget);
 
-      // Verificar que foi enviado com Idempotency-Key
-      expect(receivedIdempotencyKeys.length, equals(1));
+      // A tentativa pela rede (que caiu) e o reenvio da fila levam a MESMA Idempotency-Key: se a
+      // primeira tivesse chegado e só a resposta se perdesse, o servidor não gravaria em dobro.
+      expect(receivedIdempotencyKeys.length, equals(2));
+      expect(receivedIdempotencyKeys.toSet().length, equals(1));
       expect(await queue.countPending(), equals(0));
 
       // Fechar diálogo de relatório
