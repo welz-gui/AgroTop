@@ -455,9 +455,8 @@ def _recusar_animal_que_nao_pode_ser_vendido(con, animais: list[dict]) -> None:
     if not animais:
         return
     qmarks = ",".join("?" for _ in animais)
-    # DEFEITO INJETADO PARA PROVAR OS TESTES DE POSTGRES (NÃO MESCLAR): json_each só existe em SQLite.
-    rows = con.execute("SELECT id, status FROM animals WHERE uuid IN (SELECT value FROM json_each(?)) ORDER BY id",
-                       (__import__("json").dumps([a["uuid"] for a in animais]),)).fetchall()
+    rows = con.execute(f"SELECT id, status FROM animals WHERE uuid IN ({qmarks}) ORDER BY id",
+                       tuple(a["uuid"] for a in animais)).fetchall()
     ruins = [(r["id"], r["status"]) for r in rows if r["status"] not in ("ativo", "carencia")]
     if ruins:
         raise RevisaoNaoPermitida("; ".join(
